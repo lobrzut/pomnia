@@ -51,8 +51,10 @@ function pickUrl(srv: any): { url?: string; transport?: string; hasToken?: boole
   // url or serverUrl (claude-code/cursor/vscode use `url`; antigravity/windsurf use `serverUrl`)
   if (typeof srv.url === 'string') out.url = srv.url
   else if (typeof srv.serverUrl === 'string') out.url = srv.serverUrl
-  // claude-desktop wraps in `mcp-remote` subprocess — URL is in args
-  else if (srv.command === 'npx' && Array.isArray(srv.args)) {
+  // claude-desktop wraps in `mcp-remote` subprocess — URL is in args. `command` is
+  // a full path on Windows (e.g. "C:\Program Files\nodejs\npx.cmd"), not literally
+  // "npx" — match on the basename instead of an exact string.
+  else if (typeof srv.command === 'string' && /^npx(\.cmd)?$/i.test(srv.command.split(/[\\/]/).pop() || '') && Array.isArray(srv.args)) {
     const arg = srv.args.find((a: unknown) => typeof a === 'string' && /^https?:\/\//.test(a))
     if (arg) {
       out.url = arg as string
