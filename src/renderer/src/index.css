@@ -1,0 +1,151 @@
+@import 'tailwindcss';
+
+/* ── Reliqua design tokens ───────────────────────────────────────────── */
+@theme {
+  --color-void: #06070d;
+  --color-abyss: #0a0c16;
+  --color-panel: #11141f;
+  --color-panel-2: #161a28;
+  --color-line: #232838;
+  --color-ink: #e9ecf5;
+  --color-ink-dim: #9aa3bd;
+  --color-ink-faint: #5b6178;
+  --color-violet: #8b5cf6;
+  --color-iris: #6366f1;
+  --color-cyan: #22d3ee;
+  --color-mint: #34d399;
+  --color-amber: #fbbf24;
+  --color-rose: #fb7185;
+
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+
+  --radius-xl: 1.25rem;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    background: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    user-select: none;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #ffffff14;
+    border-radius: 99px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #ffffff28;
+    background-clip: padding-box;
+  }
+}
+
+/* ── Utilities ─────────────────────────────────────────────────────────── */
+@layer utilities {
+  .drag {
+    -webkit-app-region: drag;
+  }
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+  .glass {
+    background: linear-gradient(160deg, #ffffff0e, #ffffff05);
+    border: 1px solid #ffffff14;
+    backdrop-filter: blur(18px) saturate(140%);
+    box-shadow:
+      0 1px 0 0 #ffffff1a inset,
+      0 20px 60px -28px #000000cc;
+  }
+  .glass-hover {
+    transition:
+      transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 0.35s,
+      box-shadow 0.35s;
+  }
+  .glass-hover:hover {
+    border-color: #ffffff2e;
+    box-shadow:
+      0 1px 0 0 #ffffff24 inset,
+      0 28px 80px -30px #6366f188;
+  }
+  .text-grad {
+    background: linear-gradient(100deg, var(--color-ink), #c7b8ff 55%, var(--color-cyan));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .accent-grad {
+    background: linear-gradient(120deg, var(--color-violet), var(--color-iris) 50%, var(--color-cyan));
+  }
+  .ring-glow {
+    box-shadow: 0 0 0 1px #ffffff1f, 0 0 40px -8px var(--color-iris);
+  }
+  .grain::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    z-index: 1;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+/* ── Aurora blobs ──────────────────────────────────────────────────────── */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora .blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.55;
+  mix-blend-mode: screen;
+  animation: drift 24s ease-in-out infinite;
+}
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(6vw, -4vh) scale(1.15);
+  }
+  66% {
+    transform: translate(-5vw, 5vh) scale(0.92);
+  }
+}
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(90deg, #ffffff08, #ffffff18, #ffffff08);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}

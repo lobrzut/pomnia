@@ -1,0 +1,24 @@
+appId: dev.helluk.reliqua
+productName: Reliqua
+directories:
+  output: release
+  buildResources: resources
+files:
+  - out/**/*
+  - resources/**/*
+asarUnpack:
+  - "**/*.wasm"
+win:
+  target: [nsis]
+  icon: resources/icon.ico
+  artifactName: ${productName}-${version}-setup.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+mac:
+  target: [dmg]
+  category: public.app-category.utilities
+  artifactName: ${productName}-${version}.${ext}
+# Linux target intentionally omitted for now — focus is Windows + macOS.
+# The engine stays cross-platform (path logic handles linux), so re-adding a
+# linux: AppImage target later is a one-block change.
