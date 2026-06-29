@@ -8,6 +8,7 @@ export type {
   RestorePlan,
   RestorePlanEntry
 } from '@core/model'
+export type { ClientId, ClientStatus, WiredState, Snippet, BrainPing, SkillListEntry, SkillSyncResult } from '@core/brain/index'
 
 export interface VaultStatus {
   open: boolean

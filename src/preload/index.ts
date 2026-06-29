@@ -40,6 +40,11 @@ const bridge = {
   },
   brainSearch: (query: string, ollamaUrl?: string) => ipcRenderer.invoke('brain:search', query, ollamaUrl),
   brainDeploy: (opts: unknown) => ipcRenderer.invoke('brain:deploy', opts),
+  connectStatus: (brainUrl?: string, token?: string) => ipcRenderer.invoke('connect:status', brainUrl, token),
+  connectSnippet: (clientId: string, brainUrl: string, token?: string) =>
+    ipcRenderer.invoke('connect:snippet', clientId, brainUrl, token),
+  connectSkillsList: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsList', brainUrl, token),
+  connectSkillsSync: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsSync', brainUrl, token),
   minimize: () => ipcRenderer.send('win:minimize'),
   toggleMaximize: () => ipcRenderer.send('win:maximize'),
   close: () => ipcRenderer.send('win:close')

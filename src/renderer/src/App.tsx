@@ -11,10 +11,11 @@ import Browse from './pages/Browse'
 import ImportPage from './pages/Import'
 import Restore from './pages/Restore'
 import Brain from './pages/Brain'
+import Connect from './pages/Connect'
 import Settings from './pages/Settings'
 import VaultGate from './pages/VaultGate'
 
-const PAGES = { dashboard: Dashboard, snapshots: Snapshots, browse: Browse, import: ImportPage, restore: Restore, brain: Brain, settings: Settings } as const
+const PAGES = { dashboard: Dashboard, snapshots: Snapshots, browse: Browse, import: ImportPage, restore: Restore, brain: Brain, connect: Connect, settings: Settings } as const
 
 export default function App() {
   const { route, scan, refreshVault, vault, toast } = useStore()

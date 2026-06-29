@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Boxes, BrainCircuit, History, Import as ImportIcon, LayoutDashboard, Lock, MessagesSquare, Minus, RotateCcw, Settings as Cog, Square, X } from 'lucide-react'
+import { Boxes, BrainCircuit, History, Import as ImportIcon, LayoutDashboard, Lock, MessagesSquare, Minus, Plug, RotateCcw, Settings as Cog, Square, X } from 'lucide-react'
 import clsx from 'clsx'
 import { api, isMock } from '../lib/api'
 import { useStore, type Route } from '../store/useStore'
@@ -11,6 +11,7 @@ const NAV: { id: Route; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'import', label: 'Import', icon: ImportIcon },
   { id: 'restore', label: 'Restore', icon: RotateCcw },
   { id: 'brain', label: 'Brain', icon: BrainCircuit },
+  { id: 'connect', label: 'Connect', icon: Plug },
   { id: 'settings', label: 'Settings', icon: Cog }
 ]
 

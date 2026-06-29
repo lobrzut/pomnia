@@ -1,15 +1,21 @@
 import type {
   BackupProgressEvent,
   BrainHit,
+  BrainPing,
   BrainProgressEvent,
   BrainRunResult,
   BrainStatus,
+  ClientId,
+  ClientStatus,
   Conversation,
   ConversationMeta,
   DetectedSource,
   RestorePlan,
   RestoreResultDTO,
+  SkillListEntry,
+  SkillSyncResult,
   Snapshot,
+  Snippet,
   SourceId,
   TextHit,
   VaultStatus
@@ -59,6 +65,10 @@ export interface ReliquaBridge {
     reindex?: boolean
     sources?: SourceId[]
   }): Promise<{ detail: string }>
+  connectStatus(brainUrl?: string, token?: string): Promise<{ clients: ClientStatus[]; brain: BrainPing }>
+  connectSnippet(clientId: ClientId, brainUrl: string, token?: string): Promise<Snippet>
+  connectSkillsList(brainUrl: string, token?: string): Promise<SkillListEntry[]>
+  connectSkillsSync(brainUrl: string, token?: string): Promise<SkillSyncResult>
   minimize(): void
   toggleMaximize(): void
   close(): void
@@ -221,6 +231,53 @@ function mockBridge(): ReliquaBridge {
     },
     async brainDeploy() {
       return { detail: 'Deployed 38 notes to Brain vault; reindex triggered.' }
+    },
+    async connectStatus() {
+      await new Promise((r) => setTimeout(r, 500))
+      return {
+        brain: { url: 'http://brain.example.local:7862/healthz', reachable: true, status: 200, data: { notes: 1731, sessions: 49, library_docs: 42 } },
+        clients: [
+          { id: 'claude-code', label: 'Claude Code (CLI)', configPath: '~/.claude.json', configExists: true, state: 'wired',
+            servers: [
+              { key: 'brain-rag', present: true, url: 'http://brain.example.local:7862/sse', transport: 'http' },
+              { key: 'brain-vault', present: true, url: 'http://brain.example.local:7862/servers/brain-vault/sse', transport: 'http' },
+              { key: 'brain-library', present: true, url: 'http://brain.example.local:7862/servers/brain-library/sse', transport: 'http' }
+            ], issues: [] },
+          { id: 'cursor', label: 'Cursor', configPath: '~/.cursor/mcp.json', configExists: true, state: 'wired',
+            servers: [
+              { key: 'brain-rag', present: true, url: 'http://brain.example.local:7862/sse' },
+              { key: 'brain-vault', present: true, url: 'http://brain.example.local:7862/servers/brain-vault/sse' },
+              { key: 'brain-library', present: true, url: 'http://brain.example.local:7862/servers/brain-library/sse' }
+            ], issues: [] },
+          { id: 'antigravity', label: 'Antigravity (Google IDE)', configPath: '~/.gemini/antigravity-ide/mcp_config.json', configExists: true, state: 'partial',
+            servers: [{ key: 'brain-rag', present: true, url: 'http://brain.example.local:7862/mcp', transport: 'streamable-http' }],
+            issues: ['brain-vault: missing', 'brain-library: missing'] },
+          { id: 'claude-desktop', label: 'Claude Desktop', configPath: '~/AppData/Roaming/Claude/claude_desktop_config.json', configExists: false, state: 'not_wired', servers: [], issues: ['config file does not exist'] },
+          { id: 'vscode', label: 'VS Code (1.103+ native MCP)', configPath: '~/AppData/Roaming/Code/User/mcp.json', configExists: false, state: 'not_wired', servers: [], issues: ['config file does not exist'] },
+          { id: 'windsurf', label: 'Windsurf (Codeium)', configPath: '~/AppData/Roaming/Windsurf/User/mcp.json', configExists: false, state: 'not_wired', servers: [], issues: ['config file does not exist'] }
+        ]
+      } as { clients: ClientStatus[]; brain: BrainPing }
+    },
+    async connectSnippet(clientId, brainUrl) {
+      return {
+        client: clientId,
+        label: clientId,
+        filePath: '~/.example/mcp.json',
+        mcpKey: 'mcpServers',
+        fullFileJson: `{\n  "mcpServers": {\n    "brain-rag": { "type": "http", "url": "${brainUrl}/sse" }\n  }\n}\n`,
+        mergeJson: `{\n  "brain-rag": { "type": "http", "url": "${brainUrl}/sse" }\n}\n`,
+        instructions: `▶ ${clientId}\n\n1. Open or create the config file.\n2. Paste the snippet.\n3. Restart the client.`
+      }
+    },
+    async connectSkillsList() {
+      return [
+        { kind: 'brain', name: 'trading-digest', description: 'Zbiera notatki tradingowe z vault…', model: 'qwen2.5:14b' },
+        { kind: 'cli', name: '09-web-security', description: 'Web hacking / bug bounty expertise' }
+      ] as SkillListEntry[]
+    },
+    async connectSkillsSync() {
+      await new Promise((r) => setTimeout(r, 700))
+      return { fetched: 12, written: 12, errors: [] } as SkillSyncResult
     },
     minimize() {},
     toggleMaximize() {},

@@ -7,6 +7,8 @@ import {
   Vault,
   applyRestore,
   buildIndex,
+  buildSnippet,
+  checkAllClients,
   currentOS,
   defaultOllamaConfig,
   deployDashboard,
@@ -17,17 +19,21 @@ import {
   getAdapter,
   homeDir,
   hostName,
+  listAllSkills,
   loadIndex,
   log,
   parseExportPath,
+  pingBrain,
   planRestore,
   runBackup,
   saveIndex,
   searchIndex,
   setLogSink,
+  syncSkills,
   triggerReindex,
   userName,
   type BackupOptions,
+  type ClientId,
   type Conversation,
   type RestoreOptions,
   type Snapshot,
@@ -341,6 +347,27 @@ function registerIpc(): void {
       }
       return { detail }
     }
+  )
+
+  // ── Connect to Brain (status read + copy-paste snippets, no auto-deploy) ──
+  ipcMain.handle('connect:status', async (_e, brainUrl?: string, token?: string) => {
+    const [clients, brain] = await Promise.all([
+      checkAllClients(),
+      pingBrain(brainUrl || 'http://brain.example.local:7862', token)
+    ])
+    return { clients, brain }
+  })
+
+  ipcMain.handle('connect:snippet', (_e, clientId: ClientId, brainUrl: string, token?: string) =>
+    buildSnippet(clientId, brainUrl, currentOS(), homeDir(), token)
+  )
+
+  ipcMain.handle('connect:skillsList', (_e, brainUrl: string, token?: string) =>
+    listAllSkills(brainUrl, { token })
+  )
+
+  ipcMain.handle('connect:skillsSync', (_e, brainUrl: string, token?: string) =>
+    syncSkills(brainUrl, join(app.getPath('userData'), 'brain-skills'), { token })
   )
 
   ipcMain.on('win:minimize', () => win?.minimize())

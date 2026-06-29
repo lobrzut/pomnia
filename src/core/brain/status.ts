@@ -175,7 +175,7 @@ export async function pingBrain(url: string, token?: string): Promise<BrainPing>
     try {
       const r = await fetch(`${base}${probe}`, { headers, signal: AbortSignal.timeout(5000) })
       let data: Record<string, unknown> | undefined
-      try { data = await r.json() } catch { /* non-JSON body is fine for plain /healthz */ }
+      try { data = (await r.json()) as Record<string, unknown> } catch { /* non-JSON body is fine for plain /healthz */ }
       return { url: base + probe, reachable: r.ok, status: r.status, data }
     } catch (e) {
       // try next probe

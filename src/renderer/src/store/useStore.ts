@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { api } from '../lib/api'
 import type { DetectedSource, Snapshot, SourceId, VaultStatus } from '../lib/types'
 
-export type Route = 'dashboard' | 'snapshots' | 'browse' | 'import' | 'restore' | 'brain' | 'settings'
+export type Route = 'dashboard' | 'snapshots' | 'browse' | 'import' | 'restore' | 'brain' | 'connect' | 'settings'
 
 export interface Toast {
   id: string
