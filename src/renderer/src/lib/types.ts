@@ -33,6 +33,8 @@ export interface BrainRunResult {
   notesDir: string
   notes: number
   stubs: number
+  garbage: number
+  skipped: number
   chunks: number
   dim: number
 }

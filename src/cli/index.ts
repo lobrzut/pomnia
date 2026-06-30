@@ -233,15 +233,19 @@ async function cmdBrain(p: Parsed): Promise<void> {
     if (!(await ollama.reachable())) throw new Error(`Ollama offline at ${ollama.cfg.baseUrl}`)
     const convs = await collectLive(p.flags)
     console.log(C.dim(`  distilling ${convs.length} conversation(s) with ${ollama.cfg.chatModel}…`))
-    const notes = await distillAll(convs, ollama, undefined, (pr) =>
+    const { notes, skipped } = await distillAll(convs, ollama, undefined, (pr) =>
       process.stdout.write(`\r  ${pr.done}/${pr.total} ${C.dim((pr.detail || '').slice(0, 46))}            `)
     )
     process.stdout.write('\n')
     await deployFilesystem(notes, out)
     const stubs = notes.filter((n) => n.quality === 'stub').length
-    console.log(`  ${C.green('✔')} ${notes.length} notes → ${out} ${C.dim(`(${stubs} stubs)`)}`)
+    const garbage = notes.filter((n) => n.quality === 'garbage').length
+    const okNotes = notes.filter((n) => n.quality === 'ok')
+    console.log(
+      `  ${C.green('✔')} ${okNotes.length} notes → ${out} ${C.dim(`(${stubs} stubs, ${garbage} low-quality → _review/, ${skipped} skipped as too short)`)}`
+    )
     if (sub === 'pipeline') {
-      const indexNotes = notes.map((n) => ({ source: n.source, notePath: n.sessionId, text: n.markdown }))
+      const indexNotes = okNotes.map((n) => ({ source: n.source, notePath: n.sessionId, text: n.markdown }))
       const idx = await buildIndex(indexNotes, ollama, (d, t) =>
         process.stdout.write(`\r  indexing ${d}/${t}            `)
       )

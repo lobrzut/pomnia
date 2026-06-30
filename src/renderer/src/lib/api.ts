@@ -188,7 +188,7 @@ function mockBridge(): ReliquaBridge {
     },
     async brainRun() {
       await new Promise((r) => setTimeout(r, 1400))
-      return { notesDir: 'C:/…/brain-notes', notes: 38, stubs: 4, chunks: 121, dim: 768 }
+      return { notesDir: 'C:/…/brain-notes', notes: 38, stubs: 4, garbage: 3, skipped: 7, chunks: 121, dim: 768 }
     },
     onBrainProgress() {
       return () => {}

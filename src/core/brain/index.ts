@@ -1,7 +1,7 @@
 /** Brain pipeline — public API. Collect (engine) → Distill → Pre-index → Deploy. */
 export { Ollama, defaultOllamaConfig } from './ollama.js'
 export type { OllamaConfig, OllamaModel } from './ollama.js'
-export { distillConversation, assembleNote, transcript, sanitizeUnicode } from './distill.js'
+export { distillConversation, assembleNote, transcript, sanitizeUnicode, isWorthDistilling } from './distill.js'
 export type { DistilledNote } from './distill.js'
 export {
   buildIndex,
@@ -22,7 +22,7 @@ export type { ClientStatus, WiredState, BrainPing } from './status.js'
 
 import type { Conversation } from '../model.js'
 import { Ollama } from './ollama.js'
-import { distillConversation, type DistilledNote } from './distill.js'
+import { distillConversation, isWorthDistilling, type DistilledNote } from './distill.js'
 
 export interface PipelineProgress {
   phase: 'distill' | 'index'
@@ -31,16 +31,28 @@ export interface PipelineProgress {
   detail?: string
 }
 
+export interface DistillAllResult {
+  notes: DistilledNote[]
+  /** Conversations skipped by the pre-filter (too short/trivial) — no LLM call spent. */
+  skipped: number
+}
+
 /** Distill many conversations on the host, with progress + resilience. */
 export async function distillAll(
   conversations: Conversation[],
   ollama: Ollama,
   model?: string,
   onProgress?: (p: PipelineProgress) => void
-): Promise<DistilledNote[]> {
+): Promise<DistillAllResult> {
   const out: DistilledNote[] = []
   let done = 0
+  let skipped = 0
   for (const c of conversations) {
+    if (!isWorthDistilling(c)) {
+      skipped++
+      onProgress?.({ phase: 'distill', done: ++done, total: conversations.length, detail: `${c.title} — skipped (too short)` })
+      continue
+    }
     try {
       out.push(await distillConversation(c, ollama, model))
     } catch {
@@ -48,5 +60,5 @@ export async function distillAll(
     }
     onProgress?.({ phase: 'distill', done: ++done, total: conversations.length, detail: c.title })
   }
-  return out
+  return { notes: out, skipped }
 }

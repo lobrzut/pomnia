@@ -232,6 +232,8 @@ export default function Brain() {
           <div className="flex flex-wrap items-center gap-2">
             <Badge color="#34d399">{result.notes} notes</Badge>
             <Badge color="#9aa3bd">{result.stubs} stubs</Badge>
+            {!!result.garbage && <Badge color="#fb7185">{result.garbage} low-quality → review</Badge>}
+            {!!result.skipped && <Badge color="#fbbf24">{result.skipped} skipped (too short)</Badge>}
             <Badge color="#22d3ee">{result.chunks} chunks · dim {result.dim}</Badge>
             <span className="text-xs text-ink-faint">{result.notesDir}</span>
           </div>

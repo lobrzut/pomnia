@@ -31,16 +31,28 @@ export function noteFilename(n: DistilledNote): string {
   return `${n.date}_${n.source}_${slug(n.title)}_${n.sessionId.slice(0, 8)}.md`
 }
 
-/** Write distilled notes into a target directory (e.g. .../brain/data/vault/distilled). */
+/** Write distilled notes into a target directory (e.g. .../brain/data/vault/distilled).
+ *  Notes that failed the quality gate (stub/garbage) go into a `_review/`
+ *  subfolder instead of the main dir — kept for manual review, not lost, but
+ *  out of the searchable vault by default so they don't pollute RAG results. */
 export async function deployFilesystem(notes: DistilledNote[], targetDir: string): Promise<string[]> {
   await fs.mkdir(targetDir, { recursive: true })
+  const reviewDir = path.join(targetDir, '_review')
+  let reviewMade = false
   const written: string[] = []
   for (const n of notes) {
-    const file = path.join(targetDir, noteFilename(n))
+    const lowQuality = n.quality === 'stub' || n.quality === 'garbage'
+    if (lowQuality && !reviewMade) {
+      await fs.mkdir(reviewDir, { recursive: true })
+      reviewMade = true
+    }
+    const file = path.join(lowQuality ? reviewDir : targetDir, noteFilename(n))
     await fs.writeFile(file, n.markdown, 'utf8')
     written.push(file)
   }
-  log.info('deployed', written.length, 'notes →', targetDir)
+  const reviewed = written.length - notes.filter((n) => n.quality === 'ok').length
+  log.info('deployed', notes.filter((n) => n.quality === 'ok').length, 'notes →', targetDir,
+    reviewed ? `(${reviewed} low-quality → _review/)` : '')
   return written
 }
 

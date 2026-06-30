@@ -292,19 +292,22 @@ function registerIpc(): void {
       const convs = opts.importPath
         ? (await parseExportPath(opts.importPath)).conversations.slice(0, opts.limit || undefined)
         : await collectLive(opts.sources, opts.limit)
-      const notes = await distillAll(convs, o, opts.model, (p) => win?.webContents.send('brain:progress', p))
+      const { notes, skipped } = await distillAll(convs, o, opts.model, (p) => win?.webContents.send('brain:progress', p))
       const dir = brainDir()
       await deployFilesystem(notes, dir)
+      const okNotes = notes.filter((n) => n.quality === 'ok')
       const idx = await buildIndex(
-        notes.map((n) => ({ source: n.source, notePath: n.sessionId, text: n.markdown })),
+        okNotes.map((n) => ({ source: n.source, notePath: n.sessionId, text: n.markdown })),
         o,
         (done, total) => win?.webContents.send('brain:progress', { phase: 'index', done, total })
       )
       await saveIndex(idx, brainIndexFile())
       return {
         notesDir: dir,
-        notes: notes.length,
+        notes: okNotes.length,
         stubs: notes.filter((n) => n.quality === 'stub').length,
+        garbage: notes.filter((n) => n.quality === 'garbage').length,
+        skipped,
         chunks: idx.entries.length,
         dim: idx.dim
       }

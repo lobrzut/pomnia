@@ -13,7 +13,11 @@ export interface DistilledNote {
   source: string
   sessionId: string
   msgCount: number
-  quality: 'ok' | 'stub'
+  /** stub = LLM found nothing durable. garbage = it found *something*, but it's
+   *  generic filler (score below threshold). ok = passed the quality bar. */
+  quality: 'ok' | 'stub' | 'garbage'
+  /** Heuristic content-quality score, 0-10 — see scoreFields(). */
+  score: number
   markdown: string
   /** Structured fields, kept for the local index + optional re-use. */
   fields: { summary: string; decisions: string[]; solutions: string[]; facts: string[]; openQuestions: string[] }
@@ -34,6 +38,90 @@ Respond with ONLY a JSON object matching exactly this schema:
 export function sanitizeUnicode(s: string): string {
   return s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
 }
+
+// Cheap, deterministic pre-filter — skip conversations too trivial to be worth
+// an LLM call ("hi" / "thanks" exchanges, accidental or test chats). Catches
+// the bulk of garbage-in before any compute is spent; the LLM-side "stub"
+// verdict in assembleNote() still catches longer-but-empty conversations that
+// pass this gate but turn out to have nothing durable.
+const MIN_MESSAGES = 3
+const MIN_CONTENT_CHARS = 200
+
+export function isWorthDistilling(conv: Conversation): boolean {
+  if (conv.messages.length < MIN_MESSAGES) return false
+  const totalChars = conv.messages.reduce((n, m) => n + m.text.length, 0)
+  return totalChars >= MIN_CONTENT_CHARS
+}
+
+// ---------------------------------------------------------------------------
+// Post-distill quality score — TS port of pipeline/note_quality.py's heuristic
+// (generic-phrase + specificity detection), run inline instead of as a
+// separate after-the-fact audit. Catches notes where the LLM produced *some*
+// output but it's generic filler ("decided to continue working on X") rather
+// than durable, searchable knowledge.
+// ---------------------------------------------------------------------------
+const GENERIC_PATTERNS = [
+  /\bdecided to\s+(continue|proceed|work on|move forward|further)\b/i,
+  /\bzdecydowano?\s*(się)?\s*(kontynuować|przejść|pójść|pracować)\b/i,
+  /\bdiscussed (the |a )?(topic|matter|issue|approach)\b/i,
+  /\bomówiono?\s+(temat|kwestię|zagadnienie|podejście)\b/i,
+  /\b(further|additional)\s+(analysis|investigation|research)\b/i,
+  /\bwymagana?\s*(jest)?\s*(dalsza|dodatkowa)\s*(analiza|weryfikacja)\b/i,
+  /^(yes|no|tak|nie|ok|okay)\b\s*\.?$/i,
+  /^\s*(continued|kontynuacja|to be continued|cdn)\.?\s*$/i,
+  /^\s*(brak|none|n\/a|not specified)\s*\.?\s*$/i,
+  /^\s*\.?\s*$/,
+  /^[\W_]+$/,
+  /^\s*\d+\s*$/
+]
+const HAS_NUMBER = /\b\d{2,}\b/
+const HAS_DATE = /\b\d{4}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b/
+const HAS_CODE = /`[^`]+`|\$\w+|\/\w+\/\w+|[a-z_]+\.(py|js|ts|md|json|yaml|rs|go|sh)\b/
+const HAS_CMD = /\b(sudo |apt |npm |pip |git |docker |systemctl |curl |wget )/i
+const HAS_URL = /https?:\/\/[^\s)]+/
+const HAS_CAPS_AC = /\b[A-Z][A-Z0-9]{2,}\b/
+const HAS_PROPER = /\b[A-Z][a-z]+[A-Z]\w+\b/
+
+function scoreBullet(b: string): { generic: boolean; specific: number } {
+  const t = b.trim()
+  const generic = GENERIC_PATTERNS.some((rx) => rx.test(t))
+  let specific = 0
+  if (HAS_NUMBER.test(t)) specific += 1
+  if (HAS_DATE.test(t)) specific += 1
+  if (HAS_CODE.test(t)) specific += 2
+  if (HAS_CMD.test(t)) specific += 2
+  if (HAS_URL.test(t)) specific += 1
+  if (HAS_CAPS_AC.test(t)) specific += 1
+  if (HAS_PROPER.test(t)) specific += 1
+  return { generic, specific }
+}
+
+/** Heuristic 0-10 content score for a distilled note's fields. Mirrors the
+ *  threshold bands in note_quality.py: solid>=6, ok>=4, weak>=2, garbage<2. */
+export function scoreFields(fields: DistilledNote['fields']): number {
+  const all = [...fields.decisions, ...fields.solutions, ...fields.facts, ...fields.openQuestions]
+  if (all.length === 0) return 0
+
+  const scored = all.map(scoreBullet)
+  const genericRatio = scored.filter((s) => s.generic).length / scored.length
+  const avgSpecific = scored.reduce((n, s) => n + s.specific, 0) / scored.length
+
+  const seen = new Map<string, number>()
+  for (const b of all) {
+    const key = b.toLowerCase().trim().slice(0, 80)
+    seen.set(key, (seen.get(key) || 0) + 1)
+  }
+  let dupCount = 0
+  for (const c of seen.values()) if (c > 1) dupCount += c - 1
+
+  let score = Math.min(6, avgSpecific * 2) - genericRatio * 3 - dupCount * 0.5
+  const solDec = [...fields.decisions, ...fields.solutions].slice(0, 5)
+  if (solDec.some((b) => scoreBullet(b).specific >= 2)) score += 1
+  score = Math.max(0, Math.min(10, score + 4))
+  return Math.round(score * 100) / 100
+}
+
+const GARBAGE_THRESHOLD = 4.0 // below note_quality.py's "ok" bar
 
 /** Render a conversation to a transcript, budgeting characters (head + tail on overflow). */
 export function transcript(conv: Conversation, maxChars = 14000): { text: string; truncated: boolean } {
@@ -58,7 +146,8 @@ export function assembleNote(conv: Conversation, fields: DistilledNote['fields']
     !fields.solutions.length &&
     !fields.facts.length &&
     !fields.openQuestions.length
-  const quality: 'ok' | 'stub' = empty ? 'stub' : 'ok'
+  const score = empty ? 0 : scoreFields(fields)
+  const quality: DistilledNote['quality'] = empty ? 'stub' : score < GARBAGE_THRESHOLD ? 'garbage' : 'ok'
 
   const fm = [
     '---',
@@ -70,6 +159,7 @@ export function assembleNote(conv: Conversation, fields: DistilledNote['fields']
     `distilled_via: reliqua`,
     `model: ${model}`,
     `quality: ${quality}`,
+    `quality_score: ${score}`,
     '---',
     ''
   ].join('\n')
@@ -102,6 +192,7 @@ export function assembleNote(conv: Conversation, fields: DistilledNote['fields']
     sessionId: conv.id,
     msgCount: conv.messages.length,
     quality,
+    score,
     markdown: sanitizeUnicode(fm + body),
     fields
   }
