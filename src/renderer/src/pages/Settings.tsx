@@ -1,13 +1,28 @@
-import { useState } from 'react'
-import { Brain, FolderOpen, Lock, ShieldCheck, Vault } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Brain, FolderOpen, Lock, Plug, RotateCcw, ShieldCheck, Vault } from 'lucide-react'
 import { Button, Field, GlassCard, Input } from '../components/ui'
+import { ClientIcon } from '../components/ClientIcon'
 import { api, isMock } from '../lib/api'
 import { useStore } from '../store/useStore'
+import type { ClientId, ClientStatus } from '../lib/types'
+
+const ALL_CLIENTS: ClientId[] = ['claude-code', 'cursor', 'antigravity', 'claude-desktop', 'vscode', 'windsurf']
 
 export default function Settings() {
-  const { vault, lockVault, snapshots, toast } = useStore()
+  const { vault, lockVault, snapshots, toast, connectClientOverride, setConnectClientVisible, resetConnectClient } =
+    useStore()
   const [exportDir, setExportDir] = useState('')
   const [exportSnap, setExportSnap] = useState(snapshots[0]?.id ?? '')
+  const [clients, setClients] = useState<ClientStatus[]>([])
+
+  useEffect(() => {
+    // Detection (configExists) is independent of the brain URL — we only read
+    // local client config files here; the URL is just to satisfy the signature.
+    api
+      .connectStatus('http://brain.example.local:7862')
+      .then((r) => setClients(r.clients))
+      .catch(() => {})
+  }, [])
 
   async function pickExport() {
     const d = await api.pickDirectory()
@@ -82,6 +97,65 @@ export default function Settings() {
           <Button onClick={brainExport} disabled={!exportSnap || !exportDir}>
             <Brain className="h-4 w-4" /> Export
           </Button>
+        </div>
+      </GlassCard>
+
+      <GlassCard className="mb-4 p-5">
+        <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
+          <Plug className="h-4 w-4 text-cyan" /> MCP clients
+        </div>
+        <p className="mb-4 text-xs text-ink-dim">
+          Choose which clients appear in the Connect tab. Detected clients show by default — pin one you haven't set up
+          yet, or hide ones you don't use.
+        </p>
+        <div className="space-y-2">
+          {ALL_CLIENTS.map((id) => {
+            const c = clients.find((x) => x.id === id)
+            const detected = !!c?.configExists
+            const override = connectClientOverride[id]
+            const visible = override ?? detected
+            const overridden = override !== undefined
+            return (
+              <div
+                key={id}
+                className="flex items-center gap-3 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5"
+              >
+                <ClientIcon id={id} size={34} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-ink">{c?.label ?? id}</div>
+                  <div className="text-[11px]" style={{ color: detected ? '#34d399' : '#6b7390' }}>
+                    {detected ? 'Detected on this machine' : 'Not found'}
+                    {overridden && <span className="text-ink-faint"> · custom</span>}
+                  </div>
+                </div>
+                {overridden && (
+                  <button
+                    onClick={() => resetConnectClient(id)}
+                    className="no-drag rounded-lg p-1.5 text-ink-faint transition-colors hover:bg-white/8 hover:text-ink"
+                    title="Reset to auto-detect"
+                    aria-label="Reset to auto-detect"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setConnectClientVisible(id, !visible)}
+                  role="switch"
+                  aria-checked={visible}
+                  aria-label={`Show ${c?.label ?? id} in Connect`}
+                  className={`no-drag relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                    visible ? 'bg-iris' : 'bg-white/12'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                      visible ? 'translate-x-[22px]' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+            )
+          })}
         </div>
       </GlassCard>
 

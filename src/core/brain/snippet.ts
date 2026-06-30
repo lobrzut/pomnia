@@ -220,6 +220,10 @@ export interface Snippet {
   mergeJson: string
   /** Plain-text user instruction block. */
   instructions: string
+  /** How to make the client pick up the change (also embedded in instructions). */
+  restartHint: string
+  /** Human notes — quirks, multi-location warnings (also embedded in instructions). */
+  notes: string
 }
 
 /**
@@ -258,5 +262,15 @@ export function buildSnippet(
     token ? `Token included in headers — keep this file private (chmod 600 if possible).` : `No token included — add Authorization headers manually if the brain MCP proxy is auth-gated.`,
   ].join('\n')
 
-  return { client: clientId, label: spec.label, filePath, mcpKey: spec.mcpKey, fullFileJson, mergeJson, instructions }
+  return {
+    client: clientId,
+    label: spec.label,
+    filePath,
+    mcpKey: spec.mcpKey,
+    fullFileJson,
+    mergeJson,
+    instructions,
+    restartHint: spec.restartHint,
+    notes: spec.notes,
+  }
 }

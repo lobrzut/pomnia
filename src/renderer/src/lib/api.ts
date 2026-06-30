@@ -10,8 +10,6 @@ import type {
   Conversation,
   ConversationMeta,
   DetectedSource,
-  RestorePlan,
-  RestoreResultDTO,
   SkillListEntry,
   SkillSyncResult,
   Snapshot,
@@ -34,12 +32,6 @@ export interface ReliquaBridge {
   listSnapshots(): Promise<Snapshot[]>
   backup(sources: SourceId[], note?: string): Promise<Snapshot[]>
   onBackupProgress(cb: (e: BackupProgressEvent) => void): () => void
-  restorePlan(snapshotId: string, opts: { overwrite?: boolean; remapPaths?: boolean }): Promise<RestorePlan>
-  restore(
-    snapshotId: string,
-    opts: { overwrite?: boolean; remapPaths?: boolean }
-  ): Promise<RestoreResultDTO>
-  onRestoreProgress(cb: (done: number, total: number, rel: string) => void): () => void
   verify(): Promise<{ ok: boolean; checked: number; errors: string[] }>
   getConversations(snapshotId: string): Promise<Conversation[]>
   vaultConversations(): Promise<ConversationMeta[]>
@@ -131,28 +123,6 @@ function mockBridge(): ReliquaBridge {
       return made
     },
     onBackupProgress() {
-      return () => {}
-    },
-    async restorePlan(snapshotId) {
-      return {
-        snapshotId,
-        targetRoot: 'C:/Users/Alice/.claude (reliqua-restore)',
-        entries: Array.from({ length: 24 }, (_, i) => ({
-          relPath: `projects/demo/file_${i}.jsonl`,
-          from: 'sha',
-          to: `C:/…/file_${i}.jsonl`,
-          action: i % 7 === 0 ? 'remap' : 'create',
-          bytes: 12000
-        })),
-        totalBytes: 288000,
-        warnings: ['Cross-OS restore (win32 → darwin). Absolute paths inside configs will be remapped.']
-      }
-    },
-    async restore() {
-      await new Promise((r) => setTimeout(r, 1400))
-      return { written: 24, remapped: 4, skipped: 0, failed: 0, bytes: 288000, targetRoot: 'C:/…/.claude (reliqua-restore)' }
-    },
-    onRestoreProgress() {
       return () => {}
     },
     async verify() {
@@ -266,7 +236,9 @@ function mockBridge(): ReliquaBridge {
         mcpKey: 'mcpServers',
         fullFileJson: `{\n  "mcpServers": {\n    "brain-rag": { "type": "http", "url": "${brainUrl}/sse" }\n  }\n}\n`,
         mergeJson: `{\n  "brain-rag": { "type": "http", "url": "${brainUrl}/sse" }\n}\n`,
-        instructions: `▶ ${clientId}\n\n1. Open or create the config file.\n2. Paste the snippet.\n3. Restart the client.`
+        instructions: `▶ ${clientId}\n\n1. Open or create the config file.\n2. Paste the snippet.\n3. Restart the client.`,
+        restartHint: 'Restart the client to pick up the new config.',
+        notes: 'Mock snippet (browser preview). Run inside Reliqua for the real per-client config.'
       }
     },
     async connectSkillsList() {

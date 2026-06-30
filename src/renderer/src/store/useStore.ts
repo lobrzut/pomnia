@@ -1,8 +1,31 @@
 import { create } from 'zustand'
 import { api } from '../lib/api'
-import type { DetectedSource, Snapshot, SourceId, VaultStatus } from '../lib/types'
+import type { ClientId, DetectedSource, Snapshot, SourceId, VaultStatus } from '../lib/types'
 
-export type Route = 'dashboard' | 'snapshots' | 'browse' | 'import' | 'restore' | 'brain' | 'connect' | 'settings'
+export type Route = 'dashboard' | 'snapshots' | 'browse' | 'import' | 'brain' | 'connect' | 'settings'
+
+/**
+ * Connect-tab client visibility override. Default behaviour shows only clients
+ * we actually detect on disk (config file present); this lets the user pin a
+ * not-yet-installed client to show (to set it up) or hide one they don't care
+ * about. true = force show, false = force hide, absent = auto (follow detection).
+ */
+const CLIENT_OVERRIDE_KEY = 'reliqua.connect.clientOverride'
+function loadClientOverride(): Partial<Record<ClientId, boolean>> {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(CLIENT_OVERRIDE_KEY) : null
+    return raw ? (JSON.parse(raw) as Partial<Record<ClientId, boolean>>) : {}
+  } catch {
+    return {}
+  }
+}
+function saveClientOverride(o: Partial<Record<ClientId, boolean>>): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(CLIENT_OVERRIDE_KEY, JSON.stringify(o))
+  } catch {
+    /* ignore quota / unavailable storage */
+  }
+}
 
 export interface Toast {
   id: string
@@ -33,8 +56,9 @@ interface State {
   selectAll: (ids: SourceId[]) => void
   backup: (note?: string) => Promise<void>
 
-  restoreTarget: Snapshot | null
-  setRestoreTarget: (s: Snapshot | null) => void
+  connectClientOverride: Partial<Record<ClientId, boolean>>
+  setConnectClientVisible: (id: ClientId, visible: boolean) => void
+  resetConnectClient: (id: ClientId) => void
 
   toasts: Toast[]
   toast: (t: Omit<Toast, 'id'>) => void
@@ -138,8 +162,20 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  restoreTarget: null,
-  setRestoreTarget: (restoreTarget) => set({ restoreTarget, route: restoreTarget ? 'restore' : get().route }),
+  connectClientOverride: loadClientOverride(),
+  setConnectClientVisible: (id, visible) =>
+    set((s) => {
+      const next = { ...s.connectClientOverride, [id]: visible }
+      saveClientOverride(next)
+      return { connectClientOverride: next }
+    }),
+  resetConnectClient: (id) =>
+    set((s) => {
+      const next = { ...s.connectClientOverride }
+      delete next[id]
+      saveClientOverride(next)
+      return { connectClientOverride: next }
+    }),
 
   toasts: [],
   toast: (t) => {
