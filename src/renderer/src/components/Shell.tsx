@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Boxes, BrainCircuit, History, Import as ImportIcon, LayoutDashboard, Lock, MessagesSquare, Minus, Plug, RotateCcw, Settings as Cog, Square, X } from 'lucide-react'
+import { Boxes, BrainCircuit, History, Import as ImportIcon, LayoutDashboard, Lock, MessagesSquare, Minus, Plug, Settings as Cog, Square, X } from 'lucide-react'
 import clsx from 'clsx'
 import { api, isMock } from '../lib/api'
 import { useStore, type Route } from '../store/useStore'
@@ -9,7 +9,6 @@ const NAV: { id: Route; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'snapshots', label: 'Snapshots', icon: History },
   { id: 'browse', label: 'Chats', icon: MessagesSquare },
   { id: 'import', label: 'Import', icon: ImportIcon },
-  { id: 'restore', label: 'Restore', icon: RotateCcw },
   { id: 'brain', label: 'Brain', icon: BrainCircuit },
   { id: 'connect', label: 'Connect', icon: Plug },
   { id: 'settings', label: 'Settings', icon: Cog }
@@ -18,7 +17,10 @@ const NAV: { id: Route; label: string; icon: typeof LayoutDashboard }[] = [
 export function TitleBar() {
   const vault = useStore((s) => s.vault)
   return (
-    <div className="drag relative z-20 flex h-12 items-center justify-between px-4">
+    // z-50: must stay above VaultGate's lock overlay (z-40) — on a frameless
+    // window these minimize/maximize/close buttons are the only way to control
+    // the window, so they can't be obscured while the vault is locked.
+    <div className="drag relative z-50 flex h-12 items-center justify-between px-4">
       <div className="flex items-center gap-3">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg accent-grad ring-glow">
           <Boxes className="h-4 w-4 text-white" />
