@@ -5,7 +5,6 @@ import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron'
 import {
   Ollama,
   Vault,
-  applyRestore,
   buildIndex,
   buildSnippet,
   checkAllClients,
@@ -24,7 +23,6 @@ import {
   log,
   parseExportPath,
   pingBrain,
-  planRestore,
   runBackup,
   saveIndex,
   searchIndex,
@@ -35,7 +33,6 @@ import {
   type BackupOptions,
   type ClientId,
   type Conversation,
-  type RestoreOptions,
   type Snapshot,
   type SourceId
 } from '@core/index'
@@ -170,16 +167,6 @@ function registerIpc(): void {
     const opts: BackupOptions = { sources, note }
     return runBackup(requireVault(), opts, (p) => win?.webContents.send('backup:progress', p))
   })
-
-  ipcMain.handle('restore:plan', (_e, id: string, opts: Partial<RestoreOptions>) =>
-    planRestore(requireVault(), { snapshotId: id, ...opts })
-  )
-
-  ipcMain.handle('restore:apply', (_e, id: string, opts: Partial<RestoreOptions>) =>
-    applyRestore(requireVault(), { snapshotId: id, ...opts }, (done, total, rel) =>
-      win?.webContents.send('restore:progress', { done, total, rel })
-    )
-  )
 
   ipcMain.handle('verify', () => requireVault().verify())
 

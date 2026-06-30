@@ -2,7 +2,7 @@
 
 **Twoja pamięć AI: jedno zaszyfrowane, offline'owe archiwum wszystkich rozmów — przeszukiwalne i gotowe do zasilenia Brain.**
 Reliqua zbiera czaty ze wszystkich Twoich asystentów (Claude Code, Cursor, Claude Desktop, Antigravity, VS Code, Continue) **i** importy z eksportów (Claude.ai, ChatGPT, Gemini, Grok) w jedno miejsce — z lokalnym wyszukiwaniem (zakładka **Chats**) i pipeline'em do **Brain** (distill + index).
-Backup/restore i przenośność Win↔Mac to **mechanizm** pod spodem (sejf = jeden przenośny folder, AES-256-GCM), nie główne hasło.
+Backup i przenośność Win↔Mac to **mechanizm** pod spodem (sejf = jeden przenośny folder, AES-256-GCM), nie główne hasło.
 
 > Status: **silnik przetestowany i działa na żywych danych** (419 plików Claude Code + 148 czatów Cursora zbackupowane, zaszyfrowane, zweryfikowane i odtworzone w teście round-trip; 5/5 testów jednostkowych zielonych). UI Electron + React buduje się i odpala.
 
@@ -14,7 +14,7 @@ Każdy asystent trzyma rozmowy gdzie indziej i w innym formacie. Zmiana maszyny 
 
 - **wyciąga** rozmowy do jednego, znormalizowanego modelu (`Conversation`/`Message`),
 - **zabezpiecza** całość (czaty + surowe configi) w content-addressed, szyfrowanym sejfie z deduplikacją,
-- **odtwarza** na dowolnej platformie, tłumacząc ścieżki Windows ↔ macOS ↔ Linux,
+- **przenosi** sejf na dowolną platformę — skopiuj folder `*.continuum`, otwórz tą samą frazą gdziekolwiek,
 - **karmi Brain** — eksportuje rozmowy do formatu notatek vault (RAG inbox), żeby kontekst się nie marnował między sesjami.
 
 ## Co potrafi (zweryfikowane formaty)
@@ -41,7 +41,7 @@ src/core/            Silnik — czysty TS, tylko Node + sql.js(WASM) + crypto. Z
   pathmap.ts         Tłumaczenie ścieżek Win↔Mac↔Linux (kodowanie projektów Claude Code)
   fsutil.ts          Walker z exclude/keepTop/maxFileBytes
   adapters/          claudeCode · cursor · profile(snapshot) + rejestr
-  backup.ts/restore.ts  Orkiestracja (plan → apply, dry-run, side-by-side)
+  backup.ts          Orkiestracja backupu (plan → apply, dedup, incremental)
   brainExport.ts     Eksport rozmów do formatu notatek Brain vault
   brain/             Host-side pipeline: ollama · distill · localIndex · deploy
                      (Collect → Distill → Pre-index → Deploy do Brain)
@@ -72,7 +72,6 @@ CONTINUUM_PASS=… npm run cli backup --vault ~/Reliqua.continuum --create --sou
 
 npm run cli list    --vault ~/Reliqua.continuum
 npm run cli verify  --vault ~/Reliqua.continuum
-npm run cli restore --vault ~/Reliqua.continuum --snapshot <id> [--overwrite] [--dry-run]
 
 # eksport rozmów do Brain (RAG inbox) — prosto z żywych źródeł, bez sejfu
 npm run cli brain-export --out /opt/BRAIN/data/vault/sessions --sources all
@@ -80,7 +79,7 @@ npm run cli brain-export --out /opt/BRAIN/data/vault/sessions --sources all
 
 ## Brain — handoff do serwera (+ opcjonalny host-side pipeline)
 
-Podział ról: **aplikacja desktopowa = agregacja źródeł + backup/restore**; **destylacja/embedding (GPU) = robota serwerowego [BRAIN](BRAIN-INTEGRATION.md)**. W GUI „Send to Brain" oddajesz surowe rozmowy serwerowi (on destyluje u siebie). Host-side distill (Ollama lokalnie) zostaje jako **opcja CLI / dla boxa z brain** — nie obciąża zwykłego desktopu.
+Podział ról: **aplikacja desktopowa = agregacja źródeł + backup**; **destylacja/embedding (GPU) = robota serwerowego [BRAIN](BRAIN-INTEGRATION.md)**. W GUI „Send to Brain" oddajesz surowe rozmowy serwerowi (on destyluje u siebie). Host-side distill (Ollama lokalnie) zostaje jako **opcja CLI / dla boxa z brain** — nie obciąża zwykłego desktopu.
 
 ```
 Collect/Import → Distill (Ollama, qwen2.5) → Pre-index (nomic-embed-text) → Deploy (Brain)
@@ -104,15 +103,6 @@ npm run cli brain deploy   --to dashboard --url http://brain-host:7860 --reindex
 ```
 
 W GUI: zakładka **Brain** (status Ollama, etapy, run z live progressem, lokalny RAG, deploy).
-
-## Cross-platform restore — jak to działa
-
-Sejf to tylko pliki → kopiujesz folder `*.continuum` na drugą maszynę i otwierasz tą samą frazą.
-Przy odtwarzaniu na innym OS:
-
-1. **Nazwy projektów Claude Code** (`C--Users-Admin-PROJEKTY`) są dekodowane i przemapowywane na docelowy dom/usera (`-Users-jane-PROJEKTY`); niepewne mapowania są zgłaszane jako ostrzeżenie, nigdy po cichu.
-2. **Ścieżki bezwzględne w configach** (`pathSensitive`) są przepisywane przez wszystkie warianty separatorów (`\`, `/`, `\\` w JSON).
-3. Domyślnie **tryb bezpieczny**: restore ląduje w folderze obok (`… (continuum-restore)`), żeby nie nadpisać żywych danych. `--overwrite` wyłącza to świadomie.
 
 ## Bezpieczeństwo
 

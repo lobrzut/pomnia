@@ -16,13 +16,6 @@ const bridge = {
     ipcRenderer.on('backup:progress', l)
     return () => ipcRenderer.removeListener('backup:progress', l)
   },
-  restorePlan: (id: string, opts: unknown) => ipcRenderer.invoke('restore:plan', id, opts),
-  restore: (id: string, opts: unknown) => ipcRenderer.invoke('restore:apply', id, opts),
-  onRestoreProgress: (cb: (done: number, total: number, rel: string) => void) => {
-    const l = (_: IpcRendererEvent, e: { done: number; total: number; rel: string }) => cb(e.done, e.total, e.rel)
-    ipcRenderer.on('restore:progress', l)
-    return () => ipcRenderer.removeListener('restore:progress', l)
-  },
   verify: () => ipcRenderer.invoke('verify'),
   getConversations: (id: string) => ipcRenderer.invoke('conversations', id),
   vaultConversations: () => ipcRenderer.invoke('vault:conversations'),

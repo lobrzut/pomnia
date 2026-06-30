@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { FileArchive, MessageSquare, RotateCcw, ShieldCheck, Clock } from 'lucide-react'
+import { FileArchive, MessageSquare, ShieldCheck, Clock } from 'lucide-react'
 import { Badge, Button, GlassCard, SourceTile, Spinner } from '../components/ui'
 import { humanBytes, relativeTime, sourceMeta } from '../lib/format'
 import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
 
 export default function Snapshots() {
-  const { snapshots, vault, setRestoreTarget, toast } = useStore()
+  const { snapshots, vault, toast } = useStore()
   const [verifying, setVerifying] = useState(false)
 
   async function verify() {
@@ -69,10 +69,6 @@ export default function Snapshots() {
                   <span className="font-mono text-[10px] text-ink-faint">{s.id.slice(0, 8)}</span>
                 </div>
               </div>
-              <Button variant="soft" onClick={() => setRestoreTarget(s)}>
-                <RotateCcw className="h-4 w-4" />
-                Restore
-              </Button>
             </GlassCard>
           )
         })}

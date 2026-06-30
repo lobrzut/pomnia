@@ -147,30 +147,3 @@ export interface BackupOptions {
   incremental?: boolean
 }
 
-export interface RestoreOptions {
-  snapshotId: string
-  /** Where to restore. If omitted, uses the live source root for the current OS. */
-  targetRoot?: string
-  /** Only compute the plan, do not write. */
-  dryRun?: boolean
-  /** Overwrite existing files (default false → write into a side-by-side folder). */
-  overwrite?: boolean
-  /** Remap absolute paths inside captured configs from the snapshot's origin. */
-  remapPaths?: boolean
-}
-
-export interface RestorePlanEntry {
-  relPath: string
-  from: string
-  to: string
-  action: 'create' | 'overwrite' | 'skip-exists' | 'remap'
-  bytes: number
-}
-
-export interface RestorePlan {
-  snapshotId: string
-  targetRoot: string
-  entries: RestorePlanEntry[]
-  totalBytes: number
-  warnings: string[]
-}

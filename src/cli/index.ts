@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 /**
- * Reliqua CLI — headless backup/restore. Designed to be automation-friendly:
+ * Reliqua CLI — headless backup. Designed to be automation-friendly:
  * pass the vault passphrase via $RELIQUA_PASS to run unattended (e.g. cron /
  * scheduled tasks / a "bypass" autonomous loop).
  *
  *   reliqua scan
  *   reliqua backup  --vault <dir> [--create] [--name N] [--sources all|a,b] [--note "…"]
  *   reliqua list    --vault <dir>
- *   reliqua restore --vault <dir> --snapshot <id> [--target <dir>] [--overwrite] [--dry-run] [--no-remap]
  *   reliqua verify  --vault <dir>
  *   reliqua brain-export --out <dir> [--vault <dir> --snapshot <id>] [--sources all]
  */
@@ -18,7 +17,6 @@ import {
   ADAPTERS,
   Ollama,
   Vault,
-  applyRestore,
   buildIndex,
   defaultOllamaConfig,
   deployDashboard,
@@ -34,7 +32,6 @@ import {
   loadIndex,
   parseExportPath,
   pingBrain,
-  planRestore,
   runBackup,
   saveIndex,
   searchIndex,
@@ -445,42 +442,6 @@ async function cmdList(p: Parsed): Promise<void> {
   console.log()
 }
 
-async function cmdRestore(p: Parsed): Promise<void> {
-  const dir = String(p.flags.vault || '')
-  const snapshot = String(p.flags.snapshot || '')
-  if (!dir || !snapshot) throw new Error('--vault <dir> and --snapshot <id> required')
-  const vault = await Vault.open(dir, await getPass(p.flags))
-  // Allow short ids.
-  const full = vault.getManifest().snapshots.find((s) => s.id === snapshot || s.id.startsWith(snapshot))
-  if (!full) throw new Error(`snapshot ${snapshot} not found`)
-  const opts = {
-    snapshotId: full.id,
-    targetRoot: typeof p.flags.target === 'string' ? p.flags.target : undefined,
-    overwrite: p.flags.overwrite === true,
-    remapPaths: p.flags['no-remap'] !== true,
-    dryRun: p.flags['dry-run'] === true
-  }
-  const plan = await planRestore(vault, opts)
-  console.log(C.bold(`\n  Restore plan → ${plan.targetRoot}`))
-  console.log(`  ${plan.entries.length} files, ${human(plan.totalBytes)}`)
-  for (const w of plan.warnings) console.log(`  ${C.yellow('⚠')} ${w}`)
-  if (opts.dryRun) {
-    const counts = plan.entries.reduce<Record<string, number>>((a, e) => ((a[e.action] = (a[e.action] || 0) + 1), a), {})
-    console.log('  ' + C.dim(JSON.stringify(counts)))
-    console.log(C.dim('  (dry run — nothing written)\n'))
-    return
-  }
-  const res = await applyRestore(vault, opts, (done, total, rel) => {
-    if (done % 25 === 0 || done === total) process.stdout.write(`\r  restoring ${done}/${total} ${C.dim(rel.slice(0, 50))}        `)
-  })
-  process.stdout.write('\n')
-  console.log(
-    `  ${C.green('✔')} restored ${res.written} files (${res.remapped} path-remapped, ${res.skipped} skipped) → ${C.bold(
-      res.targetRoot
-    )}\n`
-  )
-}
-
 async function cmdVerify(p: Parsed): Promise<void> {
   const dir = String(p.flags.vault || '')
   if (!dir) throw new Error('--vault <dir> required')
@@ -534,7 +495,6 @@ ${C.bold('Reliqua')} — encrypted, cross-platform backup for AI assistant chats
   ${C.cyan('scan')}                                   detect installed assistants
   ${C.cyan('backup')}  --vault DIR [--create] [--name N] [--sources all|a,b] [--note "…"]
   ${C.cyan('list')}    --vault DIR
-  ${C.cyan('restore')} --vault DIR --snapshot ID [--target DIR] [--overwrite] [--dry-run] [--no-remap]
   ${C.cyan('verify')}  --vault DIR
   ${C.cyan('brain-export')} --out DIR [--vault DIR --snapshot ID | --sources all]
   ${C.cyan('import')} --in FILE|DIR [--out DIR]            parse Claude.ai/ChatGPT/Grok/Gemini exports
@@ -552,7 +512,6 @@ async function main(): Promise<void> {
       case 'scan': return await cmdScan()
       case 'backup': return await cmdBackup(p)
       case 'list': return await cmdList(p)
-      case 'restore': return await cmdRestore(p)
       case 'verify': return await cmdVerify(p)
       case 'brain-export': return await cmdBrainExport(p)
       case 'brain': return await cmdBrain(p)

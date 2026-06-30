@@ -4,9 +4,7 @@ export type {
   Snapshot,
   SourceId,
   Conversation,
-  Message,
-  RestorePlan,
-  RestorePlanEntry
+  Message
 } from '@core/model'
 export type { ClientId, ClientStatus, WiredState, Snippet, BrainPing, SkillListEntry, SkillSyncResult } from '@core/brain/index'
 
@@ -21,15 +19,6 @@ export interface BackupProgressEvent {
   source: string
   phase: 'scan' | 'conversations' | 'files' | 'store' | 'done'
   detail?: string
-}
-
-export interface RestoreResultDTO {
-  written: number
-  remapped: number
-  skipped: number
-  failed: number
-  bytes: number
-  targetRoot: string
 }
 
 export interface BrainStatus {
