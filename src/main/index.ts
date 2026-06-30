@@ -90,6 +90,12 @@ function createWindow(): void {
   })
 
   win.on('ready-to-show', () => win?.show())
+  // Pipe renderer console output (incl. uncaught exceptions logged via
+  // window.onerror in App.tsx) into the main-process log — otherwise
+  // renderer-side errors are invisible outside DevTools.
+  win.webContents.on('console-message', (_e, level, message, line, sourceId) => {
+    if (level >= 2) log.warn(`[renderer] ${message} (${sourceId}:${line})`)
+  })
   win.webContents.on('did-finish-load', () => {
     win?.webContents
       .executeJavaScript('typeof window.reliqua')
