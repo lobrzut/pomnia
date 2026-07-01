@@ -7,7 +7,7 @@ import { humanBytes, relativeTime } from '../lib/format'
 import { useStore } from '../store/useStore'
 import type { ClientId, ClientStatus } from '../lib/types'
 
-const ALL_CLIENTS: ClientId[] = ['claude-code', 'cursor', 'antigravity', 'claude-desktop', 'vscode', 'windsurf']
+const ALL_CLIENTS: ClientId[] = ['claude-code', 'cursor', 'antigravity', 'claude-desktop', 'vscode', 'windsurf', 'hermes']
 
 export default function Settings() {
   const { vault, lockVault, snapshots, toast, connectClientOverride, setConnectClientVisible, resetConnectClient } =

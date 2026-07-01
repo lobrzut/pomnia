@@ -20,6 +20,7 @@ export type ClientId =
   | 'claude-desktop'
   | 'vscode'
   | 'windsurf'
+  | 'hermes'
 
 export interface ClientSpec {
   id: ClientId
@@ -194,6 +195,31 @@ export const CLIENTS: ClientSpec[] = [
     },
     notes: 'Windsurf is Codeium-lineage; format mirrors Antigravity\'s `serverUrl` style. If your Windsurf version differs, check Settings → Cascade → MCP.',
     restartHint: 'Restart Windsurf or use the in-app "Reload Cascade" action.',
+  },
+
+  {
+    id: 'hermes',
+    label: 'Hermes Agent (Nous Research)',
+    // Hermes reads ~/.hermes/config.yaml on all platforms (HERMES_HOME env
+    // var overrides the default). Same path on Win/macOS/Linux — the tilde
+    // convention is honored by Hermes' own loader.
+    configPath: (os, home) => joinPath(os, home, '.hermes', 'config.yaml'),
+    mcpKey: 'mcp_servers',
+    buildServers: (url, token) => {
+      const base = trimBase(url)
+      return {
+        'brain-rag':     withHeaders(token, { url: PATHS.ragMcp(base) }),
+        'brain-vault':   withHeaders(token, { url: PATHS.vaultMcp(base) }),
+        'brain-library': withHeaders(token, { url: PATHS.libraryMcp(base) }),
+      }
+    },
+    // Note the YAML caveat: the snippet is emitted as JSON (Reliqua's uniform
+    // format), but YAML parsers accept flow-style JSON as valid YAML, so it
+    // pastes in cleanly. If you prefer classic block-style YAML you can
+    // convert by hand — the shape (top-level `mcp_servers:` map keyed by
+    // server name, each entry with `url:` and `headers:`) matches Hermes' docs.
+    notes: 'Hermes reads ~/.hermes/config.yaml. The snippet is JSON — YAML parsers accept it since JSON is a subset of YAML, so paste it as-is under mcp_servers. See https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp for schema details (transport, timeout, keepalive_interval, etc.).',
+    restartHint: 'Restart the Hermes daemon (`hermes stop && hermes start`) or start a new session — MCP servers are discovered per-session.',
   },
 ]
 
