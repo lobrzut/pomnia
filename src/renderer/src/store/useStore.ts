@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { api } from '../lib/api'
 import type { ClientId, DetectedSource, Snapshot, SourceId, VaultStatus } from '../lib/types'
 
-export type Route = 'dashboard' | 'snapshots' | 'browse' | 'import' | 'brain' | 'connect' | 'settings'
+export type Route = 'dashboard' | 'browse' | 'import' | 'brain' | 'connect' | 'settings'
 
 /**
  * Connect-tab client visibility override. Default behaviour shows only clients
