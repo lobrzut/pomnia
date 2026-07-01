@@ -1,4 +1,5 @@
 // Re-export engine types for the renderer (type-only — erased at build, no node code pulled in).
+import type { SourceId } from '@core/model'
 export type {
   DetectedSource,
   Snapshot,

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Brain, FolderOpen, Lock, Plug, RotateCcw, ShieldCheck, Vault } from 'lucide-react'
-import { Button, Field, GlassCard, Input } from '../components/ui'
+import { Brain, Clock, FileArchive, FolderOpen, Lock, Plug, RotateCcw, ShieldCheck, Vault } from 'lucide-react'
+import { Button, Field, GlassCard, Input, Spinner } from '../components/ui'
 import { ClientIcon } from '../components/ClientIcon'
 import { api, isMock } from '../lib/api'
+import { humanBytes, relativeTime } from '../lib/format'
 import { useStore } from '../store/useStore'
 import type { ClientId, ClientStatus } from '../lib/types'
 
@@ -14,6 +15,21 @@ export default function Settings() {
   const [exportDir, setExportDir] = useState('')
   const [exportSnap, setExportSnap] = useState(snapshots[0]?.id ?? '')
   const [clients, setClients] = useState<ClientStatus[]>([])
+  const [verifying, setVerifying] = useState(false)
+
+  async function verifyIntegrity() {
+    setVerifying(true)
+    try {
+      const r = await api.verify()
+      toast({
+        kind: r.ok ? 'success' : 'error',
+        title: r.ok ? 'Vault integrity OK' : `${r.errors.length} integrity error(s)`,
+        detail: `${r.checked} encrypted blobs checked`,
+      })
+    } finally {
+      setVerifying(false)
+    }
+  }
 
   useEffect(() => {
     // Detection (configExists) is independent of the brain URL — we only read
@@ -157,6 +173,59 @@ export default function Settings() {
             )
           })}
         </div>
+      </GlassCard>
+
+      <GlassCard className="mb-4 p-5">
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <FileArchive className="h-4 w-4 text-violet" /> Snapshots
+          </div>
+          {snapshots.length > 0 && vault.open && (
+            <Button variant="soft" onClick={verifyIntegrity} disabled={verifying}>
+              {verifying ? <Spinner className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+              Verify integrity
+            </Button>
+          )}
+        </div>
+        <p className="mb-3 text-xs text-ink-dim">
+          {vault.open
+            ? snapshots.length === 0
+              ? 'No snapshots yet — run a backup from the Dashboard to create your first sealed point-in-time capture.'
+              : `${snapshots.length} sealed point-in-time captures. Create new snapshots from the Dashboard.`
+            : 'Unlock a vault to see snapshots.'}
+        </p>
+        {vault.open && snapshots.length > 0 && (
+          <ul className="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-xs">
+            {snapshots.slice(0, 20).map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center gap-3 rounded-lg border border-white/8 bg-black/20 px-3 py-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-medium text-ink">{s.source.label}</span>
+                    <span className="rounded bg-white/6 px-1.5 py-0.5 font-mono text-[9px] text-ink-faint">
+                      {s.id.slice(0, 8)}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-3 text-[11px] text-ink-dim">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> {relativeTime(s.createdAt)}
+                    </span>
+                    <span>
+                      {s.stats.files} files · {humanBytes(s.stats.bytes)}
+                    </span>
+                  </div>
+                </div>
+              </li>
+            ))}
+            {snapshots.length > 20 && (
+              <li className="px-3 py-1 text-[11px] italic text-ink-faint">
+                + {snapshots.length - 20} more…
+              </li>
+            )}
+          </ul>
+        )}
       </GlassCard>
 
       <GlassCard className="p-5">
