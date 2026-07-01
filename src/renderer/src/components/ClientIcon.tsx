@@ -14,7 +14,8 @@ export const CLIENT_BRAND: Record<ClientId, { color: string; tagline: string }> 
   antigravity: { color: '#4285f4', tagline: 'Google agentic IDE' },
   'claude-desktop': { color: '#c08a5a', tagline: 'Desktop app' },
   vscode: { color: '#3aa0ff', tagline: 'Native MCP (1.103+)' },
-  windsurf: { color: '#10b6a2', tagline: 'Codeium Cascade' }
+  windsurf: { color: '#10b6a2', tagline: 'Codeium Cascade' },
+  hermes: { color: '#f0b429', tagline: 'Nous Research agent' }
 }
 
 // 12-ray sunburst — shared by both Claude clients.
@@ -72,6 +73,22 @@ const GLYPH: Record<ClientId, ReactNode> = {
       <path d="M11 3 L11 16.5" />
       <path d="M11 3.6 C16.2 5.6 17.4 11 16.8 15 L11 15 Z" fill="currentColor" stroke="none" />
       <path d="M4 19 C7 17.4 9 20 12 18.4 C15 16.9 17 19.5 20 18" />
+    </g>
+  ),
+
+  // Winged helmet — Hermes/Mercury messenger motif.
+  hermes: (
+    <g fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round">
+      {/* helmet dome */}
+      <path d="M7 13 C7 8.6 9.2 5.5 12 5.5 C14.8 5.5 17 8.6 17 13 L7 13 Z" />
+      {/* helmet band */}
+      <path d="M6.6 13 L17.4 13 L16.6 15 L7.4 15 Z" fill="currentColor" stroke="none" />
+      {/* left wing */}
+      <path d="M7 10.5 C4.5 10 3 11 2.5 12.4 C4 12.2 5.4 11.6 7 11.2" />
+      {/* right wing */}
+      <path d="M17 10.5 C19.5 10 21 11 21.5 12.4 C20 12.2 18.6 11.6 17 11.2" />
+      {/* chin strap suggestion */}
+      <path d="M9.5 15 L9.5 17.5 L14.5 17.5 L14.5 15" />
     </g>
   )
 }

@@ -28,7 +28,8 @@ const CLIENT_ORDER: ClientId[] = [
   'antigravity',
   'claude-desktop',
   'vscode',
-  'windsurf'
+  'windsurf',
+  'hermes'
 ]
 
 function stateMeta(state: WiredState): { label: string; color: string; Icon: typeof CheckCircle2 } {
