@@ -61,6 +61,11 @@ export interface ReliquaBridge {
   connectSnippet(clientId: ClientId, brainUrl: string, token?: string): Promise<Snippet>
   connectSkillsList(brainUrl: string, token?: string): Promise<SkillListEntry[]>
   connectSkillsSync(brainUrl: string, token?: string): Promise<SkillSyncResult>
+  connectMcpTokenCreate(
+    brainUrl: string,
+    name: string,
+    adminToken?: string,
+  ): Promise<{ name: string; token: string; created: string }>
   minimize(): void
   toggleMaximize(): void
   close(): void
@@ -250,6 +255,14 @@ function mockBridge(): ReliquaBridge {
     async connectSkillsSync() {
       await new Promise((r) => setTimeout(r, 700))
       return { fetched: 12, written: 12, errors: [] } as SkillSyncResult
+    },
+    async connectMcpTokenCreate(_brainUrl, name) {
+      await new Promise((r) => setTimeout(r, 500))
+      return {
+        name,
+        token: 'btk_MOCK_' + Math.random().toString(36).slice(2, 34),
+        created: new Date().toISOString(),
+      }
     },
     minimize() {},
     toggleMaximize() {},

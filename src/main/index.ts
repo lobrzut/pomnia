@@ -8,6 +8,7 @@ import {
   buildIndex,
   buildSnippet,
   checkAllClients,
+  createMcpToken,
   currentOS,
   defaultOllamaConfig,
   deployDashboard,
@@ -364,6 +365,12 @@ function registerIpc(): void {
 
   ipcMain.handle('connect:skillsSync', (_e, brainUrl: string, token?: string) =>
     syncSkills(brainUrl, join(app.getPath('userData'), 'brain-skills'), { token })
+  )
+
+  ipcMain.handle(
+    'connect:mcpTokenCreate',
+    (_e, brainUrl: string, name: string, adminToken?: string) =>
+      createMcpToken(brainUrl, name, { token: adminToken }),
   )
 
   ipcMain.on('win:minimize', () => win?.minimize())
