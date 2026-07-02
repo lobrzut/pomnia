@@ -19,6 +19,8 @@ export { CLIENTS, getClient, listClients, buildSnippet } from './snippet.js'
 export type { ClientId, ClientSpec, Snippet } from './snippet.js'
 export { checkClient, checkAllClients, pingBrain } from './status.js'
 export type { ClientStatus, WiredState, BrainPing } from './status.js'
+export { createMcpToken } from './mcpTokens.js'
+export type { McpTokenEntry } from './mcpTokens.js'
 
 import type { Conversation } from '../model.js'
 import { Ollama } from './ollama.js'

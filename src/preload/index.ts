@@ -38,6 +38,8 @@ const bridge = {
     ipcRenderer.invoke('connect:snippet', clientId, brainUrl, token),
   connectSkillsList: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsList', brainUrl, token),
   connectSkillsSync: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsSync', brainUrl, token),
+  connectMcpTokenCreate: (brainUrl: string, name: string, adminToken?: string) =>
+    ipcRenderer.invoke('connect:mcpTokenCreate', brainUrl, name, adminToken),
   minimize: () => ipcRenderer.send('win:minimize'),
   toggleMaximize: () => ipcRenderer.send('win:maximize'),
   close: () => ipcRenderer.send('win:close')

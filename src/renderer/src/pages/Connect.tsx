@@ -61,6 +61,36 @@ export default function Connect() {
   const [snippetLoading, setSnippetLoading] = useState(false)
   const [mode, setMode] = useState<'new' | 'merge'>('new')
   const [copied, setCopied] = useState<string | null>(null)
+  const [minting, setMinting] = useState(false)
+
+  async function mintToken() {
+    if (minting) return
+    const dashboardUrl = brainUrl.replace(/:\d+$/, ':7860')
+    const suggested = `reliqua-${new Date().toISOString().slice(0, 10)}`
+    const name = window.prompt(
+      'Name for the new token (identifies where it lives — helps if you need to revoke it later):',
+      suggested,
+    )
+    if (!name) return
+    setMinting(true)
+    try {
+      const r = await api.connectMcpTokenCreate(dashboardUrl, name.trim(), token || undefined)
+      setToken(r.token)
+      toast({
+        kind: 'success',
+        title: `Token minted: ${r.name}`,
+        detail: `Saved into the token field. Regenerate the snippet to include it.`,
+      })
+    } catch (e) {
+      toast({
+        kind: 'error',
+        title: 'Could not mint token',
+        detail: (e as Error).message,
+      })
+    } finally {
+      setMinting(false)
+    }
+  }
 
   const [syncing, setSyncing] = useState(false)
 
@@ -193,6 +223,10 @@ export default function Connect() {
             type="password"
             className="w-56"
           />
+          <Button variant="soft" onClick={() => void mintToken()} disabled={minting}>
+            {minting ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+            New token
+          </Button>
           <span className="text-[11px] text-ink-faint">
             Changing the URL or token? Hit Refresh, then re-pick a client.
           </span>
