@@ -9,6 +9,10 @@
 export { createBrainServer } from './mcp/server.js'
 export type { BrainServer, BrainServerOptions } from './mcp/server.js'
 
+// MCP tools — public tool catalog + dispatch. Server wires these to the SDK.
+export { listTools, callTool } from './mcp/tools/index.js'
+export type { ToolDef, ToolContext } from './mcp/tools/index.js'
+
 // RAG core (embed + cosine + chunking)
 // Re-exports live here so tools/, tests/ and consumers stay decoupled from the file layout.
 export { EmbedClient, EMBED_DIMS } from './rag/embed.js'
