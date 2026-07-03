@@ -6,6 +6,9 @@
   "license": "MIT",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "main": "./out/main/index.js",
   "bin": {
     "reliqua": "./out/cli/index.js"
