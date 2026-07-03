@@ -11,9 +11,18 @@ export type { BrainServer, BrainServerOptions } from './mcp/server.js'
 
 // RAG core (embed + cosine + chunking)
 // Re-exports live here so tools/, tests/ and consumers stay decoupled from the file layout.
+export { EmbedClient, EMBED_DIMS } from './rag/embed.js'
+export type { EmbedClientConfig } from './rag/embed.js'
+export { chunkText, CHUNK_CHAR, CHUNK_OVERLAP } from './rag/chunk.js'
+export { vecToBlob, blobToVec } from './rag/vec.js'
+export { search } from './rag/search.js'
+export type { SearchOptions, SearchSource } from './rag/search.js'
 export type { RagIndex, SearchHit } from './rag/types.js'
 
 // Storage (sqlite-vec + vault filesystem)
+export { openDb } from './storage/db.js'
+export type { OpenDbOptions, BrainDb } from './storage/db.js'
+export { defaultVaultConfig } from './storage/vault.js'
 export type { VaultConfig } from './storage/vault.js'
 
 // Config (env + optional TOML/JSON file)
