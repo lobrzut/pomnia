@@ -11,7 +11,8 @@
   },
   "exports": {
     ".": "./dist/index.js",
-    "./daemon": "./dist/daemon.js"
+    "./daemon": "./dist/daemon.js",
+    "./embedded": "./dist/embedded.js"
   },
   "scripts": {
     "build": "tsc",
@@ -23,7 +24,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "better-sqlite3": "^11.7.0",
+    "better-sqlite3": "^12.11.1",
     "sqlite-vec": "^0.1.9",
     "zod": "^3.24.0"
   },
