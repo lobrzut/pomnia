@@ -27,6 +27,15 @@ const bridge = {
   brainStatus: (ollamaUrl?: string) => ipcRenderer.invoke('brain:status', ollamaUrl),
   brainRun: (opts: unknown) => ipcRenderer.invoke('brain:run', opts),
   brainState: () => ipcRenderer.invoke('brain:state'),
+  brainCoreStatus: () => ipcRenderer.invoke('brainCore:status'),
+  brainCoreStart: (ollamaUrl?: string) => ipcRenderer.invoke('brainCore:start', ollamaUrl),
+  brainCoreStop: () => ipcRenderer.invoke('brainCore:stop'),
+  brainCoreReindex: () => ipcRenderer.invoke('brainCore:reindex'),
+  onBrainCoreEvent: (cb: (e: unknown) => void) => {
+    const l = (_: IpcRendererEvent, e: unknown) => cb(e)
+    ipcRenderer.on('brainCore:event', l)
+    return () => ipcRenderer.removeListener('brainCore:event', l)
+  },
   onBrainProgress: (cb: (e: unknown) => void) => {
     const l = (_: IpcRendererEvent, e: unknown) => cb(e)
     ipcRenderer.on('brain:progress', l)

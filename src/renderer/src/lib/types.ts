@@ -40,6 +40,16 @@ export interface OllamaPullEvent {
   total?: number
 }
 
+/** Embedded brain-core child process state. */
+export interface EmbeddedBrainStatus {
+  running: boolean
+  starting: boolean
+  indexing: boolean
+  url: string | null
+  dataDir: string
+  lastError: string | null
+}
+
 /** Honest distill-pipeline state — live source counts vs the distill ledger. */
 export interface BrainStateInfo {
   total: number
