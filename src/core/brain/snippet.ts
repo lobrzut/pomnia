@@ -35,6 +35,20 @@ export interface ClientSpec {
   notes: string
   /** How to make the client pick up the change. */
   restartHint: string
+  /**
+   * Optional agent brief — a markdown/system-prompt file the client auto-reads
+   * on each session. Tells the agent to call get_user_profile at start,
+   * search_library before technical answers, save_conversation on "zapisz do
+   * brain", and memory.add when corrected. Snippet-only: Reliqua does not
+   * write to this file, user pastes. `null` if the client has no such hook
+   * (e.g. Claude Desktop, Hermes).
+   */
+  brief?: {
+    briefPath: (os: OS, home: string) => string
+    /** append-to-existing = user pastes at bottom of existing file; create-if-missing = whole file content */
+    mode: 'append-to-existing' | 'create-if-missing'
+    hint: string
+  }
 }
 
 function joinPath(os: OS, ...parts: string[]): string {
@@ -64,6 +78,53 @@ function withHeaders(token: string | undefined, server: Record<string, unknown>)
 }
 
 /* ---------------------------------------------------------------------- */
+/* Agent brief — one markdown, all clients                                */
+/* ---------------------------------------------------------------------- */
+
+/**
+ * The behavior contract we want every MCP-capable agent to follow when it
+ * has brain-rag/brain-vault/brain-library wired. Same text for every client
+ * because the tool surface is identical — only the destination file changes.
+ *
+ * Written in Polish because that is the user's operating language; the tool
+ * names + payload keys stay English because that is how MCP catalog reports
+ * them.
+ */
+export const BRAIN_BRIEF_MD = `## Brain integration (MCP)
+
+Masz dostęp do trzech MCP serverów: \`brain-rag\`, \`brain-vault\`, \`brain-library\`.
+Traktuj je jak przedłużenie mojej pamięci — nie moją wiedzę pretrenowaną.
+
+### Na starcie każdej nietrywialnej sesji
+1. Wywołaj \`brain-rag.get_user_profile\` — przeczytaj mój profil (USER.md).
+   Bez tego nie wiesz kim jestem, jak rozmawiam, jakich narzędzi używam.
+2. Jeśli pytanie brzmi technicznie / dotyczy tego projektu — wywołaj
+   \`brain-rag.search_library\` z tematem pytania PRZED odpowiedzią.
+   Cytuj źródła (path, score) gdy pomogły.
+
+### W trakcie rozmowy
+3. Gdy powiem "zapisz do brain", "zapisz rozmowę", "zapisz" lub podobnie —
+   natychmiast wywołaj \`brain-rag.save_conversation\` z PEŁNYM payloadem:
+   \`decisions\`, \`solutions\`, \`root_causes\`, \`files_touched\`,
+   \`commands_run\`, \`errors_seen\`, \`attempts_failed\`, \`facts\`,
+   \`open_questions\`, \`endpoints_urls_ips\`.
+   Preferuj konkret (ścieżki z numerami linii, dokładne komendy, kody błędów)
+   nad ogólnymi zdaniami — te notatki czytam za miesiące.
+4. Gdy Cię koryguję ("nie używaj X", "wolę Y", "przestań robić Z") lub gdy
+   powiem coś trwałego o sobie — wywołaj \`brain-rag.memory\` z akcją
+   \`add\` i odpowiednią kategorią (\`user\` / \`tech\` / \`comm\` / \`income\`).
+
+### Preferencje
+- Preferuj \`brain-rag.search_library\` nad własną pretrenowaną wiedzą gdy
+  pytanie brzmi jak coś specyficznego dla tego projektu / usera.
+- Bez wywołania brain = zgadujesz. Z brain = masz kontekst tej konkretnej
+  osoby i tego konkretnego repo.
+- Nie pytaj mnie o pozwolenie na wywołanie tych narzędzi — są bezpieczne
+  (read + append do vault). Rób.
+`
+
+
+/* ---------------------------------------------------------------------- */
 /* Client specs                                                           */
 /* ---------------------------------------------------------------------- */
 
@@ -83,6 +144,14 @@ export const CLIENTS: ClientSpec[] = [
     },
     notes: 'Merge into the root mcpServers object in ~/.claude.json. If the file does not exist, create it with just this snippet.',
     restartHint: 'Next `claude` invocation in a terminal will pick up the new config. Active sessions need to restart.',
+    brief: {
+      // ~/.claude/CLAUDE.md is Claude Code's user-scope memory file — auto-loaded
+      // on every session across every project. Appending is safer than creating
+      // because the user may already have their own notes there.
+      briefPath: (os, home) => joinPath(os, home, '.claude', 'CLAUDE.md'),
+      mode: 'append-to-existing',
+      hint: 'Effective on the next `claude` invocation — active sessions do NOT reload CLAUDE.md.',
+    },
   },
 
   {
@@ -100,6 +169,13 @@ export const CLIENTS: ClientSpec[] = [
     },
     notes: 'Cursor reads the global ~/.cursor/mcp.json. The whole file is just this object — paste as-is.',
     restartHint: 'In Cursor: Ctrl+Shift+P → "Developer: Reload Window", or restart Cursor.',
+    brief: {
+      // Cursor 0.46+ reads user-global rules from ~/.cursor/rules/*.mdc.
+      // Dedicated file avoids merging with per-project .cursorrules.
+      briefPath: (os, home) => joinPath(os, home, '.cursor', 'rules', 'brain.mdc'),
+      mode: 'create-if-missing',
+      hint: 'Ctrl+Shift+P → "Developer: Reload Window" (rules are re-scanned on window reload).',
+    },
   },
 
   {
@@ -233,6 +309,17 @@ export function listClients(): Array<{ id: ClientId; label: string }> {
   return CLIENTS.map(({ id, label }) => ({ id, label }))
 }
 
+export interface SnippetBrief {
+  /** Absolute path where the brief should go. */
+  filePath: string
+  /** Markdown content — ready to paste. */
+  content: string
+  /** append-to-existing or create-if-missing — drives UI copy ("Dopisz" vs "Utwórz"). */
+  mode: 'append-to-existing' | 'create-if-missing'
+  /** How to make the client pick up the brief change. */
+  restartHint: string
+}
+
 export interface Snippet {
   client: ClientId
   label: string
@@ -250,6 +337,8 @@ export interface Snippet {
   restartHint: string
   /** Human notes — quirks, multi-location warnings (also embedded in instructions). */
   notes: string
+  /** Optional agent brief — undefined if this client has no auto-loaded rules mechanism. */
+  brief?: SnippetBrief
 }
 
 /**
@@ -288,6 +377,15 @@ export function buildSnippet(
     token ? `Token included in headers — keep this file private (chmod 600 if possible).` : `No token included — add Authorization headers manually if the brain MCP proxy is auth-gated.`,
   ].join('\n')
 
+  const brief: SnippetBrief | undefined = spec.brief
+    ? {
+        filePath: spec.brief.briefPath(os, home),
+        content: BRAIN_BRIEF_MD,
+        mode: spec.brief.mode,
+        restartHint: spec.brief.hint,
+      }
+    : undefined
+
   return {
     client: clientId,
     label: spec.label,
@@ -298,5 +396,6 @@ export function buildSnippet(
     instructions,
     restartHint: spec.restartHint,
     notes: spec.notes,
+    brief,
   }
 }

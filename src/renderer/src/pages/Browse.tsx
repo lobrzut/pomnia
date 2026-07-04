@@ -71,7 +71,11 @@ export default function Browse() {
       <div className="mb-5">
         <h1 className="text-[26px] font-bold tracking-tight text-grad">Chats</h1>
         <p className="mt-1 text-sm text-ink-dim">
-          {list.length} conversations aggregated from every source — searched locally, no GPU.
+          {loading
+            ? 'Loading conversations from your vault…'
+            : list.length === 0
+              ? 'No conversations in this vault yet — import some from the Import tab.'
+              : `${list.length} conversations aggregated from every source — searched locally, no GPU.`}
         </p>
       </div>
 

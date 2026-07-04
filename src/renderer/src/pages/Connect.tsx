@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
+  BookOpenText,
   Check,
   CheckCircle2,
   Circle,
@@ -410,6 +411,64 @@ export default function Connect() {
                     : 'No token added. If your Brain proxy is auth-gated, paste a token above first, then re-copy.'}
                 </p>
               </div>
+
+              {/* Optional: agent brief — makes the agent auto-call brain tools */}
+              {snippet.brief && (
+                <div className="mt-5 rounded-2xl border border-amber/25 bg-amber/5 p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <BookOpenText className="h-4 w-4 text-amber" />
+                    <span className="text-sm font-semibold text-ink">Agent brief (optional)</span>
+                    <Badge color="#fbbf24">recommended</Badge>
+                  </div>
+                  <p className="mb-3 text-[11px] leading-relaxed text-ink-dim">
+                    Instructions the agent auto-reads every session. Without them the agent knows brain
+                    tools exist but decides when to use them — with them it calls <code>get_user_profile</code>,
+                    <code> search_library</code> before technical answers, and <code>save_conversation</code> when
+                    you say &laquo;zapisz do brain&raquo;. Copy-paste, we don&apos;t touch the file.
+                  </p>
+                  <ol className="mb-3 space-y-2.5">
+                    <Step n={1}>
+                      {snippet.brief.mode === 'append-to-existing'
+                        ? 'Append the block below to (create if missing):'
+                        : 'Create this file with the block below as its content:'}
+                      <button
+                        onClick={() => snippet.brief && void copy(snippet.brief.filePath, 'brief-path', 'brief path')}
+                        className="no-drag group ml-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-white/10 bg-black/30 px-2 py-1 align-middle text-[11px] text-ink-dim transition-colors hover:border-amber/40 hover:text-ink"
+                      >
+                        <span className="truncate">{snippet.brief.filePath}</span>
+                        {copied === 'brief-path' ? (
+                          <Check className="h-3 w-3 shrink-0 text-mint" />
+                        ) : (
+                          <Copy className="h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100" />
+                        )}
+                      </button>
+                    </Step>
+                  </ol>
+                  <div className="relative mb-3">
+                    <button
+                      onClick={() => snippet.brief && void copy(snippet.brief.content, 'brief', 'brief content')}
+                      className="no-drag absolute right-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-lg border border-amber/25 bg-amber/10 px-2.5 py-1 text-[11px] font-semibold text-amber transition-colors hover:bg-amber/20"
+                    >
+                      {copied === 'brief' ? (
+                        <>
+                          <Check className="h-3.5 w-3.5" /> Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" /> Copy brief
+                        </>
+                      )}
+                    </button>
+                    <pre className="max-h-56 overflow-auto rounded-xl border border-white/8 bg-black/40 p-3.5 pt-9 text-[11px] leading-relaxed text-ink-dim">
+                      {snippet.brief.content}
+                    </pre>
+                  </div>
+                  <div className="flex items-start gap-2 rounded-xl border border-amber/20 bg-amber/8 px-3 py-2 text-[11px] leading-relaxed text-ink-dim">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber" />
+                    <span>{snippet.brief.restartHint}</span>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </GlassCard>
