@@ -27,6 +27,16 @@ function saveClientOverride(o: Partial<Record<ClientId, boolean>>): void {
   }
 }
 
+/** First-run flag — once true the onboarding wizard never shows again. */
+const ONBOARDED_KEY = 'reliqua.onboarded'
+function loadOnboarded(): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem(ONBOARDED_KEY) === '1'
+  } catch {
+    return true // storage unavailable — fail open, never trap the user in the wizard
+  }
+}
+
 export interface Toast {
   id: string
   kind: 'info' | 'success' | 'warn' | 'error'
@@ -37,6 +47,9 @@ export interface Toast {
 interface State {
   route: Route
   setRoute: (r: Route) => void
+
+  onboarded: boolean
+  completeOnboarding: () => void
 
   scanning: boolean
   sources: DetectedSource[]
@@ -68,6 +81,16 @@ interface State {
 export const useStore = create<State>((set, get) => ({
   route: 'dashboard',
   setRoute: (route) => set({ route }),
+
+  onboarded: loadOnboarded(),
+  completeOnboarding: () => {
+    try {
+      localStorage.setItem(ONBOARDED_KEY, '1')
+    } catch {
+      /* storage unavailable — flag stays in-memory for this session */
+    }
+    set({ onboarded: true })
+  },
 
   scanning: false,
   sources: [],
