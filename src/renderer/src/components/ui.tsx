@@ -124,12 +124,24 @@ export function Toggle({
   )
 }
 
-export function ProgressBar({ value }: { value: number }) {
+export function ProgressBar({ value, indeterminate }: { value?: number; indeterminate?: boolean }) {
+  if (indeterminate) {
+    // Honest "working, no ETA" sweep — for phases where we can't compute a %.
+    return (
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/8">
+        <motion.div
+          className="h-full w-1/3 rounded-full accent-grad"
+          animate={{ x: ['-110%', '320%'] }}
+          transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      </div>
+    )
+  }
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/8">
       <motion.div
         className="h-full accent-grad"
-        animate={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+        animate={{ width: `${Math.min(100, Math.max(0, value ?? 0))}%` }}
         transition={{ ease: 'easeOut', duration: 0.3 }}
       />
     </div>

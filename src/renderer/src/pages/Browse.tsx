@@ -137,6 +137,18 @@ export default function Browse() {
                 )
               })
             )
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-white/10 px-4 py-8 text-center">
+              <MessagesSquare className="h-6 w-6 text-ink-faint" />
+              <p className="text-sm text-ink-dim">
+                {list.length === 0 ? 'Nothing here yet.' : 'No chats from this source.'}
+              </p>
+              <p className="text-[11px] text-ink-faint">
+                {list.length === 0
+                  ? 'Run a backup from the Dashboard or bring exports in via Import.'
+                  : 'Pick another source filter above.'}
+              </p>
+            </div>
           ) : (
             filtered.map((c) => {
               const m = sourceMeta(c.source)

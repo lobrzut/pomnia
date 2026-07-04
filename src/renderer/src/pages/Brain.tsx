@@ -91,6 +91,7 @@ export default function Brain() {
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<BrainHit[]>([])
   const [searching, setSearching] = useState(false)
+  const [searched, setSearched] = useState(false)
 
   const [deployUrl, setDeployUrl] = useState('http://localhost:7860')
   const [reindex, setReindex] = useState(true)
@@ -144,6 +145,7 @@ export default function Brain() {
     setSearching(true)
     try {
       setHits(await api.brainSearch(query, ollamaUrl))
+      setSearched(true)
     } catch (e) {
       useStore.getState().toast({ kind: 'error', title: 'Search failed', detail: (e as Error).message })
     } finally {
@@ -421,7 +423,8 @@ export default function Brain() {
           </div>
         ) : (
           <p className="text-xs text-ink-faint">
-            Distills selected sources with {status?.chatModel ?? 'the local model'} and builds a searchable index.
+            Distills selected sources with <code className="text-cyan">{activeProfile.chatModel}</code> ({activeProfile.label}{' '}
+            profile) and builds a searchable index.
           </p>
         )}
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -474,6 +477,11 @@ export default function Brain() {
           </Button>
         </div>
         <div className="mt-3 space-y-2">
+          {searched && hits.length === 0 && !searching && (
+            <p className="rounded-xl border border-dashed border-white/10 px-4 py-4 text-center text-xs text-ink-faint">
+              No matches. The index only covers distilled notes — run the pipeline above first if you haven't yet.
+            </p>
+          )}
           {hits.map((h, i) => {
             const m = sourceMeta(h.source)
             return (
