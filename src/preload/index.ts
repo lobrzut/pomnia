@@ -32,6 +32,13 @@ const bridge = {
     return () => ipcRenderer.removeListener('brain:progress', l)
   },
   brainSearch: (query: string, ollamaUrl?: string) => ipcRenderer.invoke('brain:search', query, ollamaUrl),
+  ollamaPull: (model: string, ollamaUrl?: string) => ipcRenderer.invoke('ollama:pull', model, ollamaUrl),
+  ollamaPullCancel: () => ipcRenderer.invoke('ollama:pullCancel'),
+  onOllamaPullProgress: (cb: (e: unknown) => void) => {
+    const l = (_: IpcRendererEvent, e: unknown) => cb(e)
+    ipcRenderer.on('ollama:pull:progress', l)
+    return () => ipcRenderer.removeListener('ollama:pull:progress', l)
+  },
   brainDeploy: (opts: unknown) => ipcRenderer.invoke('brain:deploy', opts),
   connectStatus: (brainUrl?: string, token?: string) => ipcRenderer.invoke('connect:status', brainUrl, token),
   connectSnippet: (clientId: string, brainUrl: string, token?: string) =>

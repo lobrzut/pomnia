@@ -11,6 +11,14 @@ export interface OllamaModel {
   size?: number
 }
 
+export interface PullProgress {
+  /** Ollama's human phase string: "pulling manifest", "downloading", "verifying sha256 digest", "success"… */
+  status: string
+  /** Bytes done/total for the current layer — only present during downloads. */
+  completed?: number
+  total?: number
+}
+
 export interface OllamaConfig {
   baseUrl: string
   chatModel: string
@@ -70,6 +78,47 @@ export class Ollama {
     if (!r.ok) throw new Error(`ollama generate ${r.status}: ${await r.text().catch(() => '')}`)
     const j = (await r.json()) as { response?: string }
     return j.response ?? ''
+  }
+
+  /**
+   * Pull a model with streamed progress. Ollama answers NDJSON lines:
+   *   {"status":"pulling manifest"}
+   *   {"status":"downloading","digest":"sha256:…","total":N,"completed":M}
+   *   {"status":"success"}
+   * No global timeout — a 20 GB model on slow WiFi legitimately takes an hour.
+   * Abort via the optional signal instead.
+   */
+  async pull(model: string, onProgress?: (p: PullProgress) => void, signal?: AbortSignal): Promise<void> {
+    const r = await fetch(`${this.cfg.baseUrl}/api/pull`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model, stream: true }),
+      signal
+    })
+    if (!r.ok || !r.body) throw new Error(`ollama pull ${r.status}: ${await r.text().catch(() => '')}`)
+
+    const reader = r.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      // NDJSON: complete lines end with \n; keep the trailing partial in buf.
+      const lines = buf.split('\n')
+      buf = lines.pop() ?? ''
+      for (const line of lines) {
+        if (!line.trim()) continue
+        try {
+          const j = JSON.parse(line) as PullProgress & { error?: string }
+          if (j.error) throw new Error(j.error)
+          onProgress?.(j)
+        } catch (e) {
+          if (e instanceof SyntaxError) continue // torn line — ignore
+          throw e
+        }
+      }
+    }
   }
 
   /** Embed one or more strings. Tries /api/embed (batch) then falls back to /api/embeddings. */

@@ -3,8 +3,10 @@ import { motion } from 'framer-motion'
 import {
   ArrowRight,
   BrainCircuit,
+  Check,
   Cpu,
   Database,
+  Download,
   FileArchive,
   FolderInput,
   Layers,
@@ -14,11 +16,20 @@ import {
   Upload,
   X
 } from 'lucide-react'
+import clsx from 'clsx'
 import { Badge, Button, GlassCard, Input, ProgressBar, Spinner } from '../components/ui'
 import { sourceMeta } from '../lib/format'
 import { api } from '../lib/api'
-import type { BrainHit, BrainRunResult, BrainStatus } from '../lib/types'
+import { VRAM_PROFILES, PROFILE_EMBED_MODEL, PROFILE_EMBED_SIZE } from '@core/brain/profiles'
+import type { BrainHit, BrainRunResult, BrainStatus, OllamaPullEvent } from '../lib/types'
 import { useStore } from '../store/useStore'
+
+const PROFILE_KEY = 'reliqua.brain.profile'
+
+/** "qwen2.5:14b" and "qwen2.5:14b" match; "nomic-embed-text" matches "nomic-embed-text:latest". */
+function hasModel(models: string[], want: string): boolean {
+  return models.some((m) => m === want || m === `${want}:latest` || m.replace(/:latest$/, '') === want)
+}
 
 const STAGES = [
   { id: 'collect', label: 'Collect', icon: Database, note: 'from assistants' },
@@ -28,10 +39,49 @@ const STAGES = [
 ] as const
 
 export default function Brain() {
-  const { sources, selected, toggleSelected } = useStore()
+  const { sources, selected, toggleSelected, toast } = useStore()
   const [status, setStatus] = useState<BrainStatus | null>(null)
   const [ollamaUrl, setOllamaUrl] = useState('')
   const [checking, setChecking] = useState(true)
+
+  // VRAM profile: which chat model distillation uses. Persisted per user.
+  const [profileId, setProfileId] = useState<string>(() => {
+    try {
+      return localStorage.getItem(PROFILE_KEY) ?? 'standard'
+    } catch {
+      return 'standard'
+    }
+  })
+  const [pull, setPull] = useState<OllamaPullEvent | null>(null)
+  const [justPulled, setJustPulled] = useState<Set<string>>(new Set())
+
+  const activeProfile = VRAM_PROFILES.find((p) => p.id === profileId) ?? VRAM_PROFILES[1]
+
+  function selectProfile(id: string) {
+    setProfileId(id)
+    try {
+      localStorage.setItem(PROFILE_KEY, id)
+    } catch {
+      /* storage unavailable — selection lives for this session only */
+    }
+  }
+
+  useEffect(() => api.onOllamaPullProgress(setPull), [])
+
+  async function pullModel(model: string) {
+    try {
+      await api.ollamaPull(model, ollamaUrl || undefined)
+      setJustPulled((s) => new Set(s).add(model))
+      toast({ kind: 'success', title: 'Model ready', detail: model })
+      void check() // refresh the installed list
+    } catch (e) {
+      toast({ kind: 'error', title: 'Pull failed', detail: (e as Error).message })
+    } finally {
+      setPull(null)
+    }
+  }
+
+  const installed = (m: string) => hasModel(status?.models ?? [], m) || justPulled.has(m)
 
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState<{ label: string; pct: number } | null>(null)
@@ -75,6 +125,7 @@ export default function Brain() {
       const sel = [...selected].filter((id) => distillable.some((d) => d.id === id))
       const r = await api.brainRun({
         sources: sel.length ? sel : distillable.map((d) => d.id),
+        model: activeProfile.chatModel,
         ollamaUrl,
         importPath: importPath || undefined
       })
@@ -173,27 +224,158 @@ export default function Brain() {
         })}
       </GlassCard>
 
-      {/* Ollama status */}
+      {/* Ollama status + VRAM profiles */}
       <GlassCard className="mb-5 p-5">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
-          <Cpu className="h-4 w-4 text-iris" /> Local engine (Ollama)
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Input value={ollamaUrl} onChange={(e) => setOllamaUrl(e.target.value)} placeholder="http://localhost:11434" className="w-64" />
-          <Button variant="soft" onClick={() => check()} disabled={checking}>
-            {checking ? <Spinner className="h-4 w-4" /> : <Cpu className="h-4 w-4" />}
-            Recheck
-          </Button>
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <Cpu className="h-4 w-4 text-iris" /> Local engine (Ollama)
+          </div>
           {status && (
             <div className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${status.reachable ? 'bg-mint' : 'bg-rose'}`} />
-              <span className="text-sm text-ink-dim">
-                {status.reachable ? `${status.models.length} models` : 'offline'}
+              <span className="text-xs text-ink-dim">
+                {status.reachable ? `${status.models.length} models installed` : 'offline'}
               </span>
-              {status.reachable && <Badge color="#8b5cf6">{status.chatModel}</Badge>}
-              {status.reachable && <Badge color="#22d3ee">{status.embedModel}</Badge>}
             </div>
           )}
+          <div className="ml-auto flex items-center gap-2">
+            <Input
+              value={ollamaUrl}
+              onChange={(e) => setOllamaUrl(e.target.value)}
+              placeholder="http://localhost:11434"
+              className="w-56"
+            />
+            <Button variant="soft" onClick={() => check()} disabled={checking}>
+              {checking ? <Spinner className="h-4 w-4" /> : <Cpu className="h-4 w-4" />}
+              Recheck
+            </Button>
+          </div>
+        </div>
+
+        <p className="mb-3 text-xs text-ink-faint">
+          Pick the profile matching your GPU — it sets which model distills your chats. Missing models can be pulled
+          right here.
+        </p>
+
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+          {VRAM_PROFILES.map((p) => {
+            const active = p.id === profileId
+            const have = installed(p.chatModel)
+            const pulling = pull !== null && pull.model === p.chatModel
+            const pct = pulling && pull.total ? Math.round(((pull.completed ?? 0) / pull.total) * 100) : null
+            return (
+              <button
+                key={p.id}
+                onClick={() => selectProfile(p.id)}
+                className={clsx(
+                  'no-drag flex flex-col rounded-2xl border p-3.5 text-left transition-colors',
+                  active
+                    ? 'border-iris/60 bg-iris/10 ring-1 ring-iris/30'
+                    : 'border-white/8 bg-black/20 hover:bg-white/5'
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[13px] font-bold text-ink">{p.label}</span>
+                  <span className="text-[10px] font-medium text-ink-faint">{p.vram} VRAM</span>
+                  {p.recommended && <Badge color="#22d3ee">recommended</Badge>}
+                  {active && <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-iris" />}
+                </div>
+                <p className="mt-1.5 min-h-[42px] text-[11px] leading-relaxed text-ink-faint">{p.blurb}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-cyan">{p.chatModel}</code>
+                  <span className="text-[10px] text-ink-faint">{p.chatSize}</span>
+                </div>
+
+                {pulling ? (
+                  <div className="mt-2.5 space-y-1.5">
+                    <ProgressBar value={pct ?? 6} />
+                    <div className="flex items-center justify-between text-[10px] text-ink-faint">
+                      <span>
+                        {pct !== null && pull.total
+                          ? `${pct}% · ${((pull.completed ?? 0) / 1e9).toFixed(1)} / ${(pull.total / 1e9).toFixed(1)} GB`
+                          : pull.status}
+                      </span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void api.ollamaPullCancel()
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.stopPropagation()
+                            void api.ollamaPullCancel()
+                          }
+                        }}
+                        className="cursor-pointer text-rose hover:underline"
+                      >
+                        cancel
+                      </span>
+                    </div>
+                  </div>
+                ) : have ? (
+                  <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium text-mint">
+                    <Check className="h-3.5 w-3.5" /> installed
+                  </div>
+                ) : (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void pullModel(p.chatModel)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.stopPropagation()
+                        void pullModel(p.chatModel)
+                      }
+                    }}
+                    className={clsx(
+                      'mt-2.5 inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-ink transition-colors hover:bg-white/14',
+                      pull !== null && 'pointer-events-none opacity-40'
+                    )}
+                  >
+                    <Download className="h-3 w-3" /> Pull model
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Shared embedding model — one for every profile, changing it = full reindex */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+          <span className="text-[11px] font-medium text-ink-dim">Embedding model (shared)</span>
+          <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-cyan">{PROFILE_EMBED_MODEL}</code>
+          <span className="text-[10px] text-ink-faint">{PROFILE_EMBED_SIZE}</span>
+          {pull?.model === PROFILE_EMBED_MODEL ? (
+            <span className="flex min-w-40 flex-1 items-center gap-2">
+              <span className="flex-1">
+                <ProgressBar
+                  value={pull.total ? Math.round(((pull.completed ?? 0) / pull.total) * 100) : 8}
+                />
+              </span>
+              <span className="text-[10px] text-ink-faint">{pull.status}</span>
+            </span>
+          ) : installed(PROFILE_EMBED_MODEL) ? (
+            <span className="flex items-center gap-1 text-[11px] font-medium text-mint">
+              <Check className="h-3 w-3" /> installed
+            </span>
+          ) : (
+            <Button
+              variant="soft"
+              onClick={() => void pullModel(PROFILE_EMBED_MODEL)}
+              disabled={pull !== null}
+              className="!px-2.5 !py-1 !text-[11px]"
+            >
+              <Download className="h-3 w-3" /> Pull
+            </Button>
+          )}
+          <span className="ml-auto text-[10px] text-ink-faint">
+            same for every profile — switching it would force a full reindex
+          </span>
         </div>
       </GlassCard>
 

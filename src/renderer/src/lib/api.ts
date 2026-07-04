@@ -10,6 +10,7 @@ import type {
   Conversation,
   ConversationMeta,
   DetectedSource,
+  OllamaPullEvent,
   SkillListEntry,
   SkillSyncResult,
   Snapshot,
@@ -50,6 +51,9 @@ export interface ReliquaBridge {
   }): Promise<BrainRunResult>
   onBrainProgress(cb: (e: BrainProgressEvent) => void): () => void
   brainSearch(query: string, ollamaUrl?: string): Promise<BrainHit[]>
+  ollamaPull(model: string, ollamaUrl?: string): Promise<{ ok: boolean }>
+  ollamaPullCancel(): Promise<{ ok: boolean }>
+  onOllamaPullProgress(cb: (e: OllamaPullEvent) => void): () => void
   brainDeploy(opts: {
     to: 'filesystem' | 'dashboard'
     target?: string
@@ -72,6 +76,9 @@ export interface ReliquaBridge {
 }
 
 /* ── Mock bridge for browser preview (no Electron) ──────────────────────── */
+const mockPullListeners = new Set<(e: OllamaPullEvent) => void>()
+let mockPullCancelled = false
+
 function mockBridge(): ReliquaBridge {
   const demoSources: DetectedSource[] = [
     { id: 'claude-code', label: 'Claude Code', strategy: 'hybrid', installed: true, root: '~/.claude', os: 'win32', sizeBytes: 7.2e6, conversations: 38, notes: ['JSONL transcripts per session'] },
@@ -206,6 +213,27 @@ function mockBridge(): ReliquaBridge {
     },
     async brainDeploy() {
       return { detail: 'Deployed 38 notes to Brain vault; reindex triggered.' }
+    },
+    async ollamaPull(model) {
+      // Simulated download: ~4s of progress events, then success.
+      mockPullCancelled = false
+      const total = 1_900_000_000
+      mockPullListeners.forEach((cb) => cb({ model, status: 'pulling manifest' }))
+      for (let i = 1; i <= 20; i++) {
+        await new Promise((r) => setTimeout(r, 180))
+        if (mockPullCancelled) throw new Error('pull cancelled')
+        mockPullListeners.forEach((cb) => cb({ model, status: 'downloading', completed: (total / 20) * i, total }))
+      }
+      mockPullListeners.forEach((cb) => cb({ model, status: 'success' }))
+      return { ok: true }
+    },
+    async ollamaPullCancel() {
+      mockPullCancelled = true
+      return { ok: true }
+    },
+    onOllamaPullProgress(cb) {
+      mockPullListeners.add(cb)
+      return () => mockPullListeners.delete(cb)
     },
     async connectStatus() {
       await new Promise((r) => setTimeout(r, 500))
