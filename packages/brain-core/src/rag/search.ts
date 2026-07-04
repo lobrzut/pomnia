@@ -111,7 +111,9 @@ export async function search(
         WHERE chunks_vec.embedding MATCH ? AND k = ?
         ORDER BY chunks_vec.distance`,
     )
-    .all(vecToBlob(emb), fetchN) as SemanticRow[]
+    // BigInt: better-sqlite3 v12 binds JS numbers as REAL and vec0 requires
+    // an INTEGER k — same constraint as rowid binds in the indexer.
+    .all(vecToBlob(emb), BigInt(fetchN)) as SemanticRow[]
 
   const matchesSource = (name: string): boolean => {
     if (source === 'all') return true
