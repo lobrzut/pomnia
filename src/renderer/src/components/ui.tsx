@@ -88,6 +88,42 @@ export function Spinner({ className }: { className?: string }) {
   return <Loader2 className={clsx('animate-spin', className)} />
 }
 
+export function Toggle({
+  checked,
+  onChange,
+  disabled,
+  'aria-label': ariaLabel
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  disabled?: boolean
+  'aria-label'?: string
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={clsx(
+        'no-drag relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40',
+        checked
+          ? 'bg-iris shadow-[inset_0_1px_2px_#0003,0_0_14px_-3px_#6366f1b3]'
+          : 'bg-white/10 shadow-[inset_0_1px_3px_#0006] ring-1 ring-inset ring-white/10'
+      )}
+    >
+      <motion.span
+        aria-hidden
+        animate={{ x: checked ? 22 : 2 }}
+        transition={{ type: 'spring', stiffness: 550, damping: 32 }}
+        className="absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_#0006]"
+      />
+    </button>
+  )
+}
+
 export function ProgressBar({ value }: { value: number }) {
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/8">

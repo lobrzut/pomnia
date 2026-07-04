@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Brain, Clock, FileArchive, FolderOpen, Lock, Plug, RotateCcw, ShieldCheck, Vault } from 'lucide-react'
-import { Button, Field, GlassCard, Input, Spinner } from '../components/ui'
+import { Button, Field, GlassCard, Input, Spinner, Toggle } from '../components/ui'
 import { ClientIcon } from '../components/ClientIcon'
 import { api, isMock } from '../lib/api'
 import { humanBytes, relativeTime } from '../lib/format'
@@ -154,21 +154,11 @@ export default function Settings() {
                     <RotateCcw className="h-3.5 w-3.5" />
                   </button>
                 )}
-                <button
-                  onClick={() => setConnectClientVisible(id, !visible)}
-                  role="switch"
-                  aria-checked={visible}
+                <Toggle
+                  checked={visible}
+                  onChange={(v) => setConnectClientVisible(id, v)}
                   aria-label={`Show ${c?.label ?? id} in Connect`}
-                  className={`no-drag relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                    visible ? 'bg-iris' : 'bg-white/12'
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-                      visible ? 'translate-x-[22px]' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
+                />
               </div>
             )
           })}
