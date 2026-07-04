@@ -82,8 +82,8 @@ export default function Import() {
           <GlassCard className="mb-5 flex items-center gap-3 p-4">
             <CheckCircle2 className="h-5 w-5 text-mint" />
             <div className="flex-1 text-sm text-ink">
-              Sealed <span className="font-semibold">{result.sealed}</span> conversations into the vault — now in{' '}
-              <span className="text-iris">Chats</span> &amp; restorable.
+              Sealed <span className="font-semibold">{result.sealed}</span> conversations into the vault — browse and
+              search them in <span className="text-iris">Chats</span>.
             </div>
             <div className="flex gap-1.5">
               {result.sources.map((s) => (

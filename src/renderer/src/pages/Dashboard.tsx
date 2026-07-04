@@ -80,11 +80,21 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        {scanning && installed.length === 0
-          ? Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="skeleton h-[104px] rounded-[var(--radius-xl)]" />
-            ))
-          : installed.map((s, i) => {
+        {scanning && installed.length === 0 ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="skeleton h-[104px] rounded-[var(--radius-xl)]" />
+          ))
+        ) : installed.length === 0 ? (
+          <div className="col-span-2 flex flex-col items-center gap-2 rounded-[var(--radius-xl)] border border-dashed border-white/10 px-6 py-10 text-center">
+            <Server className="h-6 w-6 text-ink-faint" />
+            <p className="text-sm text-ink-dim">No AI tools detected on this machine.</p>
+            <p className="max-w-sm text-[11px] leading-relaxed text-ink-faint">
+              Reliqua looks for Claude Code, Cursor, Claude Desktop, Antigravity and VS Code. Install one, chat a bit,
+              then hit Rescan — or bring exported chats in via the Import tab.
+            </p>
+          </div>
+        ) : (
+          installed.map((s, i) => {
               const meta = sourceMeta(s.id)
               const on = selected.has(s.id)
               return (
@@ -125,7 +135,8 @@ export default function Dashboard() {
                   </div>
                 </GlassCard>
               )
-            })}
+            })
+        )}
       </div>
 
       {/* Backup launch bar */}
@@ -138,7 +149,7 @@ export default function Dashboard() {
             {backingUp ? (
               <>
                 <div className="mb-1.5 text-sm font-medium text-ink">{backupPhase || 'Working…'}</div>
-                <ProgressBar value={66} />
+                <ProgressBar indeterminate />
               </>
             ) : (
               <>
