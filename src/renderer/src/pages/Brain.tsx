@@ -21,7 +21,7 @@ import { Badge, Button, GlassCard, Input, ProgressBar, Spinner } from '../compon
 import { relativeTime, sourceMeta } from '../lib/format'
 import { api } from '../lib/api'
 import { VRAM_PROFILES, PROFILE_EMBED_MODEL, PROFILE_EMBED_SIZE } from '@core/brain/profiles'
-import type { BrainHit, BrainRunResult, BrainStateInfo, BrainStatus, OllamaPullEvent } from '../lib/types'
+import type { BrainHit, BrainRunResult, BrainStateInfo, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent } from '../lib/types'
 import { useStore } from '../store/useStore'
 
 const PROFILE_KEY = 'reliqua.brain.profile'
@@ -92,6 +92,49 @@ export default function Brain() {
   const [hits, setHits] = useState<BrainHit[]>([])
   const [searching, setSearching] = useState(false)
   const [searched, setSearched] = useState(false)
+
+  // Embedded brain-core (forked local MCP server).
+  const [embedded, setEmbedded] = useState<EmbeddedBrainStatus | null>(null)
+  const [embeddedBusy, setEmbeddedBusy] = useState(false)
+  async function refreshEmbedded() {
+    try {
+      setEmbedded(await api.brainCoreStatus())
+    } catch {
+      setEmbedded(null)
+    }
+  }
+  useEffect(() => {
+    void refreshEmbedded()
+  }, [])
+  async function toggleEmbedded() {
+    if (embeddedBusy || !embedded) return
+    setEmbeddedBusy(true)
+    try {
+      setEmbedded(embedded.running ? await api.brainCoreStop() : await api.brainCoreStart(ollamaUrl || undefined))
+    } catch (e) {
+      useStore.getState().toast({ kind: 'error', title: 'Embedded brain', detail: (e as Error).message })
+      void refreshEmbedded()
+    } finally {
+      setEmbeddedBusy(false)
+    }
+  }
+  async function reindexEmbedded() {
+    if (embeddedBusy) return
+    setEmbeddedBusy(true)
+    try {
+      const r = await api.brainCoreReindex()
+      useStore.getState().toast({
+        kind: 'success',
+        title: 'Local index refreshed',
+        detail: `${r.stats.files} notes · ${r.stats.chunks} chunks${r.stats.prunedFiles ? ` · ${r.stats.prunedFiles} pruned` : ''}`
+      })
+    } catch (e) {
+      useStore.getState().toast({ kind: 'error', title: 'Reindex failed', detail: (e as Error).message })
+    } finally {
+      setEmbeddedBusy(false)
+      void refreshEmbedded()
+    }
+  }
 
   // Honest pipeline state — live chats vs the distill ledger.
   const [brainState, setBrainState] = useState<BrainStateInfo | null>(null)
@@ -473,6 +516,46 @@ export default function Brain() {
             same for every profile — switching it would force a full reindex
           </span>
         </div>
+      </GlassCard>
+
+      {/* Embedded brain — forked brain-core serving MCP on localhost */}
+      <GlassCard className="mb-5 p-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <Rocket className="h-4 w-4 text-violet" /> Embedded brain
+            <Badge color="#8b5cf6">local MCP</Badge>
+          </div>
+          {embedded?.running ? (
+            <span className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-mint" />
+              </span>
+              <code className="font-mono text-[11px] text-cyan">{embedded.url}</code>
+            </span>
+          ) : (
+            <span className="text-xs text-ink-faint">
+              {embedded?.lastError ? `stopped — ${embedded.lastError}` : 'stopped'}
+            </span>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            {embedded?.running && (
+              <Button variant="soft" onClick={() => void reindexEmbedded()} disabled={embeddedBusy || embedded.indexing}>
+                {embedded.indexing || embeddedBusy ? <Spinner className="h-3.5 w-3.5" /> : <Layers className="h-3.5 w-3.5" />}
+                Reindex
+              </Button>
+            )}
+            <Button onClick={() => void toggleEmbedded()} disabled={embeddedBusy || embedded?.starting}>
+              {embeddedBusy || embedded?.starting ? <Spinner className="h-4 w-4" /> : <Rocket className="h-4 w-4" />}
+              {embedded?.running ? 'Stop' : 'Start'}
+            </Button>
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+          Runs brain-core as a child process — MCP clients on this machine (Claude Code, Cursor…) get{' '}
+          <code className="text-cyan">search_library</code> / <code className="text-cyan">save_conversation</code> from{' '}
+          <code className="text-cyan">127.0.0.1</code> without any server. Distill runs refresh its index automatically.
+        </p>
       </GlassCard>
 
       {/* Run */}

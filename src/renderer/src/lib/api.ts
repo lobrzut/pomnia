@@ -7,6 +7,7 @@ import type {
   BrainStateInfo,
   BrainStatus,
   ClientId,
+  EmbeddedBrainStatus,
   ClientStatus,
   Conversation,
   ConversationMeta,
@@ -52,6 +53,11 @@ export interface ReliquaBridge {
     pendingOnly?: boolean
   }): Promise<BrainRunResult>
   brainState(): Promise<BrainStateInfo>
+  brainCoreStatus(): Promise<EmbeddedBrainStatus>
+  brainCoreStart(ollamaUrl?: string): Promise<EmbeddedBrainStatus>
+  brainCoreStop(): Promise<EmbeddedBrainStatus>
+  brainCoreReindex(): Promise<{ stats: { files: number; chunks: number; empty: number; prunedFiles: number } }>
+  onBrainCoreEvent(cb: (e: { type: string; file?: string; done?: number; total?: number }) => void): () => void
   onBrainProgress(cb: (e: BrainProgressEvent) => void): () => void
   brainSearch(query: string, ollamaUrl?: string): Promise<BrainHit[]>
   ollamaPull(model: string, ollamaUrl?: string): Promise<{ ok: boolean }>
@@ -81,6 +87,14 @@ export interface ReliquaBridge {
 /* ── Mock bridge for browser preview (no Electron) ──────────────────────── */
 const mockPullListeners = new Set<(e: OllamaPullEvent) => void>()
 let mockPullCancelled = false
+const mockEmbedded: EmbeddedBrainStatus = {
+  running: false,
+  starting: false,
+  indexing: false,
+  url: null,
+  dataDir: 'C:/Users/…/Reliqua/brain-core-data',
+  lastError: null
+}
 // Mutable so "distill backlog" is demoable: brainRun drains the pending count.
 const mockBrainState: BrainStateInfo = {
   total: 59,
@@ -223,6 +237,28 @@ function mockBridge(): ReliquaBridge {
     },
     async brainState() {
       return { ...mockBrainState, perSource: mockBrainState.perSource.map((p) => ({ ...p })) }
+    },
+    async brainCoreStatus() {
+      return { ...mockEmbedded }
+    },
+    async brainCoreStart() {
+      mockEmbedded.starting = true
+      await new Promise((r) => setTimeout(r, 900))
+      Object.assign(mockEmbedded, { running: true, starting: false, url: 'http://127.0.0.1:7862/mcp', lastError: null })
+      return { ...mockEmbedded }
+    },
+    async brainCoreStop() {
+      Object.assign(mockEmbedded, { running: false, url: null })
+      return { ...mockEmbedded }
+    },
+    async brainCoreReindex() {
+      mockEmbedded.indexing = true
+      await new Promise((r) => setTimeout(r, 1200))
+      mockEmbedded.indexing = false
+      return { stats: { files: 38, chunks: 121, empty: 2, prunedFiles: 1 } }
+    },
+    onBrainCoreEvent() {
+      return () => {}
     },
     onBrainProgress() {
       return () => {}

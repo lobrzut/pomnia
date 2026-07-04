@@ -38,6 +38,8 @@ import {
   type SourceId
 } from '@core/index'
 
+import { brainCore } from './brainCore.js'
+
 let win: BrowserWindow | null = null
 let vault: Vault | null = null
 let vaultPath: string | null = null
@@ -369,6 +371,11 @@ function registerIpc(): void {
       // including skipped-as-too-short ones (they will never produce a note,
       // re-running them forever would be noise, not signal).
       await markProcessed(convs.map((c) => c.id))
+      // Fresh notes on disk → refresh the embedded brain's index too, so MCP
+      // clients see them without a manual reindex. Fire-and-forget.
+      if (brainCore.status().running) {
+        brainCore.reindex(brainDir()).catch((e) => log.warn('embedded reindex failed:', (e as Error).message))
+      }
       return {
         notesDir: dir,
         notes: okNotes.length,
@@ -380,6 +387,26 @@ function registerIpc(): void {
       }
     }
   )
+
+  // ── Embedded brain-core (fork lifecycle) ──
+  brainCore.onEvent = (e) => win?.webContents.send('brainCore:event', e)
+  ipcMain.handle('brainCore:status', () => brainCore.status())
+  ipcMain.handle('brainCore:start', async (_e, ollamaUrl?: string) => {
+    await brainCore.start({
+      dataDir: join(app.getPath('userData'), 'brain-core-data'),
+      ollamaUrl,
+    })
+    return brainCore.status()
+  })
+  ipcMain.handle('brainCore:stop', async () => brainCore.stop())
+  ipcMain.handle('brainCore:reindex', async () => {
+    // Index the distilled-notes dir — the same place brain:run deploys to.
+    const stats = await brainCore.reindex(brainDir())
+    return { stats }
+  })
+  app.on('before-quit', () => {
+    void brainCore.stop()
+  })
 
   // Honest pipeline state: how many chats exist in the tools right now vs how
   // many the ledger has seen. Reads live sources, so it reflects deletions too.

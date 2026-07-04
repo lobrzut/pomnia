@@ -1,0 +1,196 @@
+/**
+ * BrainCoreManager — lifecycle of the embedded brain-core child process.
+ *
+ * Reliqua forks `packages/brain-core/dist/embedded.js` and talks to it over
+ * the fork IPC channel (see brain-core/src/embedded.ts for the protocol).
+ * One child max; crash puts us back in `stopped` with lastError set.
+ *
+ * ABI note: better-sqlite3 is a native module. A fork from Electron main runs
+ * Electron-as-node (ELECTRON_RUN_AS_NODE), which needs the binding compiled
+ * for Electron's ABI — `electron-builder install-app-deps` handles that for
+ * packaged builds. In dev we prefer the system `node` binary (matches the
+ * prebuild that `npm install` fetched); RELIQUA_NODE_BIN overrides.
+ */
+
+import { fork, type ChildProcess } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { app } from 'electron'
+
+export interface EmbeddedBrainStatus {
+  running: boolean
+  starting: boolean
+  indexing: boolean
+  url: string | null
+  dataDir: string
+  lastError: string | null
+}
+
+interface ChildMsg {
+  type: string
+  url?: string
+  message?: string
+  stats?: unknown
+  file?: string
+  done?: number
+  total?: number
+}
+
+export interface StartOptions {
+  dataDir: string
+  ollamaUrl?: string
+  port?: number
+}
+
+function resolveNodeBin(): string | undefined {
+  if (process.env.RELIQUA_NODE_BIN) return process.env.RELIQUA_NODE_BIN
+  if (app.isPackaged) return undefined // packaged: Electron-as-node + electron-ABI binding
+  for (const p of ['C:/Program Files/nodejs/node.exe', '/usr/local/bin/node', '/usr/bin/node']) {
+    if (existsSync(p)) return p
+  }
+  return undefined
+}
+
+function entryPath(): string {
+  // Dev: monorepo path. Packaged: shipped as extraResource (see electron-builder config — TODO Phase 3).
+  return app.isPackaged
+    ? join(process.resourcesPath, 'brain-core', 'embedded.js')
+    : join(app.getAppPath(), 'packages', 'brain-core', 'dist', 'embedded.js')
+}
+
+export class BrainCoreManager {
+  private child: ChildProcess | null = null
+  private url: string | null = null
+  private starting = false
+  private indexing = false
+  private lastError: string | null = null
+  private dataDir = ''
+  /** Broadcast hook — main wires this to webContents.send. */
+  onEvent: ((e: ChildMsg) => void) | null = null
+
+  status(): EmbeddedBrainStatus {
+    return {
+      running: !!this.child && !!this.url,
+      starting: this.starting,
+      indexing: this.indexing,
+      url: this.url,
+      dataDir: this.dataDir,
+      lastError: this.lastError,
+    }
+  }
+
+  async start(opts: StartOptions): Promise<EmbeddedBrainStatus> {
+    if (this.child) return this.status()
+    this.starting = true
+    this.lastError = null
+    this.dataDir = opts.dataDir
+    try {
+      const entry = entryPath()
+      if (!existsSync(entry)) {
+        throw new Error(`brain-core build missing: ${entry} — run \`npm run build -w @reliqua/brain-core\``)
+      }
+      const execPath = resolveNodeBin()
+      const child = fork(entry, [], {
+        stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+        ...(execPath ? { execPath } : {}),
+      })
+      child.stderr?.on('data', (d: Buffer) => console.error('[brain-core]', d.toString().trimEnd()))
+      child.on('exit', (code) => {
+        if (this.child === child) {
+          this.child = null
+          this.url = null
+          this.indexing = false
+          if (code && code !== 0) this.lastError = `brain-core exited with code ${code}`
+          this.onEvent?.({ type: 'exited', message: String(code ?? 0) })
+        }
+      })
+      child.on('message', (m: ChildMsg) => {
+        if (m.type === 'reindex-progress') this.onEvent?.(m)
+      })
+      this.child = child
+
+      const ready = await new Promise<string>((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('brain-core start timeout (20s)')), 20_000)
+        const h = (m: ChildMsg): void => {
+          if (m.type === 'ready' && m.url) {
+            clearTimeout(t)
+            child.off('message', h)
+            resolve(m.url)
+          } else if (m.type === 'error') {
+            clearTimeout(t)
+            child.off('message', h)
+            reject(new Error(m.message ?? 'unknown brain-core error'))
+          }
+        }
+        child.on('message', h)
+        child.send({
+          type: 'start',
+          config: {
+            dataDir: opts.dataDir,
+            ollamaUrl: opts.ollamaUrl,
+            port: opts.port ?? 7862,
+            host: '127.0.0.1',
+          },
+        })
+      })
+      this.url = ready
+      return this.status()
+    } catch (err) {
+      this.lastError = err instanceof Error ? err.message : String(err)
+      this.child?.kill()
+      this.child = null
+      this.url = null
+      throw err
+    } finally {
+      this.starting = false
+    }
+  }
+
+  async stop(): Promise<EmbeddedBrainStatus> {
+    const child = this.child
+    if (!child) return this.status()
+    await new Promise<void>((resolve) => {
+      const t = setTimeout(() => {
+        child.kill()
+        resolve()
+      }, 5_000)
+      child.once('exit', () => {
+        clearTimeout(t)
+        resolve()
+      })
+      child.send({ type: 'stop' })
+    })
+    this.child = null
+    this.url = null
+    return this.status()
+  }
+
+  async reindex(dir: string): Promise<unknown> {
+    const child = this.child
+    if (!child || !this.url) throw new Error('embedded brain is not running')
+    if (this.indexing) throw new Error('reindex already running')
+    this.indexing = true
+    try {
+      return await new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('reindex timeout (10 min)')), 600_000)
+        const h = (m: ChildMsg): void => {
+          if (m.type === 'reindexed') {
+            clearTimeout(t)
+            child.off('message', h)
+            resolve(m.stats)
+          } else if (m.type === 'error') {
+            clearTimeout(t)
+            child.off('message', h)
+            reject(new Error(m.message ?? 'reindex failed'))
+          }
+        }
+        child.on('message', h)
+        child.send({ type: 'reindex', dir })
+      })
+    } finally {
+      this.indexing = false
+    }
+  }
+}
+
+export const brainCore = new BrainCoreManager()
