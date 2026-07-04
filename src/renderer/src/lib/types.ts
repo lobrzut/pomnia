@@ -40,6 +40,15 @@ export interface OllamaPullEvent {
   total?: number
 }
 
+/** Honest distill-pipeline state — live source counts vs the distill ledger. */
+export interface BrainStateInfo {
+  total: number
+  distilled: number
+  pending: number
+  perSource: { source: SourceId; label: string; total: number; pending: number }[]
+  lastRun: string | null
+}
+
 export interface BrainRunResult {
   notesDir: string
   notes: number
