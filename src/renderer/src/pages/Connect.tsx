@@ -151,11 +151,13 @@ export default function Connect() {
       // two different services on two different ports. Derive by convention.
       const dashboardUrl = brainUrl.replace(/:7862\b/, ':7860')
       const r = await api.connectSkillsSync(dashboardUrl, token || undefined)
-      toast({
-        kind: r.errors.length ? 'warn' : 'success',
-        title: `Synced ${r.written} skill(s)`,
-        detail: r.errors.length ? `${r.errors.length} error(s) — see console` : 'Available offline now.'
-      })
+      toast(
+        r.errors.length
+          ? { kind: 'warn', title: `Synced ${r.written} skill(s)`, detail: `${r.errors.length} error(s) — see console` }
+          : r.written === 0
+            ? { kind: 'info', title: 'No skills to sync', detail: 'The Brain server has no skills yet.' }
+            : { kind: 'success', title: `Synced ${r.written} skill(s)`, detail: 'Available offline now.' }
+      )
       if (r.errors.length) console.warn('skill sync errors', r.errors)
     } catch (e) {
       toast({ kind: 'error', title: 'Skill sync failed', detail: (e as Error).message })

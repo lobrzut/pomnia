@@ -30,6 +30,16 @@ export interface BrainStatus {
   models: string[]
 }
 
+// VRAM profiles are plain data (no node imports) — safe to deep-import as a value.
+export type { VramProfile } from '@core/brain/profiles'
+
+export interface OllamaPullEvent {
+  model: string
+  status: string
+  completed?: number
+  total?: number
+}
+
 export interface BrainRunResult {
   notesDir: string
   notes: number

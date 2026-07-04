@@ -282,6 +282,30 @@ function registerIpc(): void {
     return { reachable, baseUrl: o.cfg.baseUrl, chatModel: o.cfg.chatModel, embedModel: o.cfg.embedModel, models }
   })
 
+  // One pull at a time — Ollama serializes downloads anyway, and a single
+  // AbortController keeps cancel semantics trivial.
+  let pullAbort: AbortController | null = null
+  ipcMain.handle('ollama:pull', async (_e, model: string, url?: string) => {
+    if (pullAbort) throw new Error('another pull is already running')
+    const o = ollamaFor(url)
+    pullAbort = new AbortController()
+    try {
+      await o.pull(
+        model,
+        (p) => win?.webContents.send('ollama:pull:progress', { model, ...p }),
+        pullAbort.signal
+      )
+      win?.webContents.send('ollama:pull:progress', { model, status: 'success' })
+      return { ok: true }
+    } finally {
+      pullAbort = null
+    }
+  })
+  ipcMain.handle('ollama:pullCancel', () => {
+    pullAbort?.abort()
+    return { ok: true }
+  })
+
   ipcMain.handle(
     'brain:run',
     async (

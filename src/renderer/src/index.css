@@ -27,6 +27,13 @@
   * {
     box-sizing: border-box;
   }
+  /* Replace the UA focus ring (orange on Windows) with a house-style iris ring.
+     Keyboard-only (:focus-visible) — mouse clicks stay ring-free. */
+  :focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-iris) 70%, transparent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
   html,
   body,
   #root {
