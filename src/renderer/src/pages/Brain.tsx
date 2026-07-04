@@ -18,10 +18,10 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { Badge, Button, GlassCard, Input, ProgressBar, Spinner } from '../components/ui'
-import { sourceMeta } from '../lib/format'
+import { relativeTime, sourceMeta } from '../lib/format'
 import { api } from '../lib/api'
 import { VRAM_PROFILES, PROFILE_EMBED_MODEL, PROFILE_EMBED_SIZE } from '@core/brain/profiles'
-import type { BrainHit, BrainRunResult, BrainStatus, OllamaPullEvent } from '../lib/types'
+import type { BrainHit, BrainRunResult, BrainStateInfo, BrainStatus, OllamaPullEvent } from '../lib/types'
 import { useStore } from '../store/useStore'
 
 const PROFILE_KEY = 'reliqua.brain.profile'
@@ -93,6 +93,23 @@ export default function Brain() {
   const [searching, setSearching] = useState(false)
   const [searched, setSearched] = useState(false)
 
+  // Honest pipeline state — live chats vs the distill ledger.
+  const [brainState, setBrainState] = useState<BrainStateInfo | null>(null)
+  const [stateLoading, setStateLoading] = useState(false)
+  async function loadState() {
+    setStateLoading(true)
+    try {
+      setBrainState(await api.brainState())
+    } catch {
+      setBrainState(null)
+    } finally {
+      setStateLoading(false)
+    }
+  }
+  useEffect(() => {
+    void loadState()
+  }, [])
+
   const [deployUrl, setDeployUrl] = useState('http://localhost:7860')
   const [reindex, setReindex] = useState(true)
   const [deploying, setDeploying] = useState(false)
@@ -112,7 +129,7 @@ export default function Brain() {
 
   const distillable = sources.filter((s) => ['claude-code', 'cursor', 'claude-desktop'].includes(s.id))
 
-  async function run() {
+  async function run(pendingOnly = false) {
     setRunning(true)
     setResult(null)
     setProgress({ label: 'starting…', pct: 4 })
@@ -128,7 +145,8 @@ export default function Brain() {
         sources: sel.length ? sel : distillable.map((d) => d.id),
         model: activeProfile.chatModel,
         ollamaUrl,
-        importPath: importPath || undefined
+        importPath: importPath || undefined,
+        pendingOnly
       })
       setResult(r)
     } catch (e) {
@@ -137,6 +155,7 @@ export default function Brain() {
       off()
       setRunning(false)
       setProgress(null)
+      void loadState()
     }
   }
 
@@ -194,6 +213,81 @@ export default function Brain() {
           </p>
         </div>
       </div>
+
+      {/* Brain state — live chats vs distill ledger, the "what's left to do" panel */}
+      <GlassCard className="mb-5 p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <Database className="h-4 w-4 text-iris" /> Brain state
+          </div>
+          <div className="flex items-center gap-3">
+            {brainState?.lastRun && (
+              <span className="text-[11px] text-ink-faint">last distill {relativeTime(brainState.lastRun)}</span>
+            )}
+            <Button variant="ghost" onClick={() => void loadState()} disabled={stateLoading} className="!px-2 !py-1">
+              {stateLoading ? <Spinner className="h-3.5 w-3.5" /> : <ArrowRight className="h-3.5 w-3.5 rotate-90" />}
+            </Button>
+          </div>
+        </div>
+        {brainState === null ? (
+          <div className="flex items-center gap-2 py-1 text-sm text-ink-dim">
+            <Spinner className="h-4 w-4" /> reading pipeline state…
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="rounded-2xl border border-white/8 bg-black/20 p-3.5">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-ink-faint">Chats in tools</div>
+                <div className="mt-1 text-2xl font-bold text-ink">{brainState.total}</div>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-black/20 p-3.5">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-ink-faint">Distilled</div>
+                <div className="mt-1 flex items-baseline gap-1.5 text-2xl font-bold text-ink">
+                  {brainState.distilled}
+                  {brainState.pending === 0 && brainState.total > 0 && <Check className="h-4 w-4 text-mint" />}
+                </div>
+              </div>
+              <div
+                className={`rounded-2xl border p-3.5 ${
+                  brainState.pending > 0 ? 'border-amber/30 bg-amber/8' : 'border-white/8 bg-black/20'
+                }`}
+              >
+                <div className="text-[10px] font-medium uppercase tracking-wider text-ink-faint">Backlog</div>
+                <div className={`mt-1 text-2xl font-bold ${brainState.pending > 0 ? 'text-amber' : 'text-ink'}`}>
+                  {brainState.pending}
+                </div>
+              </div>
+            </div>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              {brainState.perSource.map((p) => {
+                const m = sourceMeta(p.source)
+                return (
+                  <span
+                    key={p.source}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[11px]"
+                  >
+                    <span style={{ color: m.color }}>{p.label}</span>
+                    <span className="text-ink-faint">
+                      {p.total - p.pending}/{p.total}
+                    </span>
+                    {p.pending > 0 && <span className="font-medium text-amber">+{p.pending} new</span>}
+                  </span>
+                )
+              })}
+              {brainState.pending > 0 && (
+                <Button
+                  onClick={() => void run(true)}
+                  disabled={running || !status?.reachable}
+                  className="ml-auto !px-3.5 !py-1.5 !text-[12px]"
+                >
+                  {running ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  Distill backlog ({brainState.pending})
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+      </GlassCard>
 
       {/* Pipeline stages */}
       <GlassCard className="mb-5 flex items-center justify-between p-5">

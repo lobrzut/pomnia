@@ -26,6 +26,7 @@ const bridge = {
   revealPath: (p: string) => ipcRenderer.invoke('reveal', p),
   brainStatus: (ollamaUrl?: string) => ipcRenderer.invoke('brain:status', ollamaUrl),
   brainRun: (opts: unknown) => ipcRenderer.invoke('brain:run', opts),
+  brainState: () => ipcRenderer.invoke('brain:state'),
   onBrainProgress: (cb: (e: unknown) => void) => {
     const l = (_: IpcRendererEvent, e: unknown) => cb(e)
     ipcRenderer.on('brain:progress', l)

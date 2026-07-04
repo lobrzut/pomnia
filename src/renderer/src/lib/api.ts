@@ -4,6 +4,7 @@ import type {
   BrainPing,
   BrainProgressEvent,
   BrainRunResult,
+  BrainStateInfo,
   BrainStatus,
   ClientId,
   ClientStatus,
@@ -48,7 +49,9 @@ export interface ReliquaBridge {
     model?: string
     ollamaUrl?: string
     importPath?: string
+    pendingOnly?: boolean
   }): Promise<BrainRunResult>
+  brainState(): Promise<BrainStateInfo>
   onBrainProgress(cb: (e: BrainProgressEvent) => void): () => void
   brainSearch(query: string, ollamaUrl?: string): Promise<BrainHit[]>
   ollamaPull(model: string, ollamaUrl?: string): Promise<{ ok: boolean }>
@@ -78,6 +81,17 @@ export interface ReliquaBridge {
 /* ── Mock bridge for browser preview (no Electron) ──────────────────────── */
 const mockPullListeners = new Set<(e: OllamaPullEvent) => void>()
 let mockPullCancelled = false
+// Mutable so "distill backlog" is demoable: brainRun drains the pending count.
+const mockBrainState: BrainStateInfo = {
+  total: 59,
+  distilled: 38,
+  pending: 21,
+  perSource: [
+    { source: 'claude-code', label: 'Claude Code', total: 38, pending: 12 },
+    { source: 'cursor', label: 'Cursor', total: 21, pending: 9 }
+  ],
+  lastRun: new Date(Date.now() - 26 * 3600e3).toISOString()
+}
 
 function mockBridge(): ReliquaBridge {
   const demoSources: DetectedSource[] = [
@@ -200,7 +214,15 @@ function mockBridge(): ReliquaBridge {
     },
     async brainRun() {
       await new Promise((r) => setTimeout(r, 1400))
+      // Drain the mock backlog so the Brain state panel reacts like the real app.
+      mockBrainState.distilled = mockBrainState.total
+      mockBrainState.pending = 0
+      mockBrainState.perSource.forEach((p) => (p.pending = 0))
+      mockBrainState.lastRun = new Date().toISOString()
       return { notesDir: 'C:/…/brain-notes', notes: 38, stubs: 4, garbage: 3, skipped: 7, chunks: 121, dim: 768 }
+    },
+    async brainState() {
+      return { ...mockBrainState, perSource: mockBrainState.perSource.map((p) => ({ ...p })) }
     },
     onBrainProgress() {
       return () => {}

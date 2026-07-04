@@ -50,6 +50,32 @@ function requireVault(): Vault {
 const brainDir = (): string => join(app.getPath('userData'), 'brain-notes')
 const brainIndexFile = (): string => join(brainDir(), '.reliqua-index.json')
 
+/* ── Distill ledger ────────────────────────────────────────────────────────
+   Which conversation ids have been through the pipeline. This is what lets
+   the UI show an honest backlog ("N chats not distilled yet") instead of
+   guessing — and lets "distill backlog" run incrementally. */
+const ledgerFile = (): string => join(app.getPath('userData'), 'distill-ledger.json')
+
+interface DistillLedger {
+  /** conversation id → ISO timestamp of the run that processed it */
+  processed: Record<string, string>
+}
+
+async function readLedger(): Promise<DistillLedger> {
+  try {
+    return JSON.parse(await fs.readFile(ledgerFile(), 'utf8')) as DistillLedger
+  } catch {
+    return { processed: {} }
+  }
+}
+
+async function markProcessed(ids: string[]): Promise<void> {
+  const l = await readLedger()
+  const now = new Date().toISOString()
+  for (const id of ids) if (!l.processed[id]) l.processed[id] = now
+  await fs.writeFile(ledgerFile(), JSON.stringify(l), 'utf8')
+}
+
 function ollamaFor(url?: string, model?: string): Ollama {
   const cfg = defaultOllamaConfig()
   if (url) cfg.baseUrl = url
@@ -310,13 +336,25 @@ function registerIpc(): void {
     'brain:run',
     async (
       _e,
-      opts: { sources: SourceId[]; limit?: number; model?: string; ollamaUrl?: string; importPath?: string }
+      opts: {
+        sources: SourceId[]
+        limit?: number
+        model?: string
+        ollamaUrl?: string
+        importPath?: string
+        /** Only distill conversations the ledger hasn't seen — the "distill backlog" CTA. */
+        pendingOnly?: boolean
+      }
     ) => {
       const o = ollamaFor(opts.ollamaUrl, opts.model)
       if (!(await o.reachable())) throw new Error(`Ollama offline at ${o.cfg.baseUrl}`)
-      const convs = opts.importPath
+      let convs = opts.importPath
         ? (await parseExportPath(opts.importPath)).conversations.slice(0, opts.limit || undefined)
         : await collectLive(opts.sources, opts.limit)
+      if (opts.pendingOnly) {
+        const l = await readLedger()
+        convs = convs.filter((c) => !l.processed[c.id])
+      }
       const { notes, skipped } = await distillAll(convs, o, opts.model, (p) => win?.webContents.send('brain:progress', p))
       const dir = brainDir()
       await deployFilesystem(notes, dir)
@@ -327,6 +365,10 @@ function registerIpc(): void {
         (done, total) => win?.webContents.send('brain:progress', { phase: 'index', done, total })
       )
       await saveIndex(idx, brainIndexFile())
+      // Every conversation that went through the run counts as processed —
+      // including skipped-as-too-short ones (they will never produce a note,
+      // re-running them forever would be noise, not signal).
+      await markProcessed(convs.map((c) => c.id))
       return {
         notesDir: dir,
         notes: okNotes.length,
@@ -338,6 +380,28 @@ function registerIpc(): void {
       }
     }
   )
+
+  // Honest pipeline state: how many chats exist in the tools right now vs how
+  // many the ledger has seen. Reads live sources, so it reflects deletions too.
+  ipcMain.handle('brain:state', async () => {
+    const os = currentOS()
+    const home = homeDir()
+    const l = await readLedger()
+    const perSource: { source: SourceId; label: string; total: number; pending: number }[] = []
+    for (const s of await detectAll()) {
+      const a = getAdapter(s.id)
+      if (!s.installed || !a?.collectConversations) continue
+      const root = a.resolveRoot(os, home)
+      if (!root) continue
+      const convs = await a.collectConversations(root)
+      const pending = convs.filter((c) => !l.processed[c.id]).length
+      perSource.push({ source: s.id, label: s.label, total: convs.length, pending })
+    }
+    const total = perSource.reduce((n, p) => n + p.total, 0)
+    const pending = perSource.reduce((n, p) => n + p.pending, 0)
+    const stamps = Object.values(l.processed).sort()
+    return { total, distilled: total - pending, pending, perSource, lastRun: stamps.at(-1) ?? null }
+  })
 
   ipcMain.handle('brain:search', async (_e, query: string, url?: string) => {
     const idx = await loadIndex(brainIndexFile())
