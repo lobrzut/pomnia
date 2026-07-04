@@ -12,11 +12,12 @@ import Brain from './pages/Brain'
 import Connect from './pages/Connect'
 import Settings from './pages/Settings'
 import VaultGate from './pages/VaultGate'
+import Onboarding from './pages/Onboarding'
 
 const PAGES = { dashboard: Dashboard, browse: Browse, import: ImportPage, brain: Brain, connect: Connect, settings: Settings } as const
 
 export default function App() {
-  const { route, scan, refreshVault, vault, toast } = useStore()
+  const { route, scan, refreshVault, vault, toast, onboarded } = useStore()
 
   useEffect(() => {
     void scan()
@@ -58,7 +59,8 @@ export default function App() {
           </AnimatePresence>
         </main>
       </div>
-      <AnimatePresence>{!vault.open && <VaultGate />}</AnimatePresence>
+      {/* First run: full setup wizard. After that: plain lock gate when the vault is closed. */}
+      <AnimatePresence>{!onboarded ? <Onboarding /> : !vault.open && <VaultGate />}</AnimatePresence>
       <Toasts />
     </div>
   )
