@@ -17,11 +17,12 @@ import Onboarding from './pages/Onboarding'
 const PAGES = { dashboard: Dashboard, browse: Browse, import: ImportPage, brain: Brain, connect: Connect, settings: Settings } as const
 
 export default function App() {
-  const { route, scan, refreshVault, vault, toast, onboarded } = useStore()
+  const { route, scan, refreshVault, vault, toast, onboarded, loadAppSettings } = useStore()
 
   useEffect(() => {
     void scan()
     void refreshVault()
+    void loadAppSettings()
     // Surface otherwise-silent async failures as toasts (diagnostics).
     const onErr = (e: ErrorEvent) => toast({ kind: 'error', title: 'Unexpected error', detail: e.message })
     const onRej = (e: PromiseRejectionEvent) =>
@@ -47,9 +48,9 @@ export default function App() {
           <AnimatePresence initial={false}>
             <motion.div
               key={route}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8, pointerEvents: 'none' }}
+              initial={{ y: 12 }}
+              animate={{ y: 0 }}
+              exit={{ y: -8, pointerEvents: 'none' }}
               transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
             >
               <ErrorBoundary>

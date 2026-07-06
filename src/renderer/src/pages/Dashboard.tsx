@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Check, Database, HardDriveDownload, MessageSquare, RefreshCw, Server, Layers } from 'lucide-react'
 import { Badge, Button, GlassCard, Input, ProgressBar, SourceTile, Spinner } from '../components/ui'
@@ -31,9 +31,8 @@ function Stat({
 }
 
 export default function Dashboard() {
-  const { sources, scanning, scan, selected, toggleSelected, selectAll, backup, backingUp, backupPhase, vault } =
+  const { sources, scanning, scan, selected, toggleSelected, selectAll, backup, backingUp, backupPhase, vault, backupNote, setBackupNote } =
     useStore()
-  const [note, setNote] = useState('')
 
   const installed = useMemo(() => sources.filter((s) => s.installed), [sources])
   const totals = useMemo(
@@ -163,9 +162,9 @@ export default function Dashboard() {
             )}
           </div>
           <div className="hidden w-56 shrink-0 md:block">
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="optional note…" />
+            <Input value={backupNote} onChange={(e) => setBackupNote(e.target.value)} placeholder="optional note…" />
           </div>
-          <Button onClick={() => backup(note)} disabled={backingUp || !vault.open || selected.size === 0}>
+          <Button onClick={() => backup(backupNote)} disabled={backingUp || !vault.open || selected.size === 0}>
             {backingUp ? <Spinner className="h-4 w-4" /> : <HardDriveDownload className="h-4 w-4" />}
             Backup now
           </Button>

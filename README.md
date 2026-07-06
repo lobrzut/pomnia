@@ -106,6 +106,8 @@ W GUI: zakładka **Brain** (status Ollama, etapy, run z live progressem, lokalny
 
 ## Bezpieczeństwo
 
+Zasady zaufania i model publikacji przy premierze: [SECURITY.md](SECURITY.md).
+
 - AES-256-GCM (uwierzytelnione), losowe IV per blob, tag integralności.
 - scrypt (N=2¹⁷) do wyprowadzenia klucza z frazy; fraza nigdzie nie zapisywana.
 - Nagłówek sejfu nie zawiera sekretów — tylko salt + token-sprawdzający.

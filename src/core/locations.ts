@@ -108,7 +108,7 @@ export const SOURCES: SourceDescriptor[] = [
   {
     id: 'antigravity',
     label: 'Antigravity',
-    strategy: 'snapshot',
+    strategy: 'hybrid',
     root: (os, home) =>
       os === 'win32'
         ? appData(os, home, 'Antigravity')
@@ -126,7 +126,11 @@ export const SOURCES: SourceDescriptor[] = [
       'User'
     ],
     pathSensitive: ['app_storage.json', 'Preferences', 'Local State'],
-    notes: ['Google IDE (Windsurf/VS Code lineage)', 'Cascade/agent state in Local Storage + SharedStorage']
+    notes: [
+      'Google IDE (Windsurf/VS Code lineage)',
+      'Chats parsed from ~/.gemini/antigravity/brain/*/transcript.jsonl',
+      'Session DBs in ~/.gemini/antigravity/conversations/*.db'
+    ]
   },
   {
     id: 'vscode',

@@ -22,6 +22,7 @@ import { relativeTime, sourceMeta } from '../lib/format'
 import { api } from '../lib/api'
 import { VRAM_PROFILES, PROFILE_EMBED_MODEL, PROFILE_EMBED_SIZE } from '@core/brain/profiles'
 import type { BrainHit, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent } from '../lib/types'
+import { uiLabels } from '../lib/labels'
 import { useStore, ollamaUrlFromBrainUrl, dashboardUrlFromBrainUrl } from '../store/useStore'
 
 const PROFILE_KEY = 'reliqua.brain.profile'
@@ -61,8 +62,14 @@ export default function Brain() {
     brainDeployUrl,
     setBrainDeployUrl,
     brainDeployTarget,
-    setBrainDeployTarget
+    setBrainDeployTarget,
+    brainDeployReindex,
+    setBrainDeployReindex,
+    simpleMode
   } = useStore()
+  const labels = uiLabels(simpleMode)
+  const [advancedOpen, setAdvancedOpen] = useState(!simpleMode)
+  const showAdvanced = !simpleMode || advancedOpen
   const [status, setStatus] = useState<BrainStatus | null>(null)
   const [checking, setChecking] = useState(true)
 
@@ -87,6 +94,10 @@ export default function Brain() {
       /* storage unavailable — selection lives for this session only */
     }
   }
+
+  useEffect(() => {
+    setAdvancedOpen(!simpleMode)
+  }, [simpleMode])
 
   useEffect(() => api.onOllamaPullProgress(setPull), [])
 
@@ -160,8 +171,6 @@ export default function Brain() {
     void loadBrainState()
   }, [loadBrainState])
 
-  const [deployUrl, setDeployUrlLocal] = useState(brainDeployUrl)
-  const [reindex, setReindex] = useState(true)
   const [deploying, setDeploying] = useState(false)
   const [deployMsg, setDeployMsg] = useState('')
 
@@ -224,10 +233,17 @@ export default function Brain() {
     try {
       let target: string | undefined
       if (to === 'filesystem') {
-        target = (await api.pickDirectory()) || undefined
+        target = brainDeployTarget || (await api.pickDirectory()) || undefined
         if (!target) return
+        if (target !== brainDeployTarget) setBrainDeployTarget(target)
       }
-      const r = await api.brainDeploy({ to, target, url: deployUrl, reindex, sources: distillable.map((d) => d.id) })
+      const r = await api.brainDeploy({
+        to,
+        target,
+        url: brainDeployUrl,
+        reindex: brainDeployReindex,
+        sources: distillable.map((d) => d.id)
+      })
       setDeployMsg(r.detail)
       useStore.getState().toast({ kind: 'success', title: 'Deployed', detail: r.detail })
     } catch (e) {
@@ -254,12 +270,21 @@ export default function Brain() {
           <BrainCircuit className="h-6 w-6 text-white" />
         </div>
         <div>
-          <h1 className="text-[26px] font-bold tracking-tight text-grad">Send to Brain</h1>
-          <p className="text-sm text-ink-dim">
-            Hand your aggregated chats to your Brain server — it distills + indexes (GPU work stays server-side).
-          </p>
+          <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.brainPageTitle}</h1>
+          <p className="text-sm text-ink-dim">{labels.brainPageLead}</p>
         </div>
       </div>
+
+      {simpleMode && (
+        <button
+          type="button"
+          onClick={() => setAdvancedOpen((o) => !o)}
+          className="no-drag mb-5 flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-2.5 text-left text-sm font-medium text-ink-dim transition-colors hover:bg-white/5"
+        >
+          <span>{labels.advanced}</span>
+          <span className="text-[11px] text-ink-faint">{advancedOpen ? '▲' : '▼'}</span>
+        </button>
+      )}
 
       {/* Brain state — live chats vs distill ledger, the "what's left to do" panel */}
       <GlassCard className="mb-5 p-5">
@@ -328,7 +353,7 @@ export default function Brain() {
                   className="ml-auto !px-3.5 !py-1.5 !text-[12px]"
                 >
                   {brainRunning ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
-                  Distill backlog ({brainState.pending})
+                  {labels.distillBacklog(brainState.pending)}
                 </Button>
               )}
               {brainRunning && (
@@ -347,7 +372,8 @@ export default function Brain() {
         )}
       </GlassCard>
 
-      {/* Pipeline stages */}
+      {/* Pipeline stages — advanced only */}
+      {showAdvanced && (
       <GlassCard className="mb-5 flex items-center justify-between p-5">
         {STAGES.map((s, i) => {
           const st = stageState(s.id)
@@ -377,8 +403,10 @@ export default function Brain() {
           )
         })}
       </GlassCard>
+      )}
 
-      {/* Ollama status + VRAM profiles */}
+      {/* Ollama status + VRAM profiles — advanced only */}
+      {showAdvanced && (
       <GlassCard className="mb-5 p-5">
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
@@ -533,12 +561,13 @@ export default function Brain() {
           </span>
         </div>
       </GlassCard>
+      )}
 
       {/* Embedded brain — forked brain-core serving MCP on localhost */}
       <GlassCard className="mb-5 p-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <Rocket className="h-4 w-4 text-violet" /> Embedded brain
+            <Rocket className="h-4 w-4 text-violet" /> {labels.embeddedBrain}
             <Badge color="#8b5cf6">local MCP</Badge>
           </div>
           {embedded?.running ? (
@@ -555,10 +584,10 @@ export default function Brain() {
             </span>
           )}
           <div className="ml-auto flex items-center gap-2">
-            {embedded?.running && (
+            {embedded?.running && showAdvanced && (
               <Button variant="soft" onClick={() => void reindexEmbedded()} disabled={embeddedBusy || embedded.indexing}>
                 {embedded.indexing || embeddedBusy ? <Spinner className="h-3.5 w-3.5" /> : <Layers className="h-3.5 w-3.5" />}
-                Reindex
+                {labels.reindex}
               </Button>
             )}
             <Button onClick={() => void toggleEmbedded()} disabled={embeddedBusy || embedded?.starting}>
@@ -568,7 +597,7 @@ export default function Brain() {
           </div>
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-          Runs brain-core as a child process — MCP clients on this machine (Claude Code, Cursor…) get{' '}
+          Runs brain-core as a child process — MCP clients on this machine (Claude Code, Cursor, Antigravity…) get{' '}
           <code className="text-cyan">search_library</code> / <code className="text-cyan">save_conversation</code> from{' '}
           <code className="text-cyan">127.0.0.1</code> without any server. Distill runs refresh its index automatically.
         </p>
@@ -577,8 +606,10 @@ export default function Brain() {
       {/* Run */}
       <GlassCard className="mb-5 p-5">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-semibold text-ink">Advanced · distill on this host</span>
-          <span className="text-xs text-ink-faint">optional — needs local Ollama</span>
+          <span className="text-sm font-semibold text-ink">
+            {showAdvanced ? 'Advanced · distill on this host' : labels.distill}
+          </span>
+          {showAdvanced && <span className="text-xs text-ink-faint">optional — needs local Ollama</span>}
         </div>
         <div className="mb-4 flex flex-wrap gap-2">
           {distillable.map((s) => {
@@ -628,7 +659,7 @@ export default function Brain() {
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button onClick={() => run()} disabled={brainRunning || !status?.reachable}>
             {brainRunning ? <Spinner className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-            Run pipeline
+            {labels.runPipeline}
           </Button>
           {brainRunning && (
             <Button variant="soft" onClick={cancelBrainPipeline}>
@@ -665,7 +696,7 @@ export default function Brain() {
       {/* Search */}
       <GlassCard className="mb-5 p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
-          <Search className="h-4 w-4 text-cyan" /> Search your knowledge (local RAG)
+          <Search className="h-4 w-4 text-cyan" /> {labels.searchKnowledge}
         </div>
         <div className="flex gap-2">
           <Input
@@ -701,10 +732,11 @@ export default function Brain() {
         </div>
       </GlassCard>
 
-      {/* Deploy — remote Brain (KVM) receives notes after distill when auto-deploy is on */}
+      {/* Deploy — remote Brain (KVM) — advanced only */}
+      {showAdvanced && (
       <GlassCard className="p-5">
         <div className="mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
-          <Rocket className="h-4 w-4 text-violet" /> Deploy to Brain
+          <Rocket className="h-4 w-4 text-violet" /> {labels.deployToBrain}
           {brainTarget === 'remote' && (
             <Badge color="#8b5cf6">remote KVM</Badge>
           )}
@@ -735,11 +767,8 @@ export default function Brain() {
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-medium text-ink-dim">Dashboard URL</span>
           <Input
-            value={deployUrl}
-            onChange={(e) => {
-              setDeployUrlLocal(e.target.value)
-              setBrainDeployUrl(e.target.value)
-            }}
+            value={brainDeployUrl}
+            onChange={(e) => setBrainDeployUrl(e.target.value)}
             placeholder={dashboardUrlFromBrainUrl(remoteBrainUrl)}
             className="w-64"
           />
@@ -754,9 +783,18 @@ export default function Brain() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => setReindex(!reindex)} className="no-drag flex items-center gap-2 text-sm text-ink-dim">
-            <span className={`relative h-5 w-9 rounded-full transition-colors ${reindex ? 'accent-grad' : 'bg-white/12'}`}>
-              <motion.span layout className="absolute top-0.5 h-4 w-4 rounded-full bg-white" style={{ left: reindex ? 18 : 2 }} />
+          <button
+            onClick={() => setBrainDeployReindex(!brainDeployReindex)}
+            className="no-drag flex items-center gap-2 text-sm text-ink-dim"
+          >
+            <span
+              className={`relative h-5 w-9 rounded-full transition-colors ${brainDeployReindex ? 'accent-grad' : 'bg-white/12'}`}
+            >
+              <motion.span
+                layout
+                className="absolute top-0.5 h-4 w-4 rounded-full bg-white"
+                style={{ left: brainDeployReindex ? 18 : 2 }}
+              />
             </span>
             reindex
           </button>
@@ -775,6 +813,7 @@ export default function Brain() {
           <code className="text-cyan">library/reindex</code> — only <code className="text-cyan">nomic-embed-text</code> (~274 MB) runs on the server.
         </p>
       </GlassCard>
+      )}
     </div>
   )
 }

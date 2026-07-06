@@ -20,6 +20,7 @@ import {
 import { Badge, Button, GlassCard, Input, Spinner } from '../components/ui'
 import { ClientIcon, CLIENT_BRAND } from '../components/ClientIcon'
 import { api } from '../lib/api'
+import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
 import type { BrainTarget, ClientId, ClientStatus, Snippet, WiredState } from '../lib/types'
 
@@ -57,8 +58,12 @@ export default function Connect() {
   const setBrainTarget = useStore((s) => s.setBrainTarget)
   const remoteBrainUrl = useStore((s) => s.remoteBrainUrl)
   const setRemoteBrainUrl = useStore((s) => s.setRemoteBrainUrl)
-  const [brainUrl, setBrainUrl] = useState(brainTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl)
-  const [token, setToken] = useState('')
+  const connectToken = useStore((s) => s.connectToken)
+  const setConnectToken = useStore((s) => s.setConnectToken)
+  const simpleMode = useStore((s) => s.simpleMode)
+  const labels = uiLabels(simpleMode)
+  const effectiveTarget: BrainTarget = simpleMode ? 'embedded' : brainTarget
+  const brainUrl = effectiveTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
   const [loading, setLoading] = useState(true)
   const [clients, setClients] = useState<ClientStatus[]>([])
   const [brainOk, setBrainOk] = useState<boolean | null>(null)
@@ -83,8 +88,8 @@ export default function Connect() {
     if (!name) return
     setMinting(true)
     try {
-      const r = await api.connectMcpTokenCreate(dashboardUrl, name.trim(), token || undefined)
-      setToken(r.token)
+      const r = await api.connectMcpTokenCreate(dashboardUrl, name.trim(), connectToken || undefined)
+      setConnectToken(r.token)
       toast({
         kind: 'success',
         title: `Token minted: ${r.name}`,
@@ -107,8 +112,8 @@ export default function Connect() {
     setLoading(true)
     try {
       const [r, core] = await Promise.all([
-        api.connectStatus(brainUrl, brainTarget === 'remote' ? token || undefined : undefined, brainTarget),
-        brainTarget === 'embedded' ? api.brainCoreStatus() : Promise.resolve(null),
+        api.connectStatus(brainUrl, effectiveTarget === 'remote' ? connectToken || undefined : undefined, effectiveTarget),
+        effectiveTarget === 'embedded' ? api.brainCoreStatus() : Promise.resolve(null),
       ])
       setClients(r.clients)
       setBrainOk(r.brain.reachable)
@@ -120,7 +125,7 @@ export default function Connect() {
           : r.brain.reachable
             ? [d?.notes && `${d.notes} notes`, d?.sessions && `${d.sessions} sessions`, d?.library_docs && `${d.library_docs} docs`]
                 .filter(Boolean)
-                .join(' · ') || (brainTarget === 'embedded' ? 'local MCP ready' : 'reachable')
+                .join(' · ') || (effectiveTarget === 'embedded' ? 'local MCP ready' : 'reachable')
             : r.brain.error || 'unreachable'
       )
     } catch (e) {
@@ -133,7 +138,6 @@ export default function Connect() {
   function switchTarget(next: BrainTarget) {
     setBrainTarget(next)
     const url = next === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
-    setBrainUrl(url)
     setPicked(null)
     setSnippet(null)
   }
@@ -150,7 +154,7 @@ export default function Connect() {
     setSnippet(null)
     setSnippetLoading(true)
     try {
-      setSnippet(await api.connectSnippet(id, brainUrl, brainTarget === 'remote' ? token || undefined : undefined, brainTarget))
+      setSnippet(await api.connectSnippet(id, brainUrl, effectiveTarget === 'remote' ? connectToken || undefined : undefined, effectiveTarget))
     } catch (e) {
       toast({ kind: 'error', title: 'Could not build snippet', detail: (e as Error).message })
     } finally {
@@ -172,7 +176,7 @@ export default function Connect() {
       // (:7862) that brainUrl normally points at for client status + snippets —
       // two different services on two different ports. Derive by convention.
       const dashboardUrl = brainUrl.replace(/:7862\b/, ':7860')
-      const r = await api.connectSkillsSync(dashboardUrl, token || undefined)
+      const r = await api.connectSkillsSync(dashboardUrl, connectToken || undefined)
       toast(
         r.errors.length
           ? { kind: 'warn', title: `Synced ${r.written} skill(s)`, detail: `${r.errors.length} error(s) — see console` }
@@ -203,9 +207,11 @@ export default function Connect() {
           <Plug className="h-6 w-6 text-white" />
         </div>
         <div>
-          <h1 className="text-[26px] font-bold tracking-tight text-grad">Connect to Brain</h1>
+          <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.mcpConnect}</h1>
           <p className="text-sm text-ink-dim">
-            See what's wired up, and get a copy-paste snippet for what isn't — we never touch your config files.
+            {simpleMode
+              ? 'Skopiuj konfigurację MCP i wklej w Cursorze — Reliqua nigdy nie dotyka Twoich plików.'
+              : "See what's wired up, and get a copy-paste snippet for what isn't — we never touch your config files."}
           </p>
         </div>
       </div>
@@ -214,7 +220,9 @@ export default function Connect() {
       <GlassCard className="mb-5 p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-ink">Brain server</span>
+            <span className="text-sm font-semibold text-ink">
+              {simpleMode ? labels.embeddedBrain : 'Brain server'}
+            </span>
             {brainOk !== null && (
               <span
                 className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium"
@@ -235,6 +243,7 @@ export default function Connect() {
           </Button>
         </div>
 
+        {!simpleMode && (
         <div className="mb-3 inline-flex rounded-xl border border-white/10 bg-black/30 p-1">
           <button
             onClick={() => switchTarget('embedded')}
@@ -242,7 +251,7 @@ export default function Connect() {
               brainTarget === 'embedded' ? 'bg-iris/20 text-ink' : 'text-ink-faint hover:text-ink-dim'
             }`}
           >
-            Local embedded
+            {labels.embedded}
           </button>
           <button
             onClick={() => switchTarget('remote')}
@@ -250,11 +259,12 @@ export default function Connect() {
               brainTarget === 'remote' ? 'bg-iris/20 text-ink' : 'text-ink-faint hover:text-ink-dim'
             }`}
           >
-            Remote master
+            {labels.remote}
           </button>
         </div>
+        )}
 
-        {brainTarget === 'embedded' && embeddedRunning === false && (
+        {(brainTarget === 'embedded' || simpleMode) && embeddedRunning === false && (
           <p className="mb-3 text-[11px] text-amber">
             Embedded brain is not running. Open the{' '}
             <button onClick={() => setRoute('brain')} className="no-drag font-medium text-iris hover:underline">
@@ -265,21 +275,22 @@ export default function Connect() {
         )}
 
         <div className="flex flex-wrap items-center gap-3">
+          {!simpleMode && (
           <Input
             value={brainUrl}
             onChange={(e) => {
-              setBrainUrl(e.target.value)
               if (brainTarget === 'remote') setRemoteBrainUrl(e.target.value)
             }}
             placeholder={brainTarget === 'embedded' ? EMBEDDED_URL : REMOTE_URL}
             className="w-64"
             readOnly={brainTarget === 'embedded'}
           />
-          {brainTarget === 'remote' && (
+          )}
+          {!simpleMode && brainTarget === 'remote' && (
             <>
               <Input
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
+                value={connectToken}
+                onChange={(e) => setConnectToken(e.target.value)}
                 placeholder="Bearer token (optional)"
                 type="password"
                 className="w-56"
@@ -291,7 +302,7 @@ export default function Connect() {
             </>
           )}
           <span className="text-[11px] text-ink-faint">
-            {brainTarget === 'embedded'
+            {simpleMode || brainTarget === 'embedded'
               ? 'Snippets point at localhost — one MCP server, no token.'
               : 'Changing URL or token? Refresh, then re-pick a client.'}
           </span>
@@ -472,7 +483,7 @@ export default function Connect() {
                 <p className="text-[11px] leading-relaxed text-ink-faint">
                   {brainTarget === 'embedded'
                     ? 'Embedded mode: single brain-rag server at /mcp — no Bearer token.'
-                    : token
+                    : connectToken
                       ? 'Token is baked into the headers — keep this file private (chmod 600 if possible).'
                       : 'No token added. If your Brain proxy is auth-gated, paste a token above first, then re-copy.'}
                 </p>

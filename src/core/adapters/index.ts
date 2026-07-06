@@ -2,13 +2,14 @@ import type { DetectedSource, SourceId } from '../model.js'
 import type { Adapter } from './types.js'
 import { claudeCodeAdapter } from './claudeCode.js'
 import { cursorAdapter } from './cursor.js'
+import { antigravityAdapter } from './antigravity.js'
 import { makeProfileAdapter } from './profile.js'
 
 export const ADAPTERS: Adapter[] = [
   claudeCodeAdapter,
   cursorAdapter,
   makeProfileAdapter('claude-desktop'),
-  makeProfileAdapter('antigravity'),
+  antigravityAdapter,
   makeProfileAdapter('vscode'),
   makeProfileAdapter('windsurf'),
   makeProfileAdapter('continue')

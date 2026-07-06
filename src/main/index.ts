@@ -41,9 +41,17 @@ import {
 } from '@core/index'
 
 import { brainCore } from './brainCore.js'
+import { getAppSettings, loadAppSettings, setAppSettings, shouldHideOnClose, shouldHideOnMinimize } from './appSettings.js'
+import { destroyTray, initTray, refreshTrayMenu } from './tray.js'
 import { isCursorDbTooLarge } from '@core/adapters/cursor.js'
 
 let win: BrowserWindow | null = null
+let forceQuit = false
+
+function requestQuit(): void {
+  forceQuit = true
+  app.quit()
+}
 let vault: Vault | null = null
 let vaultPath: string | null = null
 let brainRunAbort: AbortController | null = null
@@ -123,6 +131,11 @@ function createWindow(): void {
   })
 
   win.on('ready-to-show', () => win?.show())
+  win.on('close', (e) => {
+    if (forceQuit || !shouldHideOnClose(brainCore.status().running)) return
+    e.preventDefault()
+    win?.hide()
+  })
   // Pipe renderer console output (incl. uncaught exceptions logged via
   // window.onerror in App.tsx) into the main-process log — otherwise
   // renderer-side errors are invisible outside DevTools.
@@ -450,22 +463,36 @@ function registerIpc(): void {
   })
 
   // ── Embedded brain-core (fork lifecycle) ──
-  brainCore.onEvent = (e) => win?.webContents.send('brainCore:event', e)
+  brainCore.onEvent = (e) => {
+    win?.webContents.send('brainCore:event', e)
+    if (e.type === 'ready' || e.type === 'exited') refreshTrayMenu(win, requestQuit)
+  }
   ipcMain.handle('brainCore:status', () => brainCore.status())
   ipcMain.handle('brainCore:start', async (_e, ollamaUrl?: string) => {
     await brainCore.start({
       dataDir: join(app.getPath('userData'), 'brain-core-data'),
       ollamaUrl,
     })
+    refreshTrayMenu(win, requestQuit)
     return brainCore.status()
   })
-  ipcMain.handle('brainCore:stop', async () => brainCore.stop())
+  ipcMain.handle('brainCore:stop', async () => {
+    const s = await brainCore.stop()
+    refreshTrayMenu(win, requestQuit)
+    return s
+  })
   ipcMain.handle('brainCore:reindex', async () => {
     // Index the distilled-notes dir — the same place brain:run deploys to.
     const stats = await brainCore.reindex(brainDir())
     return { stats }
   })
+  ipcMain.handle('app:settings', () => getAppSettings())
+  ipcMain.handle('app:settings:set', async (_e, patch: { minimizeToTray?: boolean; closeToTray?: boolean }) =>
+    setAppSettings(patch)
+  )
+
   app.on('before-quit', () => {
+    destroyTray()
     void brainCore.stop()
   })
 
@@ -559,19 +586,28 @@ function registerIpc(): void {
       createMcpToken(brainUrl, name, { token: adminToken }),
   )
 
-  ipcMain.on('win:minimize', () => win?.minimize())
+  ipcMain.on('win:minimize', () => {
+    if (shouldHideOnMinimize()) win?.hide()
+    else win?.minimize()
+  })
   ipcMain.on('win:maximize', () => (win?.isMaximized() ? win.unmaximize() : win?.maximize()))
   ipcMain.on('win:close', () => win?.close())
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await loadAppSettings()
   registerIpc()
   createWindow()
+  if (win) void initTray(win, requestQuit)
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    else win?.show()
   })
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  if (forceQuit || process.platform === 'darwin') return
+  // Hidden-to-tray keeps the window alive; only quit when explicitly requested.
+  if (win && !win.isDestroyed() && !win.isVisible()) return
+  app.quit()
 })

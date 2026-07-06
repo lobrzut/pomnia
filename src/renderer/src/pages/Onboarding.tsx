@@ -24,7 +24,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary'
 import { ClientIcon } from '../components/ClientIcon'
 import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
-import type { BrainStatus, BrainTarget, ClientId, ClientStatus, Snippet } from '../lib/types'
+import type { BrainStatus, BrainTarget, ClientId, ClientStatus, EmbeddedBrainStatus, Snippet } from '../lib/types'
 
 const EMBEDDED_URL = 'http://127.0.0.1:7862'
 const REMOTE_URL = 'http://brain.example.local:7862'
@@ -39,9 +39,9 @@ const REMOTE_URL = 'http://brain.example.local:7862'
  * honest summary — "skipped" is a first-class result, not a failure.
  */
 
-type StepId = 'welcome' | 'vault' | 'engine' | 'connect' | 'ready'
+type StepId = 'welcome' | 'vault' | 'backup' | 'engine' | 'connect' | 'ready'
 
-const STEPS: { id: StepId; label: string }[] = [
+const FULL_STEPS: { id: StepId; label: string }[] = [
   { id: 'welcome', label: 'Welcome' },
   { id: 'vault', label: 'Vault' },
   { id: 'engine', label: 'Engine' },
@@ -49,8 +49,18 @@ const STEPS: { id: StepId; label: string }[] = [
   { id: 'ready', label: 'Ready' }
 ]
 
+const SIMPLE_STEPS: { id: StepId; label: string }[] = [
+  { id: 'welcome', label: 'Start' },
+  { id: 'vault', label: 'Vault' },
+  { id: 'backup', label: 'Backup' },
+  { id: 'engine', label: 'Memory' },
+  { id: 'connect', label: 'Connect' },
+  { id: 'ready', label: 'Ready' }
+]
+
 interface Outcomes {
   vault: 'done' | null
+  backup: 'done' | 'skipped' | null
   engine: 'done' | 'skipped' | null
   brainTarget: BrainTarget | null
   connect: 'done' | 'skipped' | null
@@ -58,9 +68,17 @@ interface Outcomes {
 
 export default function Onboarding() {
   const completeOnboarding = useStore((s) => s.completeOnboarding)
+  const simpleMode = useStore((s) => s.simpleMode)
+  const STEPS = simpleMode ? SIMPLE_STEPS : FULL_STEPS
   const [stepIdx, setStepIdx] = useState(0)
   const [dir, setDir] = useState(1)
-  const [outcomes, setOutcomes] = useState<Outcomes>({ vault: null, engine: null, brainTarget: null, connect: null })
+  const [outcomes, setOutcomes] = useState<Outcomes>({
+    vault: null,
+    backup: null,
+    engine: null,
+    brainTarget: null,
+    connect: null
+  })
 
   const step = STEPS[stepIdx]
 
@@ -73,6 +91,8 @@ export default function Onboarding() {
     setOutcomes((o) => ({ ...o, [key]: how, ...extra }))
     go(1)
   }
+
+  const isSimpleEngine = simpleMode && step.id === 'engine'
 
   return (
     <motion.div
@@ -147,9 +167,23 @@ export default function Onboarding() {
           className="w-full max-w-[540px]"
         >
           <ErrorBoundary>
-            {step.id === 'welcome' && <WelcomeStep onNext={() => go(1)} />}
+            {step.id === 'welcome' && <WelcomeStep simpleMode={simpleMode} onNext={() => go(1)} />}
             {step.id === 'vault' && <VaultStep onDone={() => resolve('vault', 'done')} onBack={() => go(-1)} />}
-            {step.id === 'engine' && (
+            {step.id === 'backup' && (
+              <BackupStep
+                onDone={() => resolve('backup', 'done')}
+                onSkip={() => resolve('backup', 'skipped')}
+                onBack={() => go(-1)}
+              />
+            )}
+            {step.id === 'engine' && isSimpleEngine && (
+              <SimpleBrainStep
+                onDone={() => resolve('engine', 'done', { brainTarget: 'embedded' })}
+                onSkip={() => resolve('engine', 'skipped', { brainTarget: 'embedded' })}
+                onBack={() => go(-1)}
+              />
+            )}
+            {step.id === 'engine' && !isSimpleEngine && (
               <EngineStep
                 onDone={(brainTarget) => resolve('engine', 'done', { brainTarget })}
                 onSkip={() => resolve('engine', 'skipped', { brainTarget: 'embedded' })}
@@ -158,13 +192,14 @@ export default function Onboarding() {
             )}
             {step.id === 'connect' && (
               <ConnectStep
+                simpleMode={simpleMode}
                 brainTarget={outcomes.brainTarget ?? 'embedded'}
                 onDone={() => resolve('connect', 'done')}
                 onSkip={() => resolve('connect', 'skipped')}
                 onBack={() => go(-1)}
               />
             )}
-            {step.id === 'ready' && <ReadyStep outcomes={outcomes} onFinish={completeOnboarding} />}
+            {step.id === 'ready' && <ReadyStep simpleMode={simpleMode} outcomes={outcomes} onFinish={completeOnboarding} />}
           </ErrorBoundary>
         </motion.div>
       </div>
@@ -180,7 +215,7 @@ const VALUE_PROPS = [
   { icon: Zap, title: 'Recall', text: 'Feed the context back to any AI through MCP — agents that remember you.' }
 ]
 
-function WelcomeStep({ onNext }: { onNext: () => void }) {
+function WelcomeStep({ simpleMode, onNext }: { simpleMode: boolean; onNext: () => void }) {
   return (
     <div className="glass rounded-3xl p-9 text-center">
       <div className="relative mx-auto mb-6 h-20 w-20">
@@ -195,33 +230,46 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
       </div>
 
       <h1 className="text-[28px] font-bold leading-tight tracking-tight text-grad">
-        Your AI conversations
-        <br />
-        deserve a memory
+        {simpleMode ? (
+          <>
+            Twoja pamięć AI
+            <br />
+            w jednym miejscu
+          </>
+        ) : (
+          <>
+            Your AI conversations
+            <br />
+            deserve a memory
+          </>
+        )}
       </h1>
       <p className="mx-auto mt-2.5 max-w-[380px] text-sm leading-relaxed text-ink-dim">
-        Reliqua turns scattered assistant chats into one encrypted, searchable memory — and hands it back to every AI
-        you work with.
+        {simpleMode
+          ? 'Vault → backup rozmów → lokalna wyszukiwarka → podłączenie Cursora. Bez żargonu, bez serwera w chmurze.'
+          : 'Reliqua turns scattered assistant chats into one encrypted, searchable memory — and hands it back to every AI you work with.'}
       </p>
 
-      <div className="mt-7 grid grid-cols-3 gap-3">
-        {VALUE_PROPS.map((v, i) => (
-          <motion.div
-            key={v.title}
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 + i * 0.12, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            className="rounded-2xl border border-white/8 bg-black/20 p-4 text-left"
-          >
-            <v.icon className="mb-2 h-[18px] w-[18px] text-iris" />
-            <div className="text-[13px] font-semibold text-ink">{v.title}</div>
-            <div className="mt-1 text-[11px] leading-relaxed text-ink-faint">{v.text}</div>
-          </motion.div>
-        ))}
-      </div>
+      {!simpleMode && (
+        <div className="mt-7 grid grid-cols-3 gap-3">
+          {VALUE_PROPS.map((v, i) => (
+            <motion.div
+              key={v.title}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 + i * 0.12, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="rounded-2xl border border-white/8 bg-black/20 p-4 text-left"
+            >
+              <v.icon className="mb-2 h-[18px] w-[18px] text-iris" />
+              <div className="text-[13px] font-semibold text-ink">{v.title}</div>
+              <div className="mt-1 text-[11px] leading-relaxed text-ink-faint">{v.text}</div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       <Button onClick={onNext} className="mt-8 w-full">
-        <Sparkles className="h-4 w-4" /> Set up in 2 minutes
+        <Sparkles className="h-4 w-4" /> {simpleMode ? 'Zaczynamy' : 'Set up in 2 minutes'}
       </Button>
     </div>
   )
@@ -314,6 +362,77 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
         <Button onClick={submit} disabled={!valid || busy}>
           {busy ? <Spinner className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
           {mode === 'create' ? 'Create & continue' : 'Unlock & continue'}
+        </Button>
+      </StepNav>
+    </StepCard>
+  )
+}
+
+/* ── Step 2b: Backup (simple mode) ─────────────────────────────────────── */
+
+function BackupStep({
+  onDone,
+  onSkip,
+  onBack
+}: {
+  onDone: () => void
+  onSkip: () => void
+  onBack: () => void
+}) {
+  const { scan, sources, selected, backup, backingUp, backupPhase } = useStore()
+  const [scanned, setScanned] = useState(false)
+
+  useEffect(() => {
+    void scan().finally(() => setScanned(true))
+  }, [scan])
+
+  const picked = sources.filter((s) => selected.has(s.id) && s.installed)
+
+  async function runBackup() {
+    if (backingUp || picked.length === 0) return
+    await backup('First backup — onboarding')
+    onDone()
+  }
+
+  return (
+    <StepCard
+      icon={Download}
+      title="Backup your chats"
+      lead="We auto-select assistants found on this machine. One click saves them into your vault."
+    >
+      {!scanned ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-5">
+          <Spinner className="h-4 w-4 text-iris" />
+          <span className="text-sm text-ink-dim">Scanning for Claude Code, Cursor, Antigravity…</span>
+        </div>
+      ) : picked.length === 0 ? (
+        <p className="rounded-2xl border border-white/8 bg-black/20 px-4 py-5 text-sm text-ink-dim">
+          No assistants detected yet. Install Cursor or Claude Code, then run backup from the Dashboard — or skip for now.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {picked.map((s) => (
+            <div
+              key={s.id}
+              className="flex items-center gap-2.5 rounded-xl border border-mint/20 bg-mint/5 px-3.5 py-2.5"
+            >
+              <Check className="h-4 w-4 shrink-0 text-mint" />
+              <span className="text-[13px] font-medium text-ink">{s.label}</span>
+              {s.conversations != null && (
+                <span className="ml-auto text-[11px] text-ink-faint">{s.conversations} chats</span>
+              )}
+            </div>
+          ))}
+          {backingUp && (
+            <p className="text-xs text-ink-dim">{backupPhase || 'Backing up…'}</p>
+          )}
+        </div>
+      )}
+
+      <StepNav onBack={onBack} onSkip={onSkip} skipLabel="Skip — backup later from Dashboard">
+        <Button onClick={() => void runBackup()} disabled={!scanned || backingUp || picked.length === 0}>
+          {backingUp ? <Spinner className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+          Backup now
         </Button>
       </StepNav>
     </StepCard>
@@ -483,14 +602,106 @@ function EngineStep({
   )
 }
 
+/* ── Step 3b: Simple brain (embedded only) ──────────────────────────────── */
+
+function SimpleBrainStep({
+  onDone,
+  onSkip,
+  onBack
+}: {
+  onDone: () => void
+  onSkip: () => void
+  onBack: () => void
+}) {
+  const setBrainTarget = useStore((s) => s.setBrainTarget)
+  const [embedded, setEmbedded] = useState<EmbeddedBrainStatus | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function refresh() {
+    try {
+      setEmbedded(await api.brainCoreStatus())
+    } catch {
+      setEmbedded(null)
+    }
+  }
+
+  useEffect(() => {
+    setBrainTarget('embedded')
+    void refresh()
+  }, [setBrainTarget])
+
+  async function startAndContinue() {
+    if (busy) return
+    setBusy(true)
+    try {
+      if (!embedded?.running) {
+        setEmbedded(await api.brainCoreStart())
+      }
+      onDone()
+    } catch {
+      void refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const running = embedded?.running
+
+  return (
+    <StepCard
+      icon={Cpu}
+      title="Start local search"
+      lead="Runs a small search engine on this machine — Cursor can query your memory without any remote server."
+    >
+      {embedded === null ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-5">
+          <Spinner className="h-4 w-4 text-iris" />
+          <span className="text-sm text-ink-dim">Checking local search engine…</span>
+        </div>
+      ) : running ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="rounded-2xl border border-mint/20 bg-mint/5 p-4"
+        >
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-mint" />
+            </span>
+            <span className="text-sm font-semibold text-ink">Lokalna wyszukiwarka działa</span>
+            <code className="ml-auto font-mono text-[11px] text-ink-faint">{embedded.url}</code>
+          </div>
+        </motion.div>
+      ) : (
+        <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
+          <div className="text-sm font-semibold text-ink">Ready to start</div>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-ink-dim">
+            One click starts the local MCP server on <code className="text-cyan">{EMBEDDED_URL}</code>.
+          </p>
+        </div>
+      )}
+
+      <StepNav onBack={onBack} onSkip={onSkip} skipLabel="Skip — start later in Brain tab">
+        <Button onClick={() => void (running ? onDone() : startAndContinue())} disabled={busy || embedded === null}>
+          {busy ? <Spinner className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+          {running ? 'Continue' : 'Start & continue'}
+        </Button>
+      </StepNav>
+    </StepCard>
+  )
+}
+
 /* ── Step 4: Connect a client ───────────────────────────────────────────── */
 
 function ConnectStep({
+  simpleMode,
   brainTarget,
   onDone,
   onSkip,
   onBack
 }: {
+  simpleMode: boolean
   brainTarget: BrainTarget
   onDone: () => void
   onSkip: () => void
@@ -512,6 +723,13 @@ function ConnectStep({
 
   const detected = useMemo(() => (clients ?? []).filter((c) => c.configExists), [clients])
 
+  useEffect(() => {
+    if (!simpleMode || picked || !clients) return
+    const cursor = detected.find((c) => c.id === 'cursor')
+    if (cursor) void pick('cursor')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients, simpleMode])
+
   async function pick(id: ClientId) {
     setPicked(id)
     setSnippet(null)
@@ -530,12 +748,13 @@ function ConnectStep({
     setTimeout(() => setCopied(false), 1800)
   }
 
+  const title = simpleMode ? 'Podłącz Cursora' : 'Give an AI your memory'
+  const lead = simpleMode
+    ? 'Skopiuj konfigurację MCP i wklej w Cursorze — Reliqua nigdy nie dotyka Twoich plików.'
+    : `Snippets target ${brainTarget === 'embedded' ? 'local embedded brain' : 'your remote master'} (${brainUrl}). Pick a client — paste the config, we never touch their files.`
+
   return (
-    <StepCard
-      icon={Plug}
-      title="Give an AI your memory"
-      lead={`Snippets target ${brainTarget === 'embedded' ? 'local embedded brain' : 'your remote master'} (${brainUrl}). Pick a client — paste the config, we never touch their files.`}
-    >
+    <StepCard icon={Plug} title={title} lead={lead}>
       {clients === null ? (
         <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-5">
           <Spinner className="h-4 w-4 text-iris" />
@@ -543,7 +762,7 @@ function ConnectStep({
         </div>
       ) : detected.length === 0 ? (
         <p className="rounded-2xl border border-white/8 bg-black/20 px-4 py-5 text-sm text-ink-dim">
-          No MCP clients detected. Install Claude Code, Cursor or another MCP tool — then wire it up any time from the
+          No MCP clients detected. Install Claude Code, Cursor, Antigravity or another MCP tool — then wire it up any time from the
           Connect tab.
         </p>
       ) : (
@@ -600,15 +819,30 @@ function ConnectStep({
 
 /* ── Step 5: Ready ──────────────────────────────────────────────────────── */
 
-function ReadyStep({ outcomes, onFinish }: { outcomes: Outcomes; onFinish: () => void }) {
-  const rows = [
-    { label: 'Encrypted vault', state: outcomes.vault ?? 'skipped' },
-    {
-      label: outcomes.brainTarget === 'remote' ? 'Remote Brain master' : 'Local embedded brain',
-      state: outcomes.engine ?? 'skipped'
-    },
-    { label: 'First MCP client', state: outcomes.connect ?? 'skipped' }
-  ]
+function ReadyStep({
+  simpleMode,
+  outcomes,
+  onFinish
+}: {
+  simpleMode: boolean
+  outcomes: Outcomes
+  onFinish: () => void
+}) {
+  const rows = simpleMode
+    ? [
+        { label: 'Encrypted vault', state: outcomes.vault ?? 'skipped' },
+        { label: 'First backup', state: outcomes.backup ?? 'skipped' },
+        { label: 'Local search engine', state: outcomes.engine ?? 'skipped' },
+        { label: 'Cursor MCP config', state: outcomes.connect ?? 'skipped' }
+      ]
+    : [
+        { label: 'Encrypted vault', state: outcomes.vault ?? 'skipped' },
+        {
+          label: outcomes.brainTarget === 'remote' ? 'Remote Brain master' : 'Local embedded brain',
+          state: outcomes.engine ?? 'skipped'
+        },
+        { label: 'First MCP client', state: outcomes.connect ?? 'skipped' }
+      ]
   return (
     <div className="glass rounded-3xl p-9 text-center">
       <motion.div
@@ -622,7 +856,9 @@ function ReadyStep({ outcomes, onFinish }: { outcomes: Outcomes; onFinish: () =>
 
       <h1 className="text-[26px] font-bold tracking-tight text-grad">You're set</h1>
       <p className="mx-auto mt-2 max-w-[360px] text-sm text-ink-dim">
-        Run your first backup from the Dashboard — everything else is wired.
+        {simpleMode
+          ? 'Vault, backup i wyszukiwarka są gotowe. Cursor może teraz przeszukiwać Twoją pamięć.'
+          : 'Run your first backup from the Dashboard — everything else is wired.'}
       </p>
 
       <div className="mx-auto mt-6 max-w-[340px] space-y-2 text-left">
