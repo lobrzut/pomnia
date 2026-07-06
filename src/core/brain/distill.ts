@@ -219,10 +219,17 @@ function coerceFields(raw: string): DistilledNote['fields'] {
 export async function distillConversation(
   conv: Conversation,
   ollama: Ollama,
-  model?: string
+  model?: string,
+  opts?: { timeoutMs?: number; signal?: AbortSignal; maxChars?: number }
 ): Promise<DistilledNote> {
   const m = model || ollama.cfg.chatModel
-  const { text } = transcript(conv)
-  const raw = await ollama.generate(text, { system: SYSTEM, model: m, json: true })
+  const { text } = transcript(conv, opts?.maxChars ?? 12_000)
+  const raw = await ollama.generate(text, {
+    system: SYSTEM,
+    model: m,
+    json: true,
+    timeoutMs: opts?.timeoutMs,
+    signal: opts?.signal
+  })
   return assembleNote(conv, coerceFields(raw), m)
 }

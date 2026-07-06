@@ -7,7 +7,7 @@ export type {
   Conversation,
   Message
 } from '@core/model'
-export type { ClientId, ClientStatus, WiredState, Snippet, BrainPing, SkillListEntry, SkillSyncResult } from '@core/brain/index'
+export type { ClientId, ClientStatus, WiredState, Snippet, BrainPing, SkillListEntry, SkillSyncResult, BrainTarget } from '@core/brain/index'
 
 export interface VaultStatus {
   open: boolean
@@ -65,8 +65,12 @@ export interface BrainRunResult {
   stubs: number
   garbage: number
   skipped: number
+  failed?: number
   chunks: number
   dim: number
+  deployed?: number
+  deployMethod?: 'filesystem' | 'http' | 'none'
+  reindexed?: boolean
 }
 
 export interface BrainHit {
@@ -77,7 +81,7 @@ export interface BrainHit {
 }
 
 export interface BrainProgressEvent {
-  phase: 'collect' | 'distill' | 'index'
+  phase: 'collect' | 'distill' | 'index' | 'deploy'
   done: number
   total: number
   detail?: string

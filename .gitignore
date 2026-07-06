@@ -11,3 +11,4 @@ release/
 *.reliqua
 vault/
 sandbox/
+build/brain-core-runtime/

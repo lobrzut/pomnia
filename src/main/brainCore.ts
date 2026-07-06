@@ -14,7 +14,7 @@
 
 import { fork, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { app } from 'electron'
 
 export interface EmbeddedBrainStatus {
@@ -52,10 +52,13 @@ function resolveNodeBin(): string | undefined {
 }
 
 function entryPath(): string {
-  // Dev: monorepo path. Packaged: shipped as extraResource (see electron-builder config — TODO Phase 3).
   return app.isPackaged
     ? join(process.resourcesPath, 'brain-core', 'embedded.js')
     : join(app.getAppPath(), 'packages', 'brain-core', 'dist', 'embedded.js')
+}
+
+function entryDir(): string {
+  return dirname(entryPath())
 }
 
 export class BrainCoreManager {
@@ -92,6 +95,12 @@ export class BrainCoreManager {
       const execPath = resolveNodeBin()
       const child = fork(entry, [], {
         stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+        cwd: entryDir(),
+        env: {
+          ...process.env,
+          // Packaged: Reliqua.exe must run as Node, not spawn a second GUI window.
+          ...(app.isPackaged ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
+        },
         ...(execPath ? { execPath } : {}),
       })
       child.stderr?.on('data', (d: Buffer) => console.error('[brain-core]', d.toString().trimEnd()))

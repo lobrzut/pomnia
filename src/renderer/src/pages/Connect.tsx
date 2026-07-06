@@ -21,7 +21,10 @@ import { Badge, Button, GlassCard, Input, Spinner } from '../components/ui'
 import { ClientIcon, CLIENT_BRAND } from '../components/ClientIcon'
 import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
-import type { ClientId, ClientStatus, Snippet, WiredState } from '../lib/types'
+import type { BrainTarget, ClientId, ClientStatus, Snippet, WiredState } from '../lib/types'
+
+const EMBEDDED_URL = 'http://127.0.0.1:7862'
+const REMOTE_URL = 'http://brain.example.local:7862'
 
 const CLIENT_ORDER: ClientId[] = [
   'claude-code',
@@ -50,12 +53,17 @@ export default function Connect() {
   const toast = useStore((s) => s.toast)
   const setRoute = useStore((s) => s.setRoute)
   const clientOverride = useStore((s) => s.connectClientOverride)
-  const [brainUrl, setBrainUrl] = useState('http://brain.example.local:7862')
+  const brainTarget = useStore((s) => s.brainTarget)
+  const setBrainTarget = useStore((s) => s.setBrainTarget)
+  const remoteBrainUrl = useStore((s) => s.remoteBrainUrl)
+  const setRemoteBrainUrl = useStore((s) => s.setRemoteBrainUrl)
+  const [brainUrl, setBrainUrl] = useState(brainTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl)
   const [token, setToken] = useState('')
   const [loading, setLoading] = useState(true)
   const [clients, setClients] = useState<ClientStatus[]>([])
   const [brainOk, setBrainOk] = useState<boolean | null>(null)
   const [brainDetail, setBrainDetail] = useState('')
+  const [embeddedRunning, setEmbeddedRunning] = useState<boolean | null>(null)
 
   const [picked, setPicked] = useState<ClientId | null>(null)
   const [snippet, setSnippet] = useState<Snippet | null>(null)
@@ -98,16 +106,22 @@ export default function Connect() {
   async function refresh() {
     setLoading(true)
     try {
-      const r = await api.connectStatus(brainUrl, token || undefined)
+      const [r, core] = await Promise.all([
+        api.connectStatus(brainUrl, brainTarget === 'remote' ? token || undefined : undefined, brainTarget),
+        brainTarget === 'embedded' ? api.brainCoreStatus() : Promise.resolve(null),
+      ])
       setClients(r.clients)
       setBrainOk(r.brain.reachable)
+      setEmbeddedRunning(core?.running ?? null)
       const d = r.brain.data as Record<string, unknown> | undefined
       setBrainDetail(
-        r.brain.reachable
-          ? [d?.notes && `${d.notes} notes`, d?.sessions && `${d.sessions} sessions`, d?.library_docs && `${d.library_docs} docs`]
-              .filter(Boolean)
-              .join(' · ') || 'reachable'
-          : r.brain.error || 'unreachable'
+        brainTarget === 'embedded' && core && !core.running
+          ? 'embedded brain stopped — start in Brain tab'
+          : r.brain.reachable
+            ? [d?.notes && `${d.notes} notes`, d?.sessions && `${d.sessions} sessions`, d?.library_docs && `${d.library_docs} docs`]
+                .filter(Boolean)
+                .join(' · ') || (brainTarget === 'embedded' ? 'local MCP ready' : 'reachable')
+            : r.brain.error || 'unreachable'
       )
     } catch (e) {
       toast({ kind: 'error', title: 'Could not check status', detail: (e as Error).message })
@@ -116,10 +130,18 @@ export default function Connect() {
     }
   }
 
+  function switchTarget(next: BrainTarget) {
+    setBrainTarget(next)
+    const url = next === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
+    setBrainUrl(url)
+    setPicked(null)
+    setSnippet(null)
+  }
+
   useEffect(() => {
     void refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [brainTarget, brainUrl])
 
   async function pick(id: ClientId) {
     const c = clients.find((x) => x.id === id)
@@ -128,7 +150,7 @@ export default function Connect() {
     setSnippet(null)
     setSnippetLoading(true)
     try {
-      setSnippet(await api.connectSnippet(id, brainUrl, token || undefined))
+      setSnippet(await api.connectSnippet(id, brainUrl, brainTarget === 'remote' ? token || undefined : undefined, brainTarget))
     } catch (e) {
       toast({ kind: 'error', title: 'Could not build snippet', detail: (e as Error).message })
     } finally {
@@ -190,7 +212,7 @@ export default function Connect() {
 
       {/* Brain server + URL */}
       <GlassCard className="mb-5 p-5">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-ink">Brain server</span>
             {brainOk !== null && (
@@ -212,26 +234,66 @@ export default function Connect() {
             Refresh
           </Button>
         </div>
+
+        <div className="mb-3 inline-flex rounded-xl border border-white/10 bg-black/30 p-1">
+          <button
+            onClick={() => switchTarget('embedded')}
+            className={`no-drag rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+              brainTarget === 'embedded' ? 'bg-iris/20 text-ink' : 'text-ink-faint hover:text-ink-dim'
+            }`}
+          >
+            Local embedded
+          </button>
+          <button
+            onClick={() => switchTarget('remote')}
+            className={`no-drag rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+              brainTarget === 'remote' ? 'bg-iris/20 text-ink' : 'text-ink-faint hover:text-ink-dim'
+            }`}
+          >
+            Remote master
+          </button>
+        </div>
+
+        {brainTarget === 'embedded' && embeddedRunning === false && (
+          <p className="mb-3 text-[11px] text-amber">
+            Embedded brain is not running. Open the{' '}
+            <button onClick={() => setRoute('brain')} className="no-drag font-medium text-iris hover:underline">
+              Brain tab
+            </button>{' '}
+            and press Start before clients can connect.
+          </p>
+        )}
+
         <div className="flex flex-wrap items-center gap-3">
           <Input
             value={brainUrl}
-            onChange={(e) => setBrainUrl(e.target.value)}
-            placeholder="http://brain.example.local:7862"
+            onChange={(e) => {
+              setBrainUrl(e.target.value)
+              if (brainTarget === 'remote') setRemoteBrainUrl(e.target.value)
+            }}
+            placeholder={brainTarget === 'embedded' ? EMBEDDED_URL : REMOTE_URL}
             className="w-64"
+            readOnly={brainTarget === 'embedded'}
           />
-          <Input
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder="Bearer token (optional)"
-            type="password"
-            className="w-56"
-          />
-          <Button variant="soft" onClick={() => void mintToken()} disabled={minting}>
-            {minting ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
-            New token
-          </Button>
+          {brainTarget === 'remote' && (
+            <>
+              <Input
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Bearer token (optional)"
+                type="password"
+                className="w-56"
+              />
+              <Button variant="soft" onClick={() => void mintToken()} disabled={minting}>
+                {minting ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                New token
+              </Button>
+            </>
+          )}
           <span className="text-[11px] text-ink-faint">
-            Changing the URL or token? Hit Refresh, then re-pick a client.
+            {brainTarget === 'embedded'
+              ? 'Snippets point at localhost — one MCP server, no token.'
+              : 'Changing URL or token? Refresh, then re-pick a client.'}
           </span>
         </div>
       </GlassCard>
@@ -408,9 +470,11 @@ export default function Connect() {
               <div className="mt-2 flex items-start gap-2 px-1">
                 <KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-faint" />
                 <p className="text-[11px] leading-relaxed text-ink-faint">
-                  {token
-                    ? 'Token is baked into the headers — keep this file private (chmod 600 if possible).'
-                    : 'No token added. If your Brain proxy is auth-gated, paste a token above first, then re-copy.'}
+                  {brainTarget === 'embedded'
+                    ? 'Embedded mode: single brain-rag server at /mcp — no Bearer token.'
+                    : token
+                      ? 'Token is baked into the headers — keep this file private (chmod 600 if possible).'
+                      : 'No token added. If your Brain proxy is auth-gated, paste a token above first, then re-copy.'}
                 </p>
               </div>
 

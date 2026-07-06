@@ -13,12 +13,14 @@ import {
   defaultOllamaConfig,
   deployDashboard,
   deployFilesystem,
+  deployDistilledToBrain,
   detectAll,
   distillAll,
   exportConversationsToDir,
   getAdapter,
   homeDir,
   hostName,
+  isWorthDistilling,
   listAllSkills,
   loadIndex,
   log,
@@ -39,10 +41,12 @@ import {
 } from '@core/index'
 
 import { brainCore } from './brainCore.js'
+import { isCursorDbTooLarge } from '@core/adapters/cursor.js'
 
 let win: BrowserWindow | null = null
 let vault: Vault | null = null
 let vaultPath: string | null = null
+let brainRunAbort: AbortController | null = null
 
 function requireVault(): Vault {
   if (!vault) throw new Error('No vault is open')
@@ -344,49 +348,106 @@ function registerIpc(): void {
         model?: string
         ollamaUrl?: string
         importPath?: string
-        /** Only distill conversations the ledger hasn't seen — the "distill backlog" CTA. */
         pendingOnly?: boolean
+        /** After distill, push notes to remote Brain (KVM/homelab) and reindex. */
+        autoDeploy?: boolean
+        deployUrl?: string
+        /** Optional SMB/NFS path to brain vault/distilled (preferred over HTTP). */
+        deployTarget?: string
+        reindex?: boolean
       }
     ) => {
-      const o = ollamaFor(opts.ollamaUrl, opts.model)
-      if (!(await o.reachable())) throw new Error(`Ollama offline at ${o.cfg.baseUrl}`)
-      let convs = opts.importPath
-        ? (await parseExportPath(opts.importPath)).conversations.slice(0, opts.limit || undefined)
-        : await collectLive(opts.sources, opts.limit)
-      if (opts.pendingOnly) {
-        const l = await readLedger()
-        convs = convs.filter((c) => !l.processed[c.id])
-      }
-      const { notes, skipped } = await distillAll(convs, o, opts.model, (p) => win?.webContents.send('brain:progress', p))
-      const dir = brainDir()
-      await deployFilesystem(notes, dir)
-      const okNotes = notes.filter((n) => n.quality === 'ok')
-      const idx = await buildIndex(
-        okNotes.map((n) => ({ source: n.source, notePath: n.sessionId, text: n.markdown })),
-        o,
-        (done, total) => win?.webContents.send('brain:progress', { phase: 'index', done, total })
-      )
-      await saveIndex(idx, brainIndexFile())
-      // Every conversation that went through the run counts as processed —
-      // including skipped-as-too-short ones (they will never produce a note,
-      // re-running them forever would be noise, not signal).
-      await markProcessed(convs.map((c) => c.id))
-      // Fresh notes on disk → refresh the embedded brain's index too, so MCP
-      // clients see them without a manual reindex. Fire-and-forget.
-      if (brainCore.status().running) {
-        brainCore.reindex(brainDir()).catch((e) => log.warn('embedded reindex failed:', (e as Error).message))
-      }
-      return {
-        notesDir: dir,
-        notes: okNotes.length,
-        stubs: notes.filter((n) => n.quality === 'stub').length,
-        garbage: notes.filter((n) => n.quality === 'garbage').length,
-        skipped,
-        chunks: idx.entries.length,
-        dim: idx.dim
+      brainRunAbort?.abort()
+      brainRunAbort = new AbortController()
+      const signal = brainRunAbort.signal
+      try {
+        const o = ollamaFor(opts.ollamaUrl, opts.model)
+        if (!(await o.reachable())) throw new Error(`Ollama offline at ${o.cfg.baseUrl}`)
+        let convs = opts.importPath
+          ? (await parseExportPath(opts.importPath)).conversations.slice(0, opts.limit || undefined)
+          : await collectLive(opts.sources, opts.limit)
+        if (opts.pendingOnly) {
+          const l = await readLedger()
+          convs = convs.filter((c) => !l.processed[c.id])
+        }
+        const { notes, skipped, failed } = await distillAll(
+          convs,
+          o,
+          opts.model,
+          (p) => win?.webContents.send('brain:progress', p),
+          { signal }
+        )
+        if (signal.aborted) throw new Error('Distill cancelled')
+        const dir = brainDir()
+        await deployFilesystem(notes, dir)
+        const okNotes = notes.filter((n) => n.quality === 'ok')
+        const idx = await buildIndex(
+          okNotes.map((n) => ({ source: n.source, notePath: n.sessionId, text: n.markdown })),
+          o,
+          (done, total) => win?.webContents.send('brain:progress', { phase: 'index', done, total })
+        )
+        await saveIndex(idx, brainIndexFile())
+        const noteIds = new Set(notes.map((n) => n.sessionId))
+        const processedIds = convs
+          .filter((c) => !isWorthDistilling(c) || noteIds.has(c.id))
+          .map((c) => c.id)
+        await markProcessed(processedIds)
+        if (brainCore.status().running) {
+          brainCore.reindex(brainDir()).catch((e) => log.warn('embedded reindex failed:', (e as Error).message))
+        }
+
+        let deployed = 0
+        let deployMethod: 'filesystem' | 'http' | 'none' = 'none'
+        let reindexed = false
+        if (opts.autoDeploy && opts.deployUrl && okNotes.length > 0) {
+          win?.webContents.send('brain:progress', {
+            phase: 'deploy',
+            done: 0,
+            total: 1,
+            detail: 'pushing notes to remote Brain…'
+          })
+          const dep = await deployDistilledToBrain({
+            notesDir: dir,
+            dashboardUrl: opts.deployUrl,
+            filesystemTarget: opts.deployTarget,
+            reindex: opts.reindex !== false
+          })
+          deployed = dep.copied
+          deployMethod = dep.method
+          reindexed = dep.reindex
+          win?.webContents.send('brain:progress', {
+            phase: 'deploy',
+            done: 1,
+            total: 1,
+            detail: dep.method === 'none'
+              ? 'deploy skipped — set deploy folder or enable save-note API on Brain'
+              : `${dep.copied} note(s) via ${dep.method}${dep.reindex ? ' · reindex ok' : ' · reindex failed'}`
+          })
+        }
+
+        return {
+          notesDir: dir,
+          notes: okNotes.length,
+          stubs: notes.filter((n) => n.quality === 'stub').length,
+          garbage: notes.filter((n) => n.quality === 'garbage').length,
+          skipped,
+          failed: failed.length,
+          chunks: idx.entries.length,
+          dim: idx.dim,
+          deployed,
+          deployMethod,
+          reindexed
+        }
+      } finally {
+        brainRunAbort = null
       }
     }
   )
+
+  ipcMain.handle('brain:runCancel', () => {
+    brainRunAbort?.abort()
+    return { ok: true }
+  })
 
   // ── Embedded brain-core (fork lifecycle) ──
   brainCore.onEvent = (e) => win?.webContents.send('brainCore:event', e)
@@ -420,6 +481,11 @@ function registerIpc(): void {
       if (!s.installed || !a?.collectConversations) continue
       const root = a.resolveRoot(os, home)
       if (!root) continue
+      if (s.id === 'cursor' && (await isCursorDbTooLarge(root))) {
+        const total = s.conversations ?? 0
+        perSource.push({ source: s.id, label: s.label, total, pending: total })
+        continue
+      }
       const convs = await a.collectConversations(root)
       const pending = convs.filter((c) => !l.processed[c.id]).length
       perSource.push({ source: s.id, label: s.label, total: convs.length, pending })
@@ -462,16 +528,21 @@ function registerIpc(): void {
   )
 
   // ── Connect to Brain (status read + copy-paste snippets, no auto-deploy) ──
-  ipcMain.handle('connect:status', async (_e, brainUrl?: string, token?: string) => {
+  ipcMain.handle('connect:status', async (_e, brainUrl?: string, token?: string, target?: 'embedded' | 'remote') => {
+    const url =
+      brainUrl ||
+      (target === 'embedded' ? 'http://127.0.0.1:7862' : 'http://brain.example.local:7862')
     const [clients, brain] = await Promise.all([
       checkAllClients(),
-      pingBrain(brainUrl || 'http://brain.example.local:7862', token)
+      pingBrain(url, target === 'embedded' ? undefined : token),
     ])
     return { clients, brain }
   })
 
-  ipcMain.handle('connect:snippet', (_e, clientId: ClientId, brainUrl: string, token?: string) =>
-    buildSnippet(clientId, brainUrl, currentOS(), homeDir(), token)
+  ipcMain.handle(
+    'connect:snippet',
+    (_e, clientId: ClientId, brainUrl: string, token?: string, target?: 'embedded' | 'remote') =>
+      buildSnippet(clientId, brainUrl, currentOS(), homeDir(), token, target ?? 'remote'),
   )
 
   ipcMain.handle('connect:skillsList', (_e, brainUrl: string, token?: string) =>

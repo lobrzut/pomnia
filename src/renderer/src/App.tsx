@@ -44,12 +44,12 @@ export default function App() {
       <div className="relative z-10 flex min-h-0 flex-1">
         <Sidebar />
         <main className="min-h-0 flex-1 overflow-y-auto px-9 pb-12 pt-3">
-          <AnimatePresence mode="wait">
+          <AnimatePresence initial={false}>
             <motion.div
               key={route}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
+              exit={{ opacity: 0, y: -8, pointerEvents: 'none' }}
               transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
             >
               <ErrorBoundary>
@@ -60,7 +60,8 @@ export default function App() {
         </main>
       </div>
       {/* First run: full setup wizard. After that: plain lock gate when the vault is closed. */}
-      <AnimatePresence>{!onboarded ? <Onboarding /> : !vault.open && <VaultGate />}</AnimatePresence>
+      {/* No exit animation on full-screen gates — AnimatePresence left a z-40 overlay at opacity 0 that still captured clicks. */}
+      {!onboarded ? <Onboarding /> : !vault.open ? <VaultGate /> : null}
       <Toasts />
     </div>
   )

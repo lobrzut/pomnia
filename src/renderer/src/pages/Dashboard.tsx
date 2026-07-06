@@ -157,7 +157,7 @@ export default function Dashboard() {
                   {selected.size} source{selected.size === 1 ? '' : 's'} selected
                 </div>
                 <div className="text-xs text-ink-dim">
-                  {vault.open ? `Sealing into "${vault.name}"` : 'Open a vault to enable backup'}
+                  {vault.open ? `Ready — backup to “${vault.name}”` : 'Open a vault to enable backup'}
                 </div>
               </>
             )}

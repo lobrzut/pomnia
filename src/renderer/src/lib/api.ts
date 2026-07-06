@@ -51,7 +51,12 @@ export interface ReliquaBridge {
     ollamaUrl?: string
     importPath?: string
     pendingOnly?: boolean
+    autoDeploy?: boolean
+    deployUrl?: string
+    deployTarget?: string
+    reindex?: boolean
   }): Promise<BrainRunResult>
+  brainRunCancel(): Promise<{ ok: boolean }>
   brainState(): Promise<BrainStateInfo>
   brainCoreStatus(): Promise<EmbeddedBrainStatus>
   brainCoreStart(ollamaUrl?: string): Promise<EmbeddedBrainStatus>
@@ -70,8 +75,17 @@ export interface ReliquaBridge {
     reindex?: boolean
     sources?: SourceId[]
   }): Promise<{ detail: string }>
-  connectStatus(brainUrl?: string, token?: string): Promise<{ clients: ClientStatus[]; brain: BrainPing }>
-  connectSnippet(clientId: ClientId, brainUrl: string, token?: string): Promise<Snippet>
+  connectStatus(
+    brainUrl?: string,
+    token?: string,
+    target?: 'embedded' | 'remote',
+  ): Promise<{ clients: ClientStatus[]; brain: BrainPing }>
+  connectSnippet(
+    clientId: ClientId,
+    brainUrl: string,
+    token?: string,
+    target?: 'embedded' | 'remote',
+  ): Promise<Snippet>
   connectSkillsList(brainUrl: string, token?: string): Promise<SkillListEntry[]>
   connectSkillsSync(brainUrl: string, token?: string): Promise<SkillSyncResult>
   connectMcpTokenCreate(
@@ -233,7 +247,10 @@ function mockBridge(): ReliquaBridge {
       mockBrainState.pending = 0
       mockBrainState.perSource.forEach((p) => (p.pending = 0))
       mockBrainState.lastRun = new Date().toISOString()
-      return { notesDir: 'C:/…/brain-notes', notes: 38, stubs: 4, garbage: 3, skipped: 7, chunks: 121, dim: 768 }
+      return { notesDir: 'C:/…/brain-notes', notes: 38, stubs: 4, garbage: 3, skipped: 7, failed: 0, chunks: 121, dim: 768 }
+    },
+    async brainRunCancel() {
+      return { ok: true }
     },
     async brainState() {
       return { ...mockBrainState, perSource: mockBrainState.perSource.map((p) => ({ ...p })) }

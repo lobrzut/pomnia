@@ -21,8 +21,8 @@ import { Badge, Button, GlassCard, Input, ProgressBar, Spinner } from '../compon
 import { relativeTime, sourceMeta } from '../lib/format'
 import { api } from '../lib/api'
 import { VRAM_PROFILES, PROFILE_EMBED_MODEL, PROFILE_EMBED_SIZE } from '@core/brain/profiles'
-import type { BrainHit, BrainRunResult, BrainStateInfo, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent } from '../lib/types'
-import { useStore } from '../store/useStore'
+import type { BrainHit, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent } from '../lib/types'
+import { useStore, ollamaUrlFromBrainUrl, dashboardUrlFromBrainUrl } from '../store/useStore'
 
 const PROFILE_KEY = 'reliqua.brain.profile'
 
@@ -39,9 +39,31 @@ const STAGES = [
 ] as const
 
 export default function Brain() {
-  const { sources, selected, toggleSelected, toast } = useStore()
+  const {
+    sources,
+    selected,
+    toggleSelected,
+    toast,
+    brainRunning,
+    brainProgress,
+    brainResult,
+    brainState,
+    brainStateLoading,
+    loadBrainState,
+    runBrainPipeline,
+    cancelBrainPipeline,
+    ollamaUrl,
+    setOllamaUrl,
+    remoteBrainUrl,
+    brainTarget,
+    brainAutoDeploy,
+    setBrainAutoDeploy,
+    brainDeployUrl,
+    setBrainDeployUrl,
+    brainDeployTarget,
+    setBrainDeployTarget
+  } = useStore()
   const [status, setStatus] = useState<BrainStatus | null>(null)
-  const [ollamaUrl, setOllamaUrl] = useState('')
   const [checking, setChecking] = useState(true)
 
   // VRAM profile: which chat model distillation uses. Persisted per user.
@@ -83,9 +105,6 @@ export default function Brain() {
 
   const installed = (m: string) => hasModel(status?.models ?? [], m) || justPulled.has(m)
 
-  const [running, setRunning] = useState(false)
-  const [progress, setProgress] = useState<{ label: string; pct: number } | null>(null)
-  const [result, setResult] = useState<BrainRunResult | null>(null)
   const [importPath, setImportPath] = useState<string | null>(null)
 
   const [query, setQuery] = useState('')
@@ -136,33 +155,37 @@ export default function Brain() {
     }
   }
 
-  // Honest pipeline state — live chats vs the distill ledger.
-  const [brainState, setBrainState] = useState<BrainStateInfo | null>(null)
-  const [stateLoading, setStateLoading] = useState(false)
-  async function loadState() {
-    setStateLoading(true)
-    try {
-      setBrainState(await api.brainState())
-    } catch {
-      setBrainState(null)
-    } finally {
-      setStateLoading(false)
-    }
-  }
+  // Honest pipeline state — live chats vs the distill ledger (global store).
   useEffect(() => {
-    void loadState()
-  }, [])
+    void loadBrainState()
+  }, [loadBrainState])
 
-  const [deployUrl, setDeployUrl] = useState('http://localhost:7860')
+  const [deployUrl, setDeployUrlLocal] = useState(brainDeployUrl)
   const [reindex, setReindex] = useState(true)
   const [deploying, setDeploying] = useState(false)
   const [deployMsg, setDeployMsg] = useState('')
 
   async function check(url?: string) {
     setChecking(true)
-    const s = await api.brainStatus(url || ollamaUrl || undefined)
-    setStatus(s)
-    if (!ollamaUrl) setOllamaUrl(s.baseUrl)
+    const candidates = [
+      url,
+      ollamaUrl || undefined,
+      remoteBrainUrl ? ollamaUrlFromBrainUrl(remoteBrainUrl) : undefined,
+      undefined
+    ].filter((u, i, a) => u === undefined || a.indexOf(u) === i) as (string | undefined)[]
+
+    let best: BrainStatus | null = null
+    for (const candidate of candidates) {
+      const s = await api.brainStatus(candidate)
+      if (s.reachable) {
+        best = s
+        if (candidate && candidate !== ollamaUrl) setOllamaUrl(candidate)
+        else if (!ollamaUrl && s.baseUrl) setOllamaUrl(s.baseUrl)
+        break
+      }
+      if (!best) best = s
+    }
+    setStatus(best)
     setChecking(false)
   }
   useEffect(() => {
@@ -172,34 +195,15 @@ export default function Brain() {
 
   const distillable = sources.filter((s) => ['claude-code', 'cursor', 'claude-desktop'].includes(s.id))
 
-  async function run(pendingOnly = false) {
-    setRunning(true)
-    setResult(null)
-    setProgress({ label: 'starting…', pct: 4 })
-    const off = api.onBrainProgress((e) =>
-      setProgress({
-        label: `${e.phase}${e.detail ? ' · ' + e.detail.slice(0, 40) : ''}`,
-        pct: e.total ? Math.round((e.done / e.total) * 100) : 0
-      })
-    )
-    try {
-      const sel = [...selected].filter((id) => distillable.some((d) => d.id === id))
-      const r = await api.brainRun({
-        sources: sel.length ? sel : distillable.map((d) => d.id),
-        model: activeProfile.chatModel,
-        ollamaUrl,
-        importPath: importPath || undefined,
-        pendingOnly
-      })
-      setResult(r)
-    } catch (e) {
-      useStore.getState().toast({ kind: 'error', title: 'Pipeline failed', detail: (e as Error).message })
-    } finally {
-      off()
-      setRunning(false)
-      setProgress(null)
-      void loadState()
-    }
+  function run(pendingOnly = false) {
+    const sel = [...selected].filter((id) => distillable.some((d) => d.id === id))
+    void runBrainPipeline({
+      sources: sel.length ? sel : distillable.map((d) => d.id),
+      model: activeProfile.chatModel,
+      ollamaUrl,
+      importPath: importPath || undefined,
+      pendingOnly
+    })
   }
 
   async function search() {
@@ -234,11 +238,11 @@ export default function Brain() {
   }
 
   const stageState = (id: string): 'idle' | 'active' | 'done' => {
-    if (!running && result) return 'done'
-    if (running && progress) {
+    if (!brainRunning && brainResult) return 'done'
+    if (brainRunning && brainProgress) {
       if (id === 'collect') return 'done'
-      if (progress.label.startsWith('distill')) return id === 'distill' ? 'active' : id === 'collect' ? 'done' : 'idle'
-      if (progress.label.startsWith('index')) return id === 'index' ? 'active' : id === 'deploy' ? 'idle' : 'done'
+      if (brainProgress.label.startsWith('distill')) return id === 'distill' ? 'active' : id === 'collect' ? 'done' : 'idle'
+      if (brainProgress.label.startsWith('index')) return id === 'index' ? 'active' : id === 'deploy' ? 'idle' : 'done'
     }
     return 'idle'
   }
@@ -267,8 +271,8 @@ export default function Brain() {
             {brainState?.lastRun && (
               <span className="text-[11px] text-ink-faint">last distill {relativeTime(brainState.lastRun)}</span>
             )}
-            <Button variant="ghost" onClick={() => void loadState()} disabled={stateLoading} className="!px-2 !py-1">
-              {stateLoading ? <Spinner className="h-3.5 w-3.5" /> : <ArrowRight className="h-3.5 w-3.5 rotate-90" />}
+            <Button variant="ghost" onClick={() => void loadBrainState()} disabled={brainStateLoading} className="!px-2 !py-1">
+              {brainStateLoading ? <Spinner className="h-3.5 w-3.5" /> : <ArrowRight className="h-3.5 w-3.5 rotate-90" />}
             </Button>
           </div>
         </div>
@@ -319,15 +323,26 @@ export default function Brain() {
               })}
               {brainState.pending > 0 && (
                 <Button
-                  onClick={() => void run(true)}
-                  disabled={running || !status?.reachable}
+                  onClick={() => run(true)}
+                  disabled={brainRunning || !status?.reachable}
                   className="ml-auto !px-3.5 !py-1.5 !text-[12px]"
                 >
-                  {running ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {brainRunning ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
                   Distill backlog ({brainState.pending})
                 </Button>
               )}
+              {brainRunning && (
+                <Button variant="soft" onClick={cancelBrainPipeline} className="!px-3 !py-1.5 !text-[12px]">
+                  Cancel
+                </Button>
+              )}
             </div>
+            {brainRunning && brainProgress && (
+              <div className="mt-3 space-y-1.5">
+                <div className="text-xs text-ink-dim">{brainProgress.label}</div>
+                <ProgressBar value={brainProgress.pct || 6} />
+              </div>
+            )}
           </>
         )}
       </GlassCard>
@@ -381,7 +396,8 @@ export default function Brain() {
             <Input
               value={ollamaUrl}
               onChange={(e) => setOllamaUrl(e.target.value)}
-              placeholder="http://localhost:11434"
+              onBlur={() => void check()}
+              placeholder={remoteBrainUrl ? ollamaUrlFromBrainUrl(remoteBrainUrl) : 'http://localhost:11434'}
               className="w-56"
             />
             <Button variant="soft" onClick={() => check()} disabled={checking}>
@@ -584,19 +600,24 @@ export default function Brain() {
             )
           })}
         </div>
-        {running && progress ? (
+        {brainRunning && brainProgress ? (
           <div className="space-y-2">
-            <div className="text-sm text-ink-dim">{progress.label}</div>
-            <ProgressBar value={progress.pct} />
+            <div className="text-sm text-ink-dim">{brainProgress.label}</div>
+            <ProgressBar value={brainProgress.pct} />
           </div>
-        ) : result ? (
+        ) : brainResult ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Badge color="#34d399">{result.notes} notes</Badge>
-            <Badge color="#9aa3bd">{result.stubs} stubs</Badge>
-            {!!result.garbage && <Badge color="#fb7185">{result.garbage} low-quality → review</Badge>}
-            {!!result.skipped && <Badge color="#fbbf24">{result.skipped} skipped (too short)</Badge>}
-            <Badge color="#22d3ee">{result.chunks} chunks · dim {result.dim}</Badge>
-            <span className="text-xs text-ink-faint">{result.notesDir}</span>
+            <Badge color="#34d399">{brainResult.notes} notes</Badge>
+            <Badge color="#9aa3bd">{brainResult.stubs} stubs</Badge>
+            {!!brainResult.garbage && <Badge color="#fb7185">{brainResult.garbage} low-quality → review</Badge>}
+            {!!brainResult.skipped && <Badge color="#fbbf24">{brainResult.skipped} skipped (too short)</Badge>}
+            {!!brainResult.failed && <Badge color="#fbbf24">{brainResult.failed} timed out</Badge>}
+            {!!brainResult.reindexed && <Badge color="#34d399">deployed + reindexed</Badge>}
+            {brainResult.deployed != null && brainResult.deployed > 0 && !brainResult.reindexed && (
+              <Badge color="#fbbf24">{brainResult.deployed} deployed</Badge>
+            )}
+            <Badge color="#22d3ee">{brainResult.chunks} chunks · dim {brainResult.dim}</Badge>
+            <span className="text-xs text-ink-faint">{brainResult.notesDir}</span>
           </div>
         ) : (
           <p className="text-xs text-ink-faint">
@@ -605,13 +626,18 @@ export default function Brain() {
           </p>
         )}
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button onClick={run} disabled={running || !status?.reachable}>
-            {running ? <Spinner className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+          <Button onClick={() => run()} disabled={brainRunning || !status?.reachable}>
+            {brainRunning ? <Spinner className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
             Run pipeline
           </Button>
+          {brainRunning && (
+            <Button variant="soft" onClick={cancelBrainPipeline}>
+              Cancel
+            </Button>
+          )}
           <Button
             variant="soft"
-            disabled={running}
+            disabled={brainRunning}
             onClick={async () => {
               const f = await api.pickFile()
               if (f) setImportPath(f)
@@ -675,13 +701,59 @@ export default function Brain() {
         </div>
       </GlassCard>
 
-      {/* Deploy */}
+      {/* Deploy — remote Brain (KVM) receives notes after distill when auto-deploy is on */}
       <GlassCard className="p-5">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
           <Rocket className="h-4 w-4 text-violet" /> Deploy to Brain
+          {brainTarget === 'remote' && (
+            <Badge color="#8b5cf6">remote KVM</Badge>
+          )}
+        </div>
+        {brainTarget === 'remote' && (
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setBrainAutoDeploy(!brainAutoDeploy)}
+              className="no-drag flex items-center gap-2 text-sm text-ink-dim"
+            >
+              <span
+                className={`relative h-5 w-9 rounded-full transition-colors ${brainAutoDeploy ? 'accent-grad' : 'bg-white/12'}`}
+              >
+                <motion.span
+                  layout
+                  className="absolute top-0.5 h-4 w-4 rounded-full bg-white"
+                  style={{ left: brainAutoDeploy ? 18 : 2 }}
+                />
+              </span>
+              Auto-deploy after distill
+            </button>
+            <span className="text-[11px] text-ink-faint">
+              Distill on client GPU → push notes → Brain embeds with <code className="text-cyan">nomic-embed-text</code>
+            </span>
+          </div>
+        )}
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-medium text-ink-dim">Dashboard URL</span>
+          <Input
+            value={deployUrl}
+            onChange={(e) => {
+              setDeployUrlLocal(e.target.value)
+              setBrainDeployUrl(e.target.value)
+            }}
+            placeholder={dashboardUrlFromBrainUrl(remoteBrainUrl)}
+            className="w-64"
+          />
+        </div>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-medium text-ink-dim">Distilled folder (optional SMB)</span>
+          <Input
+            value={brainDeployTarget}
+            onChange={(e) => setBrainDeployTarget(e.target.value)}
+            placeholder="\\\\host\\share\\brain\\vault\\distilled"
+            className="min-w-64 flex-1"
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Input value={deployUrl} onChange={(e) => setDeployUrl(e.target.value)} placeholder="http://brain-host:7860" className="w-56" />
           <button onClick={() => setReindex(!reindex)} className="no-drag flex items-center gap-2 text-sm text-ink-dim">
             <span className={`relative h-5 w-9 rounded-full transition-colors ${reindex ? 'accent-grad' : 'bg-white/12'}`}>
               <motion.span layout className="absolute top-0.5 h-4 w-4 rounded-full bg-white" style={{ left: reindex ? 18 : 2 }} />
@@ -693,12 +765,14 @@ export default function Brain() {
           </Button>
           <Button onClick={() => deploy('dashboard')} disabled={deploying}>
             {deploying ? <Spinner className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
-            Push to Brain
+            Push raw chats
           </Button>
         </div>
         {deployMsg && <p className="mt-3 text-xs text-mint">{deployMsg}</p>}
-        <p className="mt-3 text-[11px] text-ink-faint">
-          Folder deploy writes finished notes into a vault dir (Brain only embeds). Push sends chats to Brain's API.
+        <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
+          Local <code className="text-cyan">brain-notes</code> is a staging dir. With <strong className="font-medium text-ink-dim">Remote master</strong>,
+          auto-deploy copies finished notes to your KVM (SMB folder preferred) and triggers{' '}
+          <code className="text-cyan">library/reindex</code> — only <code className="text-cyan">nomic-embed-text</code> (~274 MB) runs on the server.
         </p>
       </GlassCard>
     </div>

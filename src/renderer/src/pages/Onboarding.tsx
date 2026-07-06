@@ -20,10 +20,14 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { Button, Field, Input, Spinner } from '../components/ui'
+import { ErrorBoundary } from '../components/ErrorBoundary'
 import { ClientIcon } from '../components/ClientIcon'
 import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
-import type { BrainStatus, ClientId, ClientStatus, Snippet } from '../lib/types'
+import type { BrainStatus, BrainTarget, ClientId, ClientStatus, Snippet } from '../lib/types'
+
+const EMBEDDED_URL = 'http://127.0.0.1:7862'
+const REMOTE_URL = 'http://brain.example.local:7862'
 
 /**
  * First-run onboarding wizard. Full-screen overlay shown instead of VaultGate
@@ -48,6 +52,7 @@ const STEPS: { id: StepId; label: string }[] = [
 interface Outcomes {
   vault: 'done' | null
   engine: 'done' | 'skipped' | null
+  brainTarget: BrainTarget | null
   connect: 'done' | 'skipped' | null
 }
 
@@ -55,7 +60,7 @@ export default function Onboarding() {
   const completeOnboarding = useStore((s) => s.completeOnboarding)
   const [stepIdx, setStepIdx] = useState(0)
   const [dir, setDir] = useState(1)
-  const [outcomes, setOutcomes] = useState<Outcomes>({ vault: null, engine: null, connect: null })
+  const [outcomes, setOutcomes] = useState<Outcomes>({ vault: null, engine: null, brainTarget: null, connect: null })
 
   const step = STEPS[stepIdx]
 
@@ -64,8 +69,8 @@ export default function Onboarding() {
     setStepIdx((i) => Math.min(STEPS.length - 1, Math.max(0, i + delta)))
   }
 
-  function resolve(key: keyof Outcomes, how: 'done' | 'skipped') {
-    setOutcomes((o) => ({ ...o, [key]: how }))
+  function resolve(key: keyof Outcomes, how: 'done' | 'skipped', extra?: Partial<Outcomes>) {
+    setOutcomes((o) => ({ ...o, [key]: how, ...extra }))
     go(1)
   }
 
@@ -74,7 +79,7 @@ export default function Onboarding() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-40 flex items-stretch bg-void/80 backdrop-blur-xl"
+      className="absolute inset-0 z-40 flex items-stretch bg-void/80 backdrop-blur-md"
     >
       {/* Step rail */}
       <div className="hidden w-[230px] shrink-0 flex-col justify-between border-r border-white/6 p-7 sm:flex">
@@ -132,37 +137,36 @@ export default function Onboarding() {
         </p>
       </div>
 
-      {/* Step content */}
+      {/* Step content — no mode="wait": exit-then-enter left Engine step blank in packaged Electron */}
       <div className="flex min-w-0 flex-1 items-center justify-center p-6">
-        <AnimatePresence mode="wait" custom={dir}>
-          <motion.div
-            key={step.id}
-            custom={dir}
-            initial={{ opacity: 0, x: dir * 28 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: dir * -20 }}
-            transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-[540px]"
-          >
+        <motion.div
+          key={step.id}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-[540px]"
+        >
+          <ErrorBoundary>
             {step.id === 'welcome' && <WelcomeStep onNext={() => go(1)} />}
             {step.id === 'vault' && <VaultStep onDone={() => resolve('vault', 'done')} onBack={() => go(-1)} />}
             {step.id === 'engine' && (
               <EngineStep
-                onDone={() => resolve('engine', 'done')}
-                onSkip={() => resolve('engine', 'skipped')}
+                onDone={(brainTarget) => resolve('engine', 'done', { brainTarget })}
+                onSkip={() => resolve('engine', 'skipped', { brainTarget: 'embedded' })}
                 onBack={() => go(-1)}
               />
             )}
             {step.id === 'connect' && (
               <ConnectStep
+                brainTarget={outcomes.brainTarget ?? 'embedded'}
                 onDone={() => resolve('connect', 'done')}
                 onSkip={() => resolve('connect', 'skipped')}
                 onBack={() => go(-1)}
               />
             )}
             {step.id === 'ready' && <ReadyStep outcomes={outcomes} onFinish={completeOnboarding} />}
-          </motion.div>
-        </AnimatePresence>
+          </ErrorBoundary>
+        </motion.div>
       </div>
     </motion.div>
   )
@@ -318,9 +322,22 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
 
 /* ── Step 3: Engine (Ollama) ────────────────────────────────────────────── */
 
-function EngineStep({ onDone, onSkip, onBack }: { onDone: () => void; onSkip: () => void; onBack: () => void }) {
+function EngineStep({
+  onDone,
+  onSkip,
+  onBack
+}: {
+  onDone: (target: BrainTarget) => void
+  onSkip: () => void
+  onBack: () => void
+}) {
+  const setBrainTarget = useStore((s) => s.setBrainTarget)
+  const setRemoteBrainUrl = useStore((s) => s.setRemoteBrainUrl)
+  const remoteBrainUrl = useStore((s) => s.remoteBrainUrl)
   const [checking, setChecking] = useState(true)
   const [status, setStatus] = useState<BrainStatus | null>(null)
+  const [mode, setMode] = useState<BrainTarget>('embedded')
+  const [remoteUrl, setRemoteUrl] = useState(remoteBrainUrl)
 
   async function check() {
     setChecking(true)
@@ -338,76 +355,127 @@ function EngineStep({ onDone, onSkip, onBack }: { onDone: () => void; onSkip: ()
   }, [])
 
   const found = !!status?.reachable
+  const canContinue = mode === 'remote' || found
+
+  function continueWithMode() {
+    setBrainTarget(mode)
+    if (mode === 'remote') setRemoteBrainUrl(remoteUrl.trim() || REMOTE_URL)
+    onDone(mode)
+  }
 
   return (
     <StepCard
       icon={Cpu}
-      title="Local AI engine"
-      lead="Ollama distills your chats into knowledge notes and powers semantic search — fully offline, on your GPU."
+      title="How will Brain run?"
+      lead="Pick local embedded brain (built into Reliqua) or your homelab master. Ollama on this machine powers embeddings for the local path."
     >
-      {checking ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-5">
-          <Spinner className="h-4 w-4 text-iris" />
-          <span className="text-sm text-ink-dim">Looking for Ollama on this machine…</span>
-        </div>
-      ) : found ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="rounded-2xl border border-mint/20 bg-mint/5 p-4"
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => setMode('embedded')}
+          className={clsx(
+            'no-drag rounded-2xl border px-4 py-3 text-left transition-colors',
+            mode === 'embedded' ? 'border-iris/60 bg-iris/10 ring-1 ring-iris/30' : 'border-white/8 bg-black/20 hover:bg-white/5'
+          )}
         >
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-mint" />
-            </span>
-            <span className="text-sm font-semibold text-ink">Ollama is running</span>
-            <span className="ml-auto font-mono text-[11px] text-ink-faint">{status!.baseUrl}</span>
+          <div className="text-sm font-semibold text-ink">Local embedded</div>
+          <div className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+            One .exe, MCP on {EMBEDDED_URL} — no remote server, no token.
           </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {status!.models.slice(0, 4).map((m) => (
-              <span key={m} className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 font-mono text-[11px] text-ink-dim">
-                {m}
-              </span>
-            ))}
-            {status!.models.length > 4 && (
-              <span className="px-1.5 py-1 text-[11px] text-ink-faint">+{status!.models.length - 4} more</span>
-            )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('remote')}
+          className={clsx(
+            'no-drag rounded-2xl border px-4 py-3 text-left transition-colors',
+            mode === 'remote' ? 'border-iris/60 bg-iris/10 ring-1 ring-iris/30' : 'border-white/8 bg-black/20 hover:bg-white/5'
+          )}
+        >
+          <div className="text-sm font-semibold text-ink">Remote master</div>
+          <div className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+            Your Brain server on the LAN — three MCP servers + Bearer token.
           </div>
-          <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
-            Embedding model: <code className="text-cyan">{status!.embedModel}</code> — used to index your chats for
-            semantic search.
-          </p>
-        </motion.div>
-      ) : (
-        <div className="rounded-2xl border border-amber/20 bg-amber/5 p-4">
-          <div className="text-sm font-semibold text-ink">Ollama not found</div>
-          <ol className="mt-2.5 space-y-2 text-[13px] text-ink-dim">
-            <li className="flex gap-2">
-              <span className="font-bold text-amber">1.</span>
-              <span>
-                Download from <code className="text-cyan">ollama.com/download</code> and install (2 min).
-              </span>
-            </li>
-            <li className="flex gap-2">
-              <span className="font-bold text-amber">2.</span>
-              <span>
-                Pull the embedding model: <code className="rounded bg-black/40 px-1.5 py-0.5 text-cyan">ollama pull nomic-embed-text</code>
-              </span>
-            </li>
-            <li className="flex gap-2">
-              <span className="font-bold text-amber">3.</span>
-              <span>Come back and re-check.</span>
-            </li>
-          </ol>
-          <Button variant="soft" onClick={check} className="mt-3.5">
-            <RefreshCw className="h-3.5 w-3.5" /> Re-check
-          </Button>
+        </button>
+      </div>
+
+      {mode === 'remote' && (
+        <div className="mb-4">
+          <Field label="Master MCP URL">
+            <Input value={remoteUrl} onChange={(e) => setRemoteUrl(e.target.value)} placeholder={REMOTE_URL} />
+          </Field>
         </div>
       )}
 
-      <StepNav onBack={onBack} onSkip={onSkip} skipLabel="Skip — works without it, search falls back to plain text">
-        <Button onClick={onDone} disabled={!found}>
+      {mode === 'embedded' &&
+        (checking ? (
+          <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-5">
+            <Spinner className="h-4 w-4 text-iris" />
+            <span className="text-sm text-ink-dim">Looking for Ollama on this machine…</span>
+          </div>
+        ) : found ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="rounded-2xl border border-mint/20 bg-mint/5 p-4"
+          >
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-mint" />
+              </span>
+              <span className="text-sm font-semibold text-ink">Ollama is running</span>
+              <span className="ml-auto font-mono text-[11px] text-ink-faint">{status!.baseUrl}</span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {(status?.models ?? []).slice(0, 4).map((m) => (
+                <span key={m} className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 font-mono text-[11px] text-ink-dim">
+                  {m}
+                </span>
+              ))}
+              {(status?.models ?? []).length > 4 && (
+                <span className="px-1.5 py-1 text-[11px] text-ink-faint">+{(status?.models ?? []).length - 4} more</span>
+              )}
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
+              Embedding model: <code className="text-cyan">{status?.embedModel ?? 'nomic-embed-text'}</code> — powers local semantic search.
+            </p>
+          </motion.div>
+        ) : (
+          <div className="rounded-2xl border border-amber/20 bg-amber/5 p-4">
+            <div className="text-sm font-semibold text-ink">Ollama not found</div>
+            <ol className="mt-2.5 space-y-2 text-[13px] text-ink-dim">
+              <li className="flex gap-2">
+                <span className="font-bold text-amber">1.</span>
+                <span>
+                  Download from <code className="text-cyan">ollama.com/download</code> and install (2 min).
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-bold text-amber">2.</span>
+                <span>
+                  Pull the embedding model:{' '}
+                  <code className="rounded bg-black/40 px-1.5 py-0.5 text-cyan">ollama pull nomic-embed-text</code>
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-bold text-amber">3.</span>
+                <span>Come back and re-check.</span>
+              </li>
+            </ol>
+            <Button variant="soft" onClick={check} className="mt-3.5">
+              <RefreshCw className="h-3.5 w-3.5" /> Re-check
+            </Button>
+          </div>
+        ))}
+
+      {mode === 'remote' && (
+        <p className="text-[11px] leading-relaxed text-ink-faint">
+          Ollama on this PC is optional in remote mode — distillation runs on your master server.
+        </p>
+      )}
+
+      <StepNav onBack={onBack} onSkip={onSkip} skipLabel="Skip — pick later in Connect tab">
+        <Button onClick={continueWithMode} disabled={!canContinue}>
           <ArrowRight className="h-4 w-4" /> Continue
         </Button>
       </StepNav>
@@ -417,7 +485,19 @@ function EngineStep({ onDone, onSkip, onBack }: { onDone: () => void; onSkip: ()
 
 /* ── Step 4: Connect a client ───────────────────────────────────────────── */
 
-function ConnectStep({ onDone, onSkip, onBack }: { onDone: () => void; onSkip: () => void; onBack: () => void }) {
+function ConnectStep({
+  brainTarget,
+  onDone,
+  onSkip,
+  onBack
+}: {
+  brainTarget: BrainTarget
+  onDone: () => void
+  onSkip: () => void
+  onBack: () => void
+}) {
+  const remoteBrainUrl = useStore((s) => s.remoteBrainUrl)
+  const brainUrl = brainTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
   const [clients, setClients] = useState<ClientStatus[] | null>(null)
   const [picked, setPicked] = useState<ClientId | null>(null)
   const [snippet, setSnippet] = useState<Snippet | null>(null)
@@ -425,10 +505,10 @@ function ConnectStep({ onDone, onSkip, onBack }: { onDone: () => void; onSkip: (
 
   useEffect(() => {
     api
-      .connectStatus()
+      .connectStatus(brainUrl, undefined, brainTarget)
       .then((r) => setClients(r.clients))
       .catch(() => setClients([]))
-  }, [])
+  }, [brainUrl, brainTarget])
 
   const detected = useMemo(() => (clients ?? []).filter((c) => c.configExists), [clients])
 
@@ -437,7 +517,7 @@ function ConnectStep({ onDone, onSkip, onBack }: { onDone: () => void; onSkip: (
     setSnippet(null)
     setCopied(false)
     try {
-      setSnippet(await api.connectSnippet(id, 'http://brain.example.local:7862'))
+      setSnippet(await api.connectSnippet(id, brainUrl, undefined, brainTarget))
     } catch {
       setSnippet(null)
     }
@@ -454,7 +534,7 @@ function ConnectStep({ onDone, onSkip, onBack }: { onDone: () => void; onSkip: (
     <StepCard
       icon={Plug}
       title="Give an AI your memory"
-      lead="These MCP-capable tools are already on this machine. Pick one — we'll hand you the config, you paste it in. We never touch their files."
+      lead={`Snippets target ${brainTarget === 'embedded' ? 'local embedded brain' : 'your remote master'} (${brainUrl}). Pick a client — paste the config, we never touch their files.`}
     >
       {clients === null ? (
         <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-5">
@@ -523,7 +603,10 @@ function ConnectStep({ onDone, onSkip, onBack }: { onDone: () => void; onSkip: (
 function ReadyStep({ outcomes, onFinish }: { outcomes: Outcomes; onFinish: () => void }) {
   const rows = [
     { label: 'Encrypted vault', state: outcomes.vault ?? 'skipped' },
-    { label: 'Local AI engine (Ollama)', state: outcomes.engine ?? 'skipped' },
+    {
+      label: outcomes.brainTarget === 'remote' ? 'Remote Brain master' : 'Local embedded brain',
+      state: outcomes.engine ?? 'skipped'
+    },
     { label: 'First MCP client', state: outcomes.connect ?? 'skipped' }
   ]
   return (

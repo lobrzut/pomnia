@@ -37,7 +37,7 @@ export default function VaultGate() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-40 flex items-center justify-center bg-void/70 backdrop-blur-xl"
+      className="absolute inset-0 z-40 flex items-center justify-center bg-void/70 backdrop-blur-md"
     >
       <motion.div
         initial={{ scale: 0.94, y: 16, opacity: 0 }}

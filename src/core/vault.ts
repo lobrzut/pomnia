@@ -186,15 +186,17 @@ export class Vault {
           sha = f.reuse.sha256
           bytes = f.reuse.bytes
         } else {
-          let data: Buffer
-          try {
-            data = await f.read()
-          } catch {
-            // A live app may hold a transient lock (Cursor WAL, leveldb…) — retry once.
-            await new Promise((r) => setTimeout(r, 200))
-            data = await f.read()
+          let data: Buffer | undefined
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              data = await f.read()
+              break
+            } catch {
+              if (attempt === 2) throw new Error('locked after retries')
+              await new Promise((r) => setTimeout(r, 250 * (attempt + 1)))
+            }
           }
-          ;({ sha256: sha, bytes } = await this.writeBlob(data))
+          ;({ sha256: sha, bytes } = await this.writeBlob(data!))
         }
         captured.push({ ...f.item, sha256: sha, bytes })
         totalBytes += bytes

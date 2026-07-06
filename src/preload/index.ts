@@ -26,6 +26,7 @@ const bridge = {
   revealPath: (p: string) => ipcRenderer.invoke('reveal', p),
   brainStatus: (ollamaUrl?: string) => ipcRenderer.invoke('brain:status', ollamaUrl),
   brainRun: (opts: unknown) => ipcRenderer.invoke('brain:run', opts),
+  brainRunCancel: () => ipcRenderer.invoke('brain:runCancel'),
   brainState: () => ipcRenderer.invoke('brain:state'),
   brainCoreStatus: () => ipcRenderer.invoke('brainCore:status'),
   brainCoreStart: (ollamaUrl?: string) => ipcRenderer.invoke('brainCore:start', ollamaUrl),
@@ -50,9 +51,10 @@ const bridge = {
     return () => ipcRenderer.removeListener('ollama:pull:progress', l)
   },
   brainDeploy: (opts: unknown) => ipcRenderer.invoke('brain:deploy', opts),
-  connectStatus: (brainUrl?: string, token?: string) => ipcRenderer.invoke('connect:status', brainUrl, token),
-  connectSnippet: (clientId: string, brainUrl: string, token?: string) =>
-    ipcRenderer.invoke('connect:snippet', clientId, brainUrl, token),
+  connectStatus: (brainUrl?: string, token?: string, target?: string) =>
+    ipcRenderer.invoke('connect:status', brainUrl, token, target),
+  connectSnippet: (clientId: string, brainUrl: string, token?: string, target?: string) =>
+    ipcRenderer.invoke('connect:snippet', clientId, brainUrl, token, target),
   connectSkillsList: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsList', brainUrl, token),
   connectSkillsSync: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsSync', brainUrl, token),
   connectMcpTokenCreate: (brainUrl: string, name: string, adminToken?: string) =>
