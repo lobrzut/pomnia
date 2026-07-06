@@ -105,6 +105,13 @@ export async function createBrainServer(config: BrainConfig): Promise<BrainServe
       await mcp.connect(transport)
 
       http = createServer((req: IncomingMessage, res: ServerResponse) => {
+        const pathOnly = req.url?.split('?')[0] ?? ''
+        if (pathOnly === '/healthz' || pathOnly === '/healthz/') {
+          res.statusCode = 200
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ ok: true, service: 'brain-core' }))
+          return
+        }
         // All MCP traffic goes through POST/GET/DELETE on `/mcp`. Anything
         // else gets a 404 — matches Python mcp-proxy behavior + means
         // `/register` / `/.well-known/*` OAuth discovery probes get a proper

@@ -151,7 +151,19 @@ export async function checkClient(spec: ClientSpec): Promise<ClientStatus> {
     return { key, present: true, ...picked }
   })
   const present = servers.filter((s) => s.present).length
-  const state: WiredState = present === BRAIN_KEYS.length ? 'wired' : present === 0 ? 'not_wired' : 'partial'
+  const rag = servers.find((s) => s.key === 'brain-rag')
+  const embeddedLocal =
+    rag?.present &&
+    !!rag.url &&
+    /127\.0\.0\.1|localhost/i.test(rag.url) &&
+    rag.url.includes('/mcp')
+  const state: WiredState = embeddedLocal
+    ? 'wired'
+    : present === BRAIN_KEYS.length
+      ? 'wired'
+      : present === 0
+        ? 'not_wired'
+        : 'partial'
 
   const issues: string[] = []
   for (const s of servers) {

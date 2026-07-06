@@ -21,8 +21,10 @@
     "cli": "tsx src/cli/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",
-    "pack:win": "electron-vite build && electron-builder --win",
-    "pack:mac": "electron-vite build && electron-builder --mac"
+    "build:brain-core": "npm run build -w @reliqua/brain-core",
+    "stage:brain-core": "node scripts/stage-brain-core.mjs",
+    "pack:win": "npm run build:brain-core && npm run stage:brain-core && electron-vite build && electron-builder --win",
+    "pack:mac": "npm run build:brain-core && npm run stage:brain-core && electron-vite build && electron-builder --mac"
   },
   "dependencies": {
     "fflate": "^0.8.3",
@@ -37,6 +39,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "@electron/rebuild": "^3.7.1",
     "electron": "^33.0.0",
     "electron-builder": "^25.1.8",
     "electron-vite": "^3.1.0",

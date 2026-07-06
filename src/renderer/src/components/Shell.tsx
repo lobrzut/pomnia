@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { Boxes, BrainCircuit, Import as ImportIcon, LayoutDashboard, Lock, MessagesSquare, Minus, Plug, Settings as Cog, Square, X } from 'lucide-react'
 import clsx from 'clsx'
+import { Spinner } from './ui'
 import { api, isMock } from '../lib/api'
 import { useStore, type Route } from '../store/useStore'
 
@@ -66,7 +67,7 @@ function WinBtn({ children, onClick, danger }: { children: React.ReactNode; onCl
 }
 
 export function Sidebar() {
-  const { route, setRoute, vault, lockVault } = useStore()
+  const { route, setRoute, vault, lockVault, brainRunning, brainProgress } = useStore()
   return (
     <nav className="relative z-10 flex w-[208px] shrink-0 flex-col gap-1 px-3 pb-4">
       <div className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
@@ -89,7 +90,15 @@ export function Sidebar() {
               />
             )}
             <Icon className={clsx('relative h-[18px] w-[18px]', active ? 'text-iris' : 'text-ink-faint')} />
-            <span className={clsx('relative', active ? 'text-ink' : 'text-ink-dim')}>{n.label}</span>
+            <span className={clsx('relative flex min-w-0 flex-1 flex-col text-left', active ? 'text-ink' : 'text-ink-dim')}>
+              <span className="flex items-center gap-1.5">
+                {n.label}
+                {n.id === 'brain' && brainRunning && <Spinner className="h-3 w-3 shrink-0 text-iris" />}
+              </span>
+              {n.id === 'brain' && brainRunning && brainProgress && (
+                <span className="truncate text-[10px] font-normal text-ink-faint">{brainProgress.label}</span>
+              )}
+            </span>
           </button>
         )
       })}

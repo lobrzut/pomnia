@@ -13,6 +13,13 @@ import path from 'node:path'
 import type { OS } from '../model.js'
 import { appDataRoot } from '../platform.js'
 
+/** Local embedded brain-core (forked child, no auth). */
+export const EMBEDDED_BRAIN_DEFAULT_URL = 'http://127.0.0.1:7862'
+/** Remote homelab master behind supergateway (Bearer auth). */
+export const REMOTE_BRAIN_DEFAULT_URL = 'http://brain.example.local:7862'
+
+export type BrainTarget = 'embedded' | 'remote'
+
 export type ClientId =
   | 'claude-code'
   | 'cursor'
@@ -77,6 +84,37 @@ function withHeaders(token: string | undefined, server: Record<string, unknown>)
   return { ...server, headers: { Authorization: `Bearer ${token}` } }
 }
 
+/**
+ * Embedded brain-core exposes ONE unified MCP at `/mcp` (all tools on one server).
+ * Remote master uses supergateway with three split servers — see buildServers below.
+ */
+function embeddedServers(spec: ClientSpec, brainUrl: string): Record<string, Record<string, unknown>> {
+  const mcp = `${trimBase(brainUrl)}/mcp`
+  switch (spec.id) {
+    case 'claude-code':
+      return { 'brain-rag': { type: 'http', url: mcp } }
+    case 'cursor':
+      return { 'brain-rag': { url: mcp } }
+    case 'antigravity':
+      return { 'brain-rag': { type: 'streamable-http', serverUrl: mcp } }
+    case 'claude-desktop':
+      return {
+        'brain-rag': {
+          command: 'npx',
+          args: ['-y', 'mcp-remote', mcp, '--allow-http'],
+        },
+      }
+    case 'vscode':
+      return { 'brain-rag': { type: 'http', url: mcp } }
+    case 'windsurf':
+      return { 'brain-rag': { serverUrl: mcp } }
+    case 'hermes':
+      return { 'brain-rag': { url: mcp } }
+    default:
+      return { 'brain-rag': { url: mcp } }
+  }
+}
+
 /* ---------------------------------------------------------------------- */
 /* Agent brief — one markdown, all clients                                */
 /* ---------------------------------------------------------------------- */
@@ -90,6 +128,23 @@ function withHeaders(token: string | undefined, server: Record<string, unknown>)
  * names + payload keys stay English because that is how MCP catalog reports
  * them.
  */
+export const BRAIN_BRIEF_EMBEDDED_MD = `## Brain integration (MCP) — lokalny embedded
+
+Masz **jeden** MCP server \`brain-rag\` na \`127.0.0.1:7862\` — wszystkie narzędzia są na nim
+(\`search_library\`, \`save_conversation\`, \`get_user_profile\`, \`memory\`, \`library_status\`).
+Bez tokena — localhost only.
+
+### Na starcie każdej nietrywialnej sesji
+1. Wywołaj \`brain-rag.get_user_profile\` — przeczytaj mój profil (USER.md).
+2. Gdy pytanie brzmi technicznie — \`brain-rag.search_library\` PRZED odpowiedzią.
+
+### W trakcie rozmowy
+3. "zapisz do brain" → \`brain-rag.save_conversation\` z pełnym payloadem.
+4. Korekty / trwałe fakty → \`brain-rag.memory\` add/replace/remove.
+
+Uruchom embedded brain w Reliqua (Brain tab → Start) jeśli MCP nie odpowiada.
+`
+
 export const BRAIN_BRIEF_MD = `## Brain integration (MCP)
 
 Masz dostęp do trzech MCP serverów: \`brain-rag\`, \`brain-vault\`, \`brain-library\`.
@@ -345,25 +400,33 @@ export interface Snippet {
  * Build the snippet bundle for one client.
  *
  * @param clientId  one of CLIENTS
- * @param brainUrl  base URL of the brain MCP proxy (e.g. http://brain.example.local:7862 or https://brain.example.com)
+ * @param brainUrl  base URL of the brain MCP proxy (e.g. http://127.0.0.1:7862 or https://brain.example.com)
  * @param os        target OS for path resolution
  * @param home      target home dir for path resolution
- * @param token     optional Bearer token from /api/mcp/tokens
+ * @param token     optional Bearer token from /api/mcp/tokens (remote only)
+ * @param target    embedded = single local /mcp, no auth; remote = three supergateway servers
  */
 export function buildSnippet(
   clientId: ClientId,
   brainUrl: string,
   os: OS,
   home: string,
-  token?: string
+  token?: string,
+  target: BrainTarget = 'remote'
 ): Snippet {
   const spec = getClient(clientId)
-  const servers = spec.buildServers(brainUrl, token)
+  const servers =
+    target === 'embedded' ? embeddedServers(spec, brainUrl) : spec.buildServers(trimBase(brainUrl), token)
   const filePath = spec.configPath(os, home)
 
   const fullFileObj = { [spec.mcpKey]: servers }
   const fullFileJson = JSON.stringify(fullFileObj, null, 2) + '\n'
   const mergeJson = JSON.stringify(servers, null, 2) + '\n'
+
+  const embeddedNote =
+    target === 'embedded'
+      ? 'Embedded brain: one server (brain-rag) at /mcp — no Bearer token. Start it in Reliqua → Brain tab first.'
+      : null
 
   const instructions = [
     `▶ ${spec.label}`,
@@ -374,13 +437,22 @@ export function buildSnippet(
     `3. ${spec.restartHint}`,
     ``,
     `Notes: ${spec.notes}`,
-    token ? `Token included in headers — keep this file private (chmod 600 if possible).` : `No token included — add Authorization headers manually if the brain MCP proxy is auth-gated.`,
-  ].join('\n')
+    embeddedNote,
+    target === 'remote' && token
+      ? `Token included in headers — keep this file private (chmod 600 if possible).`
+      : target === 'remote'
+        ? `No token included — add Authorization headers manually if the brain MCP proxy is auth-gated.`
+        : `No token — localhost embedded brain does not use Bearer auth.`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const briefContent = target === 'embedded' ? BRAIN_BRIEF_EMBEDDED_MD : BRAIN_BRIEF_MD
 
   const brief: SnippetBrief | undefined = spec.brief
     ? {
         filePath: spec.brief.briefPath(os, home),
-        content: BRAIN_BRIEF_MD,
+        content: briefContent,
         mode: spec.brief.mode,
         restartHint: spec.brief.hint,
       }

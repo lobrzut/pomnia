@@ -8,6 +8,12 @@ files:
   - resources/**/*
 asarUnpack:
   - "**/*.wasm"
+# brain-core forked child (embedded MCP) — lives outside asar with native bindings
+extraResources:
+  - from: build/brain-core-runtime
+    to: brain-core
+    filter:
+      - "**/*"
 win:
   target: [nsis]
   icon: resources/icon.ico

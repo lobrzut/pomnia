@@ -59,7 +59,14 @@ export class Ollama {
   /** One-shot generation. `json: true` asks Ollama to constrain output to JSON. */
   async generate(
     prompt: string,
-    opts: { system?: string; model?: string; json?: boolean; temperature?: number; timeoutMs?: number } = {}
+    opts: {
+      system?: string
+      model?: string
+      json?: boolean
+      temperature?: number
+      timeoutMs?: number
+      signal?: AbortSignal
+    } = {}
   ): Promise<string> {
     const body = {
       model: opts.model || this.cfg.chatModel,
@@ -69,11 +76,15 @@ export class Ollama {
       format: opts.json ? 'json' : undefined,
       options: { temperature: opts.temperature ?? 0.2 }
     }
+    const timeoutMs = opts.timeoutMs ?? 300_000
+    const signals: AbortSignal[] = [AbortSignal.timeout(timeoutMs)]
+    if (opts.signal) signals.push(opts.signal)
+    const signal = AbortSignal.any(signals)
     const r = await fetch(`${this.cfg.baseUrl}/api/generate`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(opts.timeoutMs ?? 300_000)
+      signal
     })
     if (!r.ok) throw new Error(`ollama generate ${r.status}: ${await r.text().catch(() => '')}`)
     const j = (await r.json()) as { response?: string }

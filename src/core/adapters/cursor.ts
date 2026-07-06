@@ -9,6 +9,31 @@ import type { Adapter } from './types.js'
 
 const ID = 'cursor' as const
 
+/** sql.js loads the whole DB into RAM; large files also stall the Electron main process on readFile. */
+const MAX_CURSOR_DB_BYTES = 256 * 1024 * 1024
+
+function fmtBytes(n: number): string {
+  if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`
+  if (n >= 1024 ** 2) return `${Math.round(n / 1024 ** 2)} MB`
+  return `${Math.round(n / 1024)} KB`
+}
+
+export function cursorDbPath(root: string): string {
+  return path.join(root, 'globalStorage', 'state.vscdb')
+}
+
+export async function cursorDbStat(root: string): Promise<{ size: number; path: string } | null> {
+  const dbPath = cursorDbPath(root)
+  if (!(await pathExists(dbPath))) return null
+  const st = await fs.stat(dbPath)
+  return { size: st.size, path: dbPath }
+}
+
+export async function isCursorDbTooLarge(root: string): Promise<boolean> {
+  const st = await cursorDbStat(root)
+  return !!st && st.size > MAX_CURSOR_DB_BYTES
+}
+
 /** Lazy-load sql.js (WASM). Returns null if the dependency isn't installed. */
 async function loadSql(): Promise<any | null> {
   try {
@@ -42,8 +67,15 @@ function bubbleRole(type: unknown): Message['role'] {
 
 /** Best-effort extraction of composers/chats from Cursor's state.vscdb. */
 export async function readCursorConversations(root: string): Promise<Conversation[]> {
-  const dbPath = path.join(root, 'globalStorage', 'state.vscdb')
-  if (!(await pathExists(dbPath))) return []
+  const st = await cursorDbStat(root)
+  if (!st) return []
+  if (st.size > MAX_CURSOR_DB_BYTES) {
+    log.warn(
+      `Cursor DB too large (${fmtBytes(st.size)} > ${fmtBytes(MAX_CURSOR_DB_BYTES)}) — skip chat extraction to avoid freezing the app`
+    )
+    return []
+  }
+  const dbPath = st.path
   const SQL = await loadSql()
   if (!SQL) return []
 
@@ -145,10 +177,19 @@ export const cursorAdapter: Adapter = {
   async detect(): Promise<DetectedSource> {
     const d = await baseDetect(ID)
     if (d.installed) {
-      try {
-        d.conversations = (await readCursorConversations(d.root)).length
-      } catch {
-        d.conversations = undefined
+      const st = await cursorDbStat(d.root)
+      if (st && st.size > MAX_CURSOR_DB_BYTES) {
+        d.conversations = 0
+        d.notes = [
+          ...(d.notes ?? []),
+          `state.vscdb is ${fmtBytes(st.size)} — in-app chat parse skipped (too large). Close Cursor before backup; or use Import for exports.`
+        ]
+      } else {
+        try {
+          d.conversations = (await readCursorConversations(d.root)).length
+        } catch {
+          d.conversations = undefined
+        }
       }
     }
     return d

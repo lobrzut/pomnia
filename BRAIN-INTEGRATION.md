@@ -74,5 +74,6 @@ Format artefaktu Continuum (`.continuum-index.json`) jest pod to gotowy: `{embed
 - [ ] Batch całego inboxu na hoście (1668 sesji, te same ZIP-y) i jednorazowy deploy — odciąży VM z ~38 h.
 - [ ] Map-reduce dla długich rozmów (dziś transcript przycinany head+tail do 14k znaków).
 - [ ] Push przez MCP `save_conversation` jako trzeci backend deployu.
+- [x] **Auto-deploy po distill** (Remote master) — `deployDistilledToBrain`, SMB lub `save-note` + `library/reindex`. Zob. `docs/BRAIN-KVM-ARCHITECTURE.md`.
 - [ ] Brain-side `save-note` + `merge-index` (§5).
 - [ ] Wybór modelu per długość/temat (qwen2.5:14b vs 32b vs deepseek-r1).
