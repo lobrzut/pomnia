@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { api } from '../lib/api'
+import { loadBool, loadStr, saveBool, saveStr } from '../lib/persist'
 import type { ClientId, DetectedSource, Snapshot, SourceId, VaultStatus, BrainRunResult, BrainStateInfo } from '../lib/types'
 
 export type Route = 'dashboard' | 'browse' | 'import' | 'brain' | 'connect' | 'settings'
@@ -69,6 +70,12 @@ export function dashboardUrlFromBrainUrl(brainUrl: string): string {
 const BRAIN_AUTO_DEPLOY_KEY = 'reliqua.brain.autoDeploy'
 const BRAIN_DEPLOY_URL_KEY = 'reliqua.brain.deployUrl'
 const BRAIN_DEPLOY_TARGET_KEY = 'reliqua.brain.deployTarget'
+const BRAIN_DEPLOY_REINDEX_KEY = 'reliqua.brain.deployReindex'
+const CONNECT_TOKEN_KEY = 'reliqua.connect.token'
+const VAULT_PATH_KEY = 'reliqua.vault.lastPath'
+const BACKUP_NOTE_KEY = 'reliqua.backup.note'
+const SETTINGS_EXPORT_DIR_KEY = 'reliqua.settings.exportDir'
+const SIMPLE_MODE_KEY = 'reliqua.settings.simpleMode'
 
 function loadBrainAutoDeploy(): boolean {
   try {
@@ -80,19 +87,13 @@ function loadBrainAutoDeploy(): boolean {
 }
 
 function loadBrainDeployUrl(): string {
-  try {
-    return localStorage.getItem(BRAIN_DEPLOY_URL_KEY) || ''
-  } catch {
-    return ''
-  }
+  const saved = loadStr(BRAIN_DEPLOY_URL_KEY)
+  if (saved) return saved
+  return dashboardUrlFromBrainUrl(loadRemoteBrainUrl())
 }
 
 function loadBrainDeployTarget(): string {
-  try {
-    return localStorage.getItem(BRAIN_DEPLOY_TARGET_KEY) || ''
-  } catch {
-    return ''
-  }
+  return loadStr(BRAIN_DEPLOY_TARGET_KEY)
 }
 
 /** Same host as remote Brain MCP, default Ollama port. */
@@ -184,6 +185,31 @@ interface State {
   setBrainDeployUrl: (url: string) => void
   brainDeployTarget: string
   setBrainDeployTarget: (path: string) => void
+  brainDeployReindex: boolean
+  setBrainDeployReindex: (on: boolean) => void
+
+  connectToken: string
+  setConnectToken: (token: string) => void
+
+  vaultLastPath: string
+  setVaultLastPath: (path: string) => void
+
+  backupNote: string
+  setBackupNote: (note: string) => void
+
+  settingsExportDir: string
+  setSettingsExportDir: (dir: string) => void
+
+  /** Progressive disclosure — hides remote brain, deploy, VRAM profiles by default. */
+  simpleMode: boolean
+  setSimpleMode: (on: boolean) => void
+
+  /** Tray — main-process settings mirrored here for the Settings UI. */
+  minimizeToTray: boolean
+  closeToTray: boolean
+  setMinimizeToTray: (on: boolean) => void
+  setCloseToTray: (on: boolean) => void
+  loadAppSettings: () => Promise<void>
 
   /** Distill pipeline — lives in the store so progress survives tab switches. */
   brainRunning: boolean
@@ -249,7 +275,8 @@ export const useStore = create<State>((set, get) => ({
   async createVault(path, name, pass) {
     try {
       const vault = await api.createVault(path, name, pass)
-      set({ vault, snapshots: [] })
+      saveStr(VAULT_PATH_KEY, path)
+      set({ vault, snapshots: [], vaultLastPath: path })
       get().toast({ kind: 'success', title: 'Vault created', detail: name })
       return true
     } catch (e) {
@@ -260,7 +287,8 @@ export const useStore = create<State>((set, get) => ({
   async openVault(path, pass) {
     try {
       const vault = await api.openVault(path, pass)
-      set({ vault, snapshots: await api.listSnapshots() })
+      saveStr(VAULT_PATH_KEY, path)
+      set({ vault, snapshots: await api.listSnapshots(), vaultLastPath: path })
       get().toast({ kind: 'success', title: 'Vault unlocked', detail: vault.name })
       return true
     } catch (e) {
@@ -369,23 +397,67 @@ export const useStore = create<State>((set, get) => ({
     }
     set({ brainAutoDeploy })
   },
-  brainDeployUrl: loadBrainDeployUrl() || dashboardUrlFromBrainUrl(loadRemoteBrainUrl()),
+  brainDeployUrl: loadBrainDeployUrl(),
   setBrainDeployUrl: (brainDeployUrl) => {
-    try {
-      localStorage.setItem(BRAIN_DEPLOY_URL_KEY, brainDeployUrl)
-    } catch {
-      /* ignore */
-    }
+    saveStr(BRAIN_DEPLOY_URL_KEY, brainDeployUrl)
     set({ brainDeployUrl })
   },
   brainDeployTarget: loadBrainDeployTarget(),
   setBrainDeployTarget: (brainDeployTarget) => {
-    try {
-      localStorage.setItem(BRAIN_DEPLOY_TARGET_KEY, brainDeployTarget)
-    } catch {
-      /* ignore */
-    }
+    saveStr(BRAIN_DEPLOY_TARGET_KEY, brainDeployTarget)
     set({ brainDeployTarget })
+  },
+  brainDeployReindex: loadBool(BRAIN_DEPLOY_REINDEX_KEY, true),
+  setBrainDeployReindex: (brainDeployReindex) => {
+    saveBool(BRAIN_DEPLOY_REINDEX_KEY, brainDeployReindex)
+    set({ brainDeployReindex })
+  },
+
+  connectToken: loadStr(CONNECT_TOKEN_KEY),
+  setConnectToken: (connectToken) => {
+    saveStr(CONNECT_TOKEN_KEY, connectToken)
+    set({ connectToken })
+  },
+
+  vaultLastPath: loadStr(VAULT_PATH_KEY),
+  setVaultLastPath: (vaultLastPath) => {
+    saveStr(VAULT_PATH_KEY, vaultLastPath)
+    set({ vaultLastPath })
+  },
+
+  backupNote: loadStr(BACKUP_NOTE_KEY),
+  setBackupNote: (backupNote) => {
+    saveStr(BACKUP_NOTE_KEY, backupNote)
+    set({ backupNote })
+  },
+
+  settingsExportDir: loadStr(SETTINGS_EXPORT_DIR_KEY),
+  setSettingsExportDir: (settingsExportDir) => {
+    saveStr(SETTINGS_EXPORT_DIR_KEY, settingsExportDir)
+    set({ settingsExportDir })
+  },
+
+  simpleMode: loadBool(SIMPLE_MODE_KEY, true),
+  setSimpleMode: (simpleMode) => {
+    saveBool(SIMPLE_MODE_KEY, simpleMode)
+    set({ simpleMode })
+  },
+
+  minimizeToTray: false,
+  closeToTray: true,
+  async loadAppSettings() {
+    try {
+      const s = await api.appSettings()
+      set({ minimizeToTray: s.minimizeToTray, closeToTray: s.closeToTray })
+    } catch {
+      /* preview mode / unavailable */
+    }
+  },
+  setMinimizeToTray: (minimizeToTray) => {
+    void api.appSettingsSet({ minimizeToTray }).then((s) => set({ minimizeToTray: s.minimizeToTray }))
+  },
+  setCloseToTray: (closeToTray) => {
+    void api.appSettingsSet({ closeToTray }).then((s) => set({ closeToTray: s.closeToTray }))
   },
 
   brainRunning: false,

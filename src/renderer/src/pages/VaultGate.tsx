@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Boxes, FolderOpen, KeyRound, ShieldCheck, Sparkles } from 'lucide-react'
 import { Button, Field, Input } from '../components/ui'
@@ -6,22 +6,30 @@ import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
 
 export default function VaultGate() {
-  const { createVault, openVault } = useStore()
+  const { createVault, openVault, vaultLastPath, setVaultLastPath } = useStore()
   const [mode, setMode] = useState<'unlock' | 'create'>('unlock')
-  const [path, setPath] = useState('')
+  const [path, setPath] = useState(vaultLastPath)
   const [name, setName] = useState('My Vault')
   const [pass, setPass] = useState('')
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
 
+  useEffect(() => {
+    if (vaultLastPath && !path) setPath(vaultLastPath)
+  }, [vaultLastPath, path])
+
   async function pick() {
     const dir = await api.pickDirectory()
-    if (dir) setPath(dir)
+    if (dir) {
+      setPath(dir)
+      setVaultLastPath(dir)
+    }
   }
 
   async function submit() {
     if (!path || !pass) return
     if (mode === 'create' && pass !== confirm) return
+    setVaultLastPath(path)
     setBusy(true)
     if (mode === 'create') await createVault(path, name, pass)
     else await openVault(path, pass)
@@ -79,7 +87,15 @@ export default function VaultGate() {
         <div className="space-y-4">
           <Field label={mode === 'create' ? 'New vault folder' : 'Vault folder'}>
             <div className="flex gap-2">
-              <Input value={path} onChange={(e) => setPath(e.target.value)} onKeyDown={onEnter} placeholder="…/MyVault.reliqua" />
+              <Input
+                value={path}
+                onChange={(e) => {
+                  setPath(e.target.value)
+                  setVaultLastPath(e.target.value)
+                }}
+                onKeyDown={onEnter}
+                placeholder="…/MyVault.reliqua"
+              />
               <Button variant="soft" onClick={pick}>
                 <FolderOpen className="h-4 w-4" />
               </Button>

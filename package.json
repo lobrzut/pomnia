@@ -1,6 +1,6 @@
 {
   "name": "reliqua",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Cross-platform encrypted vault for backing up and restoring AI assistant chat history (Claude Code, Claude Desktop, Cursor, Antigravity, VS Code).",
   "author": "alice",
   "license": "MIT",

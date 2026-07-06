@@ -1,18 +1,34 @@
 import { useEffect, useState } from 'react'
-import { Brain, Clock, FileArchive, FolderOpen, Lock, Plug, RotateCcw, ShieldCheck, Vault } from 'lucide-react'
+import { Brain, Clock, FileArchive, FolderOpen, Lock, Minimize2, Plug, RotateCcw, ShieldCheck, Vault } from 'lucide-react'
 import { Button, Field, GlassCard, Input, Spinner, Toggle } from '../components/ui'
 import { ClientIcon } from '../components/ClientIcon'
 import { api, isMock } from '../lib/api'
 import { humanBytes, relativeTime } from '../lib/format'
+import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
 import type { ClientId, ClientStatus } from '../lib/types'
 
 const ALL_CLIENTS: ClientId[] = ['claude-code', 'cursor', 'antigravity', 'claude-desktop', 'vscode', 'windsurf', 'hermes']
 
 export default function Settings() {
-  const { vault, lockVault, snapshots, toast, connectClientOverride, setConnectClientVisible, resetConnectClient } =
-    useStore()
-  const [exportDir, setExportDir] = useState('')
+  const {
+    vault,
+    lockVault,
+    snapshots,
+    toast,
+    connectClientOverride,
+    setConnectClientVisible,
+    resetConnectClient,
+    settingsExportDir,
+    setSettingsExportDir,
+    simpleMode,
+    setSimpleMode,
+    minimizeToTray,
+    closeToTray,
+    setMinimizeToTray,
+    setCloseToTray
+  } = useStore()
+  const labels = uiLabels(simpleMode)
   const [exportSnap, setExportSnap] = useState(snapshots[0]?.id ?? '')
   const [clients, setClients] = useState<ClientStatus[]>([])
   const [verifying, setVerifying] = useState(false)
@@ -42,13 +58,13 @@ export default function Settings() {
 
   async function pickExport() {
     const d = await api.pickDirectory()
-    if (d) setExportDir(d)
+    if (d) setSettingsExportDir(d)
   }
 
   async function brainExport() {
-    if (!exportSnap || !exportDir) return
+    if (!exportSnap || !settingsExportDir) return
     try {
-      const r = await api.brainExport(exportSnap, exportDir)
+      const r = await api.brainExport(exportSnap, settingsExportDir)
       toast({ kind: 'success', title: `Exported ${r.count} notes`, detail: r.dir })
     } catch (e) {
       toast({ kind: 'error', title: 'Export failed', detail: (e as Error).message })
@@ -59,6 +75,42 @@ export default function Settings() {
     <div className="mx-auto max-w-3xl">
       <h1 className="mb-1 text-[26px] font-bold tracking-tight text-grad">Settings</h1>
       <p className="mb-6 text-sm text-ink-dim">Vault, integrations, and security.</p>
+
+      <GlassCard className="mb-4 p-5">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-ink">{labels.simpleMode}</div>
+            <p className="mt-1 text-xs text-ink-dim">{labels.simpleModeHint}</p>
+          </div>
+          <Toggle
+            checked={simpleMode}
+            onChange={setSimpleMode}
+            aria-label={labels.simpleMode}
+          />
+        </div>
+      </GlassCard>
+
+      <GlassCard className="mb-4 p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+          <Minimize2 className="h-4 w-4 text-iris" /> {simpleMode ? 'Zasobnik systemowy' : 'System tray'}
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-ink">{labels.closeToTray}</div>
+              <p className="mt-1 text-xs text-ink-dim">{labels.closeToTrayHint}</p>
+            </div>
+            <Toggle checked={closeToTray} onChange={setCloseToTray} aria-label={labels.closeToTray} />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-ink">{labels.minimizeToTray}</div>
+              <p className="mt-1 text-xs text-ink-dim">{labels.minimizeToTrayHint}</p>
+            </div>
+            <Toggle checked={minimizeToTray} onChange={setMinimizeToTray} aria-label={labels.minimizeToTray} />
+          </div>
+        </div>
+      </GlassCard>
 
       <GlassCard className="mb-4 p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
@@ -109,8 +161,8 @@ export default function Settings() {
           </div>
         </div>
         <div className="mt-3 flex gap-2">
-          <Input value={exportDir} onChange={(e) => setExportDir(e.target.value)} placeholder="…/brain/data/vault/sessions" />
-          <Button onClick={brainExport} disabled={!exportSnap || !exportDir}>
+          <Input value={settingsExportDir} onChange={(e) => setSettingsExportDir(e.target.value)} placeholder="…/brain/data/vault/sessions" />
+          <Button onClick={brainExport} disabled={!exportSnap || !settingsExportDir}>
             <Brain className="h-4 w-4" /> Export
           </Button>
         </div>

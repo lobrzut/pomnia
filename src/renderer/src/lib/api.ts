@@ -93,6 +93,8 @@ export interface ReliquaBridge {
     name: string,
     adminToken?: string,
   ): Promise<{ name: string; token: string; created: string }>
+  appSettings(): Promise<{ minimizeToTray: boolean; closeToTray: boolean }>
+  appSettingsSet(patch: { minimizeToTray?: boolean; closeToTray?: boolean }): Promise<{ minimizeToTray: boolean; closeToTray: boolean }>
   minimize(): void
   toggleMaximize(): void
   close(): void
@@ -126,7 +128,7 @@ function mockBridge(): ReliquaBridge {
     { id: 'claude-code', label: 'Claude Code', strategy: 'hybrid', installed: true, root: '~/.claude', os: 'win32', sizeBytes: 7.2e6, conversations: 38, notes: ['JSONL transcripts per session'] },
     { id: 'cursor', label: 'Cursor', strategy: 'hybrid', installed: true, root: '~/AppData/Roaming/Cursor/User', os: 'win32', sizeBytes: 1.6e7, conversations: 21, notes: ['Chats live in state.vscdb (SQLite)'] },
     { id: 'claude-desktop', label: 'Claude Desktop', strategy: 'snapshot', installed: true, root: '~/AppData/Roaming/Claude', os: 'win32', sizeBytes: 8.5e6, notes: ['Mostly cloud-synced; local config captured'] },
-    { id: 'antigravity', label: 'Antigravity', strategy: 'snapshot', installed: true, root: '~/AppData/Roaming/Antigravity', os: 'win32', sizeBytes: 7.6e3, notes: ['Google IDE (Windsurf lineage)'] },
+    { id: 'antigravity', label: 'Antigravity', strategy: 'hybrid', installed: true, root: '~/AppData/Roaming/Antigravity', os: 'win32', sizeBytes: 7.6e3, conversations: 7, notes: ['Chats in ~/.gemini/antigravity/brain/*/transcript.jsonl'] },
     { id: 'vscode', label: 'VS Code', strategy: 'snapshot', installed: true, root: '~/AppData/Roaming/Code/User', os: 'win32', sizeBytes: 3.4e5 }
   ]
   let status: VaultStatus = { open: false, snapshots: 0 }
@@ -366,6 +368,12 @@ function mockBridge(): ReliquaBridge {
         token: 'btk_MOCK_' + Math.random().toString(36).slice(2, 34),
         created: new Date().toISOString(),
       }
+    },
+    async appSettings() {
+      return { minimizeToTray: false, closeToTray: true }
+    },
+    async appSettingsSet(patch) {
+      return { minimizeToTray: patch.minimizeToTray ?? false, closeToTray: patch.closeToTray ?? true }
     },
     minimize() {},
     toggleMaximize() {},
