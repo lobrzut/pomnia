@@ -1,0 +1,56 @@
+{
+  "_comment": "Pomnia Slavic green logo concepts — MCP uses built-in FLUX handler; this file is prompt/workflow reference.",
+  "_pomnia": {
+    "asset": "logo-concept",
+    "brand_doc": "docs/BRAND-LOGO.md",
+    "target_path": "resources/icon.png",
+    "post_process": "User picks direction first; then refine 2-3x, vectorize, gen-icon.mjs",
+    "recommended_mcp": "generate_image_smart style=icon size=512x512 workflow=flux lora=flat-ui background=dark_navy project_style=false quality_tier=final"
+  },
+  "_style_bible": "Pomnia Slavic memory vault: forest emerald #1a5c3a, moss #3d6b4f, birch #a8c4b0, amber #c9a227, void #0a120e. Flat vector icon, original Slavic geometry, no cliche eagles wolves kolovrat Futhark, no purple cyan, no text, no photorealism, no light bulb.",
+  "_negative": "text, watermark, photorealistic, 3d render, light bulb, lamp, human, face, hands, purple, cyan, magenta, teal, letter R, kolovrat, swastika, landscape scene, trees background",
+  "_mcp_settings": {
+    "workflow": "flux",
+    "lora": "flat-ui",
+    "lora_strength": 0.55,
+    "width": 512,
+    "height": 512,
+    "quality_tier": "final",
+    "background": "dark_navy",
+    "project_style": false
+  },
+  "concepts": {
+    "moss_vault": {
+      "name": "Moss Vault",
+      "seed": 42001,
+      "status": "strongest_v1",
+      "output": "assets/generated/logo-concept-moss-vault.png",
+      "positive": "App icon logo mark, Moss Vault concept: nested vesica piscis forming a memory labyrinth vault, inner amber glow like trapped sunlight in forest moss, emerald and moss green palette, subtle Slavic woven border geometry original not Elder Futhark, flat vector UI icon, centered symbol generous padding, dark forest void background #0a120e, birch silver-green highlights, minimal geometric, no text no letters"
+    },
+    "birch_thread": {
+      "name": "Birch Thread",
+      "seed": 42002,
+      "status": "needs_iteration_colors",
+      "output": "assets/generated/logo-concept-birch-thread.png",
+      "positive": "App icon logo mark, Birch Thread concept: three interwoven memory threads forming abstract knot not a letter, inspired by Slavic haft embroidery and birch bark texture, silver-green birch and deep forest green only, delicate cross-stitch geometry, thread nodes at intersections, flat vector UI icon, centered, dark void background, minimal, no text, no magenta no teal no purple",
+      "refine_notes": "Add forbid=magenta,teal,purple,cyan; try seed 42012"
+    },
+    "dew_sigil": {
+      "name": "Dew Sigil",
+      "seed": 42003,
+      "status": "needs_iteration_too_scenic",
+      "output": "assets/generated/logo-concept-dew-sigil.png",
+      "positive": "App icon logo mark, Dew Sigil concept: single centered sigil symbol only, original angular lattice geometry not Elder Futhark, three dew droplets, vesica memory gate at center, emerald green glow with amber dew highlights, flat vector UI icon, square format, dark forest background, crisp edges, no text no rune alphabet, no landscape no trees no scene",
+      "refine_notes": "composition_lock=forbid=landscape,scene,trees"
+    },
+    "amber_loom": {
+      "name": "Amber Loom",
+      "seed": 42004,
+      "status": "needs_iteration_no_bulb",
+      "output": "assets/generated/logo-concept-amber-loom.png",
+      "positive": "App icon logo mark, Amber Loom concept: circular memory loom weaving threads, amber resin glow at center, moss green and emerald outer ring, loom spokes not kolovrat not sun wheel, flat vector UI icon, centered, dark void background, minimal geometric, no text, no light bulb no lamp",
+      "refine_notes": "forbid=lightbulb,lamp,bulb"
+    }
+  },
+  "prompt": {}
+}
