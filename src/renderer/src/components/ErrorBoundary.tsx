@@ -22,7 +22,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: unknown): void {
     // Surfaced for diagnosis; also visible in the fallback below.
-    console.error('[reliqua] page render error:', error, info)
+    console.error('[pomnia] page render error:', error, info)
   }
 
   render(): ReactNode {

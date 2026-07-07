@@ -1,5 +1,5 @@
-appId: dev.helluk.reliqua
-productName: Reliqua
+appId: ai.pomnia.app
+productName: Pomnia
 directories:
   output: release
   buildResources: resources

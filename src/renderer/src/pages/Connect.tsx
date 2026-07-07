@@ -80,7 +80,7 @@ export default function Connect() {
   async function mintToken() {
     if (minting) return
     const dashboardUrl = brainUrl.replace(/:\d+$/, ':7860')
-    const suggested = `reliqua-${new Date().toISOString().slice(0, 10)}`
+    const suggested = `pomnia-${new Date().toISOString().slice(0, 10)}`
     const name = window.prompt(
       'Name for the new token (identifies where it lives — helps if you need to revoke it later):',
       suggested,
@@ -210,7 +210,7 @@ export default function Connect() {
           <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.mcpConnect}</h1>
           <p className="text-sm text-ink-dim">
             {simpleMode
-              ? 'Skopiuj konfigurację MCP i wklej w Cursorze — Reliqua nigdy nie dotyka Twoich plików.'
+              ? 'Skopiuj konfigurację MCP i wklej w Cursorze — Pomnia nigdy nie dotyka Twoich plików.'
               : "See what's wired up, and get a copy-paste snippet for what isn't — we never touch your config files."}
           </p>
         </div>

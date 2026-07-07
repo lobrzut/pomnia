@@ -1,6 +1,6 @@
 /**
  * Bridge to alice's Brain. Converts captured conversations into markdown notes
- * compatible with Brain's `data/vault/` ingest format, so a Reliqua backup can
+ * compatible with Brain's `data/vault/` ingest format, so a Pomnia backup can
  * directly feed the RAG inbox (then re-distilled locally by Ollama). This is the
  * "stop wasting context across sessions" play.
  */
@@ -27,7 +27,7 @@ export function conversationToMarkdown(c: Conversation): string {
     `project: ${c.title.replace(/\n/g, ' ')}`,
     `date: ${date}`,
     `msg_count: ${c.messages.length}`,
-    'exported_via: reliqua',
+    'exported_via: pomnia',
     '---',
     ''
   ].join('\n')

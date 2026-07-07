@@ -67,4 +67,4 @@ const bridge = {
   close: () => ipcRenderer.send('win:close')
 }
 
-contextBridge.exposeInMainWorld('reliqua', bridge)
+contextBridge.exposeInMainWorld('pomnia', bridge)

@@ -1,7 +1,7 @@
 /**
- * @reliqua/brain-core — public API.
+ * @pomnia/brain-core — public API.
  *
- * Split by concern so both the Reliqua Electron main and the standalone
+ * Split by concern so both the Pomnia Electron main and the standalone
  * daemon entrypoint (bin/brain-core.js) can pull only what they need.
  */
 

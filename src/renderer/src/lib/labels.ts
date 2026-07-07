@@ -62,7 +62,7 @@ export function uiLabels(simple: boolean): UiLabels {
       importSelect: 'Wybierz plik…',
       importProviders: 'Skąd pobrać eksport',
       importLegalNote:
-        'Reliqua importuje tylko oficjalne eksporty — bez logowania do kont. Claude Desktop / Gemini wymagają eksportu z wersji webowej.'
+        'Pomnia importuje tylko oficjalne eksporty — bez logowania do kont. Claude Desktop / Gemini wymagają eksportu z wersji webowej.'
     }
   }
   return {
@@ -83,7 +83,7 @@ export function uiLabels(simple: boolean): UiLabels {
     simpleMode: 'Simple mode',
     simpleModeHint: 'Hides remote brain URL, deploy/SMB/reindex, manual Ollama URL, and VRAM profiles.',
     closeToTray: 'Close to tray',
-    closeToTrayHint: 'The X button hides Reliqua to the system tray instead of quitting. Always on while embedded brain runs.',
+    closeToTrayHint: 'The X button hides Pomnia to the system tray instead of quitting. Always on while embedded brain runs.',
     minimizeToTray: 'Minimize to tray',
     minimizeToTrayHint: 'The minimize button hides to tray instead of the taskbar.',
     importTitle: 'Import',
@@ -95,6 +95,6 @@ export function uiLabels(simple: boolean): UiLabels {
     importSelect: 'Select export…',
     importProviders: 'Where to export from',
     importLegalNote:
-      'Reliqua imports official exports only — no scraping or logging into accounts (fragile + against terms). Claude Desktop / Gemini chats live server-side, so you export them from the web, then import here.'
+      'Pomnia imports official exports only — no scraping or logging into accounts (fragile + against terms). Claude Desktop / Gemini chats live server-side, so you export them from the web, then import here.'
   }
 }

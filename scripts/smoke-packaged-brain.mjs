@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const entry = join(root, "release/win-unpacked/resources/brain-core/embedded.js");
-const execPath = join(root, "release/win-unpacked/Reliqua.exe");
+const execPath = join(root, "release/win-unpacked/Pomnia.exe");
 const cwd = dirname(entry);
 const dataDir = mkdtempSync(join(tmpdir(), "continuum-packaged-brain-"));
 

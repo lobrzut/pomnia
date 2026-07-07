@@ -1,7 +1,7 @@
 /**
  * Browser-only dev server for the renderer — no Electron.
  *
- * The renderer falls back to `mockBridge()` when `window.reliqua` is absent
+ * The renderer falls back to `mockBridge()` when `window.pomnia` is absent
  * (see src/renderer/src/lib/api.ts), so every page renders with illustrative
  * data. Used for visual/design iteration where we need a real browser
  * (screenshots, DOM inspection) instead of an Electron window.

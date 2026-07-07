@@ -56,7 +56,7 @@ export function decrypt(key: Buffer, blob: Buffer): Buffer {
   if (blob.length < MAGIC.length + IV_LEN + TAG_LEN)
     throw new Error('ciphertext too short / corrupt')
   if (!blob.subarray(0, MAGIC.length).equals(MAGIC))
-    throw new Error('bad magic — not a Reliqua blob')
+    throw new Error('bad magic — not a Pomnia blob')
   let off = MAGIC.length
   const iv = blob.subarray(off, (off += IV_LEN))
   const tag = blob.subarray(off, (off += TAG_LEN))

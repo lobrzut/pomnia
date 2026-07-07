@@ -9,6 +9,7 @@ release/
 # never commit a real vault or extracted chat data
 *.continuum
 *.reliqua
+*.pomnia
 vault/
 sandbox/
 build/brain-core-runtime/

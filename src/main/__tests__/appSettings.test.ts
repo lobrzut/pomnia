@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({
-  app: { getPath: () => '/tmp/reliqua-test' },
+  app: { getPath: () => '/tmp/pomnia-test' },
 }))
 
 vi.mock('node:fs', () => ({

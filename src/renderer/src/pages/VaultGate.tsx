@@ -59,7 +59,7 @@ export default function VaultGate() {
             <Boxes className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-grad">Reliqua Vault</h1>
+            <h1 className="text-lg font-bold text-grad">Pomnia Vault</h1>
             <p className="text-xs text-ink-dim">Your AI memory — encrypted, portable, yours.</p>
           </div>
         </div>
@@ -94,7 +94,7 @@ export default function VaultGate() {
                   setVaultLastPath(e.target.value)
                 }}
                 onKeyDown={onEnter}
-                placeholder="…/MyVault.reliqua"
+                placeholder="…/MyVault.pomnia"
               />
               <Button variant="soft" onClick={pick}>
                 <FolderOpen className="h-4 w-4" />

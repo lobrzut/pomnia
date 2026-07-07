@@ -1,4 +1,4 @@
-# Reliqua — zasady bezpieczeństwa i zaufania
+# Pomnia — zasady bezpieczeństwa i zaufania
 
 **Dokument wewnętrzny** dla zespołu i przyszłego audytu. Opisuje model zaufania przy premierze (v1). Nie jest specyfikacją open-source ani dokumentacją publiczną implementacji kryptograficznej.
 
@@ -6,10 +6,10 @@
 
 ## 1. Vault jako chroniony rdzeń
 
-Sejf (vault) ma bezpośredni dostęp do wszystkich danych użytkownika zgromadzonych w Reliqua — rozmów, snapshotów konfiguracji, metadanych importów. To **najbardziej chroniona warstwa** produktu.
+Sejf (vault) ma bezpośredni dostęp do wszystkich danych użytkownika zgromadzonych w Pomnia — rozmów, snapshotów konfiguracji, metadanych importów. To **najbardziej chroniona warstwa** produktu.
 
 - Kod vault, format plików sejfu oraz implementacja kryptografii **pozostają zamknięte** przy premierze — bez publikacji kodu, specyfikacji formatu ani szczegółów crypto.
-- Reliqua **nie jest modelem „open core”**. Sejf to zamknięty, przenośny „safe” użytkownika; reszta produktu może ewoluować osobno, ale rdzeń danych nie podlega otwarciu w v1.
+- Pomnia **nie jest modelem „open core”**. Sejf to zamknięty, przenośny „safe” użytkownika; reszta produktu może ewoluować osobno, ale rdzeń danych nie podlega otwarciu w v1.
 
 ---
 
@@ -34,9 +34,9 @@ Poniżej streszczenie zachowania systemu — **bez odwołań do kodu, ścieżek 
 |-----------|------------|
 | **PUBLIC** | Instalatory (exe/dmg), strona landing, fragmenty dokumentacji MCP (integracja z zewnętrznymi klientami AI). |
 | **CLOSED** | UI aplikacji, adaptery źródeł, bundle brain-core, vault, pipeline importu. |
-| **SEPARATE** | Homelab Brain (serwer RAG/indeks na infrastrukturze użytkownika) — **nie** jest częścią publikacji klienta Reliqua. |
+| **SEPARATE** | Homelab Brain (serwer RAG/indeks na infrastrukturze użytkownika) — **nie** jest częścią publikacji klienta Pomnia. |
 
-Homelab Brain to osobny produkt/instancja; Reliqua dostarcza do niego dane tylko na żądanie użytkownika (eksport/deploy), nie bundluje serwera Brain w instalatorze klienta.
+Homelab Brain to osobny produkt/instancja; Pomnia dostarcza do niego dane tylko na żądanie użytkownika (eksport/deploy), nie bundluje serwera Brain w instalatorze klienta.
 
 ---
 

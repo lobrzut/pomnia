@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import { api } from '../lib/api'
-import { loadBool, loadStr, saveBool, saveStr } from '../lib/persist'
+import { loadBool, loadStr, migrateLegacyStorage, saveBool, saveStr } from '../lib/persist'
 import type { ClientId, DetectedSource, Snapshot, SourceId, VaultStatus, BrainRunResult, BrainStateInfo } from '../lib/types'
+
+migrateLegacyStorage()
 
 export type Route = 'dashboard' | 'browse' | 'import' | 'brain' | 'connect' | 'settings'
 
@@ -11,7 +13,7 @@ export type Route = 'dashboard' | 'browse' | 'import' | 'brain' | 'connect' | 's
  * not-yet-installed client to show (to set it up) or hide one they don't care
  * about. true = force show, false = force hide, absent = auto (follow detection).
  */
-const CLIENT_OVERRIDE_KEY = 'reliqua.connect.clientOverride'
+const CLIENT_OVERRIDE_KEY = 'pomnia.connect.clientOverride'
 function loadClientOverride(): Partial<Record<ClientId, boolean>> {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(CLIENT_OVERRIDE_KEY) : null
@@ -29,10 +31,10 @@ function saveClientOverride(o: Partial<Record<ClientId, boolean>>): void {
 }
 
 /** First-run flag — once true the onboarding wizard never shows again. */
-const ONBOARDED_KEY = 'reliqua.onboarded'
-const BRAIN_TARGET_KEY = 'reliqua.brain.target'
-const REMOTE_BRAIN_URL_KEY = 'reliqua.brain.remoteUrl'
-const OLLAMA_URL_KEY = 'reliqua.brain.ollamaUrl'
+const ONBOARDED_KEY = 'pomnia.onboarded'
+const BRAIN_TARGET_KEY = 'pomnia.brain.target'
+const REMOTE_BRAIN_URL_KEY = 'pomnia.brain.remoteUrl'
+const OLLAMA_URL_KEY = 'pomnia.brain.ollamaUrl'
 
 export type BrainTarget = 'embedded' | 'remote'
 
@@ -67,15 +69,15 @@ export function dashboardUrlFromBrainUrl(brainUrl: string): string {
   }
 }
 
-const BRAIN_AUTO_DEPLOY_KEY = 'reliqua.brain.autoDeploy'
-const BRAIN_DEPLOY_URL_KEY = 'reliqua.brain.deployUrl'
-const BRAIN_DEPLOY_TARGET_KEY = 'reliqua.brain.deployTarget'
-const BRAIN_DEPLOY_REINDEX_KEY = 'reliqua.brain.deployReindex'
-const CONNECT_TOKEN_KEY = 'reliqua.connect.token'
-const VAULT_PATH_KEY = 'reliqua.vault.lastPath'
-const BACKUP_NOTE_KEY = 'reliqua.backup.note'
-const SETTINGS_EXPORT_DIR_KEY = 'reliqua.settings.exportDir'
-const SIMPLE_MODE_KEY = 'reliqua.settings.simpleMode'
+const BRAIN_AUTO_DEPLOY_KEY = 'pomnia.brain.autoDeploy'
+const BRAIN_DEPLOY_URL_KEY = 'pomnia.brain.deployUrl'
+const BRAIN_DEPLOY_TARGET_KEY = 'pomnia.brain.deployTarget'
+const BRAIN_DEPLOY_REINDEX_KEY = 'pomnia.brain.deployReindex'
+const CONNECT_TOKEN_KEY = 'pomnia.connect.token'
+const VAULT_PATH_KEY = 'pomnia.vault.lastPath'
+const BACKUP_NOTE_KEY = 'pomnia.backup.note'
+const SETTINGS_EXPORT_DIR_KEY = 'pomnia.settings.exportDir'
+const SIMPLE_MODE_KEY = 'pomnia.settings.simpleMode'
 
 function loadBrainAutoDeploy(): boolean {
   try {

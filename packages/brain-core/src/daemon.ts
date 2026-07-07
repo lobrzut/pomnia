@@ -3,11 +3,11 @@
  * Standalone daemon entry point.
  *
  * Usage:
- *   brain-core                          # reads config from env / ~/.reliqua/brain-core.toml
- *   brain-core --port 7862 --data-dir ~/.reliqua/brain
+ *   brain-core                          # reads config from env / ~/.pomnia/brain-core.toml
+ *   brain-core --port 7862 --data-dir ~/.pomnia/brain
  *   brain-core --config /etc/brain.toml
  *
- * When Reliqua embeds brain-core, it doesn't go through this file — the Electron
+ * When Pomnia embeds brain-core, it doesn't go through this file — the Electron
  * main process spawns a child via `child_process.fork()` and passes an options
  * object over IPC. This entry point is for the systemd/Docker deploy path.
  */

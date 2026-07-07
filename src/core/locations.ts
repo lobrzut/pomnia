@@ -4,7 +4,7 @@ import { appDataRoot } from './platform.js'
 
 /**
  * Declarative description of where each assistant keeps its data on each OS,
- * and how Reliqua should treat it. Adapters consume these descriptors.
+ * and how Pomnia should treat it. Adapters consume these descriptors.
  */
 export interface SourceDescriptor {
   id: SourceId

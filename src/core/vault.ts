@@ -1,7 +1,7 @@
 /**
- * Reliqua vault — an encrypted, content-addressed, portable store.
+ * Pomnia vault — an encrypted, content-addressed, portable store.
  *
- * On-disk layout of `MyVault.reliqua/`:
+ * On-disk layout of `MyVault.pomnia/`:
  *   header.json              plaintext: format, vault id, KDF salt+params, check token
  *   manifest.cvb             encrypted VaultManifest (list of snapshots + stats)
  *   snapshots/<id>.cvb       encrypted SnapshotPayload (conversations + file index)
@@ -132,7 +132,7 @@ export class Vault {
     return new Vault(dir, header, key, manifest)
   }
 
-  /** Quick check whether a directory is a Reliqua vault. */
+  /** Quick check whether a directory is a Pomnia vault. */
   static async isVault(dir: string): Promise<boolean> {
     return fs
       .access(path.join(dir, 'header.json'))

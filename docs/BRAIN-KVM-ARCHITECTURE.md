@@ -1,12 +1,12 @@
-# Reliqua × Brain — architektura KVM (split client / server)
+# Pomnia × Brain — architektura KVM (split client / server)
 
 ## Podział ról
 
 | Warstwa | Gdzie | Ollama / RAM | Co robi |
 |---------|-------|--------------|---------|
-| **Reliqua Vault** | NAS / lokalny dysk (`*.reliqua`) | — | Zaszyfrowane snapshoty surowych czatów |
+| **Pomnia Vault** | NAS / lokalny dysk (`*.pomnia`) | — | Zaszyfrowane snapshoty surowych czatów |
 | **Distill** | PC klienta (GPU) | `qwen2.5:14b` (~9 GB) | Czat → notatka markdown (JSON-mode) |
-| **Staging** | `%AppData%/reliqua/brain-notes` | — | Notatki + lokalny indeks (opcjonalny) |
+| **Staging** | `%AppData%/Pomnia/brain-notes` | — | Notatki + lokalny indeks (opcjonalny) |
 | **Brain KVM** | homelab / mały VM | `nomic-embed-text` (~274 MB) | Embed + `library.db` + MCP `:7862` |
 
 ## Przepływ (Remote master)
@@ -24,7 +24,7 @@ brain-notes/*.md  ──auto-deploy──►  vault/distilled/
 Cursor / Claude ──MCP :7862──────► search_library
 ```
 
-## Reliqua — auto-deploy (od 2026-07-06)
+## Pomnia — auto-deploy (od 2026-07-06)
 
 Gdy **Connect → Remote master** i **Brain → Auto-deploy after distill**:
 
@@ -32,7 +32,7 @@ Gdy **Connect → Remote master** i **Brain → Auto-deploy after distill**:
 2. Kopia `.md` do `brainDeployTarget` (SMB, np. `\\brain.example.local\brain\vault\distilled`) **lub** HTTP `POST /api/vault/save-note`
 3. `POST /api/library/reindex` na dashboard `:7860`
 
-Ustawienia w `localStorage`: `reliqua.brain.autoDeploy`, `reliqua.brain.deployUrl`, `reliqua.brain.deployTarget`.
+Ustawienia w `localStorage`: `pomnia.brain.autoDeploy`, `pomnia.brain.deployUrl`, `pomnia.brain.deployTarget`.
 
 ## Wymagania KVM
 

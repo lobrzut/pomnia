@@ -1,6 +1,6 @@
 /**
  * Brain skills sync — fetch skill catalogs from a brain server and persist them
- * locally so Reliqua works the same whether you're online or offline.
+ * locally so Pomnia works the same whether you're online or offline.
  *
  * Two skill kinds are mirrored, matching how brain exposes them:
  *   - "brain"  → workflow recipes (brain/skills/*.md), listed by /api/skills/list,
