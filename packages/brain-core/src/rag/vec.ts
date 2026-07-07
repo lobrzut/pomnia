@@ -3,7 +3,7 @@
  *
  * Python: `struct.pack(f"{len(vec)}f", *vec)` — packs floats as native-endian
  * `float` (4 bytes each). On the target hosts (Linux x86_64 for the master,
- * Windows x86_64 for Reliqua Electron on user desktops), "native" is
+ * Windows x86_64 for Pomnia Electron on user desktops), "native" is
  * little-endian and the format is IEEE 754 single-precision. sqlite-vec's
  * blob wire format expects exactly that.
  *

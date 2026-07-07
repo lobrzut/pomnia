@@ -1,7 +1,7 @@
 {
-  "name": "reliqua",
+  "name": "pomnia",
   "version": "0.1.2",
-  "description": "Cross-platform encrypted vault for backing up and restoring AI assistant chat history (Claude Code, Claude Desktop, Cursor, Antigravity, VS Code).",
+  "description": "Pomnia — local-first encrypted vault for AI assistant chat history (Claude Code, Claude Desktop, Cursor, Antigravity, VS Code).",
   "homepage": "https://pomnia.ai",
   "author": "alice",
   "license": "MIT",
@@ -12,7 +12,7 @@
   ],
   "main": "./out/main/index.js",
   "bin": {
-    "reliqua": "./out/cli/index.js"
+    "pomnia": "./out/cli/index.js"
   },
   "scripts": {
     "dev": "electron-vite dev --watch",
@@ -22,7 +22,7 @@
     "cli": "tsx src/cli/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",
-    "build:brain-core": "npm run build -w @reliqua/brain-core",
+    "build:brain-core": "npm run build -w @pomnia/brain-core",
     "stage:brain-core": "node scripts/stage-brain-core.mjs",
     "pack:win": "npm run build:brain-core && npm run stage:brain-core && electron-vite build && electron-builder --win",
     "pack:mac": "npm run build:brain-core && npm run stage:brain-core && electron-vite build && electron-builder --mac"

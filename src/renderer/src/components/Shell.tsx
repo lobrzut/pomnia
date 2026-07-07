@@ -26,7 +26,7 @@ export function TitleBar() {
           <Boxes className="h-4 w-4 text-white" />
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="text-[15px] font-bold tracking-tight text-grad">RELIQUA</span>
+          <span className="text-[15px] font-bold tracking-tight text-grad">POMNIA</span>
           <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">vault</span>
         </div>
         <div className="ml-2 flex items-center gap-2">

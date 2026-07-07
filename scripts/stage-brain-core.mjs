@@ -5,7 +5,7 @@
  *   embedded.js + dist tree
  *   node_modules/ (production deps, better-sqlite3 rebuilt for Electron ABI)
  *
- * Packaged Reliqua forks process.resourcesPath/brain-core/embedded.js — see brainCore.ts.
+ * Packaged Pomnia forks process.resourcesPath/brain-core/embedded.js — see brainCore.ts.
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'

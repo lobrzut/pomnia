@@ -1,8 +1,8 @@
 {
-  "name": "@reliqua/brain-core",
+  "name": "@pomnia/brain-core",
   "version": "0.1.0",
   "private": true,
-  "description": "Brain-in-Node: MCP server + RAG for Reliqua desktop and standalone deploy. Successor to the Python brain.",
+  "description": "Brain-in-Node: MCP server + RAG for Pomnia desktop and standalone deploy. Successor to the Python brain.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

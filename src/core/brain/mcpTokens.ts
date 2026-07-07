@@ -1,10 +1,10 @@
 /**
- * Manage MCP Bearer tokens on Brain from Reliqua.
+ * Manage MCP Bearer tokens on Brain from Pomnia.
  *
  * Brain exposes POST /api/mcp/tokens to create new named tokens. The endpoint
  * itself is gated by the same session/Bearer auth as the rest of /api, so this
  * requires a bootstrap token — one you already generated in the dashboard
- * (or via cookie session there). Reliqua uses that as the admin token and can
+ * (or via cookie session there). Pomnia uses that as the admin token and can
  * mint per-client tokens without the user having to open the dashboard again.
  *
  * A minted token is returned verbatim once, on creation, in the response body —

@@ -1,6 +1,6 @@
 /**
  * Import knowledge the user ALREADY has — official export archives from other
- * assistants — into Reliqua's normalized model, so they flow through the same
+ * assistants — into Pomnia's normalized model, so they flow through the same
  * Distill → Pre-index → Deploy pipeline. This is the on-ramp: "draw from the
  * knowledge you already have somewhere."
  *

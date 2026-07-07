@@ -278,8 +278,8 @@ export default function Settings() {
           <li>• AES-256-GCM authenticated encryption, per-blob random IV.</li>
           <li>• scrypt (N=2¹⁷) key derivation from your passphrase.</li>
           <li>• Content-addressed, deduplicated blob store — identical files stored once.</li>
-          <li>• Fully portable: copy the .reliqua folder to any OS and unlock.</li>
-          <li className="text-ink-faint">Reliqua v0.1.0 · engine runs headless via the CLI too.</li>
+          <li>• Fully portable: copy the .pomnia folder to any OS and unlock.</li>
+          <li className="text-ink-faint">Pomnia v0.1.0 · engine runs headless via the CLI too.</li>
         </ul>
         {isMock && (
           <p className="mt-3 rounded-lg border border-amber/20 bg-amber/10 p-2 text-[11px] text-amber">

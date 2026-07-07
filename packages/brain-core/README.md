@@ -1,6 +1,6 @@
-# @reliqua/brain-core
+# @pomnia/brain-core
 
-MCP server + RAG for Reliqua desktop (embedded sidecar) and standalone deploy (homelab
+MCP server + RAG for Pomnia desktop (embedded sidecar) and standalone deploy (homelab
 daemon, later enterprise Docker).
 
 ## What this replaces
@@ -38,7 +38,7 @@ and gets migrated (Phase 5 of the rewrite plan).
 │             ▼                                       │
 │  Ollama (embed + optional distill)                  │
 │  SQLite (library.db with vec extension)             │
-│  Filesystem (~/.reliqua/vault/*.md)                 │
+│  Filesystem (~/.pomnia/vault/*.md)                 │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -46,9 +46,9 @@ and gets migrated (Phase 5 of the rewrite plan).
 
 | Target                     | How                                                                |
 | -------------------------- | ------------------------------------------------------------------ |
-| **Home non-tech**          | Bundled inside Reliqua Electron via `child_process.fork()`         |
+| **Home non-tech**          | Bundled inside Pomnia Electron via `child_process.fork()`         |
 | **Home tech** (alice)     | systemd service on the master, replaces Python `brain-*.service`   |
-| **Enterprise** (future)    | Docker image `reliqua/brain-enterprise` with admin panel addon     |
+| **Enterprise** (future)    | Docker image `pomnia/brain-enterprise` with admin panel addon     |
 
 ## Status
 
@@ -58,9 +58,9 @@ and gets migrated (Phase 5 of the rewrite plan).
 ## Development
 
 ```bash
-npm install --workspace=@reliqua/brain-core
-npm run build --workspace=@reliqua/brain-core
-npm test --workspace=@reliqua/brain-core
+npm install --workspace=@pomnia/brain-core
+npm run build --workspace=@pomnia/brain-core
+npm test --workspace=@pomnia/brain-core
 ```
 
 Or, from `packages/brain-core/`:

@@ -22,8 +22,8 @@ import type {
   VaultStatus
 } from './types'
 
-/** The bridge exposed by preload as window.reliqua. */
-export interface ReliquaBridge {
+/** The bridge exposed by preload as window.pomnia. */
+export interface PomniaBridge {
   platform: string
   scan(): Promise<DetectedSource[]>
   vaultStatus(): Promise<VaultStatus>
@@ -110,7 +110,7 @@ const mockEmbedded: EmbeddedBrainStatus = {
   starting: false,
   indexing: false,
   url: null,
-  dataDir: 'C:/Users/…/Reliqua/brain-core-data',
+  dataDir: 'C:/Users/…/Pomnia/brain-core-data',
   lastError: null
 }
 // Mutable so "distill backlog" is demoable: brainRun drains the pending count.
@@ -125,7 +125,7 @@ const mockBrainState: BrainStateInfo = {
   lastRun: new Date(Date.now() - 26 * 3600e3).toISOString()
 }
 
-function mockBridge(): ReliquaBridge {
+function mockBridge(): PomniaBridge {
   const demoSources: DetectedSource[] = [
     { id: 'claude-code', label: 'Claude Code', strategy: 'hybrid', installed: true, root: '~/.claude', os: 'win32', sizeBytes: 7.2e6, conversations: 38, notes: ['JSONL transcripts per session'] },
     { id: 'cursor', label: 'Cursor', strategy: 'hybrid', installed: true, root: '~/AppData/Roaming/Cursor/User', os: 'win32', sizeBytes: 1.6e7, conversations: 21, notes: ['Chats live in state.vscdb (SQLite)'] },
@@ -152,7 +152,7 @@ function mockBridge(): ReliquaBridge {
       return status
     },
     async pickDirectory() {
-      return 'C:/Users/Alice/Reliqua.reliqua'
+      return 'C:/Users/Alice/Pomnia.pomnia'
     },
     async pickFile() {
       return 'C:/Users/Alice/Downloads/claude-export.zip'
@@ -191,7 +191,7 @@ function mockBridge(): ReliquaBridge {
         {
           id: 'demo',
           source: 'claude-code',
-          title: 'Designing the Reliqua vault',
+          title: 'Designing the Pomnia vault',
           messages: [
             { role: 'user', text: 'How should the vault dedupe files?' },
             { role: 'assistant', text: 'Content-addressed blobs keyed by SHA-256 — identical files store once.' }
@@ -201,7 +201,7 @@ function mockBridge(): ReliquaBridge {
     },
     async vaultConversations() {
       const demo: { id: string; source: SourceId; title: string; messages: number; updatedAt: string }[] = [
-        { id: 'd1', source: 'claude-code', title: 'Designing the Reliqua vault', messages: 42, updatedAt: '2026-06-10T20:00:00Z' },
+        { id: 'd1', source: 'claude-code', title: 'Designing the Pomnia vault', messages: 42, updatedAt: '2026-06-10T20:00:00Z' },
         { id: 'd2', source: 'cursor', title: 'MikroTik WireGuard killswitch', messages: 18, updatedAt: '2026-06-09T12:00:00Z' },
         { id: 'd3', source: 'claude-code', title: 'Pine Script non-repaint ATR stop', messages: 26, updatedAt: '2026-06-07T09:00:00Z' },
         { id: 'd4', source: 'cursor', title: 'Bug bounty IDOR methodology', messages: 31, updatedAt: '2026-06-05T18:00:00Z' }
@@ -212,7 +212,7 @@ function mockBridge(): ReliquaBridge {
       return {
         id,
         source: 'claude-code',
-        title: 'Designing the Reliqua vault',
+        title: 'Designing the Pomnia vault',
         messages: [
           { role: 'user', text: 'How should the vault dedupe files across snapshots?' },
           { role: 'assistant', text: 'Use content-addressed blobs keyed by SHA-256: identical files store once, snapshots reference the hash.' },
@@ -228,7 +228,7 @@ function mockBridge(): ReliquaBridge {
     async vaultSearchText(query) {
       return [
         { snapshotId: 'snap', id: 'd2', source: 'cursor', title: 'MikroTik WireGuard killswitch', snippet: `…${query}… routing-mark + blackhole route on RouterOS 7…`, matches: 3 },
-        { snapshotId: 'snap', id: 'd1', source: 'claude-code', title: 'Designing the Reliqua vault', snippet: `…${query}… content-addressed dedup…`, matches: 1 }
+        { snapshotId: 'snap', id: 'd1', source: 'claude-code', title: 'Designing the Pomnia vault', snippet: `…${query}… content-addressed dedup…`, matches: 1 }
       ]
     },
     async brainExport(_id, dir) {
@@ -286,7 +286,7 @@ function mockBridge(): ReliquaBridge {
     },
     async brainSearch(query) {
       return [
-        { score: 0.82, source: 'claude-code', notePath: 'reliqua-design.md', text: `Match for "${query}": content-addressed blobs keyed by SHA-256, dedup identical files…` },
+        { score: 0.82, source: 'claude-code', notePath: 'pomnia-design.md', text: `Match for "${query}": content-addressed blobs keyed by SHA-256, dedup identical files…` },
         { score: 0.71, source: 'cursor', notePath: 'mikrotik-wireguard.md', text: 'WireGuard killswitch via routing mark + NordVPN endpoint rotation…' }
       ]
     },
@@ -350,7 +350,7 @@ function mockBridge(): ReliquaBridge {
         mergeJson: `{\n  "brain-rag": { "type": "http", "url": "${brainUrl}/sse" }\n}\n`,
         instructions: `▶ ${clientId}\n\n1. Open or create the config file.\n2. Paste the snippet.\n3. Restart the client.`,
         restartHint: 'Restart the client to pick up the new config.',
-        notes: 'Mock snippet (browser preview). Run inside Reliqua for the real per-client config.'
+        notes: 'Mock snippet (browser preview). Run inside Pomnia for the real per-client config.'
       }
     },
     async connectSkillsList() {
@@ -383,9 +383,9 @@ function mockBridge(): ReliquaBridge {
   }
 }
 
-export const api: ReliquaBridge =
-  typeof window !== 'undefined' && (window as any).reliqua
-    ? ((window as any).reliqua as ReliquaBridge)
+export const api: PomniaBridge =
+  typeof window !== 'undefined' && (window as any).pomnia
+    ? ((window as any).pomnia as PomniaBridge)
     : mockBridge()
 
 export const isMock = api.platform === 'browser'

@@ -1,7 +1,7 @@
-# Reliqua
+# Pomnia
 
 **Twoja pamięć AI: jedno zaszyfrowane, offline'owe archiwum wszystkich rozmów — przeszukiwalne i gotowe do zasilenia Brain.**
-Reliqua zbiera czaty ze wszystkich Twoich asystentów (Claude Code, Cursor, Claude Desktop, Antigravity, VS Code, Continue) **i** importy z eksportów (Claude.ai, ChatGPT, Gemini, Grok) w jedno miejsce — z lokalnym wyszukiwaniem (zakładka **Chats**) i pipeline'em do **Brain** (distill + index).
+Pomnia zbiera czaty ze wszystkich Twoich asystentów (Claude Code, Cursor, Claude Desktop, Antigravity, VS Code, Continue) **i** importy z eksportów (Claude.ai, ChatGPT, Gemini, Grok) w jedno miejsce — z lokalnym wyszukiwaniem (zakładka **Chats**) i pipeline'em do **Brain** (distill + index).
 Backup i przenośność Win↔Mac to **mechanizm** pod spodem (sejf = jeden przenośny folder, AES-256-GCM), nie główne hasło.
 
 > Status: **silnik przetestowany i działa na żywych danych** (419 plików Claude Code + 148 czatów Cursora zbackupowane, zaszyfrowane, zweryfikowane i odtworzone w teście round-trip; 5/5 testów jednostkowych zielonych). UI Electron + React buduje się i odpala.
@@ -10,11 +10,11 @@ Backup i przenośność Win↔Mac to **mechanizm** pod spodem (sejf = jeden prze
 
 ## Dlaczego
 
-Każdy asystent trzyma rozmowy gdzie indziej i w innym formacie. Zmiana maszyny = utrata kontekstu. Reliqua:
+Każdy asystent trzyma rozmowy gdzie indziej i w innym formacie. Zmiana maszyny = utrata kontekstu. Pomnia:
 
 - **wyciąga** rozmowy do jednego, znormalizowanego modelu (`Conversation`/`Message`),
 - **zabezpiecza** całość (czaty + surowe configi) w content-addressed, szyfrowanym sejfie z deduplikacją,
-- **przenosi** sejf na dowolną platformę — skopiuj folder `*.continuum`, otwórz tą samą frazą gdziekolwiek,
+- **przenosi** sejf na dowolną platformę — skopiuj folder `*.pomnia`, otwórz tą samą frazą gdziekolwiek,
 - **karmi Brain** — eksportuje rozmowy do formatu notatek vault (RAG inbox), żeby kontekst się nie marnował między sesjami.
 
 ## Co potrafi (zweryfikowane formaty)
@@ -47,7 +47,7 @@ src/core/            Silnik — czysty TS, tylko Node + sql.js(WASM) + crypto. Z
                      (Collect → Distill → Pre-index → Deploy do Brain)
 src/cli/             Headless CLI (automatyzacja / tryb „bypass")
 src/main/            Proces główny Electron + IPC (trzyma odszyfrowany Vault w RAM)
-src/preload/         Bezpieczny most contextBridge → window.continuum
+src/preload/         Bezpieczny most contextBridge → window.pomnia
 src/renderer/        UI: React 19 + Tailwind v4 + Framer Motion (aurora, glass, spring)
 ```
 
@@ -67,11 +67,11 @@ npm run pack:win     # instalator Windows (też :mac). Linux pominięty na teraz
 # wykryj asystentów na tej maszynie
 npm run cli scan
 
-# backup do sejfu (passphrase z $CONTINUUM_PASS dla trybu nienadzorowanego)
-CONTINUUM_PASS=… npm run cli backup --vault ~/Reliqua.continuum --create --sources all
+# backup do sejfu (passphrase z $POMNIA_PASS dla trybu nienadzorowanego)
+POMNIA_PASS=… npm run cli backup --vault ~/Pomnia.pomnia --create --sources all
 
-npm run cli list    --vault ~/Reliqua.continuum
-npm run cli verify  --vault ~/Reliqua.continuum
+npm run cli list    --vault ~/Pomnia.pomnia
+npm run cli verify  --vault ~/Pomnia.pomnia
 
 # eksport rozmów do Brain (RAG inbox) — prosto z żywych źródeł, bez sejfu
 npm run cli brain-export --out /opt/BRAIN/data/vault/sessions --sources all
@@ -93,7 +93,7 @@ Collect/Import → Distill (Ollama, qwen2.5) → Pre-index (nomic-embed-text) �
 Zwalidowane na żywym Ollama (qwen2.5:14b + nomic-embed-text, dim 768). CLI:
 
 ```bash
-CONTINUUM_OLLAMA=http://localhost:11434 npm run cli brain status
+POMNIA_OLLAMA=http://localhost:11434 npm run cli brain status
 npm run cli import         --in ~/Downloads/claude-export.zip        # podejrzyj co jest w eksporcie
 npm run cli brain pipeline --import ~/Downloads/claude-export.zip --out ~/brain-notes   # distill eksportu
 npm run cli brain pipeline --out ~/brain-notes --sources all --model qwen2.5:14b   # distill + index (live)

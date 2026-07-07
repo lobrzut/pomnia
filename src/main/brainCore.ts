@@ -1,7 +1,7 @@
 /**
  * BrainCoreManager — lifecycle of the embedded brain-core child process.
  *
- * Reliqua forks `packages/brain-core/dist/embedded.js` and talks to it over
+ * Pomnia forks `packages/brain-core/dist/embedded.js` and talks to it over
  * the fork IPC channel (see brain-core/src/embedded.ts for the protocol).
  * One child max; crash puts us back in `stopped` with lastError set.
  *
@@ -9,7 +9,7 @@
  * Electron-as-node (ELECTRON_RUN_AS_NODE), which needs the binding compiled
  * for Electron's ABI — `electron-builder install-app-deps` handles that for
  * packaged builds. In dev we prefer the system `node` binary (matches the
- * prebuild that `npm install` fetched); RELIQUA_NODE_BIN overrides.
+ * prebuild that `npm install` fetched); POMNIA_NODE_BIN overrides.
  */
 
 import { fork, type ChildProcess } from 'node:child_process'
@@ -43,6 +43,7 @@ export interface StartOptions {
 }
 
 function resolveNodeBin(): string | undefined {
+  if (process.env.POMNIA_NODE_BIN) return process.env.POMNIA_NODE_BIN
   if (process.env.RELIQUA_NODE_BIN) return process.env.RELIQUA_NODE_BIN
   if (app.isPackaged) return undefined // packaged: Electron-as-node + electron-ABI binding
   for (const p of ['C:/Program Files/nodejs/node.exe', '/usr/local/bin/node', '/usr/bin/node']) {
@@ -90,7 +91,7 @@ export class BrainCoreManager {
     try {
       const entry = entryPath()
       if (!existsSync(entry)) {
-        throw new Error(`brain-core build missing: ${entry} — run \`npm run build -w @reliqua/brain-core\``)
+        throw new Error(`brain-core build missing: ${entry} — run \`npm run build -w @pomnia/brain-core\``)
       }
       const execPath = resolveNodeBin()
       const child = fork(entry, [], {
@@ -98,7 +99,7 @@ export class BrainCoreManager {
         cwd: entryDir(),
         env: {
           ...process.env,
-          // Packaged: Reliqua.exe must run as Node, not spawn a second GUI window.
+          // Packaged: Pomnia.exe must run as Node, not spawn a second GUI window.
           ...(app.isPackaged ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
         },
         ...(execPath ? { execPath } : {}),

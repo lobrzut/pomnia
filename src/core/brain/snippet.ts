@@ -1,7 +1,7 @@
 /**
  * Per-client MCP snippet generator.
  *
- * Reliqua's "Connect to Brain" flow does NOT auto-modify any client's config
+ * Pomnia's "Connect to Brain" flow does NOT auto-modify any client's config
  * file — we generate a copy-paste snippet plus the path where it goes plus
  * a short instruction. The user pastes. See [[snippet-not-autodeploy]] in
  * project memory for the rationale.
@@ -46,7 +46,7 @@ export interface ClientSpec {
    * Optional agent brief — a markdown/system-prompt file the client auto-reads
    * on each session. Tells the agent to call get_user_profile at start,
    * search_library before technical answers, save_conversation on "zapisz do
-   * brain", and memory.add when corrected. Snippet-only: Reliqua does not
+   * brain", and memory.add when corrected. Snippet-only: Pomnia does not
    * write to this file, user pastes. `null` if the client has no such hook
    * (e.g. Claude Desktop, Hermes).
    */
@@ -142,7 +142,7 @@ Bez tokena — localhost only.
 3. "zapisz do brain" → \`brain-rag.save_conversation\` z pełnym payloadem.
 4. Korekty / trwałe fakty → \`brain-rag.memory\` add/replace/remove.
 
-Uruchom embedded brain w Reliqua (Brain tab → Start) jeśli MCP nie odpowiada.
+Uruchom embedded brain w Pomnia (Brain tab → Start) jeśli MCP nie odpowiada.
 `
 
 export const BRAIN_BRIEF_MD = `## Brain integration (MCP)
@@ -344,7 +344,7 @@ export const CLIENTS: ClientSpec[] = [
         'brain-library': withHeaders(token, { url: PATHS.libraryMcp(base) }),
       }
     },
-    // Note the YAML caveat: the snippet is emitted as JSON (Reliqua's uniform
+    // Note the YAML caveat: the snippet is emitted as JSON (Pomnia's uniform
     // format), but YAML parsers accept flow-style JSON as valid YAML, so it
     // pastes in cleanly. If you prefer classic block-style YAML you can
     // convert by hand — the shape (top-level `mcp_servers:` map keyed by
@@ -425,7 +425,7 @@ export function buildSnippet(
 
   const embeddedNote =
     target === 'embedded'
-      ? 'Embedded brain: one server (brain-rag) at /mcp — no Bearer token. Start it in Reliqua → Brain tab first.'
+      ? 'Embedded brain: one server (brain-rag) at /mcp — no Bearer token. Start it in Pomnia → Brain tab first.'
       : null
 
   const instructions = [

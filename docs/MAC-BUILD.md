@@ -1,4 +1,4 @@
-# Reliqua — build macOS (DMG)
+# Pomnia — build macOS (DMG)
 
 Build **musi** iść na macOS. Na Windows `npm run pack:mac` się nie uda (brak narzędzi Apple + natywne moduły pod Darwin).
 
@@ -12,7 +12,7 @@ Konfiguracja `electron-builder.yml`:
 
 - output: `release/`
 - target: `dmg`
-- artifact: `Reliqua-${version}.dmg` (np. `release/Reliqua-0.1.2.dmg`)
+- artifact: `Pomnia-${version}.dmg` (np. `release/Pomnia-0.1.2.dmg`)
 - dodatkowo: `release/mac/` (rozpakowana aplikacja `.app`)
 
 ---
@@ -91,7 +91,7 @@ npm run pack:mac
 
 Kolejność wewnątrz skryptu:
 
-1. `build:brain-core` — kompilacja `@reliqua/brain-core`
+1. `build:brain-core` — kompilacja `@pomnia/brain-core`
 2. `stage:brain-core` — staging runtime + `electron-rebuild` dla `better-sqlite3` (ABI Electrona)
 3. `electron-vite build` — bundle main/preload/renderer → `out/`
 4. `electron-builder --mac` — DMG w `release/`
@@ -99,11 +99,11 @@ Kolejność wewnątrz skryptu:
 Oczekiwany wynik:
 
 ```
-release/Reliqua-0.1.2.dmg
-release/mac/Reliqua.app
+release/Pomnia-0.1.2.dmg
+release/mac/Pomnia.app
 ```
 
-Instalacja lokalna: otwórz DMG, przeciągnij `Reliqua.app` do Applications.
+Instalacja lokalna: otwórz DMG, przeciągnij `Pomnia.app` do Applications.
 
 ---
 
@@ -133,7 +133,7 @@ albo buduj na obu typach Maców / w CI (osobne artefakty).
 
 Dla **dev / lokalnego użytku** podpis nie jest wymagany. Po zainstalowaniu macOS może pokazać:
 
-> „Reliqua” cannot be opened because the developer cannot be verified.
+> „Pomnia” cannot be opened because the developer cannot be verified.
 
 Obejście (tylko zaufane buildy):
 
@@ -179,7 +179,7 @@ Workflow `.github/workflows/release-mac.yml`:
 
 - trigger: ręcznie (`workflow_dispatch`) lub tag `v*` (np. `v0.1.2`)
 - runner: `macos-latest` (Apple Silicon)
-- artefakt: `Reliqua-*.dmg` z `release/`
+- artefakt: `Pomnia-*.dmg` z `release/`
 
 Bez sekretów Apple = unsigned DMG do pobrania z zakładki Actions → Artifacts.
 
@@ -192,5 +192,5 @@ git clone <url> continuum && cd continuum
 xcode-select --install    # jeśli jeszcze nie
 npm ci
 npm run pack:mac
-open release/Reliqua-*.dmg
+open release/Pomnia-*.dmg
 ```

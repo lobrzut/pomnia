@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * Reliqua CLI — headless backup. Designed to be automation-friendly:
- * pass the vault passphrase via $RELIQUA_PASS to run unattended (e.g. cron /
+ * Pomnia CLI — headless backup. Designed to be automation-friendly:
+ * pass the vault passphrase via $POMNIA_PASS to run unattended (e.g. cron /
  * scheduled tasks / a "bypass" autonomous loop).
  *
- *   reliqua scan
- *   reliqua backup  --vault <dir> [--create] [--name N] [--sources all|a,b] [--note "…"]
- *   reliqua list    --vault <dir>
- *   reliqua verify  --vault <dir>
- *   reliqua brain-export --out <dir> [--vault <dir> --snapshot <id>] [--sources all]
+ *   pomnia scan
+ *   pomnia backup  --vault <dir> [--create] [--name N] [--sources all|a,b] [--note "…"]
+ *   pomnia list    --vault <dir>
+ *   pomnia verify  --vault <dir>
+ *   pomnia brain-export --out <dir> [--vault <dir> --snapshot <id>] [--sources all]
  */
 import { createInterface } from 'node:readline'
 import { promises as fs } from 'node:fs'
@@ -106,6 +106,7 @@ async function prompt(question: string, hidden = false): Promise<string> {
 
 async function getPass(flags: Parsed['flags'], confirm = false): Promise<string> {
   if (typeof flags.pass === 'string') return flags.pass
+  if (process.env.POMNIA_PASS) return process.env.POMNIA_PASS
   if (process.env.RELIQUA_PASS) return process.env.RELIQUA_PASS
   const p = await prompt('Vault passphrase: ', true)
   if (confirm) {
@@ -167,7 +168,7 @@ async function readNotesDir(dir: string): Promise<{ source: string; notePath: st
   return out
 }
 
-const INDEX_FILE = '.reliqua-index.json'
+const INDEX_FILE = '.pomnia-index.json'
 
 async function cmdBrain(p: Parsed): Promise<void> {
   const sub = p.positional[0]
@@ -223,7 +224,7 @@ async function cmdBrain(p: Parsed): Promise<void> {
         for (const i of c.issues) console.log(`      ${C.dim('· ' + i)}`)
       }
     }
-    console.log(C.dim(`\n  Tip: \`reliqua brain snippet --client <id>\` to get a copy-paste config.\n`))
+    console.log(C.dim(`\n  Tip: \`pomnia brain snippet --client <id>\` to get a copy-paste config.\n`))
     return
   }
 
@@ -321,7 +322,7 @@ async function cmdBrain(p: Parsed): Promise<void> {
   if (sub === 'skills') {
     const action = String(p.positional[1] || 'sync')
     const url = String(p.flags.url || p.flags.brain || 'http://localhost:7860').replace(/\/$/, '')
-    const target = String(p.flags.target || p.flags.out || path.join(process.cwd(), '.reliqua-skills'))
+    const target = String(p.flags.target || p.flags.out || path.join(process.cwd(), '.pomnia-skills'))
     const token = typeof p.flags.token === 'string' ? p.flags.token : process.env.BRAIN_TOKEN
     if (action === 'list') {
       const cat = await listAllSkills(url, { token })
@@ -365,7 +366,7 @@ async function cmdBrain(p: Parsed): Promise<void> {
   }
 
   console.log(`
-  ${C.bold('reliqua brain')} — host-side distill + pre-index, then deploy to Brain
+  ${C.bold('pomnia brain')} — host-side distill + pre-index, then deploy to Brain
 
   ${C.cyan('status')}   [--ollama URL] [--brain URL] [--token btk_…]   ${C.dim('(ollama + brain ping + which MCP clients are wired)')}
   ${C.cyan('distill')}  --out DIR [--sources all] [--model M] [--limit N] [--ollama URL]
@@ -380,7 +381,7 @@ async function cmdBrain(p: Parsed): Promise<void> {
 }
 
 async function cmdScan(): Promise<void> {
-  console.log(C.bold('\n  Reliqua — detected AI assistants\n'))
+  console.log(C.bold('\n  Pomnia — detected AI assistants\n'))
   const found = await detectAll()
   const rows = found
     .filter((d) => d.installed)
@@ -495,7 +496,7 @@ async function cmdImport(p: Parsed): Promise<void> {
 
 function help(): void {
   console.log(`
-${C.bold('Reliqua')} — encrypted, cross-platform backup for AI assistant chats
+${C.bold('Pomnia')} — encrypted, cross-platform backup for AI assistant chats
 
   ${C.cyan('scan')}                                   detect installed assistants
   ${C.cyan('backup')}  --vault DIR [--create] [--name N] [--sources all|a,b] [--note "…"]
@@ -505,8 +506,8 @@ ${C.bold('Reliqua')} — encrypted, cross-platform backup for AI assistant chats
   ${C.cyan('import')} --in FILE|DIR [--out DIR]            parse Claude.ai/ChatGPT/Grok/Gemini exports
   ${C.cyan('brain')} <status|distill|index|search|pipeline|deploy> [--import PATH]   host-side distill → Brain
 
-  Passphrase: --pass, or $RELIQUA_PASS (for unattended runs), or interactive prompt.
-  Ollama:     --ollama URL or $RELIQUA_OLLAMA (default http://localhost:11434).
+  Passphrase: --pass, or $POMNIA_PASS (legacy: $RELIQUA_PASS), or interactive prompt.
+  Ollama:     --ollama URL or $POMNIA_OLLAMA (legacy: $RELIQUA_OLLAMA, default http://localhost:11434).
 `)
 }
 

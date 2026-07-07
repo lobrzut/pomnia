@@ -1,5 +1,5 @@
 /**
- * System tray — keeps Reliqua alive (embedded brain MCP) when the window is hidden.
+ * System tray — keeps Pomnia alive (embedded brain MCP) when the window is hidden.
  */
 
 import { existsSync } from 'node:fs'
@@ -35,7 +35,7 @@ function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
   const embedded = brainCore.status()
   return Menu.buildFromTemplate([
     {
-      label: 'Otwórz Reliqua',
+      label: 'Otwórz Pomnię',
       click: () => {
         win?.show()
         win?.focus()
@@ -68,7 +68,7 @@ export async function initTray(win: BrowserWindow, onQuit: () => void): Promise<
   if (tray) return
   const icon = await resolveIcon()
   tray = new Tray(icon)
-  tray.setToolTip('Reliqua')
+  tray.setToolTip('Pomnia')
   tray.setContextMenu(buildMenu(win, onQuit))
   tray.on('double-click', () => {
     win.show()

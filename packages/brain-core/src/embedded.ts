@@ -1,5 +1,5 @@
 /**
- * Embedded entry point — the file Reliqua's Electron main forks via
+ * Embedded entry point — the file Pomnia's Electron main forks via
  * `child_process.fork()`. Message-driven, no CLI parsing:
  *
  *   parent → child

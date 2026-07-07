@@ -43,7 +43,7 @@ export interface BrainServer {
 
 /**
  * Assemble a `BrainServer`. Nothing binds/opens until you call `.start()` — so
- * this is safe to call from Reliqua's Electron main and the standalone daemon
+ * this is safe to call from Pomnia's Electron main and the standalone daemon
  * without spending resources up front.
  */
 export async function createBrainServer(config: BrainConfig): Promise<BrainServer> {

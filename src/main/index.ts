@@ -44,6 +44,7 @@ import { brainCore } from './brainCore.js'
 import { getAppSettings, loadAppSettings, setAppSettings, shouldHideOnClose, shouldHideOnMinimize } from './appSettings.js'
 import { destroyTray, initTray, refreshTrayMenu } from './tray.js'
 import { isCursorDbTooLarge } from '@core/adapters/cursor.js'
+import { migrateBrainIndexFile, migrateLegacyAppData } from './migrateLegacy.js'
 
 let win: BrowserWindow | null = null
 let forceQuit = false
@@ -62,7 +63,7 @@ function requireVault(): Vault {
 }
 
 const brainDir = (): string => join(app.getPath('userData'), 'brain-notes')
-const brainIndexFile = (): string => join(brainDir(), '.reliqua-index.json')
+const brainIndexFile = (): string => join(brainDir(), '.pomnia-index.json')
 
 /* ── Distill ledger ────────────────────────────────────────────────────────
    Which conversation ids have been through the pipeline. This is what lets
@@ -144,7 +145,7 @@ function createWindow(): void {
   })
   win.webContents.on('did-finish-load', () => {
     win?.webContents
-      .executeJavaScript('typeof window.reliqua')
+      .executeJavaScript('typeof window.pomnia')
       .then((t) => {
         const bridge = t === 'object' ? 'connected' : `MISSING(${t})`
         log.info('renderer bridge:', bridge)
@@ -598,6 +599,9 @@ function registerIpc(): void {
 }
 
 app.whenReady().then(async () => {
+  await migrateLegacyAppData()
+  await fs.mkdir(brainDir(), { recursive: true })
+  await migrateBrainIndexFile(brainDir())
   await loadAppSettings()
   registerIpc()
   createWindow()

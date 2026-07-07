@@ -26,7 +26,7 @@ describe('brain/distill', () => {
     const conv: Conversation = { id: 'abc12345', source: 'cursor', title: 'Demo', messages: [{ role: 'user', text: 'hi' }] }
     const stub = assembleNote(conv, { summary: '', decisions: [], solutions: [], facts: [], openQuestions: [] }, 'qwen2.5:14b')
     expect(stub.quality).toBe('stub')
-    expect(stub.markdown).toContain('distilled_via: reliqua')
+    expect(stub.markdown).toContain('distilled_via: pomnia')
 
     const ok = assembleNote(conv, { summary: 'did a thing', decisions: ['chose X'], solutions: [], facts: [], openQuestions: [] }, 'qwen2.5:14b')
     expect(ok.quality).toBe('ok')

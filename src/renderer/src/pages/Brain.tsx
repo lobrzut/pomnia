@@ -25,7 +25,7 @@ import type { BrainHit, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent } from
 import { uiLabels } from '../lib/labels'
 import { useStore, ollamaUrlFromBrainUrl, dashboardUrlFromBrainUrl } from '../store/useStore'
 
-const PROFILE_KEY = 'reliqua.brain.profile'
+const PROFILE_KEY = 'pomnia.brain.profile'
 
 /** "qwen2.5:14b" and "qwen2.5:14b" match; "nomic-embed-text" matches "nomic-embed-text:latest". */
 function hasModel(models: string[], want: string): boolean {

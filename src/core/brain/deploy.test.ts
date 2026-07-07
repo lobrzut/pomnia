@@ -47,7 +47,7 @@ describe('brain/deploy deployDistilledHttp', () => {
   it('sends Bearer token on save-note when provided', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 })
     vi.stubGlobal('fetch', fetchMock)
-    const notesDir = await mkdtemp(join(tmpdir(), 'reliqua-deploy-'))
+    const notesDir = await mkdtemp(join(tmpdir(), 'pomnia-deploy-'))
     await writeFile(join(notesDir, 'note.md'), '# test', 'utf8')
 
     await deployDistilledHttp(notesDir, 'http://brain.example.local:7860', 'btk_test')

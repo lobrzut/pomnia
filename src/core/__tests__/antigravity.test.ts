@@ -6,7 +6,7 @@ import os from 'node:os'
 
 describe('antigravity adapter', () => {
   it('parses Cascade transcript.jsonl into conversations', async () => {
-    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'reliqua-ag-'))
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'pomnia-ag-'))
     const sessionId = '378dc290-360d-48bf-8f0c-f68d4444152e'
     const logDir = path.join(home, '.gemini', 'antigravity', 'brain', sessionId, '.system_generated', 'logs')
     await fs.mkdir(logDir, { recursive: true })

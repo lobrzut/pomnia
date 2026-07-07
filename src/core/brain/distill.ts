@@ -156,7 +156,7 @@ export function assembleNote(conv: Conversation, fields: DistilledNote['fields']
     `project: ${conv.title.replace(/\n/g, ' ').slice(0, 120)}`,
     `date: ${date}`,
     `msg_count: ${conv.messages.length}`,
-    `distilled_via: reliqua`,
+    `distilled_via: pomnia`,
     `model: ${model}`,
     `quality: ${quality}`,
     `quality_score: ${score}`,

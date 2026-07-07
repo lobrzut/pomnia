@@ -109,7 +109,7 @@ export default function Onboarding() {
               <Boxes className="h-5 w-5 text-white" />
             </div>
             <div>
-              <div className="text-sm font-bold tracking-tight text-grad">RELIQUA</div>
+              <div className="text-sm font-bold tracking-tight text-grad">POMNIA</div>
               <div className="text-[9px] font-medium uppercase tracking-[0.22em] text-ink-faint">first run</div>
             </div>
           </div>
@@ -247,7 +247,7 @@ function WelcomeStep({ simpleMode, onNext }: { simpleMode: boolean; onNext: () =
       <p className="mx-auto mt-2.5 max-w-[380px] text-sm leading-relaxed text-ink-dim">
         {simpleMode
           ? 'Vault → backup rozmów → lokalna wyszukiwarka → podłączenie Cursora. Bez żargonu, bez serwera w chmurze.'
-          : 'Reliqua turns scattered assistant chats into one encrypted, searchable memory — and hands it back to every AI you work with.'}
+          : 'Pomnia turns scattered assistant chats into one encrypted, searchable memory — and hands it back to every AI you work with.'}
       </p>
 
       {!simpleMode && (
@@ -306,7 +306,7 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
     <StepCard
       icon={ShieldCheck}
       title="Create your vault"
-      lead="One encrypted folder holds everything Reliqua captures. Pick where it lives and choose a passphrase you won't lose."
+      lead="One encrypted folder holds everything Pomnia captures. Pick where it lives and choose a passphrase you won't lose."
     >
       <div className="mb-4 flex rounded-xl border border-white/10 bg-black/20 p-1">
         {(['create', 'unlock'] as const).map((m) => (
@@ -330,7 +330,7 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
       <div className="space-y-3.5">
         <Field label={mode === 'create' ? 'New vault folder' : 'Vault folder'}>
           <div className="flex gap-2">
-            <Input value={path} onChange={(e) => setPath(e.target.value)} placeholder="…/MyVault.reliqua" />
+            <Input value={path} onChange={(e) => setPath(e.target.value)} placeholder="…/MyVault.pomnia" />
             <Button variant="soft" onClick={pick}>
               <FolderOpen className="h-4 w-4" />
             </Button>
@@ -486,7 +486,7 @@ function EngineStep({
     <StepCard
       icon={Cpu}
       title="How will Brain run?"
-      lead="Pick local embedded brain (built into Reliqua) or your homelab master. Ollama on this machine powers embeddings for the local path."
+      lead="Pick local embedded brain (built into Pomnia) or your homelab master. Ollama on this machine powers embeddings for the local path."
     >
       <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <button
@@ -750,7 +750,7 @@ function ConnectStep({
 
   const title = simpleMode ? 'Podłącz Cursora' : 'Give an AI your memory'
   const lead = simpleMode
-    ? 'Skopiuj konfigurację MCP i wklej w Cursorze — Reliqua nigdy nie dotyka Twoich plików.'
+    ? 'Skopiuj konfigurację MCP i wklej w Cursorze — Pomnia nigdy nie dotyka Twoich plików.'
     : `Snippets target ${brainTarget === 'embedded' ? 'local embedded brain' : 'your remote master'} (${brainUrl}). Pick a client — paste the config, we never touch their files.`
 
   return (
@@ -884,7 +884,7 @@ function ReadyStep({
       </div>
 
       <Button onClick={onFinish} className="mt-8 w-full">
-        <Sparkles className="h-4 w-4" /> Enter Reliqua
+        <Sparkles className="h-4 w-4" /> Enter Pomnia
       </Button>
     </div>
   )

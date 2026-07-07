@@ -1,5 +1,5 @@
 /**
- * Reliqua — normalized data model.
+ * Pomnia — normalized data model.
  *
  * Everything that goes into the vault is described by these types. The two
  * cornerstones are:

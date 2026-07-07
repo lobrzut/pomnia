@@ -1,4 +1,4 @@
-/** Reliqua engine — public API. Pure Node, no Electron, usable from CLI or main process. */
+/** Pomnia engine — public API. Pure Node, no Electron, usable from CLI or main process. */
 export * from './model.js'
 export * from './platform.js'
 export { Vault } from './vault.js'

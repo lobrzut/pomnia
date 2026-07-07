@@ -9,7 +9,7 @@
  * revisit the rest when there's actual demand.
  *
  * Priority order for later ports (rough):
- *   - list_skills / list_cli_skills / get_skill  — Reliqua already syncs
+ *   - list_skills / list_cli_skills / get_skill  — Pomnia already syncs
  *     skills locally, agents can read them without brain
  *   - run_skill — depends on Ollama-backed workflow runner (later)
  *   - search_code / code_status — separate index (pipeline/codeindex.py in
@@ -47,7 +47,7 @@ export function runStub(name: string): string {
   return (
     `Tool "${name}" is not implemented in brain-core MVP yet. ` +
     `See brain-in-node-rewrite-plan.md — this ships in a follow-up phase. ` +
-    `For now, if this is a skill-related call, Reliqua syncs skills locally to ~/.reliqua/brain-skills/ ` +
+    `For now, if this is a skill-related call, Pomnia syncs skills locally to ~/.pomnia/brain-skills/ ` +
     `and Claude Code can read them directly. If this is search_code, use the Python master.`
   )
 }

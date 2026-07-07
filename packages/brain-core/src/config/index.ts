@@ -6,11 +6,12 @@
  * no multi-tenant, no cloud API. Add complexity when a real user asks for it.
  */
 
+import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 export interface BrainConfig {
-  /** Host to bind. `127.0.0.1` when embedded in Reliqua, `0.0.0.0` on server deploys. */
+  /** Host to bind. `127.0.0.1` when embedded in Pomnia, `0.0.0.0` on server deploys. */
   host: string
   /** MCP HTTP port. 7862 matches the current Python deploy so clients don't have to reconfigure. */
   port: number
@@ -24,7 +25,7 @@ export interface BrainConfig {
   embedModel: string
 
   /**
-   * Bearer auth. Skipped when host === 127.0.0.1 (localhost trust, Reliqua-embedded
+   * Bearer auth. Skipped when host === 127.0.0.1 (localhost trust, Pomnia-embedded
    * mode); enforced otherwise. Token file path optional — defaults to
    * `<dataDir>/mcp-tokens.json`. Format identical to Python impl.
    */
@@ -35,8 +36,16 @@ export interface BrainConfig {
   }
 }
 
+function resolveDataDir(): string {
+  if (process.env.BRAIN_DATA_DIR) return process.env.BRAIN_DATA_DIR
+  const pomniaDir = join(homedir(), '.pomnia', 'brain')
+  const legacyDir = join(homedir(), '.reliqua', 'brain')
+  if (existsSync(legacyDir) && !existsSync(pomniaDir)) return legacyDir
+  return pomniaDir
+}
+
 export function defaultConfig(): BrainConfig {
-  const dataDir = process.env.BRAIN_DATA_DIR ?? join(homedir(), '.reliqua', 'brain')
+  const dataDir = resolveDataDir()
   return {
     host: '127.0.0.1',
     port: 7862,

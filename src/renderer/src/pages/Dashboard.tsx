@@ -88,7 +88,7 @@ export default function Dashboard() {
             <Server className="h-6 w-6 text-ink-faint" />
             <p className="text-sm text-ink-dim">No AI tools detected on this machine.</p>
             <p className="max-w-sm text-[11px] leading-relaxed text-ink-faint">
-              Reliqua looks for Claude Code, Cursor, Claude Desktop, Antigravity and VS Code. Install one, chat a bit,
+              Pomnia looks for Claude Code, Cursor, Claude Desktop, Antigravity and VS Code. Install one, chat a bit,
               then hit Rescan — or bring exported chats in via the Import tab.
             </p>
           </div>
