@@ -1,8 +1,23 @@
 # Pomnia — logo & branding (Slavic green rebrand)
 
-> **Status:** koncepcje wygenerowane 2026-07-07 · **nie** podmieniamy jeszcze `resources/icon.ico` — czekamy na wybór kierunku.
+> **Status:** koncepcje wygenerowane 2026-07-07 · refinements 2026-07-07 · **depth pass (anti-flat)** 2026-07-07 · **nie** podmieniamy jeszcze `resources/icon.ico` — czekamy na wybór kierunku.
 
-Zastępujemy obecny fioletowo-cyanowy squircle z literą „R” (wygląda jak Reliqua / generyczny AI) własnym symbolem: **pamięć, sny, wiedza przodków** — słowiańsko, leśnie, w zieleniach.
+## Shortlist (feedback użytkownika 2026-07-07)
+
+| Kierunek | Status | Uwagi |
+|----------|--------|-------|
+| **Dew Sigil** *(Sygnil rosy)* | **Ulubiony — shortlist** | Użytkownik lubi kierunek; refinements: płaska ikona, geometria sigilu, kropelki rosy, bez pejzażu |
+| **Moss Vault** *(Skarbiec mchu)* | **Ulubiony — shortlist** | Użytkownik lubi kierunek; refinements: koncentryczne pierścienie, bursztynowe centrum, flat icon |
+| **Birch Thread** *(Nić brzozy)* | **Odrzucony** | „Za kontrowersyjne” — wycofany z shortlistu |
+| **Amber Loom** *(Bursztynowy krosno)* | **Depriorytet** | Nie w shortlistcie; pierwsza generacja wpadła w żarówkę — tylko archiwum |
+
+**Preferencja użytkownika:** oba kierunki shortlist (Dew Sigil **i** Moss Vault) — możliwy hybrid **Dew Vault** (geometria rosy + bursztynowe centrum skarbca).
+
+**Refinements (flat — za generyczne):** `assets/generated/logo-refine-dew-sigil-v2.png`, `v3`, `logo-refine-moss-vault-v2.png`, `v3`, `logo-refine-dew-vault-hybrid.png`. Użytkownik widzi w nich styl **Lory / flat-ui** — zbyt corporate, kopiowalne.
+
+**Depth pass (anti-flat):** `assets/generated/logo-depth-dew-sigil-v1.png`, `v2`, `logo-depth-moss-vault-v1.png`, `v2`, opcjonalnie `logo-depth-dew-vault-hybrid.png`.
+
+Zastępujemy obecny fioletowo-cyanowy squircle z literą „R” (wygląda jak Reliqua / generyczny AI) własnym symbolem: **pamięć, sny, wiedza przodków** — słowiańsko, leśnie, w zieleniach — **z głębią i fakturą**, nie płaskim szablonem z Dribbble.
 
 ---
 
@@ -33,6 +48,33 @@ Referencje UI: zrzuty w `assets/` (Command center z fioletowymi akcentami).
 
 ---
 
+## Anti-flat — dyrektywy promptów (feedback 2026-07-07)
+
+Refinements z `lora=flat-ui` wpadły w **generyczny flat corporate icon** (użytkownik: „wszystko wlatuje w styl Lory”). Kolejne generacje **bez** flat-ui LoRA.
+
+### FORBID (negative / composition_lock)
+
+`flat design, minimalist vector logo, corporate app icon, gradient squircle, generic tech logo, dribbble logo, behance flat icon, simple geometric mark, Lory style, flat-ui, material design icon, ios app icon template`
+
+### SEEK (positive / style bible)
+
+`dimensional depth, subtle emboss or engraving, organic texture moss bark amber resin, hand-crafted feel, Slavic folk art influence, carved wood or amber inlay, atmospheric rim lighting, tactile surface, symbolic object with depth — NOT illustration scene, NOT landscape`
+
+### MCP dla depth pass
+
+```
+generate_image_smart
+  lora: none
+  lora_strength: (omit)
+  asset_type: icon
+  background: dark_navy
+  project_style: false
+  quality_tier: final
+  composition_lock: forbid=flat design,minimalist vector,corporate app icon,gradient squircle,dribbble,behance flat,Lory style
+```
+
+---
+
 ## Trzy kierunki koncepcyjne (+ jeden bonus)
 
 ### 1. Moss Vault *(Skarbiec mchu)*
@@ -44,14 +86,19 @@ Referencje UI: zrzuty w `assets/` (Command center z fioletowymi akcentami).
 - Bursztyn = „zatrzymana pamięć” (słowiański skarb), nie generyczna żarówka
 - Koncentryczne pierścienie czytają się w 16×16 px (tray) lepiej niż litera
 
-**ComfyUI prompt (txt2img):**
+**ComfyUI prompt (txt2img, v1 flat — archiwum):**
 ```
 App icon logo mark, Moss Vault concept: nested vesica piscis forming a memory labyrinth vault, inner amber glow like trapped sunlight in forest moss, emerald and moss green palette, subtle Slavic woven border geometry original not Elder Futhark, flat vector UI icon, centered symbol generous padding, dark forest void background #0a120e, birch silver-green highlights, minimal geometric, no text no letters
 ```
 
-**Negative / forbidden:** `text, watermark, photorealistic, 3d render, light bulb, human, face, hands, purple, cyan, letter R, kolovrat, swastika`
+**ComfyUI prompt (depth pass — anti-flat):**
+```
+App icon logo mark, Moss Vault depth concept: concentric rings carved into dark forest stone like a memory tunnel vault, volumetric amber glow emanating from center like trapped sunlight in resin, moss texture on ring edges and crevices, subtle emboss and engraved Slavic woven border geometry original not Elder Futhark, hand-crafted carved wood and amber inlay feel, dimensional depth with atmospheric rim lighting, emerald moss green palette void background #0a120e, birch silver-green highlights, tactile organic surface, centered symbol generous padding, symbolic object only no scene no landscape, no text no letters
+```
 
-**Pierwsza generacja:** `assets/generated/logo-concept-moss-vault.png` — **najsilniejszy kandydat** (zielenie + bursztyn, czytelny symbol).
+**Negative / forbidden:** `text, watermark, light bulb, human, face, hands, purple, cyan, letter R, kolovrat, swastika, flat design, minimalist vector logo, corporate app icon, gradient squircle, generic tech logo, dribbble logo, behance flat icon, Lory style`
+
+**Pierwsza generacja:** `assets/generated/logo-concept-moss-vault.png` — **shortlist** (zielenie + bursztyn, czytelny symbol). Refinements: `logo-refine-moss-vault-v2.png`, `v3`.
 
 ---
 
@@ -71,7 +118,7 @@ App icon logo mark, Birch Thread concept: three interwoven memory threads formin
 
 **Uwaga po 1. passie:** FLUX dodał magenta/teal — w kolejnej iteracji podnieść `lora_strength` flat-ui, dodać `forbid=magenta,teal,purple,cyan` w composition_lock lub refine z seedem 42012.
 
-**Pierwsza generacja:** `assets/generated/logo-concept-birch-thread.png` — wymaga iteracji (złe kolory).
+**Pierwsza generacja:** `assets/generated/logo-concept-birch-thread.png` — **ODRZUCONY** (za kontrowersyjny). Archiwum tylko.
 
 ---
 
@@ -84,14 +131,19 @@ App icon logo mark, Birch Thread concept: three interwoven memory threads formin
 - Rosa = świeża pamięć, przebudzenie
 - Vesica jako „brama snu”
 
-**ComfyUI prompt:**
+**ComfyUI prompt (v1 flat — archiwum):**
 ```
 App icon logo mark, Dew Sigil concept: single centered sigil symbol only, original angular lattice geometry not Elder Futhark, three dew droplets, vesica memory gate at center, emerald green glow with amber dew highlights, flat vector UI icon, square format, dark forest background, crisp edges, no text no rune alphabet, no landscape no trees no scene
 ```
 
+**ComfyUI prompt (depth pass — anti-flat):**
+```
+App icon logo mark, Dew Sigil depth concept: original angular lattice sigil carved and engraved into dark stone or polished amber slab, three dew droplets as small 3D glass beads catching rim light, vesica memory gate recessed at center with subtle emboss, Slavic folk art geometric influence hand-crafted not rune alphabet, moss and bark micro-texture in grooves, dimensional depth atmospheric lighting, emerald green with amber resin highlights, void background #0a120e, symbolic carved object only no landscape no trees no scene, no text
+```
+
 **Uwaga po 1. passie:** model wygenerował pejzaż zamiast ikony — w kolejnej iteracji: `asset_type=icon`, `composition_lock=forbid=landscape,scene,trees`, krótszy prompt skupiony na jednym symbole.
 
-**Pierwsza generacja:** `assets/generated/logo-concept-dew-sigil.png` — wymaga iteracji (za dużo sceny).
+**Pierwsza generacja:** `assets/generated/logo-concept-dew-sigil.png` — **shortlist** (wymaga iteracji: za dużo sceny w v1). Refinements: `logo-refine-dew-sigil-v2.png`, `v3`; hybrid: `logo-refine-dew-vault-hybrid.png`.
 
 ---
 
@@ -143,7 +195,25 @@ python main.py --listen 127.0.0.1 --port 8188
 ```
 Potem w `mcp.json`: `"COMFYUI_URL": "http://127.0.0.1:8188"`.
 
-### MCP — jedna koncepcja
+### MCP — depth pass (zalecane od 2026-07-07)
+
+```
+generate_image_smart
+  prompt: <depth prompt z sekcji Moss Vault / Dew Sigil>
+  style: icon
+  size: 512x512
+  workflow: flux
+  lora: none
+  background: dark_navy
+  project_style: false
+  quality_tier: final
+  asset_type: icon
+  composition_lock: forbid=flat design,minimalist vector,corporate app icon,gradient squircle,dribbble,behance flat,Lory style
+  seed: 42051
+  filename: assets/generated/logo-depth-moss-vault-v1.png
+```
+
+### MCP — pierwsza generacja flat (archiwum)
 
 ```
 generate_image_smart
@@ -153,11 +223,7 @@ generate_image_smart
   workflow: flux
   lora: flat-ui
   lora_strength: 0.55
-  background: dark_navy
-  project_style: false
-  quality_tier: final
-  seed: 42001
-  filename: assets/generated/logo-concept-moss-vault-v2.png
+  ...
 ```
 
 (Upewnij się, że `COMFY_WORKSPACE` wskazuje na repo Pomnia.)
@@ -186,6 +252,9 @@ Patrz: [`assets/comfyui/logo-concept.json`](../assets/comfyui/logo-concept.json)
 | Plik | Opis |
 |------|------|
 | `assets/generated/logo-concept-*.png` | Pierwsze generacje (4 kierunki) |
+| `assets/generated/logo-refine-*.png` | Refinements shortlistu flat (Dew Sigil, Moss Vault, hybrid) — za generyczne |
+| `assets/generated/logo-depth-*.png` | Depth pass anti-flat (Dew Sigil, Moss Vault, hybrid) |
+| `assets/generated/preview.html` | Galeria slideshow do wyboru kierunku |
 | `assets/comfyui/logo-concept.json` | Referencja workflow + prompty |
 | `scripts/gen-logo-concepts.py` | Batch generator (ISKRA, poprawny workspace) |
 | `docs/COMFYUI-ASSETS.md` | Pełny pipeline assetów |
