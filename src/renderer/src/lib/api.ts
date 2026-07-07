@@ -54,6 +54,7 @@ export interface ReliquaBridge {
     autoDeploy?: boolean
     deployUrl?: string
     deployTarget?: string
+    deployToken?: string
     reindex?: boolean
   }): Promise<BrainRunResult>
   brainRunCancel(): Promise<{ ok: boolean }>
@@ -73,6 +74,7 @@ export interface ReliquaBridge {
     target?: string
     url?: string
     reindex?: boolean
+    token?: string
     sources?: SourceId[]
   }): Promise<{ detail: string }>
   connectStatus(

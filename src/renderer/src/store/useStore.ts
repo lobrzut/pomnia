@@ -506,6 +506,7 @@ export const useStore = create<State>((set, get) => ({
         autoDeploy,
         deployUrl: s.brainDeployUrl || dashboardUrlFromBrainUrl(s.remoteBrainUrl),
         deployTarget: s.brainDeployTarget || undefined,
+        deployToken: s.connectToken || undefined,
         reindex: true
       })
       set({ brainResult: r })
