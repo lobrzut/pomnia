@@ -145,9 +145,12 @@ export async function deployDistilledFiles(notesDir: string, targetDir: string):
 /** POST pre-distilled markdown to Brain dashboard (KVM / homelab). */
 export async function deployDistilledHttp(
   notesDir: string,
-  dashboardUrl: string
+  dashboardUrl: string,
+  token?: string
 ): Promise<{ ok: number; failed: number; api: 'save-note' | 'none' }> {
   const base = dashboardUrl.replace(/\/+$/, '')
+  const headers: Record<string, string> = { 'content-type': 'application/json' }
+  if (token?.trim()) headers.Authorization = `Bearer ${token.trim()}`
   let ok = 0
   let failed = 0
   let api: 'save-note' | 'none' = 'none'
@@ -157,7 +160,7 @@ export async function deployDistilledHttp(
     try {
       const r = await fetch(`${base}/api/vault/save-note`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers,
         body: JSON.stringify({ markdown, filename: name }),
         signal: AbortSignal.timeout(60_000)
       })
@@ -204,7 +207,7 @@ export async function deployDistilledToBrain(opts: {
     copied = await deployDistilledFiles(opts.notesDir, opts.filesystemTarget)
     method = 'filesystem'
   } else {
-    const http = await deployDistilledHttp(opts.notesDir, dashboardUrl)
+    const http = await deployDistilledHttp(opts.notesDir, dashboardUrl, opts.token)
     httpOk = http.ok
     httpFailed = http.failed
     method = http.api === 'none' ? 'none' : 'http'

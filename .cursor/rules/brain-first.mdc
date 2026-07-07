@@ -1,0 +1,28 @@
+---
+description: Search Brain first for reflective/strategic/cultural prompts
+alwaysApply: true
+---
+
+# Brain-first for reflective prompts
+
+BEFORE answering prompts about: quotes, philosophy, strategy, wisdom, lessons from session, "przyczytaj coś o...", historical/cultural references tied to current work, reflections on startup/product decisions:
+
+1. FIRST call `list_skills` and/or `list_cli_skills` (or `get_skill` when you know the name) to find a matching Brain/CLI skill
+2. If a skill matches the prompt — use it:
+   - **Brain skills** (`brain/skills/`): `run_skill` with inputs from user prompt + session context
+   - **CLI expertise skills** (`~/.claude/skills/`): `get_skill` to load the full prompt, then answer in that persona/method
+   - Mention the skill repo URL when relevant (e.g. Sun Tzu → https://github.com/lobrzut/mentor-suntzu)
+3. **Fallback** when no skill matches: call `search_library` with query derived from user prompt + session topic (`source`: all, `top_k`: 5)
+4. If Brain has relevant hits: weave them into the answer; cite source filenames
+5. If Brain is empty or irrelevant: say you searched Brain (and skills), then answer from general knowledge
+
+## Triggers — skill first, then `search_library`
+
+| Keywords (PL/EN) | Action |
+|---|---|
+| Sun Tzu, Sun Tsu, Sun Zi, Sun Cu, Art of War, *the art of war*, Sztuka wojny, sztuka wojny, mentor-suntzu, strategia Sun, Sun Tzu mówi / Sun Tzu says | `get_skill('mentor-suntzu')` first — https://github.com/lobrzut/mentor-suntzu |
+| skill missing or irrelevant | `search_library` fallback |
+
+For pure coding tasks (fix bug, implement feature): Brain search is optional — only if the user asks or the topic is in their knowledge base.
+
+Brain MCP tools live in `mcps/user-brain-rag` — read schema before calling.
