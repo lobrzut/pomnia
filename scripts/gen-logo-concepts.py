@@ -5,6 +5,9 @@ Usage:
   python scripts/gen-logo-concepts.py              # original flat concepts (archived)
   python scripts/gen-logo-concepts.py --depth      # anti-flat depth pass (recommended)
   python scripts/gen-logo-concepts.py --final      # depth refinements from user picks
+  python scripts/gen-logo-concepts.py --bold-a     # Ostry sigil — sharp angular (5 variants)
+  python scripts/gen-logo-concepts.py --bold-b     # Rytuał skarbca — ritual vault (5 variants)
+  python scripts/gen-logo-concepts.py --bold       # both bold series (10 images)
 """
 from __future__ import annotations
 
@@ -40,6 +43,128 @@ FORBID_FLAT = (
     "flat design,minimalist vector,corporate app icon,gradient squircle,"
     "dribbble,behance flat,Lory style"
 )
+
+FORBID_MILD = (
+    "soft, mild, generic, corporate, rounded friendly app icon, pastel, dribbble, "
+    "subtle, bland, flat design, minimalist vector, gradient squircle, Lory style, "
+    "soft glow, cute, illustration, game UI, behance flat"
+)
+
+STYLE_BOLD = (
+    "Pomnia Slavic memory vault BOLD: emerald #1a5c3a, moss #3d6b4f, amber #c9a227 ONLY, "
+    "void #0a120e background. HIGH CONTRAST carved emblem, aggressive folk-art angles, "
+    "sharp crystal facets, iron patina, cracked bark, weathered stone, handmade artifact. "
+    "Strong rim light, chiaroscuro, monumental sculptural relief NOT illustration. "
+    "FORBID soft mild generic corporate rounded pastel dribbble subtle bland flat vector. "
+    "No purple cyan, no text, no light bulb."
+)
+
+# Series A: Ostry sigil — sharp angular Dew Sigil evolution
+CONCEPTS_BOLD_A = [
+    (
+        "logo-bold-sigil-v1",
+        43101,
+        "App icon logo mark, Ostry Sigil BOLD concept: razor-sharp angular lattice sigil "
+        "carved deep into black volcanic stone, aggressive Slavic folk-art geometry with "
+        "hard chisel cuts not soft curves, three dew drops as sharp crystal facets catching "
+        "strong amber rim light, vesica memory gate as angular portal recess, high contrast "
+        "emerald and amber ONLY on void #0a120e, dramatic chiaroscuro sculptural relief, "
+        "hand-forged artifact feel, centered symbol only, no scene no landscape no text",
+    ),
+    (
+        "logo-bold-sigil-v2",
+        43287,
+        "App icon logo mark, Ostry Sigil BOLD v2: brutalist angular sigil emblem, intersecting "
+        "sharp geometric blades forming memory gate, dew droplets as cut glass diamond facets "
+        "not soft blobs, deep engraved channels with moss green patina, blazing amber fire "
+        "core in center vesica, iron and stone texture, aggressive original Slavic geometry "
+        "not runes, void black background strong side lighting, monumental carved object, "
+        "no rounded friendly icon no text",
+    ),
+    (
+        "logo-bold-sigil-v3",
+        43433,
+        "App icon logo mark, Ostry Sigil BOLD v3: spiked angular cross-lattice sigil, sharp "
+        "triangular dew crystals at vertices, carved amber inlay lines in dark emerald stone, "
+        "vesica gate as sharp almond portal with inner amber blaze, folk-art woodcut influence "
+        "with 3D depth, cracked stone surface, high contrast emerald amber only, void #0a120e, "
+        "tactile handmade artifact not corporate icon, centered emblem, no soft edges no text",
+    ),
+    (
+        "logo-bold-sigil-v4",
+        43621,
+        "App icon logo mark, Ostry Sigil BOLD v4: jagged geometric sigil like ancient ritual "
+        "brand burned into dark petrified wood, sharp angular lattice with deep relief shadows, "
+        "three faceted crystal dew drops refracting amber light, vesica threshold carved as "
+        "aggressive almond gate, Slavic folk art sharp angles original not Elder Futhark, "
+        "moss in deep grooves iron oxidized edges, strong rim light void background, "
+        "sculptural emblem only no illustration no text",
+    ),
+    (
+        "logo-bold-sigil-v5",
+        43891,
+        "App icon logo mark, Ostry Sigil BOLD v5: maximum contrast angular memory sigil, "
+        "sharp intersecting geometric arms like sacred threshold cross, dew as razor-cut amber "
+        "crystal shards on lattice nodes, vesica gate glowing molten amber from within dark "
+        "emerald stone frame, hand-carved aggressive folk motif, weathered artifact patina, "
+        "dramatic top-down rim lighting, void #0a120e, bold unique memorable symbol, "
+        "no soft mild generic rounded no text no letters",
+    ),
+]
+
+# Series B: Rytuał skarbca — monumental Moss Vault ritual gate
+CONCEPTS_BOLD_B = [
+    (
+        "logo-bold-vault-v1",
+        44101,
+        "App icon logo mark, Rytual Skarbca BOLD concept: ancient ritual gate threshold, "
+        "concentric rings like sacred Slavic labyrinth carved in weathered dark stone, amber "
+        "fire core blazing at center like trapped ancestral memory, cracked bark texture on "
+        "outer ring iron patina on inner grooves, moss growing in stone crevices, monumental "
+        "handmade artifact not cute not illustration, vesica portal tunnel depth, emerald "
+        "and amber ONLY void #0a120e, strong dramatic rim light, centered emblem no scene no text",
+    ),
+    (
+        "logo-bold-vault-v2",
+        44297,
+        "App icon logo mark, Rytual Skarbca BOLD v2: moss vault as ritual stone portal, "
+        "deep concentric labyrinth rings engraved with Slavic woven border geometry original, "
+        "molten amber resin pool at center glowing through ring gaps, weathered granite with "
+        "cracked bark and iron rust patina, lush moss in carved channels, monumental sacred "
+        "threshold not game UI, tactile sculptural relief high contrast, void black background "
+        "emerald amber palette, centered symbol only no landscape no text",
+    ),
+    (
+        "logo-bold-vault-v3",
+        44513,
+        "App icon logo mark, Rytual Skarbca BOLD v3: memory vault as ancient iron-bound stone "
+        "door, concentric ritual rings forming labyrinth mandorla portal, blazing amber core "
+        "like forge fire in center, heavy weathered stone with moss lichen in cracks, "
+        "hand-forged iron bands with green patina, Slavic folk art border engraving bold and "
+        "original, monumental artifact feel dramatic chiaroscuro, void #0a120e, no soft glow "
+        "no cute fantasy no text",
+    ),
+    (
+        "logo-bold-vault-v4",
+        44707,
+        "App icon logo mark, Rytual Skarbca BOLD v4: sacred threshold gate with nested vesica "
+        "tunnel rings, labyrinth concentric circles carved deep in petrified wood and stone, "
+        "amber fire heart pulsing at center, cracked bark outer texture iron rivets inner ring, "
+        "moss emerald in deep grooves, handmade ritual artifact monumental not illustration, "
+        "aggressive depth and shadow, strong side lighting void background, emerald amber only "
+        "centered emblem no scene no text no letters",
+    ),
+    (
+        "logo-bold-vault-v5",
+        44999,
+        "App icon logo mark, Rytual Skarbca BOLD v5: ultimate ritual memory vault portal, "
+        "massive concentric labyrinth rings like Slavic sacred circle, weathered stone and "
+        "forged iron with amber magma glow at vesica center, cracked ancient bark texture "
+        "moss in crevices iron oxide patina, bold original folk border geometry, monumental "
+        "sculptural gate threshold handmade artifact, maximum contrast emerald amber void "
+        "#0a120e, dramatic rim light, no soft mild generic game icon no text",
+    ),
+]
 
 CONCEPTS_FLAT = [
     (
@@ -195,6 +320,7 @@ def generate_batch(
     concepts: list[tuple[str, int, str]],
     *,
     depth: bool,
+    bold: bool = False,
 ) -> int:
     out_dir = ROOT / "assets" / "generated"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -203,6 +329,18 @@ def generate_batch(
     for name, seed, prompt in concepts:
         dest = out_dir / f"{name}.png"
         print(f"Generating {name}...")
+        if bold:
+            style_bible = STYLE_BOLD
+            lora = "none"
+            composition_lock = f"forbid={FORBID_MILD}"
+        elif depth:
+            style_bible = STYLE_DEPTH
+            lora = "none"
+            composition_lock = f"forbid={FORBID_FLAT}"
+        else:
+            style_bible = STYLE_FLAT
+            lora = "flat-ui"
+            composition_lock = None
         kwargs: dict = {
             "size": "512x512",
             "cfg": cfg,
@@ -210,17 +348,17 @@ def generate_batch(
             "workflow": "flux",
             "seed": seed,
             "quality_tier": "final",
-            "style_bible": STYLE_DEPTH if depth else STYLE_FLAT,
+            "style_bible": style_bible,
             "project_style": False,
             "background": "dark_navy",
             "asset_type": "icon",
             "workspace": ROOT,
         }
-        if depth:
-            kwargs["lora"] = "none"
-            kwargs["composition_lock"] = f"forbid={FORBID_FLAT}"
+        if bold or depth:
+            kwargs["lora"] = lora
+            kwargs["composition_lock"] = composition_lock
         else:
-            kwargs["lora"] = "flat-ui"
+            kwargs["lora"] = lora
             kwargs["lora_strength"] = 0.55
         try:
             result = cc.generate_to_path(prompt, dest, **kwargs)
@@ -244,7 +382,29 @@ def main() -> int:
         action="store_true",
         help="Generate depth refinements from user shortlist picks",
     )
+    parser.add_argument(
+        "--bold-a",
+        action="store_true",
+        help="Series A: Ostry sigil — sharp angular (5 variants)",
+    )
+    parser.add_argument(
+        "--bold-b",
+        action="store_true",
+        help="Series B: Rytuał skarbca — ritual vault (5 variants)",
+    )
+    parser.add_argument(
+        "--bold",
+        action="store_true",
+        help="Both bold series (10 images)",
+    )
     args = parser.parse_args()
+    if args.bold or (args.bold_a and args.bold_b):
+        concepts = CONCEPTS_BOLD_A + CONCEPTS_BOLD_B
+        return generate_batch(concepts, depth=False, bold=True)
+    if args.bold_a:
+        return generate_batch(CONCEPTS_BOLD_A, depth=False, bold=True)
+    if args.bold_b:
+        return generate_batch(CONCEPTS_BOLD_B, depth=False, bold=True)
     if args.final:
         concepts = CONCEPTS_FINAL
         depth = True

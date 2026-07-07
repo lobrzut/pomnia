@@ -1,8 +1,32 @@
 # Pomnia — logo & branding (Slavic green rebrand)
 
-> **Status:** koncepcje wygenerowane 2026-07-07 · refinements flat 2026-07-07 · **depth pass (anti-flat)** 2026-07-07 · **finaliści depth** 2026-07-07 · **nie** podmieniamy jeszcze `resources/icon.ico` — czekamy na wybór **jednego** finału.
+> **Status:** koncepcje wygenerowane 2026-07-07 · refinements flat 2026-07-07 · **depth pass (anti-flat)** 2026-07-07 · **finaliści depth** 2026-07-07 · **bold series (anti-mild)** 2026-07-07 wieczór · **nie** podmieniamy jeszcze `resources/icon.ico` — czekamy na wybór **jednego** finału.
 
-## Finaliści (feedback użytkownika 2026-07-07, wieczór)
+## Bold series — feedback „za miękkie” (2026-07-07, wieczór)
+
+Użytkownik: poprzednie depth/final batch **za miękkie, mało unikalne** — chce BOLD, memorable, zero kopiowalności (nie Lory, nie corporate flat).
+
+| Seria | Pliki | Kierunek |
+|-------|-------|----------|
+| **A: Ostry sigil** | `logo-bold-sigil-v1.png` … `v5.png` | Ostre kąty, agresywna geometria folk-art, rosa jako fasetki kryształu, wysoki kontrast emerald + amber |
+| **B: Rytuał skarbca** | `logo-bold-vault-v1.png` … `v5.png` | Monumentalna brama rytualna, labirynt pierścieni, pęknięta kora + patyna żelaza, bursztynowe serce |
+
+**Technika:** FLUX 512×512, `lora=none`, `quality_tier=final`, `FORBID` soft/mild/generic/corporate/rounded/pastel/dribbble.
+
+**Generator:**
+```powershell
+$env:COMFYUI_URL = "http://brain.example.local:7821"
+$env:COMFY_WORKSPACE = "C:\Users\Alice\Projects\pomnia"
+python scripts/gen-logo-concepts.py --bold-a   # seria A (5)
+python scripts/gen-logo-concepts.py --bold-b   # seria B (5)
+python scripts/gen-logo-concepts.py --bold       # obie (10)
+```
+
+Galeria: `assets/generated/preview.html` — **Seria A + B na górze** (slajdy 1–10).
+
+---
+
+## Finaliści (feedback użytkownika 2026-07-07, wieczór — archiwum)
 
 | Plik | Kierunek | Feedback |
 |------|----------|----------|
@@ -67,11 +91,13 @@ Refinements z `lora=flat-ui` wpadły w **generyczny flat corporate icon** (użyt
 
 ### FORBID (negative / composition_lock)
 
-`flat design, minimalist vector logo, corporate app icon, gradient squircle, generic tech logo, dribbble logo, behance flat icon, simple geometric mark, Lory style, flat-ui, material design icon, ios app icon template`
+`flat design, minimalist vector logo, corporate app icon, gradient squircle, generic tech logo, dribbble logo, behance flat icon, simple geometric mark, Lory style, flat-ui, material design icon, ios app icon template, soft, mild, generic, rounded friendly app icon, pastel, subtle, bland, soft glow, cute, game UI`
 
 ### SEEK (positive / style bible)
 
 `dimensional depth, subtle emboss or engraving, organic texture moss bark amber resin, hand-crafted feel, Slavic folk art influence, carved wood or amber inlay, atmospheric rim lighting, tactile surface, symbolic object with depth — NOT illustration scene, NOT landscape`
+
+**Bold pass (2026-07-07):** dodatkowo `sharp angular geometry, high contrast chiaroscuro, crystal facets, iron patina, cracked bark, ritual threshold, monumental artifact, aggressive folk-art angles`
 
 ### MCP dla depth pass
 
@@ -268,7 +294,9 @@ Patrz: [`assets/comfyui/logo-concept.json`](../assets/comfyui/logo-concept.json)
 | `assets/generated/logo-refine-*.png` | Refinements shortlistu flat (Dew Sigil, Moss Vault, hybrid) — za generyczne |
 | `assets/generated/logo-depth-*.png` | Depth pass anti-flat (Dew Sigil, Moss Vault, hybrid) |
 | `assets/generated/logo-final-*.png` | Final depth refinements z wyborów użytkownika |
-| `assets/generated/preview.html` | Galeria slideshow — sekcja Finaliści + archiwum |
+| `assets/generated/logo-bold-sigil-v*.png` | Seria A: Ostry sigil (bold anti-mild) |
+| `assets/generated/logo-bold-vault-v*.png` | Seria B: Rytuał skarbca (bold anti-mild) |
+| `assets/generated/preview.html` | Galeria slideshow — bold series + archiwum |
 | `assets/comfyui/logo-concept.json` | Referencja workflow + prompty |
 | `scripts/gen-logo-concepts.py` | Batch generator (ISKRA, poprawny workspace) |
 | `docs/COMFYUI-ASSETS.md` | Pełny pipeline assetów |
