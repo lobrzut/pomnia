@@ -84,11 +84,13 @@ export async function deployDashboard(
 }
 
 /** Ask Brain to (re)embed the vault + library into its vector DB. */
-export async function triggerReindex(baseUrl: string): Promise<boolean> {
+export async function triggerReindex(baseUrl: string, token?: string): Promise<boolean> {
   try {
+    const headers: Record<string, string> = { 'content-type': 'application/json' }
+    if (token?.trim()) headers.Authorization = `Bearer ${token.trim()}`
     const r = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/library/reindex`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers,
       body: '{}',
       signal: AbortSignal.timeout(15_000)
     })
@@ -190,6 +192,7 @@ export async function deployDistilledToBrain(opts: {
   dashboardUrl: string
   filesystemTarget?: string
   reindex?: boolean
+  token?: string
 }): Promise<DeployDistilledResult> {
   const dashboardUrl = dashboardUrlFromBrainUrl(opts.dashboardUrl)
   let copied = 0
@@ -208,6 +211,9 @@ export async function deployDistilledToBrain(opts: {
     copied = httpOk
   }
 
-  const reindex = opts.reindex !== false && method !== 'none' ? await triggerReindex(dashboardUrl) : false
+  const reindex =
+    opts.reindex !== false && method !== 'none'
+      ? await triggerReindex(dashboardUrl, opts.token)
+      : false
   return { copied, httpOk, httpFailed, method, reindex }
 }

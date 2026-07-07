@@ -368,6 +368,8 @@ function registerIpc(): void {
         /** Optional SMB/NFS path to brain vault/distilled (preferred over HTTP). */
         deployTarget?: string
         reindex?: boolean
+        /** Bearer token for remote Brain dashboard API (reindex). */
+        deployToken?: string
       }
     ) => {
       brainRunAbort?.abort()
@@ -423,7 +425,8 @@ function registerIpc(): void {
             notesDir: dir,
             dashboardUrl: opts.deployUrl,
             filesystemTarget: opts.deployTarget,
-            reindex: opts.reindex !== false
+            reindex: opts.reindex !== false,
+            token: opts.deployToken
           })
           deployed = dep.copied
           deployMethod = dep.method
@@ -532,7 +535,7 @@ function registerIpc(): void {
     'brain:deploy',
     async (
       _e,
-      opts: { to: 'filesystem' | 'dashboard'; target?: string; url?: string; reindex?: boolean; sources?: SourceId[] }
+      opts: { to: 'filesystem' | 'dashboard'; target?: string; url?: string; reindex?: boolean; token?: string; sources?: SourceId[] }
     ) => {
       let detail = ''
       if (opts.to === 'filesystem') {
@@ -547,7 +550,7 @@ function registerIpc(): void {
         detail = `Pushed to Brain: ${r.ok} ok, ${r.failed} failed`
       }
       if (opts.reindex && opts.url) {
-        const ok = await triggerReindex(opts.url)
+        const ok = await triggerReindex(opts.url, opts.token)
         detail += ok ? ' · reindex triggered' : ' · reindex failed'
       }
       return { detail }

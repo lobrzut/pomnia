@@ -56,8 +56,10 @@ CONTINUUM_OLLAMA=http://localhost:11434 \
   npm run cli brain pipeline --out ~/brain-notes --sources all --model qwen2.5:14b
 npm run cli brain search --notes ~/brain-notes "wireguard killswitch mikrotik"
 npm run cli brain deploy --to filesystem --notes ~/brain-notes --target /opt/BRAIN/data/vault/distilled
-npm run cli brain deploy --to dashboard --url http://brain.example.local:7860 --reindex
+npm run cli brain deploy --to dashboard --url http://brain.example.local:7860 --reindex --token $env:BRAIN_TOKEN
 ```
+
+Dashboard `:7860` wymaga `Authorization: Bearer <token>` (ten sam co w `~/.cursor/mcp.json` dla MCP `:7862`). Bez tokena reindex zwraca `auth required`.
 
 ## 5. Co dorobić po stronie BRAIN (żeby host w pełni odciążał VM)
 

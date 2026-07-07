@@ -357,7 +357,8 @@ async function cmdBrain(p: Parsed): Promise<void> {
       console.log(`  ${C.green('✔')} ${r.ok} ok, ${r.failed} failed`)
     } else throw new Error('--to must be filesystem|dashboard')
     if (p.flags.reindex && typeof p.flags.url === 'string') {
-      const ok = await triggerReindex(String(p.flags.url))
+      const token = typeof p.flags.token === 'string' ? p.flags.token : process.env.BRAIN_TOKEN
+      const ok = await triggerReindex(String(p.flags.url), token)
       console.log(ok ? `  ${C.green('✔')} reindex triggered` : `  ${C.yellow('⚠')} reindex call failed`)
     }
     return
