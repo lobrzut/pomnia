@@ -13,3 +13,7 @@ release/
 vault/
 sandbox/
 build/brain-core-runtime/
+
+# ComfyUI MCP outputs — review before promoting to resources/ or landing/
+assets/generated/*
+!assets/generated/.gitkeep
