@@ -5,11 +5,13 @@
     "brand_doc": "docs/BRAND-LOGO.md",
     "target_path": "resources/icon.png",
     "post_process": "User picks direction first; then refine 2-3x, vectorize, gen-icon.mjs",
-    "recommended_mcp": "generate_image_smart style=icon size=512x512 workflow=flux lora=flat-ui background=dark_navy project_style=false quality_tier=final"
+    "recommended_mcp_flat": "generate_image_smart style=icon size=512x512 workflow=flux lora=flat-ui background=dark_navy project_style=false quality_tier=final",
+    "recommended_mcp_depth": "generate_image_smart style=icon size=512x512 workflow=flux lora=none background=dark_navy project_style=false quality_tier=final asset_type=icon composition_lock=forbid=flat design,minimalist vector,corporate app icon,gradient squircle,dribbble,behance flat,Lory style"
   },
-  "_style_bible": "Pomnia Slavic memory vault: forest emerald #1a5c3a, moss #3d6b4f, birch #a8c4b0, amber #c9a227, void #0a120e. Flat vector icon, original Slavic geometry, no cliche eagles wolves kolovrat Futhark, no purple cyan, no text, no photorealism, no light bulb.",
-  "_negative": "text, watermark, photorealistic, 3d render, light bulb, lamp, human, face, hands, purple, cyan, magenta, teal, letter R, kolovrat, swastika, landscape scene, trees background",
-  "_mcp_settings": {
+  "_style_bible": "Pomnia Slavic memory vault: forest emerald #1a5c3a, moss #3d6b4f, birch #a8c4b0, amber #c9a227, void #0a120e. Dimensional depth, subtle emboss engraving, organic texture moss bark amber resin, hand-crafted Slavic folk art influence, carved wood or amber inlay, atmospheric rim lighting. Symbolic object with depth — NOT flat vector, NOT illustration scene. No cliche eagles wolves kolovrat Futhark, no purple cyan, no text, no light bulb.",
+  "_style_bible_flat_archive": "Flat vector icon — DEPRECATED after user feedback (Lory/flat-ui too generic). Use depth pass instead.",
+  "_negative": "text, watermark, light bulb, lamp, human, face, hands, purple, cyan, magenta, teal, letter R, kolovrat, swastika, landscape scene, trees background, flat design, minimalist vector logo, corporate app icon, gradient squircle, generic tech logo, dribbble logo, behance flat icon, simple geometric mark, Lory style, flat-ui, material design icon",
+  "_mcp_settings_flat": {
     "workflow": "flux",
     "lora": "flat-ui",
     "lora_strength": 0.55,
@@ -17,36 +19,83 @@
     "height": 512,
     "quality_tier": "final",
     "background": "dark_navy",
-    "project_style": false
+    "project_style": false,
+    "_note": "archived — refinements looked too generic"
+  },
+  "_mcp_settings_depth": {
+    "workflow": "flux",
+    "lora": "none",
+    "width": 512,
+    "height": 512,
+    "quality_tier": "final",
+    "background": "dark_navy",
+    "project_style": false,
+    "asset_type": "icon",
+    "composition_lock": "forbid=flat design,minimalist vector,corporate app icon,gradient squircle,dribbble,behance flat,Lory style"
   },
   "concepts": {
     "moss_vault": {
       "name": "Moss Vault",
       "seed": 42001,
-      "status": "strongest_v1",
+      "status": "shortlist_v1",
       "output": "assets/generated/logo-concept-moss-vault.png",
       "positive": "App icon logo mark, Moss Vault concept: nested vesica piscis forming a memory labyrinth vault, inner amber glow like trapped sunlight in forest moss, emerald and moss green palette, subtle Slavic woven border geometry original not Elder Futhark, flat vector UI icon, centered symbol generous padding, dark forest void background #0a120e, birch silver-green highlights, minimal geometric, no text no letters"
+    },
+    "moss_vault_depth_v1": {
+      "name": "Moss Vault Depth v1",
+      "seed": 42051,
+      "status": "depth_pass",
+      "output": "assets/generated/logo-depth-moss-vault-v1.png",
+      "positive": "App icon logo mark, Moss Vault depth concept: concentric rings carved into dark forest stone like a memory tunnel vault, volumetric amber glow emanating from center like trapped sunlight in resin, moss texture on ring edges and crevices, subtle emboss and engraved Slavic woven border geometry original not Elder Futhark, hand-crafted carved wood and amber inlay feel, dimensional depth with atmospheric rim lighting, emerald moss green palette void background #0a120e, birch silver-green highlights, tactile organic surface, centered symbol generous padding, symbolic object only no scene no landscape, no text no letters"
+    },
+    "moss_vault_depth_v2": {
+      "name": "Moss Vault Depth v2",
+      "seed": 42052,
+      "status": "depth_pass",
+      "output": "assets/generated/logo-depth-moss-vault-v2.png",
+      "positive": "App icon logo mark, Moss Vault depth concept: nested vesica piscis tunnel carved in aged dark stone with deep relief, concentric ring grooves filled with moss and birch lichen, inner amber resin pool glowing volumetrically, Slavic folk art border engraving subtle and original, hand-carved tactile emblem not flat vector, dramatic side lighting revealing depth, forest emerald and void #0a120e, centered symbol, no text no letters no flat design"
     },
     "birch_thread": {
       "name": "Birch Thread",
       "seed": 42002,
-      "status": "needs_iteration_colors",
+      "status": "rejected",
       "output": "assets/generated/logo-concept-birch-thread.png",
       "positive": "App icon logo mark, Birch Thread concept: three interwoven memory threads forming abstract knot not a letter, inspired by Slavic haft embroidery and birch bark texture, silver-green birch and deep forest green only, delicate cross-stitch geometry, thread nodes at intersections, flat vector UI icon, centered, dark void background, minimal, no text, no magenta no teal no purple",
-      "refine_notes": "Add forbid=magenta,teal,purple,cyan; try seed 42012"
+      "refine_notes": "Rejected by user — too controversial"
     },
     "dew_sigil": {
       "name": "Dew Sigil",
       "seed": 42003,
-      "status": "needs_iteration_too_scenic",
+      "status": "shortlist_v1",
       "output": "assets/generated/logo-concept-dew-sigil.png",
       "positive": "App icon logo mark, Dew Sigil concept: single centered sigil symbol only, original angular lattice geometry not Elder Futhark, three dew droplets, vesica memory gate at center, emerald green glow with amber dew highlights, flat vector UI icon, square format, dark forest background, crisp edges, no text no rune alphabet, no landscape no trees no scene",
-      "refine_notes": "composition_lock=forbid=landscape,scene,trees"
+      "refine_notes": "v1 too scenic; flat refinements too Lory-like"
+    },
+    "dew_sigil_depth_v1": {
+      "name": "Dew Sigil Depth v1",
+      "seed": 42053,
+      "status": "depth_pass",
+      "output": "assets/generated/logo-depth-dew-sigil-v1.png",
+      "positive": "App icon logo mark, Dew Sigil depth concept: original angular lattice sigil carved and engraved into dark stone or polished amber slab, three dew droplets as small 3D glass beads catching rim light, vesica memory gate recessed at center with subtle emboss, Slavic folk art geometric influence hand-crafted not rune alphabet, moss and bark micro-texture in grooves, dimensional depth atmospheric lighting, emerald green with amber resin highlights, void background #0a120e, symbolic carved object only no landscape no trees no scene, no text"
+    },
+    "dew_sigil_depth_v2": {
+      "name": "Dew Sigil Depth v2",
+      "seed": 42054,
+      "status": "depth_pass",
+      "output": "assets/generated/logo-depth-dew-sigil-v2.png",
+      "positive": "App icon logo mark, Dew Sigil depth concept: geometric memory sigil deeply engraved in dark petrified wood with amber inlay lines, three spherical dew beads of polished glass on lattice intersections catching light, vesica gate carved recess with inner amber glow, tactile hand-crafted Slavic folk motif not Elder Futhark, rich moss green patina in carved channels, sculptural emblem with shadow and relief, void #0a120e background, centered symbol only, no flat vector no corporate icon no text"
+    },
+    "dew_vault_depth_hybrid": {
+      "name": "Dew Vault Depth Hybrid",
+      "seed": 42055,
+      "status": "depth_pass_optional",
+      "output": "assets/generated/logo-depth-dew-vault-hybrid.png",
+      "positive": "App icon logo mark, Dew Vault hybrid depth concept: angular dew sigil lattice merged with concentric moss vault rings, carved in dark stone with amber resin inlay at center, three 3D dew beads on sigil nodes, tunnel-like ring depth with moss texture on edges, hand-crafted Slavic folk engraving, volumetric amber glow from vault core, dimensional relief not flat vector, void #0a120e, symbolic object only no scene, no text no letters"
     },
     "amber_loom": {
       "name": "Amber Loom",
       "seed": 42004,
-      "status": "needs_iteration_no_bulb",
+      "status": "deprioritized",
       "output": "assets/generated/logo-concept-amber-loom.png",
       "positive": "App icon logo mark, Amber Loom concept: circular memory loom weaving threads, amber resin glow at center, moss green and emerald outer ring, loom spokes not kolovrat not sun wheel, flat vector UI icon, centered, dark void background, minimal geometric, no text, no light bulb no lamp",
       "refine_notes": "forbid=lightbulb,lamp,bulb"
