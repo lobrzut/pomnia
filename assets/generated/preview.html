@@ -1,312 +1,737 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pomnia — koncepcje logo (shortlist)</title>
-  <style>
-    :root {
-      --void: #0a120e;
-      --forest: #1a5c3a;
-      --moss: #3d6b4f;
-      --birch: #a8c4b0;
-      --amber: #c9a227;
-      --dew: #7ec8a4;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      min-height: 100vh;
-      background: var(--void);
-      color: var(--birch);
-      font-family: "Segoe UI", system-ui, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 60% 50% at 50% 40%, rgba(26, 92, 58, 0.12) 0%, transparent 70%),
-        radial-gradient(ellipse 40% 30% at 50% 60%, rgba(126, 200, 164, 0.06) 0%, transparent 60%);
-      pointer-events: none;
-    }
-
-    .gallery {
-      position: relative;
-      z-index: 1;
-      width: min(720px, 92vw);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1.5rem;
-      padding: 2rem 1rem;
-    }
-
-    .counter {
-      font-size: 0.85rem;
-      letter-spacing: 0.15em;
-      color: var(--moss);
-      text-transform: uppercase;
-    }
-
-    .slide {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: 1.25rem;
-      width: 100%;
-      animation: fadeIn 0.35s ease;
-    }
-
-    .slide.active { display: flex; }
-
-    .slide.archived { opacity: 0.55; }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    .badge {
-      font-size: 0.7rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      padding: 0.25rem 0.65rem;
-      border-radius: 999px;
-      border: 1px solid var(--forest);
-    }
-
-    .badge.favorite { color: var(--dew); border-color: var(--dew); background: rgba(126, 200, 164, 0.08); }
-    .badge.refine   { color: var(--amber); border-color: var(--amber); background: rgba(201, 162, 39, 0.08); }
-    .badge.hybrid   { color: var(--birch); border-color: var(--moss); background: rgba(61, 107, 79, 0.15); }
-    .badge.rejected { color: #8a6a6a; border-color: #5a4040; background: rgba(90, 64, 64, 0.15); }
-
-    .image-wrap {
-      width: min(420px, 80vw);
-      aspect-ratio: 1;
-      border-radius: 1.25rem;
-      background: rgba(26, 92, 58, 0.08);
-      border: 1px solid rgba(61, 107, 79, 0.35);
-      box-shadow:
-        0 0 60px rgba(126, 200, 164, 0.08),
-        0 8px 32px rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
-    }
-
-    .image-wrap img {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-      border-radius: 0.5rem;
-    }
-
-    .concept-name {
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: var(--dew);
-      letter-spacing: 0.02em;
-    }
-
-    .concept-name span {
-      font-weight: 400;
-      color: var(--moss);
-      font-size: 1rem;
-    }
-
-    .description {
-      text-align: center;
-      max-width: 480px;
-      line-height: 1.6;
-      font-size: 0.95rem;
-      color: var(--birch);
-      opacity: 0.9;
-    }
-
-    .nav {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      margin-top: 0.5rem;
-    }
-
-    .nav button {
-      background: rgba(26, 92, 58, 0.25);
-      border: 1px solid var(--forest);
-      color: var(--birch);
-      padding: 0.6rem 1.4rem;
-      border-radius: 0.5rem;
-      font-size: 0.9rem;
-      cursor: pointer;
-      transition: background 0.2s, border-color 0.2s, color 0.2s;
-    }
-
-    .nav button:hover {
-      background: rgba(26, 92, 58, 0.45);
-      border-color: var(--dew);
-      color: var(--dew);
-    }
-
-    .nav button:disabled {
-      opacity: 0.3;
-      cursor: default;
-      pointer-events: none;
-    }
-
-    .hint {
-      font-size: 0.75rem;
-      color: var(--moss);
-      opacity: 0.7;
-      margin-top: 0.25rem;
-    }
-  </style>
-</head>
-<body>
-  <div class="gallery">
-    <div class="counter" id="counter">1 / 9</div>
-
-    <!-- Shortlist: Moss Vault -->
-    <div class="slide active" data-index="0">
-      <span class="badge favorite">Shortlist</span>
-      <div class="image-wrap">
-        <img src="logo-concept-moss-vault.png" alt="Moss Vault v1">
-      </div>
-      <h1 class="concept-name">Moss Vault <span>(Skarbiec mchu · v1)</span></h1>
-      <p class="description">
-        Pamięć jako leśny skarbiec — podwójna mandorla, bursztynowe światło w centrum.
-      </p>
-    </div>
-
-    <div class="slide" data-index="1">
-      <span class="badge refine">Refinement</span>
-      <div class="image-wrap">
-        <img src="logo-refine-moss-vault-v2.png" alt="Moss Vault v2">
-      </div>
-      <h1 class="concept-name">Moss Vault <span>v2</span></h1>
-      <p class="description">
-        Koncentryczne pierścienie, bursztynowe centrum — płaska ikona, bez ilustracji.
-      </p>
-    </div>
-
-    <div class="slide" data-index="2">
-      <span class="badge refine">Refinement</span>
-      <div class="image-wrap">
-        <img src="logo-refine-moss-vault-v3.png" alt="Moss Vault v3">
-      </div>
-      <h1 class="concept-name">Moss Vault <span>v3</span></h1>
-      <p class="description">
-        Odważniejsze pierścienie, czytelność w małym rozmiarze (tray 32px).
-      </p>
-    </div>
-
-    <!-- Shortlist: Dew Sigil -->
-    <div class="slide" data-index="3">
-      <span class="badge favorite">Shortlist</span>
-      <div class="image-wrap">
-        <img src="logo-concept-dew-sigil.png" alt="Dew Sigil v1">
-      </div>
-      <h1 class="concept-name">Dew Sigil <span>(Sygnil rosy · v1)</span></h1>
-      <p class="description">
-        Poranna rosa na geometrycznej kratce — vesica jako brama pamięci.
-      </p>
-    </div>
-
-    <div class="slide" data-index="4">
-      <span class="badge refine">Refinement</span>
-      <div class="image-wrap">
-        <img src="logo-refine-dew-sigil-v2.png" alt="Dew Sigil v2">
-      </div>
-      <h1 class="concept-name">Dew Sigil <span>v2</span></h1>
-      <p class="description">
-        Płaski sigil, kropelki rosy, zielona paleta — bez pejzażu i drzew.
-      </p>
-    </div>
-
-    <div class="slide" data-index="5">
-      <span class="badge refine">Refinement</span>
-      <div class="image-wrap">
-        <img src="logo-refine-dew-sigil-v3.png" alt="Dew Sigil v3">
-      </div>
-      <h1 class="concept-name">Dew Sigil <span>v3</span></h1>
-      <p class="description">
-        Minimalna geometria kraty, bursztynowy punkt w bramie, void #0a120e.
-      </p>
-    </div>
-
-    <!-- Hybrid -->
-    <div class="slide" data-index="6">
-      <span class="badge hybrid">Hybrid</span>
-      <div class="image-wrap">
-        <img src="logo-refine-dew-vault-hybrid.png" alt="Dew Vault hybrid">
-      </div>
-      <h1 class="concept-name">Dew Vault <span>(hybrid)</span></h1>
-      <p class="description">
-        Geometria Dew Sigil + bursztynowe centrum Moss Vault — połączenie obu ulubionych kierunków.
-      </p>
-    </div>
-
-    <!-- Archived / deprioritized -->
-    <div class="slide archived" data-index="7">
-      <span class="badge rejected">Odrzucony</span>
-      <div class="image-wrap">
-        <img src="logo-concept-birch-thread.png" alt="Birch Thread">
-      </div>
-      <h1 class="concept-name">Birch Thread <span>(archiwum)</span></h1>
-      <p class="description">
-        Odrzucony — „za kontrowersyjne”. Tylko archiwum.
-      </p>
-    </div>
-
-    <div class="slide archived" data-index="8">
-      <span class="badge rejected">Depriorytet</span>
-      <div class="image-wrap">
-        <img src="logo-concept-amber-loom.png" alt="Amber Loom">
-      </div>
-      <h1 class="concept-name">Amber Loom <span>(archiwum)</span></h1>
-      <p class="description">
-        Poza shortlistą — pierwsza generacja wpadła w metaforę żarówki.
-      </p>
-    </div>
-
-    <div class="nav">
-      <button id="prev" disabled>← Poprzedni</button>
-      <button id="next">Następny →</button>
-    </div>
-    <p class="hint">Strzałki ← → · wybierz jeden kierunek (lub hybrid) do finalnej ikony</p>
-  </div>
-
-  <script>
-    const slides = document.querySelectorAll(".slide");
-    const counter = document.getElementById("counter");
-    const prevBtn = document.getElementById("prev");
-    const nextBtn = document.getElementById("next");
-    let current = 0;
-
-    function show(index) {
-      current = Math.max(0, Math.min(index, slides.length - 1));
-      slides.forEach((s, i) => s.classList.toggle("active", i === current));
-      counter.textContent = `${current + 1} / ${slides.length}`;
-      prevBtn.disabled = current === 0;
-      nextBtn.disabled = current === slides.length - 1;
-    }
-
-    prevBtn.addEventListener("click", () => show(current - 1));
-    nextBtn.addEventListener("click", () => show(current + 1));
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowLeft") show(current - 1);
-      if (e.key === "ArrowRight") show(current + 1);
-    });
-  </script>
-</body>
-</html>
-
+<!DOCTYPE html>
+
+<html lang="pl">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Pomnia — koncepcje logo (shortlist)</title>
+
+  <style>
+
+    :root {
+
+      --void: #0a120e;
+
+      --forest: #1a5c3a;
+
+      --moss: #3d6b4f;
+
+      --birch: #a8c4b0;
+
+      --amber: #c9a227;
+
+      --dew: #7ec8a4;
+
+    }
+
+
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+
+
+    body {
+
+      min-height: 100vh;
+
+      background: var(--void);
+
+      color: var(--birch);
+
+      font-family: "Segoe UI", system-ui, sans-serif;
+
+      display: flex;
+
+      flex-direction: column;
+
+      align-items: center;
+
+      justify-content: center;
+
+      overflow: hidden;
+
+    }
+
+
+
+    body::before {
+
+      content: "";
+
+      position: fixed;
+
+      inset: 0;
+
+      background:
+
+        radial-gradient(ellipse 60% 50% at 50% 40%, rgba(26, 92, 58, 0.12) 0%, transparent 70%),
+
+        radial-gradient(ellipse 40% 30% at 50% 60%, rgba(126, 200, 164, 0.06) 0%, transparent 60%);
+
+      pointer-events: none;
+
+    }
+
+
+
+    .gallery {
+
+      position: relative;
+
+      z-index: 1;
+
+      width: min(720px, 92vw);
+
+      display: flex;
+
+      flex-direction: column;
+
+      align-items: center;
+
+      gap: 1.5rem;
+
+      padding: 2rem 1rem;
+
+    }
+
+
+
+    .counter {
+
+      font-size: 0.85rem;
+
+      letter-spacing: 0.15em;
+
+      color: var(--moss);
+
+      text-transform: uppercase;
+
+    }
+
+
+
+    .slide {
+
+      display: none;
+
+      flex-direction: column;
+
+      align-items: center;
+
+      gap: 1.25rem;
+
+      width: 100%;
+
+      animation: fadeIn 0.35s ease;
+
+    }
+
+
+
+    .slide.active { display: flex; }
+
+
+
+    .slide.archived { opacity: 0.55; }
+
+
+
+    @keyframes fadeIn {
+
+      from { opacity: 0; transform: translateY(8px); }
+
+      to   { opacity: 1; transform: translateY(0); }
+
+    }
+
+
+
+    .badge {
+
+      font-size: 0.7rem;
+
+      letter-spacing: 0.12em;
+
+      text-transform: uppercase;
+
+      padding: 0.25rem 0.65rem;
+
+      border-radius: 999px;
+
+      border: 1px solid var(--forest);
+
+    }
+
+
+
+    .badge.favorite { color: var(--dew); border-color: var(--dew); background: rgba(126, 200, 164, 0.08); }
+
+    .badge.refine   { color: var(--amber); border-color: var(--amber); background: rgba(201, 162, 39, 0.08); }
+
+    .badge.hybrid   { color: var(--birch); border-color: var(--moss); background: rgba(61, 107, 79, 0.15); }
+
+    .badge.depth    { color: var(--amber); border-color: var(--forest); background: rgba(201, 162, 39, 0.12); }
+
+    .badge.rejected { color: #8a6a6a; border-color: #5a4040; background: rgba(90, 64, 64, 0.15); }
+
+
+
+    .image-wrap {
+
+      width: min(420px, 80vw);
+
+      aspect-ratio: 1;
+
+      border-radius: 1.25rem;
+
+      background: rgba(26, 92, 58, 0.08);
+
+      border: 1px solid rgba(61, 107, 79, 0.35);
+
+      box-shadow:
+
+        0 0 60px rgba(126, 200, 164, 0.08),
+
+        0 8px 32px rgba(0, 0, 0, 0.5);
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      padding: 1.5rem;
+
+    }
+
+
+
+    .image-wrap img {
+
+      max-width: 100%;
+
+      max-height: 100%;
+
+      object-fit: contain;
+
+      border-radius: 0.5rem;
+
+    }
+
+
+
+    .concept-name {
+
+      font-size: 1.5rem;
+
+      font-weight: 600;
+
+      color: var(--dew);
+
+      letter-spacing: 0.02em;
+
+    }
+
+
+
+    .concept-name span {
+
+      font-weight: 400;
+
+      color: var(--moss);
+
+      font-size: 1rem;
+
+    }
+
+
+
+    .description {
+
+      text-align: center;
+
+      max-width: 480px;
+
+      line-height: 1.6;
+
+      font-size: 0.95rem;
+
+      color: var(--birch);
+
+      opacity: 0.9;
+
+    }
+
+
+
+    .nav {
+
+      display: flex;
+
+      align-items: center;
+
+      gap: 1.5rem;
+
+      margin-top: 0.5rem;
+
+    }
+
+
+
+    .nav button {
+
+      background: rgba(26, 92, 58, 0.25);
+
+      border: 1px solid var(--forest);
+
+      color: var(--birch);
+
+      padding: 0.6rem 1.4rem;
+
+      border-radius: 0.5rem;
+
+      font-size: 0.9rem;
+
+      cursor: pointer;
+
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+
+    }
+
+
+
+    .nav button:hover {
+
+      background: rgba(26, 92, 58, 0.45);
+
+      border-color: var(--dew);
+
+      color: var(--dew);
+
+    }
+
+
+
+    .nav button:disabled {
+
+      opacity: 0.3;
+
+      cursor: default;
+
+      pointer-events: none;
+
+    }
+
+
+
+    .hint {
+
+      font-size: 0.75rem;
+
+      color: var(--moss);
+
+      opacity: 0.7;
+
+      margin-top: 0.25rem;
+
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+  <div class="gallery">
+
+    <div class="counter" id="counter">1 / 14</div>
+
+
+
+    <!-- Shortlist: Moss Vault -->
+
+    <div class="slide active" data-index="0">
+
+      <span class="badge favorite">Shortlist</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-concept-moss-vault.png" alt="Moss Vault v1">
+
+      </div>
+
+      <h1 class="concept-name">Moss Vault <span>(Skarbiec mchu · v1)</span></h1>
+
+      <p class="description">
+
+        Pamięć jako leśny skarbiec — podwójna mandorla, bursztynowe światło w centrum.
+
+      </p>
+
+    </div>
+
+
+
+    <div class="slide" data-index="1">
+
+      <span class="badge refine">Refinement</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-refine-moss-vault-v2.png" alt="Moss Vault v2">
+
+      </div>
+
+      <h1 class="concept-name">Moss Vault <span>v2</span></h1>
+
+      <p class="description">
+
+        Koncentryczne pierścienie, bursztynowe centrum — płaska ikona, bez ilustracji.
+
+      </p>
+
+    </div>
+
+
+
+    <div class="slide" data-index="2">
+
+      <span class="badge refine">Refinement</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-refine-moss-vault-v3.png" alt="Moss Vault v3">
+
+      </div>
+
+      <h1 class="concept-name">Moss Vault <span>v3</span></h1>
+
+      <p class="description">
+
+        Odważniejsze pierścienie, czytelność w małym rozmiarze (tray 32px).
+
+      </p>
+
+    </div>
+
+
+
+    <!-- Shortlist: Dew Sigil -->
+
+    <div class="slide" data-index="3">
+
+      <span class="badge favorite">Shortlist</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-concept-dew-sigil.png" alt="Dew Sigil v1">
+
+      </div>
+
+      <h1 class="concept-name">Dew Sigil <span>(Sygnil rosy · v1)</span></h1>
+
+      <p class="description">
+
+        Poranna rosa na geometrycznej kratce — vesica jako brama pamięci.
+
+      </p>
+
+    </div>
+
+
+
+    <div class="slide" data-index="4">
+
+      <span class="badge refine">Refinement</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-refine-dew-sigil-v2.png" alt="Dew Sigil v2">
+
+      </div>
+
+      <h1 class="concept-name">Dew Sigil <span>v2</span></h1>
+
+      <p class="description">
+
+        Płaski sigil, kropelki rosy, zielona paleta — bez pejzażu i drzew.
+
+      </p>
+
+    </div>
+
+
+
+    <div class="slide" data-index="5">
+
+      <span class="badge refine">Refinement</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-refine-dew-sigil-v3.png" alt="Dew Sigil v3">
+
+      </div>
+
+      <h1 class="concept-name">Dew Sigil <span>v3</span></h1>
+
+      <p class="description">
+
+        Minimalna geometria kraty, bursztynowy punkt w bramie, void #0a120e.
+
+      </p>
+
+    </div>
+
+
+
+    <!-- Hybrid -->
+
+    <div class="slide" data-index="6">
+
+      <span class="badge hybrid">Hybrid</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-refine-dew-vault-hybrid.png" alt="Dew Vault hybrid">
+
+      </div>
+
+      <h1 class="concept-name">Dew Vault <span>(hybrid · flat)</span></h1>
+
+      <p class="description">
+
+        Geometria Dew Sigil + bursztynowe centrum Moss Vault — połączenie obu ulubionych kierunków (flat).
+
+      </p>
+
+    </div>
+
+
+
+    <!-- Głębia (anti-flat) -->
+
+    <div class="slide" data-index="7">
+
+      <span class="badge depth">Głębia · anti-flat</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-depth-moss-vault-v1.png" alt="Moss Vault depth v1">
+
+      </div>
+
+      <h1 class="concept-name">Moss Vault <span>głębia v1</span></h1>
+
+      <p class="description">
+
+        Pierścienie wyrzeźbione w ciemnym kamieniu — objętościowy blask bursztynu, mech w szczelinach. Bez flat-ui / Lory.
+
+      </p>
+
+    </div>
+
+
+
+    <div class="slide" data-index="8">
+
+      <span class="badge depth">Głębia · anti-flat</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-depth-moss-vault-v2.png" alt="Moss Vault depth v2">
+
+      </div>
+
+      <h1 class="concept-name">Moss Vault <span>głębia v2</span></h1>
+
+      <p class="description">
+
+        Tunel vesica z głębokim reliefem, żywica bursztynowa w centrum, folk-artowe obramowanie — rzeźbiarska faktura.
+
+      </p>
+
+    </div>
+
+
+
+    <div class="slide" data-index="9">
+
+      <span class="badge depth">Głębia · anti-flat</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-depth-dew-sigil-v1.png" alt="Dew Sigil depth v1">
+
+      </div>
+
+      <h1 class="concept-name">Dew Sigil <span>głębia v1</span></h1>
+
+      <p class="description">
+
+        Sigil wyryty w kamieniu/bursztynie — kropelki rosy jako 3D kule szkła, emboss bramy pamięci.
+
+      </p>
+
+    </div>
+
+
+
+    <div class="slide" data-index="10">
+
+      <span class="badge depth">Głębia · anti-flat</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-depth-dew-sigil-v2.png" alt="Dew Sigil depth v2">
+
+      </div>
+
+      <h1 class="concept-name">Dew Sigil <span>głębia v2</span></h1>
+
+      <p class="description">
+
+        Zespolone drewno z inkrustacją bursztynu, patyna mchu w rowkach — ręcznie rzeźbiony znak, nie corporate icon.
+
+      </p>
+
+    </div>
+
+
+
+    <div class="slide" data-index="11">
+
+      <span class="badge depth">Głębia · hybrid</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-depth-dew-vault-hybrid.png" alt="Dew Vault depth hybrid">
+
+      </div>
+
+      <h1 class="concept-name">Dew Vault <span>głębia hybrid</span></h1>
+
+      <p class="description">
+
+        Kratka Dew Sigil + pierścienie Moss Vault w jednym wyrzeźbionym emblemie — bursztynowe jądro skarbca.
+
+      </p>
+
+    </div>
+
+
+
+    <!-- Archived / deprioritized -->
+
+    <div class="slide archived" data-index="12">
+
+      <span class="badge rejected">Odrzucony</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-concept-birch-thread.png" alt="Birch Thread">
+
+      </div>
+
+      <h1 class="concept-name">Birch Thread <span>(archiwum)</span></h1>
+
+      <p class="description">
+
+        Odrzucony — „za kontrowersyjne”. Tylko archiwum.
+
+      </p>
+
+    </div>
+
+
+
+    <div class="slide archived" data-index="13">
+
+      <span class="badge rejected">Depriorytet</span>
+
+      <div class="image-wrap">
+
+        <img src="logo-concept-amber-loom.png" alt="Amber Loom">
+
+      </div>
+
+      <h1 class="concept-name">Amber Loom <span>(archiwum)</span></h1>
+
+      <p class="description">
+
+        Poza shortlistą — pierwsza generacja wpadła w metaforę żarówki.
+
+      </p>
+
+    </div>
+
+
+
+    <div class="nav">
+
+      <button id="prev" disabled>← Poprzedni</button>
+
+      <button id="next">Następny →</button>
+
+    </div>
+
+    <p class="hint">Strzałki ← → · slajdy 8–12 = Głębia (anti-flat) · wybierz kierunek do finalnej ikony</p>
+
+  </div>
+
+
+
+  <script>
+
+    const slides = document.querySelectorAll(".slide");
+
+    const counter = document.getElementById("counter");
+
+    const prevBtn = document.getElementById("prev");
+
+    const nextBtn = document.getElementById("next");
+
+    let current = 0;
+
+
+
+    function show(index) {
+
+      current = Math.max(0, Math.min(index, slides.length - 1));
+
+      slides.forEach((s, i) => s.classList.toggle("active", i === current));
+
+      counter.textContent = `${current + 1} / ${slides.length}`;
+
+      prevBtn.disabled = current === 0;
+
+      nextBtn.disabled = current === slides.length - 1;
+
+    }
+
+
+
+    prevBtn.addEventListener("click", () => show(current - 1));
+
+    nextBtn.addEventListener("click", () => show(current + 1));
+
+
+
+    document.addEventListener("keydown", (e) => {
+
+      if (e.key === "ArrowLeft") show(current - 1);
+
+      if (e.key === "ArrowRight") show(current + 1);
+
+    });
+
+  </script>
+
+</body>
+
+</html>
+
+
