@@ -65,7 +65,16 @@ Dashboard `:7860` wymaga `Authorization: Bearer <token>` (ten sam co w `~/.curso
 
 Continuum produkuje notatki **i** wektory. Brain dziś re-embeduje przy `library/reindex`. Dwa małe endpointy domknęłyby pętlę:
 
-1. **`POST /api/vault/save-note`** — przyjmij gotową, pre-destylowaną notatkę md (zamiast `save-chat`, które destyluje ponownie). Continuum wrzuca notatkę → brain tylko ją zapisuje.
+1. **`POST /api/vault/save-note`** — przyjmij gotową, pre-destylowaną notatkę md (zamiast `save-chat`, które destyluje ponownie). Continuum wrzuca notatkę → brain tylko ją zapisuje + `index_file` (incremental embed).
+
+   ```bash
+   curl -sS -X POST "http://brain.example.local:7860/api/vault/save-note" \
+     -H "Authorization: Bearer $BRAIN_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"markdown":"# test\n\nfrom continuum","filename":"2026-07-07_test_continuum.md","subdir":"distilled"}'
+   ```
+
+   Odpowiedź: `{"ok":true,"rel":"distilled/...","chunks_indexed":N,...}`. Wymaga Bearer (ten sam token co MCP/reindex).
 2. **`POST /api/library/merge-index`** — przyjmij precomputed wektory `nomic-embed-text` (dim 768) + chunki + metadane; dopisz do `library.db` **bez** ponownego embeddingu. Wtedy deploy z hosta = zero pracy GPU na VM.
 
 Format artefaktu Continuum (`.continuum-index.json`) jest pod to gotowy: `{embedModel, dim, entries:[{id,source,notePath,chunkIdx,text,vector}]}`.
@@ -77,5 +86,6 @@ Format artefaktu Continuum (`.continuum-index.json`) jest pod to gotowy: `{embed
 - [ ] Map-reduce dla długich rozmów (dziś transcript przycinany head+tail do 14k znaków).
 - [ ] Push przez MCP `save_conversation` jako trzeci backend deployu.
 - [x] **Auto-deploy po distill** (Remote master) — `deployDistilledToBrain`, SMB lub `save-note` + `library/reindex`. Zob. `docs/BRAIN-KVM-ARCHITECTURE.md`.
-- [ ] Brain-side `save-note` + `merge-index` (§5).
+- [x] Brain-side `save-note` (§5) — hub dashboard `POST /api/vault/save-note`, incremental `index_file`.
+- [ ] Brain-side `merge-index` (§5).
 - [ ] Wybór modelu per długość/temat (qwen2.5:14b vs 32b vs deepseek-r1).
