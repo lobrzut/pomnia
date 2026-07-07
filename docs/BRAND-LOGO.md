@@ -1,21 +1,34 @@
 # Pomnia — logo & branding (Slavic green rebrand)
 
-> **Status:** koncepcje wygenerowane 2026-07-07 · refinements 2026-07-07 · **depth pass (anti-flat)** 2026-07-07 · **nie** podmieniamy jeszcze `resources/icon.ico` — czekamy na wybór kierunku.
+> **Status:** koncepcje wygenerowane 2026-07-07 · refinements flat 2026-07-07 · **depth pass (anti-flat)** 2026-07-07 · **finaliści depth** 2026-07-07 · **nie** podmieniamy jeszcze `resources/icon.ico` — czekamy na wybór **jednego** finału.
 
-## Shortlist (feedback użytkownika 2026-07-07)
+## Finaliści (feedback użytkownika 2026-07-07, wieczór)
+
+| Plik | Kierunek | Feedback |
+|------|----------|----------|
+| **`logo-depth-moss-vault-v2.png`** | Moss Vault depth | **„Fajne”** — ulubiony z depth batch |
+| **`logo-depth-dew-sigil-v1.png`** | Dew Sigil depth | **„Fajne, ciekawe”** — ulubiony z depth batch |
+
+**Preferencja użytkownika:** wersje **depth** (anti-flat) zamiast flat hybrid / Lory. Oba kierunki nadal w grze — decyzja: jeden finał **albo** hybrid depth.
+
+**Final refinements (2026-07-07):** `logo-final-moss-vault-v1.png`, `v2` · `logo-final-dew-sigil-v1.png`, `v2` · opcjonalnie `logo-final-depth-hybrid.png` (pierścienie skarbca + geometria sigilu, carved depth).
+
+Galeria: `assets/generated/preview.html` — sekcja **Finaliści** na górze.
+
+---
+
+## Shortlist historyczny (feedback użytkownika 2026-07-07, rano)
 
 | Kierunek | Status | Uwagi |
 |----------|--------|-------|
-| **Dew Sigil** *(Sygnil rosy)* | **Ulubiony — shortlist** | Użytkownik lubi kierunek; refinements: płaska ikona, geometria sigilu, kropelki rosy, bez pejzażu |
-| **Moss Vault** *(Skarbiec mchu)* | **Ulubiony — shortlist** | Użytkownik lubi kierunek; refinements: koncentryczne pierścienie, bursztynowe centrum, flat icon |
+| **Dew Sigil** *(Sygnil rosy)* | **Finalista depth** | Pierwszy shortlist; flat refinements za generyczne (Lory) |
+| **Moss Vault** *(Skarbiec mchu)* | **Finalista depth** | Pierwszy shortlist; depth v2 wybrany jako ulubiony |
 | **Birch Thread** *(Nić brzozy)* | **Odrzucony** | „Za kontrowersyjne” — wycofany z shortlistu |
 | **Amber Loom** *(Bursztynowy krosno)* | **Depriorytet** | Nie w shortlistcie; pierwsza generacja wpadła w żarówkę — tylko archiwum |
 
-**Preferencja użytkownika:** oba kierunki shortlist (Dew Sigil **i** Moss Vault) — możliwy hybrid **Dew Vault** (geometria rosy + bursztynowe centrum skarbca).
-
 **Refinements (flat — za generyczne):** `assets/generated/logo-refine-dew-sigil-v2.png`, `v3`, `logo-refine-moss-vault-v2.png`, `v3`, `logo-refine-dew-vault-hybrid.png`. Użytkownik widzi w nich styl **Lory / flat-ui** — zbyt corporate, kopiowalne.
 
-**Depth pass (anti-flat):** `assets/generated/logo-depth-dew-sigil-v1.png`, `v2`, `logo-depth-moss-vault-v1.png`, `v2`, opcjonalnie `logo-depth-dew-vault-hybrid.png`.
+**Depth pass (anti-flat):** `assets/generated/logo-depth-dew-sigil-v1.png`, `v2`, `logo-depth-moss-vault-v1.png`, `v2`, `logo-depth-dew-vault-hybrid.png`.
 
 Zastępujemy obecny fioletowo-cyanowy squircle z literą „R” (wygląda jak Reliqua / generyczny AI) własnym symbolem: **pamięć, sny, wiedza przodków** — słowiańsko, leśnie, w zieleniach — **z głębią i fakturą**, nie płaskim szablonem z Dribbble.
 
@@ -254,7 +267,8 @@ Patrz: [`assets/comfyui/logo-concept.json`](../assets/comfyui/logo-concept.json)
 | `assets/generated/logo-concept-*.png` | Pierwsze generacje (4 kierunki) |
 | `assets/generated/logo-refine-*.png` | Refinements shortlistu flat (Dew Sigil, Moss Vault, hybrid) — za generyczne |
 | `assets/generated/logo-depth-*.png` | Depth pass anti-flat (Dew Sigil, Moss Vault, hybrid) |
-| `assets/generated/preview.html` | Galeria slideshow do wyboru kierunku |
+| `assets/generated/logo-final-*.png` | Final depth refinements z wyborów użytkownika |
+| `assets/generated/preview.html` | Galeria slideshow — sekcja Finaliści + archiwum |
 | `assets/comfyui/logo-concept.json` | Referencja workflow + prompty |
 | `scripts/gen-logo-concepts.py` | Batch generator (ISKRA, poprawny workspace) |
 | `docs/COMFYUI-ASSETS.md` | Pełny pipeline assetów |
