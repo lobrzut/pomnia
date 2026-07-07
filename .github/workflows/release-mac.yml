@@ -1,0 +1,41 @@
+name: Release macOS (DMG)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build macOS DMG
+        run: npm run pack:mac
+        env:
+          # Unsigned build — no Apple Developer secrets required
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reliqua-macos-dmg
+          path: |
+            release/*.dmg
+            release/mac/*.app
+          if-no-files-found: error
