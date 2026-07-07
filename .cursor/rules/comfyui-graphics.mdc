@@ -1,0 +1,34 @@
+---
+description: Grafiki Pomnia przez ComfyUI MCP (FLUX) — generuj od razu, bez pytania
+alwaysApply: false
+---
+
+# ComfyUI — grafiki Pomnia
+
+Gdy użytkownik prosi o **ikonę, logo, hero, banner, OG image, tray icon** dla Pomnia:
+
+1. MCP `comfyui` → **`generate_image_smart`** lub **`generate_image_intelligent`** (master quality).
+2. Załaduj `.cursor/comfy-project.json` — paleta **Slavic green**: void `#0a0a0f`, emerald `#1B4332`, moss `#40916C`, birch `#D8F3DC`, amber `#D4A574`.
+3. Kierunki logo: `docs/BRAND-LOGO.md` (Moss Vault, Birch Thread, Dew Sigil).
+4. **Nie** używaj wbudowanego generate image w czacie.
+5. Prompt po **angielsku**; styl: flat vector, dark void UI, organic green glow, **bez tekstu i bez litery „R”** w obrazie.
+6. `comfy_status` tylko gdy ISKRA nie odpowiada.
+
+## Assety → ścieżki docelowe
+
+| Asset | Rozmiar | Output MCP | Plik w repo |
+|-------|---------|------------|-------------|
+| App icon | 512×512 | `assets/generated/` | `resources/icon.png` + `resources/icon.ico` |
+| Tray | 256×256 | j.w. | `resources/icon.ico` (multi-size) |
+| Hero | 1920×1080 | j.w. | `landing/assets/hero.png` (do utworzenia) |
+| OG | 1200×630 | j.w. | `landing/assets/og.png` |
+
+Po akceptacji: skopiuj PNG do docelowej ścieżki. Ikony: `node scripts/gen-icon.mjs` lub ręczna konwersja do `.ico`.
+
+## Workflow
+
+- `flux` + `flat-ui` LoRA → ikony, tray
+- `flux` + `lora=none` → hero, OG, banner
+
+Pełna dokumentacja: `docs/COMFYUI-ASSETS.md` · branding: `docs/BRAND-LOGO.md`
+
