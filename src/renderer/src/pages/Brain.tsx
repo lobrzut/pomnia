@@ -290,11 +290,13 @@ export default function Brain() {
       <GlassCard className="mb-5 p-5">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <Database className="h-4 w-4 text-iris" /> Brain state
+            <Database className="h-4 w-4 text-iris" /> {labels.brainStateTitle}
           </div>
           <div className="flex items-center gap-3">
             {brainState?.lastRun && (
-              <span className="text-[11px] text-ink-faint">last distill {relativeTime(brainState.lastRun)}</span>
+              <span className="text-[11px] text-ink-faint">
+                {labels.brainStateLastDistill(relativeTime(brainState.lastRun))}
+              </span>
             )}
             <Button variant="ghost" onClick={() => void loadBrainState()} disabled={brainStateLoading} className="!px-2 !py-1">
               {brainStateLoading ? <Spinner className="h-3.5 w-3.5" /> : <ArrowRight className="h-3.5 w-3.5 rotate-90" />}
@@ -303,17 +305,21 @@ export default function Brain() {
         </div>
         {brainState === null ? (
           <div className="flex items-center gap-2 py-1 text-sm text-ink-dim">
-            <Spinner className="h-4 w-4" /> reading pipeline state…
+            <Spinner className="h-4 w-4" /> {labels.brainStateLoading}
           </div>
         ) : (
           <>
             <div className="grid grid-cols-3 gap-2.5">
               <div className="rounded-2xl border border-white/8 bg-black/20 p-3.5">
-                <div className="text-[10px] font-medium uppercase tracking-wider text-ink-faint">Chats in tools</div>
+                <div className="text-[10px] font-medium uppercase tracking-wider text-ink-faint">
+                  {labels.brainStateChatsInTools}
+                </div>
                 <div className="mt-1 text-2xl font-bold text-ink">{brainState.total}</div>
               </div>
               <div className="rounded-2xl border border-white/8 bg-black/20 p-3.5">
-                <div className="text-[10px] font-medium uppercase tracking-wider text-ink-faint">Distilled</div>
+                <div className="text-[10px] font-medium uppercase tracking-wider text-ink-faint">
+                  {labels.brainStateDistilled}
+                </div>
                 <div className="mt-1 flex items-baseline gap-1.5 text-2xl font-bold text-ink">
                   {brainState.distilled}
                   {brainState.pending === 0 && brainState.total > 0 && <Check className="h-4 w-4 text-mint" />}
@@ -324,7 +330,9 @@ export default function Brain() {
                   brainState.pending > 0 ? 'border-amber/30 bg-amber/8' : 'border-white/8 bg-black/20'
                 }`}
               >
-                <div className="text-[10px] font-medium uppercase tracking-wider text-ink-faint">Backlog</div>
+                <div className="text-[10px] font-medium uppercase tracking-wider text-ink-faint">
+                  {labels.brainStateBacklog}
+                </div>
                 <div className={`mt-1 text-2xl font-bold ${brainState.pending > 0 ? 'text-amber' : 'text-ink'}`}>
                   {brainState.pending}
                 </div>
@@ -342,7 +350,9 @@ export default function Brain() {
                     <span className="text-ink-faint">
                       {p.total - p.pending}/{p.total}
                     </span>
-                    {p.pending > 0 && <span className="font-medium text-amber">+{p.pending} new</span>}
+                    {p.pending > 0 && (
+                      <span className="font-medium text-amber">{labels.brainStatePendingNew(p.pending)}</span>
+                    )}
                   </span>
                 )
               })}
@@ -358,7 +368,7 @@ export default function Brain() {
               )}
               {brainRunning && (
                 <Button variant="soft" onClick={cancelBrainPipeline} className="!px-3 !py-1.5 !text-[12px]">
-                  Cancel
+                  {labels.cancel}
                 </Button>
               )}
             </div>
