@@ -73,6 +73,8 @@ export interface BrainRunResult {
   deployed?: number
   deployMethod?: 'filesystem' | 'http' | 'none'
   reindexed?: boolean
+  /** All conversations already in the distill ledger — nothing to process. */
+  emptyBacklog?: boolean
 }
 
 export interface DocImportResult {
@@ -109,7 +111,7 @@ export interface BrainHit {
 }
 
 export interface BrainProgressEvent {
-  phase: 'collect' | 'distill' | 'index' | 'deploy'
+  phase: 'collect' | 'distill' | 'index' | 'deploy' | 'idle'
   done: number
   total: number
   detail?: string

@@ -120,6 +120,8 @@ export interface UiLabels {
   brainStateBacklog: string
   brainStatePendingNew: (n: number) => string
   cancel: string
+  distillEmptyBacklog: string
+  distillEmptyBacklogDetail: string
   activityBanner: (state: ActivityState) => string
   activityTrayBusy: string
 }
@@ -225,6 +227,8 @@ const PL_LABELS: UiLabels = {
   brainStateBacklog: 'Kolejka',
   brainStatePendingNew: (n) => `+${n} nowych`,
   cancel: 'Anuluj',
+  distillEmptyBacklog: 'Brak nowych sesji do destylacji',
+  distillEmptyBacklogDetail: 'Wszystkie czaty z wybranych źródeł są już w ledgerze destylacji.',
   activityBanner: formatActivityBanner,
   activityTrayBusy: 'Operacja w tle'
 }

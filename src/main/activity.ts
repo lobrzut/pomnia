@@ -74,9 +74,15 @@ class ActivityManager {
   idle(expected?: ActivityKind | ActivityKind[]): void {
     const kinds = expected == null ? undefined : Array.isArray(expected) ? expected : [expected]
     if (kinds && !kinds.includes(this.state.kind)) return
+    if (this.state.kind === 'idle') return
     this.state = { kind: 'idle' }
     this.broadcast?.('activity:idle')
     this.onChange?.()
+  }
+
+  /** Clear brain pipeline activity (distill / embed / indexing) after run completes. */
+  pipelineIdle(): void {
+    this.idle(['distill', 'embed', 'indexing'])
   }
 
   tooltip(): string {
