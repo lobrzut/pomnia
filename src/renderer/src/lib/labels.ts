@@ -1,6 +1,6 @@
 /** Polish UI labels — simple mode only hides advanced sections, not language. */
 
-import { formatPipelineProgressLabel } from '@core/pipelineLabels'
+import { formatPipelineProgressLabel } from '@core/pipelineLabels.js'
 import type { ActivityState } from './types'
 
 const ACTIVITY_KIND: Record<Exclude<ActivityState['kind'], 'idle'>, string> = {
