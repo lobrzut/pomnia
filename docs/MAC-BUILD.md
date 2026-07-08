@@ -45,8 +45,8 @@ xcode-select -p   # powinno wypisać ścieżkę, np. /Library/Developer/CommandL
 ## 2. Przygotowanie repo
 
 ```bash
-git clone <url-repozytorium> continuum
-cd continuum
+git clone <url-repozytorium> pomnia
+cd pomnia
 git checkout master
 git pull
 ```
@@ -188,7 +188,7 @@ Bez sekretów Apple = unsigned DMG do pobrania z zakładki Actions → Artifacts
 ## 9. Szybka ściąga (copy-paste)
 
 ```bash
-git clone <url> continuum && cd continuum
+git clone <url> pomnia && cd pomnia
 xcode-select --install    # jeśli jeszcze nie
 npm ci
 npm run pack:mac

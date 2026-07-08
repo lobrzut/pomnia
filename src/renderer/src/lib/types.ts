@@ -74,6 +74,7 @@ export interface BrainRunResult {
 }
 
 export interface DocImportResult {
+  docId: string
   sourcePath: string
   extractedPath: string
   format: string
@@ -84,6 +85,7 @@ export interface DocImportResult {
   suggestOcr: boolean
   indexed: boolean
   brainRunning: boolean
+  encrypted: boolean
 }
 
 export interface DocImportProgressEvent {

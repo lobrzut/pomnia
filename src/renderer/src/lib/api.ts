@@ -235,8 +235,9 @@ function mockBridge(): PomniaBridge {
     async docImport() {
       await new Promise((r) => setTimeout(r, 900))
       return {
-        sourcePath: 'C:/…/vault/library/sources/abc_report.pdf',
-        extractedPath: 'C:/…/vault/library/extracted/abc_report.md',
+        docId: 'abc_report.pdf',
+        sourcePath: 'C:/Vault.pomnia/library/abc_report.pdf',
+        extractedPath: 'C:/Vault.pomnia/library/abc_report.pdf/extracted.md',
         format: 'pdf',
         pages: 12,
         chunks: 18,
@@ -245,6 +246,7 @@ function mockBridge(): PomniaBridge {
         suggestOcr: false,
         indexed: true,
         brainRunning: true,
+        encrypted: true,
       }
     },
     async vaultSearchText(query) {

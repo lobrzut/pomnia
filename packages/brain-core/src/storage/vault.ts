@@ -38,7 +38,7 @@ export function defaultVaultConfig(dataDir: string): VaultConfig {
   }
 }
 
-/** Create vault/library dirs if missing (plaintext brain-core-data in v0.2). */
+/** Create vault/library dirs if missing (metadata only — blobs live in encrypted .pomnia). */
 export function ensureLibraryDirs(config: VaultConfig): void {
   mkdirSync(config.librarySourcesDir, { recursive: true })
   mkdirSync(config.libraryExtractedDir, { recursive: true })

@@ -88,4 +88,37 @@ describe('vault — encrypted, content-addressed', () => {
     const got = await reopened.getSnapshotPayload('snap-1')
     expect((await reopened.readBlob(got.files[0].sha256)).toString()).toBe('hello vault')
   })
+
+  it('stores library documents as encrypted blobs', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'continuum-lib-'))
+    tmpDirs.push(dir)
+    const vaultDir = path.join(dir, 'v.continuum')
+
+    const vault = await Vault.create(vaultDir, 'Lib', 'pw-lib')
+    const source = Buffer.from('%PDF-1.4 fake pdf content for test')
+    const extracted = Buffer.from('---\nformat: pdf\n---\n\nHello document')
+    const doc = await vault.addLibraryDocument(
+      {
+        id: 'deadbeef_report.pdf',
+        originalName: 'report.pdf',
+        format: 'pdf',
+        contentSha: sha256(source),
+        pages: 1,
+        sparse: false,
+        extractionPath: 'unpdf',
+        importedAt: new Date().toISOString()
+      },
+      source,
+      extracted
+    )
+    expect(doc.sourceBlobSha).toBe(sha256(source))
+    expect(vault.getLibraryManifest().documents).toHaveLength(1)
+
+    const reopened = await Vault.open(vaultDir, 'pw-lib')
+    const got = reopened.getLibraryDocument('deadbeef_report.pdf')
+    expect(got?.originalName).toBe('report.pdf')
+    expect((await reopened.readLibrarySource('deadbeef_report.pdf')).toString()).toBe(source.toString())
+    expect((await reopened.readLibraryExtracted('deadbeef_report.pdf')).toString()).toBe(extracted.toString())
+
+  })
 })
