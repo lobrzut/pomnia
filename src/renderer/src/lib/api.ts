@@ -104,8 +104,23 @@ export interface PomniaBridge {
     name: string,
     adminToken?: string,
   ): Promise<{ name: string; token: string; created: string }>
-  appSettings(): Promise<{ minimizeToTray: boolean; closeToTray: boolean }>
-  appSettingsSet(patch: { minimizeToTray?: boolean; closeToTray?: boolean }): Promise<{ minimizeToTray: boolean; closeToTray: boolean }>
+  appSettings(): Promise<{
+    minimizeToTray: boolean
+    closeToTray: boolean
+    ollamaUrl?: string
+    embeddedBrainAutoStart?: boolean
+  }>
+  appSettingsSet(patch: {
+    minimizeToTray?: boolean
+    closeToTray?: boolean
+    ollamaUrl?: string
+    embeddedBrainAutoStart?: boolean
+  }): Promise<{
+    minimizeToTray: boolean
+    closeToTray: boolean
+    ollamaUrl?: string
+    embeddedBrainAutoStart?: boolean
+  }>
   minimize(): void
   toggleMaximize(): void
   close(): void

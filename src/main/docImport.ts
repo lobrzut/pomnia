@@ -85,11 +85,13 @@ export async function importDocument(
   let brainAutoStarted = false
   let chunks = 0
   let indexed = false
+  let indexError: string | undefined
 
   if (!brainRunning) {
     const ensured = await ensureBrainForIndexing(ollamaUrl, onProgress)
     brainRunning = ensured.running
     brainAutoStarted = ensured.autoStarted
+    if (!brainRunning) indexError = ensured.error
   }
 
   if (brainRunning) {
@@ -100,9 +102,9 @@ export async function importDocument(
       pages: parsed.pages,
     })) as { chunks?: number }
     chunks = stats?.chunks ?? 0
-    indexed = chunks > 0
+    indexed = true
     onProgress?.({ phase: 'index', done: parsed.pages.length, total: parsed.pages.length })
-    if (indexed) await vault.markLibraryDocIndexed(docId)
+    await vault.markLibraryDocIndexed(docId)
 
     // Flush any older docs that were queued while Brain was offline.
     await indexPendingLibraryDocuments(vault, vaultDir, {
@@ -126,6 +128,7 @@ export async function importDocument(
     pendingIndex: !indexed,
     brainRunning,
     brainAutoStarted,
+    indexError,
     encrypted: true,
   }
 }

@@ -5,6 +5,7 @@ import { Sidebar, TitleBar } from './components/Shell'
 import { Toasts } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useStore } from './store/useStore'
+import { api } from './lib/api'
 import Dashboard from './pages/Dashboard'
 import Browse from './pages/Browse'
 import ImportPage from './pages/Import'
@@ -22,7 +23,10 @@ export default function App() {
   useEffect(() => {
     void scan()
     void refreshVault()
-    void loadAppSettings()
+    void loadAppSettings().then(() => {
+      const url = useStore.getState().ollamaUrl
+      if (url) void api.appSettingsSet({ ollamaUrl: url }).catch(() => {})
+    })
     const offActivity = initGlobalActivity()
     // Surface otherwise-silent async failures as toasts (diagnostics).
     const onErr = (e: ErrorEvent) => toast({ kind: 'error', title: 'Unexpected error', detail: e.message })

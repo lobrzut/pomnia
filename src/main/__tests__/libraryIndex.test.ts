@@ -14,23 +14,21 @@ vi.mock('../brainPaths.js', () => ({
   brainCoreDataDir: () => '/tmp/brain-data',
 }))
 
-const reachable = vi.fn()
-vi.mock('@core/brain/ollama.js', () => ({
-  defaultOllamaConfig: () => ({
-    baseUrl: 'http://localhost:11434',
-    chatModel: 'qwen',
-    embedModel: 'nomic-embed-text',
-  }),
-  Ollama: vi.fn().mockImplementation(() => ({
-    reachable,
-  })),
+const probeOllama = vi.fn()
+vi.mock('../ollamaSettings.js', () => ({
+  resolveOllamaUrl: (u?: string) => u?.trim() || 'http://localhost:11434',
+  probeOllama: (...args: unknown[]) => probeOllama(...args),
+  ollamaUnreachableMessage: (p: { url: string; detail?: string }) =>
+    `Ollama niedostępne pod ${p.url} (GET /api/tags${p.detail ? `: ${p.detail}` : ''})`,
+  brainProcessFailedMessage: (err: unknown) =>
+    `Proces wyszukiwarki nie wystartował: ${err instanceof Error ? err.message : String(err)}`,
 }))
 
 describe('ensureBrainForIndexing', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     brainStatus.mockReturnValue({ running: false, starting: false })
-    reachable.mockResolvedValue(true)
+    probeOllama.mockResolvedValue({ ok: true, url: 'http://127.0.0.1:11434' })
     brainStart.mockResolvedValue({ running: true })
   })
 
@@ -38,14 +36,19 @@ describe('ensureBrainForIndexing', () => {
     brainStatus.mockReturnValue({ running: true, starting: false })
     const { ensureBrainForIndexing } = await import('../ensureBrain.js')
     const r = await ensureBrainForIndexing()
-    expect(r).toEqual({ running: true, autoStarted: false })
+    expect(r).toEqual({ running: true, autoStarted: false, ollamaUrl: 'http://localhost:11434' })
     expect(brainStart).not.toHaveBeenCalled()
   })
 
   it('auto-starts brain when Ollama is reachable', async () => {
     const { ensureBrainForIndexing } = await import('../ensureBrain.js')
     const r = await ensureBrainForIndexing('http://127.0.0.1:11434')
-    expect(r).toEqual({ running: true, autoStarted: true })
+    expect(r).toEqual({
+      running: true,
+      autoStarted: true,
+      ollamaUrl: 'http://127.0.0.1:11434',
+    })
+    expect(probeOllama).toHaveBeenCalledWith('http://127.0.0.1:11434')
     expect(brainStart).toHaveBeenCalledWith({
       dataDir: '/tmp/brain-data',
       ollamaUrl: 'http://127.0.0.1:11434',
@@ -53,12 +56,27 @@ describe('ensureBrainForIndexing', () => {
   })
 
   it('fails gracefully when Ollama is offline', async () => {
-    reachable.mockResolvedValue(false)
+    probeOllama.mockResolvedValue({
+      ok: false,
+      reason: 'unreachable',
+      url: 'http://brain.example.local:11434',
+      detail: 'fetch failed',
+    })
     const { ensureBrainForIndexing } = await import('../ensureBrain.js')
-    const r = await ensureBrainForIndexing()
+    const r = await ensureBrainForIndexing('http://brain.example.local:11434')
     expect(r.running).toBe(false)
     expect(r.autoStarted).toBe(false)
-    expect(r.error).toMatch(/Ollama/i)
+    expect(r.error).toMatch(/Ollama niedostępne/)
+    expect(r.error).toContain('/api/tags')
     expect(brainStart).not.toHaveBeenCalled()
+  })
+
+  it('distinguishes brain process failure from Ollama offline', async () => {
+    brainStart.mockRejectedValue(new Error('brain-core start timeout (20s)'))
+    const { ensureBrainForIndexing } = await import('../ensureBrain.js')
+    const r = await ensureBrainForIndexing('http://brain.example.local:11434')
+    expect(r.running).toBe(false)
+    expect(r.error).toMatch(/Proces wyszukiwarki/)
+    expect(r.error).not.toMatch(/Ollama niedostępne/)
   })
 })

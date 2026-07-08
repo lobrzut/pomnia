@@ -30,6 +30,7 @@ import {
   saveIndex,
   searchIndex,
   setLogSink,
+  initFileLog,
   syncSkills,
   triggerReindex,
   userName,
@@ -43,12 +44,15 @@ import {
 
 import { brainCore } from './brainCore.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
-import { indexPendingLibraryDocuments } from './libraryIndex.js'
+import { indexPendingLibraryDocuments, type PendingIndexResult } from './libraryIndex.js'
 import { getAppSettings, loadAppSettings, setAppSettings, shouldHideOnClose, shouldHideOnMinimize } from './appSettings.js'
 import { destroyTray, initTray, refreshTrayMenu } from './tray.js'
 import { activity, type ActivityUpdate } from './activity.js'
 import { isCursorDbTooLarge } from '@core/adapters/cursor.js'
 import { migrateBrainIndexFile, migrateLegacyAppData } from './migrateLegacy.js'
+import { ensureBrainForIndexing } from './ensureBrain.js'
+import { brainCoreDataDir } from './brainPaths.js'
+import { brainProcessFailedMessage, ollamaUnreachableMessage, probeOllama, resolveOllamaUrl } from './ollamaSettings.js'
 
 let win: BrowserWindow | null = null
 let forceQuit = false
@@ -123,9 +127,25 @@ async function markProcessed(ids: string[]): Promise<void> {
 
 function ollamaFor(url?: string, model?: string): Ollama {
   const cfg = defaultOllamaConfig()
-  if (url) cfg.baseUrl = url
+  cfg.baseUrl = resolveOllamaUrl(url)
   if (model) cfg.chatModel = model
   return new Ollama(cfg)
+}
+
+async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
+  if (!getAppSettings().embeddedBrainAutoStart) return
+  if (brainCore.status().running || brainCore.status().starting) return
+  const url = resolveOllamaUrl(ollamaUrl)
+  const ensured = await ensureBrainForIndexing(url)
+  if (!ensured.running || !vault || !vaultPath) return
+  refreshTrayMenu(win, requestQuit)
+  const flush = await indexPendingLibraryDocuments(vault, vaultPath, {
+    ollamaUrl: url,
+    onProgress: emitDocImportProgress,
+  })
+  if (flush.indexed > 0) {
+    win?.webContents.send('library:index-complete', flush)
+  }
 }
 
 async function collectLive(sources: SourceId[], limit?: number): Promise<Conversation[]> {
@@ -246,6 +266,7 @@ function registerIpc(): void {
 
   ipcMain.handle('doc:import', async (_e, filePath?: string, ollamaUrl?: string) => {
     const v = requireVault()
+    const url = resolveOllamaUrl(ollamaUrl)
     const p =
       filePath ??
       (
@@ -260,7 +281,7 @@ function registerIpc(): void {
       throw new Error(`Unsupported document format: ${p}`)
     }
     try {
-      return await importDocument(v, vaultPath!, p, emitDocImportProgress, ollamaUrl)
+      return await importDocument(v, vaultPath!, p, emitDocImportProgress, url)
     } finally {
       activity.idle(['doc-import', 'indexing', 'brain-start'])
     }
@@ -269,6 +290,7 @@ function registerIpc(): void {
   ipcMain.handle('vault:create', async (_e, path: string, name: string, pass: string) => {
     vault = await Vault.create(path, name, pass)
     vaultPath = path
+    void maybeAutoStartEmbeddedBrain()
     return { open: true, path, name, snapshots: 0 }
   })
 
@@ -276,6 +298,7 @@ function registerIpc(): void {
     vault = await Vault.open(path, pass)
     vaultPath = path
     const m = vault.getManifest()
+    void maybeAutoStartEmbeddedBrain()
     return { open: true, path, name: m.name, snapshots: m.snapshots.length }
   })
 
@@ -561,15 +584,20 @@ function registerIpc(): void {
   }
   ipcMain.handle('brainCore:status', () => brainCore.status())
   ipcMain.handle('brainCore:start', async (_e, ollamaUrl?: string) => {
+    const url = resolveOllamaUrl(ollamaUrl)
+    activity.update({ kind: 'brain-start', phase: 'start', detail: 'sprawdzam Ollama…' })
+    const probe = await probeOllama(url)
+    if (!probe.ok) throw new Error(ollamaUnreachableMessage(probe))
     activity.update({ kind: 'brain-start', phase: 'start', detail: 'uruchamiam…' })
     try {
       await brainCore.start({
-        dataDir: join(app.getPath('userData'), 'brain-core-data'),
-        ollamaUrl,
+        dataDir: brainCoreDataDir(),
+        ollamaUrl: url,
       })
+      await setAppSettings({ embeddedBrainAutoStart: true, ollamaUrl: url })
       if (vault && vaultPath) {
         const flush = await indexPendingLibraryDocuments(vault, vaultPath, {
-          ollamaUrl,
+          ollamaUrl: url,
           onProgress: emitDocImportProgress,
         })
         if (flush.indexed > 0) {
@@ -578,12 +606,15 @@ function registerIpc(): void {
       }
       refreshTrayMenu(win, requestQuit)
       return brainCore.status()
+    } catch (err) {
+      throw new Error(brainProcessFailedMessage(err))
     } finally {
       activity.idle(['brain-start', 'doc-import', 'indexing'])
     }
   })
   ipcMain.handle('brainCore:stop', async () => {
     const s = await brainCore.stop()
+    await setAppSettings({ embeddedBrainAutoStart: false })
     refreshTrayMenu(win, requestQuit)
     return s
   })
@@ -597,8 +628,17 @@ function registerIpc(): void {
     }
   })
   ipcMain.handle('app:settings', () => getAppSettings())
-  ipcMain.handle('app:settings:set', async (_e, patch: { minimizeToTray?: boolean; closeToTray?: boolean }) =>
-    setAppSettings(patch)
+  ipcMain.handle(
+    'app:settings:set',
+    async (
+      _e,
+      patch: {
+        minimizeToTray?: boolean
+        closeToTray?: boolean
+        ollamaUrl?: string
+        embeddedBrainAutoStart?: boolean
+      },
+    ) => setAppSettings(patch),
   )
 
   app.on('before-quit', () => {

@@ -390,6 +390,7 @@ export const useStore = create<State>((set, get) => ({
   ollamaUrl: loadOllamaUrl(),
   setOllamaUrl: (ollamaUrl) => {
     saveOllamaUrl(ollamaUrl)
+    void api.appSettingsSet({ ollamaUrl: ollamaUrl || undefined }).catch(() => {})
     set({ ollamaUrl })
   },
 
@@ -453,7 +454,14 @@ export const useStore = create<State>((set, get) => ({
   async loadAppSettings() {
     try {
       const s = await api.appSettings()
-      set({ minimizeToTray: s.minimizeToTray, closeToTray: s.closeToTray })
+      set((state) => ({
+        minimizeToTray: s.minimizeToTray,
+        closeToTray: s.closeToTray,
+        ollamaUrl: state.ollamaUrl || s.ollamaUrl || '',
+      }))
+      if (!get().ollamaUrl && s.ollamaUrl) {
+        saveOllamaUrl(s.ollamaUrl)
+      }
     } catch {
       /* preview mode / unavailable */
     }

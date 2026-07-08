@@ -12,5 +12,6 @@ export interface DocImportResult {
   pendingIndex: boolean
   brainRunning: boolean
   brainAutoStarted: boolean
+  indexError?: string
   encrypted: boolean
 }

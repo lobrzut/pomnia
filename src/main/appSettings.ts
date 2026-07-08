@@ -12,11 +12,16 @@ export interface AppSettings {
   minimizeToTray: boolean
   /** Close (X) hides to tray instead of quitting — also auto-applied while embedded brain runs. */
   closeToTray: boolean
+  /** Saved Ollama base URL (synced from renderer localStorage). Main uses this when IPC omits ollamaUrl. */
+  ollamaUrl?: string
+  /** Auto-start embedded brain on vault open when the user had it running last session. */
+  embeddedBrainAutoStart?: boolean
 }
 
 const DEFAULTS: AppSettings = {
   minimizeToTray: false,
   closeToTray: true,
+  embeddedBrainAutoStart: false,
 }
 
 let cached: AppSettings = { ...DEFAULTS }
@@ -34,6 +39,8 @@ export async function loadAppSettings(): Promise<AppSettings> {
     cached = {
       minimizeToTray: parsed.minimizeToTray ?? DEFAULTS.minimizeToTray,
       closeToTray: parsed.closeToTray ?? DEFAULTS.closeToTray,
+      ollamaUrl: parsed.ollamaUrl,
+      embeddedBrainAutoStart: parsed.embeddedBrainAutoStart ?? DEFAULTS.embeddedBrainAutoStart,
     }
   } catch {
     cached = { ...DEFAULTS }
