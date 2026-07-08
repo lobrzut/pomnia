@@ -210,9 +210,9 @@ export default function Onboarding() {
 /* ── Step 1: Welcome ────────────────────────────────────────────────────── */
 
 const VALUE_PROPS = [
-  { icon: Download, title: 'Capture', text: 'Every chat from Claude Code, Cursor, Antigravity & more — pulled into one place.' },
-  { icon: Lock, title: 'Encrypt', text: 'AES-256-GCM vault on your disk. Your prompts are yours alone.' },
-  { icon: Zap, title: 'Recall', text: 'Feed the context back to any AI through MCP — agents that remember you.' }
+  { icon: Download, title: 'Zbieraj', text: 'Każdy czat z Claude Code, Cursor, Antigravity i innych — w jednym miejscu.' },
+  { icon: Lock, title: 'Szyfruj', text: 'Vault AES-256-GCM na Twoim dysku. Twoje prompty należą tylko do Ciebie.' },
+  { icon: Zap, title: 'Przywołuj', text: 'Oddaj kontekst dowolnemu AI przez MCP — agenci, którzy Cię pamiętają.' }
 ]
 
 function WelcomeStep({ simpleMode, onNext }: { simpleMode: boolean; onNext: () => void }) {
@@ -230,24 +230,14 @@ function WelcomeStep({ simpleMode, onNext }: { simpleMode: boolean; onNext: () =
       </div>
 
       <h1 className="text-[28px] font-bold leading-tight tracking-tight text-grad">
-        {simpleMode ? (
-          <>
-            Twoja pamięć AI
-            <br />
-            w jednym miejscu
-          </>
-        ) : (
-          <>
-            Your AI conversations
-            <br />
-            deserve a memory
-          </>
-        )}
+        Twoja pamięć AI
+        <br />
+        w jednym miejscu
       </h1>
       <p className="mx-auto mt-2.5 max-w-[380px] text-sm leading-relaxed text-ink-dim">
         {simpleMode
           ? 'Vault → backup rozmów → lokalna wyszukiwarka → podłączenie Cursora. Bez żargonu, bez serwera w chmurze.'
-          : 'Pomnia turns scattered assistant chats into one encrypted, searchable memory — and hands it back to every AI you work with.'}
+          : 'Pomnia zamienia rozproszone rozmowy z asystentami w jedną zaszyfrowaną, przeszukiwalną pamięć — i oddaje ją każdemu AI, z którym pracujesz.'}
       </p>
 
       {!simpleMode && (
@@ -269,7 +259,7 @@ function WelcomeStep({ simpleMode, onNext }: { simpleMode: boolean; onNext: () =
       )}
 
       <Button onClick={onNext} className="mt-8 w-full">
-        <Sparkles className="h-4 w-4" /> {simpleMode ? 'Zaczynamy' : 'Set up in 2 minutes'}
+        <Sparkles className="h-4 w-4" /> {simpleMode ? 'Zaczynamy' : 'Konfiguracja w 2 minuty'}
       </Button>
     </div>
   )
@@ -748,10 +738,10 @@ function ConnectStep({
     setTimeout(() => setCopied(false), 1800)
   }
 
-  const title = simpleMode ? 'Podłącz Cursora' : 'Give an AI your memory'
+  const title = 'Podłącz Cursora'
   const lead = simpleMode
     ? 'Skopiuj konfigurację MCP i wklej w Cursorze — Pomnia nigdy nie dotyka Twoich plików.'
-    : `Snippets target ${brainTarget === 'embedded' ? 'local embedded brain' : 'your remote master'} (${brainUrl}). Pick a client — paste the config, we never touch their files.`
+    : `Snippety wskazują na ${brainTarget === 'embedded' ? 'lokalną wyszukiwarkę' : 'zdalny serwer Brain'} (${brainUrl}). Wybierz klienta — wklej config, nigdy nie dotykamy ich plików.`
 
   return (
     <StepCard icon={Plug} title={title} lead={lead}>
@@ -830,18 +820,18 @@ function ReadyStep({
 }) {
   const rows = simpleMode
     ? [
-        { label: 'Encrypted vault', state: outcomes.vault ?? 'skipped' },
-        { label: 'First backup', state: outcomes.backup ?? 'skipped' },
-        { label: 'Local search engine', state: outcomes.engine ?? 'skipped' },
-        { label: 'Cursor MCP config', state: outcomes.connect ?? 'skipped' }
+        { label: 'Zaszyfrowany vault', state: outcomes.vault ?? 'skipped' },
+        { label: 'Pierwszy backup', state: outcomes.backup ?? 'skipped' },
+        { label: 'Lokalna wyszukiwarka', state: outcomes.engine ?? 'skipped' },
+        { label: 'Konfiguracja MCP Cursora', state: outcomes.connect ?? 'skipped' }
       ]
     : [
-        { label: 'Encrypted vault', state: outcomes.vault ?? 'skipped' },
+        { label: 'Zaszyfrowany vault', state: outcomes.vault ?? 'skipped' },
         {
-          label: outcomes.brainTarget === 'remote' ? 'Remote Brain master' : 'Local embedded brain',
+          label: outcomes.brainTarget === 'remote' ? 'Zdalny serwer Brain' : 'Lokalna wyszukiwarka',
           state: outcomes.engine ?? 'skipped'
         },
-        { label: 'First MCP client', state: outcomes.connect ?? 'skipped' }
+        { label: 'Pierwszy klient MCP', state: outcomes.connect ?? 'skipped' }
       ]
   return (
     <div className="glass rounded-3xl p-9 text-center">
@@ -854,11 +844,11 @@ function ReadyStep({
         <PartyPopper className="h-7 w-7 text-mint" />
       </motion.div>
 
-      <h1 className="text-[26px] font-bold tracking-tight text-grad">You're set</h1>
+      <h1 className="text-[26px] font-bold tracking-tight text-grad">Gotowe</h1>
       <p className="mx-auto mt-2 max-w-[360px] text-sm text-ink-dim">
         {simpleMode
           ? 'Vault, backup i wyszukiwarka są gotowe. Cursor może teraz przeszukiwać Twoją pamięć.'
-          : 'Run your first backup from the Dashboard — everything else is wired.'}
+          : 'Uruchom pierwszy backup z Dashboardu — reszta jest podłączona.'}
       </p>
 
       <div className="mx-auto mt-6 max-w-[340px] space-y-2 text-left">
@@ -877,14 +867,14 @@ function ReadyStep({
             )}
             <span className="text-[13px] text-ink">{r.label}</span>
             <span className={clsx('ml-auto text-[11px]', r.state === 'done' ? 'text-mint' : 'text-ink-faint')}>
-              {r.state === 'done' ? 'ready' : 'later'}
+              {r.state === 'done' ? 'gotowe' : 'później'}
             </span>
           </motion.div>
         ))}
       </div>
 
       <Button onClick={onFinish} className="mt-8 w-full">
-        <Sparkles className="h-4 w-4" /> Enter Pomnia
+        <Sparkles className="h-4 w-4" /> Wejdź do Pomnia
       </Button>
     </div>
   )

@@ -61,7 +61,7 @@ export default function Connect() {
   const connectToken = useStore((s) => s.connectToken)
   const setConnectToken = useStore((s) => s.setConnectToken)
   const simpleMode = useStore((s) => s.simpleMode)
-  const labels = uiLabels(simpleMode)
+  const labels = uiLabels()
   const effectiveTarget: BrainTarget = simpleMode ? 'embedded' : brainTarget
   const brainUrl = effectiveTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
   const [loading, setLoading] = useState(true)
@@ -208,11 +208,7 @@ export default function Connect() {
         </div>
         <div>
           <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.mcpConnect}</h1>
-          <p className="text-sm text-ink-dim">
-            {simpleMode
-              ? 'Skopiuj konfigurację MCP i wklej w Cursorze — Pomnia nigdy nie dotyka Twoich plików.'
-              : "See what's wired up, and get a copy-paste snippet for what isn't — we never touch your config files."}
-          </p>
+          <p className="text-sm text-ink-dim">{labels.connectPageLead}</p>
         </div>
       </div>
 
@@ -221,7 +217,7 @@ export default function Connect() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-ink">
-              {simpleMode ? labels.embeddedBrain : 'Brain server'}
+              {simpleMode ? labels.embeddedBrain : labels.brainServer}
             </span>
             {brainOk !== null && (
               <span
@@ -266,11 +262,11 @@ export default function Connect() {
 
         {(brainTarget === 'embedded' || simpleMode) && embeddedRunning === false && (
           <p className="mb-3 text-[11px] text-amber">
-            Embedded brain is not running. Open the{' '}
+            {labels.embeddedBrainNotRunning}{' '}
             <button onClick={() => setRoute('brain')} className="no-drag font-medium text-iris hover:underline">
-              Brain tab
+              {labels.embeddedBrainNotRunningLink}
             </button>{' '}
-            and press Start before clients can connect.
+            i naciśnij Start, zanim klienci będą mogli się połączyć.
           </p>
         )}
 
