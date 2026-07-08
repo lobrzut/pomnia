@@ -1,7 +1,7 @@
 /** Pomnia engine — public API. Pure Node, no Electron, usable from CLI or main process. */
 export * from './model.js'
 export * from './platform.js'
-export { Vault } from './vault.js'
+export { Vault, libraryDocLogicalPath } from './vault.js'
 export type { SnapshotPayload, FileSource } from './vault.js'
 export { runBackup } from './backup.js'
 export type { BackupProgress } from './backup.js'

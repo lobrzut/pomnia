@@ -120,6 +120,31 @@ export interface VaultManifest {
   snapshots: Snapshot[]
 }
 
+/** Imported document stored as encrypted blobs in the vault (library.cvb manifest). */
+export interface LibraryDocument {
+  /** Stable id — `{contentSha16}_{originalName}`. */
+  id: string
+  originalName: string
+  format: string
+  /** Full sha256 hex of the source file (dedup key). */
+  contentSha: string
+  sourceBlobSha: string
+  sourceBytes: number
+  extractedBlobSha: string
+  extractedBytes: number
+  pages: number
+  sparse: boolean
+  extractionPath: string
+  importedAt: string
+}
+
+/** Encrypted document library manifest (`library.cvb`). */
+export interface LibraryManifest {
+  formatVersion: 1
+  vaultId: string
+  documents: LibraryDocument[]
+}
+
 /** Result of scanning the local machine for installed assistants. */
 export interface DetectedSource {
   id: SourceId

@@ -4,6 +4,7 @@
  * On-disk layout of `MyVault.pomnia/`:
  *   header.json              plaintext: format, vault id, KDF salt+params, check token
  *   manifest.cvb             encrypted VaultManifest (list of snapshots + stats)
+ *   library.cvb              encrypted LibraryManifest (imported PDF/DOCX docs)
  *   snapshots/<id>.cvb       encrypted SnapshotPayload (conversations + file index)
  *   blobs/<sha256>.cvb       encrypted file contents, deduplicated across snapshots
  *
@@ -14,7 +15,14 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import type { CaptureItem, Conversation, Snapshot, VaultManifest } from './model.js'
+import type {
+  CaptureItem,
+  Conversation,
+  LibraryDocument,
+  LibraryManifest,
+  Snapshot,
+  VaultManifest
+} from './model.js'
 import {
   CHECK_PLAINTEXT,
   DEFAULT_SCRYPT,
@@ -57,16 +65,25 @@ async function atomicWrite(file: string, data: Buffer): Promise<void> {
   await fs.rename(tmp, file)
 }
 
+/** Stable library.db pdf_path key for an encrypted vault document. */
+export function libraryDocLogicalPath(vaultDir: string, docId: string): string {
+  return `${vaultDir.replace(/\\/g, '/')}/library/${docId}`
+}
+
 export class Vault {
   private constructor(
     readonly dir: string,
     private header: VaultHeader,
     private key: Buffer,
-    private manifest: VaultManifest
+    private manifest: VaultManifest,
+    private library: LibraryManifest
   ) {}
 
   private get manifestPath(): string {
     return path.join(this.dir, 'manifest.cvb')
+  }
+  private get libraryPath(): string {
+    return path.join(this.dir, 'library.cvb')
   }
   private blobPath(sha: string): string {
     return path.join(this.dir, 'blobs', `${sha}.cvb`)
@@ -104,9 +121,15 @@ export class Vault {
       name,
       snapshots: []
     }
+    const library: LibraryManifest = {
+      formatVersion: 1,
+      vaultId: header.vaultId,
+      documents: []
+    }
     await atomicWrite(path.join(dir, 'header.json'), Buffer.from(JSON.stringify(header, null, 2)))
-    const v = new Vault(dir, header, key, manifest)
+    const v = new Vault(dir, header, key, manifest, library)
     await v.saveManifest()
+    await v.saveLibrary()
     log.info('created vault', name, 'at', dir)
     return v
   }
@@ -129,7 +152,22 @@ export class Vault {
       key,
       await fs.readFile(path.join(dir, 'manifest.cvb'))
     )
-    return new Vault(dir, header, key, manifest)
+    const library = await Vault.loadLibrary(dir, key, header.vaultId)
+    return new Vault(dir, header, key, manifest, library)
+  }
+
+  private static async loadLibrary(
+    dir: string,
+    key: Buffer,
+    vaultId: string
+  ): Promise<LibraryManifest> {
+    const p = path.join(dir, 'library.cvb')
+    const exists = await fs
+      .access(p)
+      .then(() => true)
+      .catch(() => false)
+    if (!exists) return { formatVersion: 1, vaultId, documents: [] }
+    return decryptJSON<LibraryManifest>(key, await fs.readFile(p))
   }
 
   /** Quick check whether a directory is a Pomnia vault. */
@@ -150,6 +188,53 @@ export class Vault {
 
   private async saveManifest(): Promise<void> {
     await atomicWrite(this.manifestPath, encryptJSON(this.key, this.manifest))
+  }
+
+  private async saveLibrary(): Promise<void> {
+    await atomicWrite(this.libraryPath, encryptJSON(this.key, this.library))
+  }
+
+  getLibraryManifest(): LibraryManifest {
+    return this.library
+  }
+
+  getLibraryDocument(id: string): LibraryDocument | undefined {
+    return this.library.documents.find((d) => d.id === id)
+  }
+
+  /** Store source + extracted markdown as encrypted blobs; update library manifest. */
+  async addLibraryDocument(
+    doc: Omit<LibraryDocument, 'sourceBlobSha' | 'sourceBytes' | 'extractedBlobSha' | 'extractedBytes'>,
+    source: Buffer,
+    extractedMd: Buffer
+  ): Promise<LibraryDocument> {
+    const { sha256: sourceBlobSha, bytes: sourceBytes } = await this.writeBlob(source)
+    const { sha256: extractedBlobSha, bytes: extractedBytes } = await this.writeBlob(extractedMd)
+    const entry: LibraryDocument = {
+      ...doc,
+      sourceBlobSha,
+      sourceBytes,
+      extractedBlobSha,
+      extractedBytes
+    }
+    const idx = this.library.documents.findIndex((d) => d.id === doc.id)
+    if (idx >= 0) this.library.documents[idx] = entry
+    else this.library.documents.unshift(entry)
+    await this.saveLibrary()
+    log.info('library document stored', entry.id, entry.originalName)
+    return entry
+  }
+
+  async readLibrarySource(docId: string): Promise<Buffer> {
+    const doc = this.getLibraryDocument(docId)
+    if (!doc) throw new Error(`Library document not found: ${docId}`)
+    return this.readBlob(doc.sourceBlobSha)
+  }
+
+  async readLibraryExtracted(docId: string): Promise<Buffer> {
+    const doc = this.getLibraryDocument(docId)
+    if (!doc) throw new Error(`Library document not found: ${docId}`)
+    return this.readBlob(doc.extractedBlobSha)
   }
 
   async writeBlob(data: Buffer): Promise<{ sha256: string; bytes: number }> {

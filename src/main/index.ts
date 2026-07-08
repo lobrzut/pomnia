@@ -207,6 +207,7 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('doc:import', async (_e, filePath?: string) => {
+    const v = requireVault()
     const p =
       filePath ??
       (
@@ -217,7 +218,7 @@ function registerIpc(): void {
         })
       ).filePaths[0]
     if (!p) return null
-    return importDocument(p, (ev) => win?.webContents.send('doc:import-progress', ev))
+    return importDocument(v, vaultPath!, p, (ev) => win?.webContents.send('doc:import-progress', ev))
   })
 
   ipcMain.handle('vault:create', async (_e, path: string, name: string, pass: string) => {

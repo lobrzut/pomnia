@@ -13,9 +13,9 @@ Pomnia operuje na **dwóch niezależnych magazynach** o różnej roli i szyfrowa
 
 | Magazyn | Ścieżka | Szyfrowanie | Zawartość dziś | Zawartość docelowa |
 |---------|---------|-------------|----------------|-------------------|
-| **Pomnia Vault** | `*.pomnia/` (user wybiera folder) | AES-256-GCM + scrypt | Snapshoty czatów, surowe pliki asystentów | + opcjonalnie oryginały PDF/DOCX jako bloby (roadmap) |
-| **Brain data dir** | `%AppData%/Pomnia/brain-core-data/` lub `~/.pomnia/brain` | Plaintext na dysku | `vault/distilled`, `vault/sessions`, `USER.md` | + `vault/library/sources`, `vault/library/extracted` |
-| **Encrypted backup** | NAS / kopia `.pomnia` | Jak vault | Pełna przenośność czatów | Docs jako bloby w vault (faza 1.5) |
+| **Pomnia Vault** | `*.pomnia/` (user wybiera folder) | AES-256-GCM + scrypt | Snapshoty czatów, surowe pliki asystentów | + oryginały PDF/DOCX + extracted .md jako bloby |
+| **Brain data dir** | `%AppData%/Pomnia/brain-core-data/` lub `~/.pomnia/brain` | Plaintext na dysku (tylko `library.db` chunki + distilled md) | `vault/distilled`, `vault/sessions`, `USER.md` | Brak plaintext sources — tylko indeks RAG |
+| **Encrypted backup** | NAS / kopia `.pomnia` | Jak vault | Pełna przenośność czatów + dokumentów | Docs jako bloby w vault ✅ v0.2 |
 
 **Zasada publikacji:** kod szyfrowania vault (`src/core/vault.ts`, `crypto.ts`) **nigdy** nie trafia do publicznego repo — tylko zamknięty instalator.
 
@@ -95,10 +95,10 @@ Legenda: **L** = lokalnie w Pomnia, **S** = serwer Brain homelab, **Q** = jakoś
          └────────┬────────┘  Tier 3: POST Brain upload (cache lokalny)
                   ▼
          ┌─────────────────┐
-         │ vault/library/  │  sources/ = oryginały
-         │                 │  extracted/ = .md + frontmatter
+         │ Pomnia Vault    │  sources + extracted → encrypted blobs
+         │ library.cvb     │  manifest w .pomnia (AES-256-GCM)
          └────────┬────────┘
-                  │  BEZ distill — tekst już jest „dokumentem"
+                  │  parse + index raz przy imporcie (RAM)
                   ▼
          ┌─────────────────┐
          │ brain-core      │  indexDocument() z page_num per strona
@@ -125,7 +125,7 @@ flowchart TB
   subgraph pomnia [Pomnia Desktop]
     PV[(Pomnia Vault<br/>encrypted .pomnia)]
     DP[@pomnia/doc-parser<br/>Tier 1-3]
-    LIB[vault/library/<br/>sources + extracted]
+    LIB[library.cvb<br/>encrypted doc blobs]
     DIST[distill.ts<br/>Ollama chat model]
     STG[brain-notes staging]
     LI[localIndex JSON<br/>.pomnia-index.json]
@@ -170,10 +170,20 @@ flowchart TB
 | Odczyt z Cursor/Claude | ✅ na hoście | — |
 | Zapis snapshotu | — | ✅ vault blobs |
 | Distill (Ollama) | ✅ RAM + staging md | — |
-| doc-parser extract | ✅ extracted .md | — |
-| brain-core-data na dysku | ✅ (lokalny profil) | 🔲 opcjonalnie w 2.0 |
+| doc-parser extract | ✅ RAM przy imporcie | ✅ source + extracted blobs w vault |
+| brain-core-data na dysku | ✅ library.db chunki, distilled md | ✅ oryginały PDF/DOCX w vault |
 | Deploy do Brain VM | ✅ SMB/HTTP | zależy od admina VM |
-| `.pomnia` na NAS | — | ✅ zawsze |
+| `.pomnia` na NAS | — | ✅ zawsze (czaty + dokumenty) |
+
+### Wydajność: koszt szyfrowania dokumentów
+
+Szyfrowanie dokumentów jest płacone **tylko podczas importu** — nie w pętli wyszukiwania:
+
+- **KDF (scrypt)** dzieje się przy **odblokowaniu** vault (raz na otwarcie).
+- Dla każdego pliku importowego zapisujemy **2 bloby** w vault (`oryginał` + `extracted .md`). AES-256-GCM na buforach rzędu 5 MB daje typowo **milisekundy** (overhead + zapis), bez „jitter” w UI.
+- **Search** korzysta z gotowych **chunków i embeddingów w `library.db`** — nie odszyfrowujemy PDF/DOCX przy każdym zapytaniu.
+
+**Wniosek:** brak zauważalnego wpływu na UX wyszukiwania; dokumenty pozostają zaszyfrowane „at rest”.
 
 ---
 
@@ -301,7 +311,7 @@ flowchart TB
 | G2 | Brak `vault/library/*` w brain-core | Brak miejsca na oryginały |
 | G3 | Brak IPC `doc:import` + UI dokumentów | User nie ma ścieżki w GUI |
 | G4 | `mammoth` nie dodany do doc-parser | Brak DOCX lokalnie |
-| G5 | Dokumenty poza encrypted vault | Backup `.pomnia` nie obejmuje PDF usera |
+| G5 | ~~Dokumenty poza encrypted vault~~ | ✅ v0.2 — bloby w `library.cvb` |
 
 ### 8.2 Zduplikowane
 
@@ -347,7 +357,7 @@ Phase 5 ── Tier 3 remote upload + cache       │  ~1 dzień
    ▼
 Phase 6 ── EPUB lokalnie                      │  ~2 dni
    │
-Phase 7 ── docs w encrypted vault (blob)      │  v1.0
+Phase 7 ── docs w encrypted vault (blob)      │  ✅ v0.2
    │
 Phase 8 ── merge-index API (Brain)            │  zero re-embed deploy
    │
@@ -359,9 +369,9 @@ Phase 9 ── code repo ingest                   │  v1.x
 | Wersja | Zakres |
 |--------|--------|
 | **0.1 (dziś)** | Czaty: vault, import, distill, deploy, embedded brain-core, localIndex |
-| **0.2** | Fazy 1–3: PDF text + DOCX offline, search `source=library` lokalnie |
+| **0.2** | Fazy 1–3: PDF text + DOCX offline, encrypted vault blobs, search `source=library` lokalnie |
 | **0.3** | Tier 2 OCR, Tier 3 remote, EPUB lokalnie |
-| **1.0** | Docs w vault backup, packaged exe validated, conflict resolution local↔remote |
+| **1.0** | packaged exe validated, conflict resolution local↔remote |
 | **1.x** | Code ingest, mobile read-only, `merge-index` |
 
 ### Zależności twarde
@@ -431,7 +441,7 @@ Zamknięte wybory na podstawie review z właścicielem produktu:
 
 | Temat | Decyzja | Uzasadnienie |
 |-------|---------|--------------|
-| **Backup PDF** | Plaintext w `brain-core-data` dla **v0.2**; zaszyfrowany vault dla dokumentów → **v0.3+** | Szybszy MVP; `.pomnia` nadal tylko czaty; docs w `%AppData%/Pomnia/brain-core-data/vault/library/` |
+| **Backup PDF** | Szyfrowane bloby dokumentów w vault **od razu (v0.2)** | Zero „plaintext deferral”: źródło + extracted .md lądują w `.pomnia`, a `library.db` dostaje gotowe chunki do search. |
 | **Indeks** | **`library.db` = single source of truth** długoterminowo; `localIndex` JSON = opcjonalny fast staging podczas migracji; **nowe importy dokumentów tylko przez `indexDocument` → library.db** | Jeden chunker (1800/200), jeden embed, jeden MCP `search_library`; unikamy driftu JSON vs SQLite |
 | **OCR (Phase 4)** | **Oba** — domyślnie `tesseract.js` offline; upgrade do Ollama vision gdy Ollama dostępna; UI pokazuje która ścieżka została użyta | Offline-first + lepsza jakość gdy GPU/model vision jest pod ręką; nie blokuje v0.2 |
 
@@ -439,7 +449,7 @@ Zamknięte wybory na podstawie review z właścicielem produktu:
 
 - `@pomnia/doc-parser`: mammoth + `parseDocument()` router (pdf/docx/md/txt)
 - `brain-core`: `indexDocument()` z `page_num` per strona PDF
-- `vault/library/sources` + `extracted/`
+- `vault/library.cvb` (encrypted bloby: oryginał + extracted .md)
 - IPC `doc:import` + sekcja „Dokumenty" w Import
 - OCR: tylko stub/hook (`ocr.ts`, `suggestOcr`) — implementacja w Phase 4
 

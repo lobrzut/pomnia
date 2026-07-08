@@ -1,9 +1,13 @@
 /**
- * Document import pipeline — parse → vault/library → index in library.db.
+ * Document import pipeline — parse → encrypted vault blobs → index in library.db.
+ *
+ * Source PDF/DOCX and extracted markdown are stored as AES-256-GCM blobs in the
+ * open `.pomnia` vault (same crypto as chat snapshots). Parsing and embedding
+ * happen once at import; search reads chunks from library.db only.
  */
 
 import { createHash } from 'node:crypto'
-import { copyFileSync, readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import { app } from 'electron'
 import {
@@ -13,10 +17,11 @@ import {
   suggestOcr,
 } from '@pomnia/doc-parser'
 import { defaultVaultConfig, ensureLibraryDirs } from '@pomnia/brain-core'
-
+import { libraryDocLogicalPath, Vault } from '@core/vault.js'
 import { brainCore } from './brainCore.js'
 
 export interface DocImportResult {
+  docId: string
   sourcePath: string
   extractedPath: string
   format: string
@@ -27,6 +32,7 @@ export interface DocImportResult {
   suggestOcr: boolean
   indexed: boolean
   brainRunning: boolean
+  encrypted: boolean
 }
 
 export function brainCoreDataDir(): string {
@@ -34,31 +40,28 @@ export function brainCoreDataDir(): string {
 }
 
 export async function importDocument(
+  vault: Vault,
+  vaultDir: string,
   filePath: string,
   onProgress?: (e: { phase: string; done: number; total: number; detail?: string }) => void,
 ): Promise<DocImportResult> {
   const dataDir = brainCoreDataDir()
-  const vault = defaultVaultConfig(dataDir)
-  ensureLibraryDirs(vault)
+  const vaultCfg = defaultVaultConfig(dataDir)
+  ensureLibraryDirs(vaultCfg)
 
   const raw = readFileSync(filePath)
-  const sha = createHash('sha256').update(raw).digest('hex').slice(0, 16)
+  const contentSha = createHash('sha256').update(raw).digest('hex')
+  const sha16 = contentSha.slice(0, 16)
   const baseName = basename(filePath)
-  const storedName = `${sha}_${baseName}`
-  const sourcePath = join(vault.librarySourcesDir, storedName)
-  copyFileSync(filePath, sourcePath)
+  const docId = `${sha16}_${baseName}`
 
   onProgress?.({ phase: 'parse', done: 0, total: 1, detail: baseName })
-  const parsed = await parseDocument(sourcePath)
+  const parsed = await parseDocument(filePath)
   onProgress?.({ phase: 'parse', done: 1, total: 1, detail: extractionPathLabel(parsed) })
 
-  const stem = baseName.replace(/\.[^.]+$/, '') || baseName
-  const extractedName = `${sha}_${stem}.md`
-  const extractedPath = join(vault.libraryExtractedDir, extractedName)
-  const body = parsed.markdown
-  const md = buildExtractedMarkdown(body, {
+  const md = buildExtractedMarkdown(parsed.markdown, {
     source_file: baseName,
-    source_sha256: sha,
+    source_sha256: sha16,
     format: parsed.format,
     extraction_tier: parsed.meta.tier,
     extraction_sparse: parsed.meta.sparse,
@@ -67,14 +70,32 @@ export async function importDocument(
     imported_at: new Date().toISOString(),
     imported_via: 'pomnia',
   })
-  writeFileSync(extractedPath, md, 'utf8')
+
+  onProgress?.({ phase: 'encrypt', done: 0, total: 2, detail: 'vault…' })
+  await vault.addLibraryDocument(
+    {
+      id: docId,
+      originalName: baseName,
+      format: parsed.format,
+      contentSha,
+      pages: parsed.meta.pageCount,
+      sparse: parsed.meta.sparse,
+      extractionPath: extractionPathLabel(parsed),
+      importedAt: new Date().toISOString(),
+    },
+    raw,
+    Buffer.from(md, 'utf8'),
+  )
+  onProgress?.({ phase: 'encrypt', done: 2, total: 2 })
+
+  const logicalPath = libraryDocLogicalPath(vaultDir, docId)
 
   const brainRunning = brainCore.status().running
   let chunks = 0
   if (brainRunning) {
     onProgress?.({ phase: 'index', done: 0, total: parsed.pages.length, detail: 'embedding…' })
     const stats = (await brainCore.indexDocument({
-      path: sourcePath,
+      path: logicalPath,
       name: baseName,
       pages: parsed.pages,
     })) as { chunks?: number }
@@ -83,8 +104,9 @@ export async function importDocument(
   }
 
   return {
-    sourcePath,
-    extractedPath,
+    docId,
+    sourcePath: logicalPath,
+    extractedPath: `${logicalPath}/extracted.md`,
     format: parsed.format,
     pages: parsed.meta.pageCount,
     chunks,
@@ -93,6 +115,7 @@ export async function importDocument(
     suggestOcr: suggestOcr(parsed),
     indexed: brainRunning && chunks > 0,
     brainRunning,
+    encrypted: true,
   }
 }
 

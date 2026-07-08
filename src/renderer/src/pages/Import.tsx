@@ -56,7 +56,7 @@ export default function Import() {
   }
 
   async function pickAndImportDoc() {
-    if (docBusy) return
+    if (!vault.open || docBusy) return
     setDocBusy(true)
     setDocResult(null)
     setDocProgress(null)
@@ -146,7 +146,7 @@ export default function Import() {
           {docBusy ? <Spinner className="h-6 w-6 text-iris" /> : <FileText className="h-6 w-6 text-iris" />}
         </div>
         <div className="text-sm font-semibold text-ink">
-          {docBusy ? labels.importDocBusy : labels.importDocPick}
+          {docBusy ? labels.importDocBusy : vault.open ? labels.importDocPick : labels.importVaultClosed}
         </div>
         <div className="text-xs text-ink-faint">{labels.importDocFormats}</div>
         {docProgress && docBusy && (
@@ -155,7 +155,7 @@ export default function Import() {
             {docProgress.total > 1 ? ` (${docProgress.done}/${docProgress.total})` : ''}
           </div>
         )}
-        <Button onClick={pickAndImportDoc} disabled={docBusy} className="mt-1">
+        <Button onClick={pickAndImportDoc} disabled={docBusy || !vault.open} className="mt-1">
           <Upload className="h-4 w-4" /> {labels.importDocSelect}
         </Button>
       </GlassCard>
@@ -171,6 +171,7 @@ export default function Import() {
               <Badge color="iris">{docResult.format.toUpperCase()}</Badge>
               <Badge color="mint">{docResult.pages} pages</Badge>
               <Badge color="amber">{docResult.extractionPath}</Badge>
+              {docResult.encrypted && <Badge color="mint">encrypted in vault</Badge>}
               {docResult.indexed ? (
                 <Badge color="mint">{docResult.chunks} chunks</Badge>
               ) : (
