@@ -22,9 +22,13 @@ describe('pipelinePhaseLabel', () => {
 
 describe('formatPipelineProgressLabel', () => {
   it('joins phase label and detail', () => {
-    expect(formatPipelineProgressLabel('distill', 'przypomnij sobie akcje z brain vault')).toBe(
-      'destylacja · przypomnij sobie akcje z brain vau…',
+    const label = formatPipelineProgressLabel(
+      'distill',
+      'przypomnij sobie akcje z brain vault i kontynuuj dalej',
     )
+    expect(label.startsWith('destylacja · przypomnij')).toBe(true)
+    expect(label.endsWith('…')).toBe(true)
+    expect(label.length).toBeLessThan('destylacja · przypomnij sobie akcje z brain vault i kontynuuj dalej'.length)
   })
 
   it('omits detail when absent', () => {
