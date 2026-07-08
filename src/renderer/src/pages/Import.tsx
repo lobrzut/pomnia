@@ -3,18 +3,13 @@ import { motion } from 'framer-motion'
 import { CheckCircle2, FileText, FileUp, Import as ImportIcon, Upload } from 'lucide-react'
 import { Badge, Button, GlassCard, SourceTile, Spinner } from '../components/ui'
 import { sourceMeta } from '../lib/format'
+import { pathFromDroppedFile } from '../lib/dropFile'
 import { uiLabels } from '../lib/labels'
 import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
 import type { DocImportProgressEvent, DocImportResult } from '../lib/types'
 
 const DOC_DROP_EXTENSIONS = new Set(['pdf', 'docx', 'md', 'txt', 'epub'])
-
-function docPathFromFile(file: File): string | null {
-  const path = (file as File & { path?: string }).path
-  if (path) return path
-  return null
-}
 
 function isDocDropFile(file: File): boolean {
   const name = file.name.toLowerCase()
@@ -31,7 +26,7 @@ const PROVIDERS: { id: string; how: string }[] = [
 
 export default function Import() {
   const { vault, refreshVault, toast, simpleMode } = useStore()
-  const labels = uiLabels(simpleMode)
+  const labels = uiLabels()
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ sealed: number; sources: { source: string; count: number }[] } | null>(null)
   const [docBusy, setDocBusy] = useState(false)
@@ -116,12 +111,12 @@ export default function Import() {
     const dropped = e.dataTransfer.files[0]
     if (!dropped) return
     if (!isDocDropFile(dropped)) {
-      toast({ kind: 'warn', title: 'Unsupported format', detail: labels.importDocFormats })
+      toast({ kind: 'warn', title: labels.importUnsupportedFormat, detail: labels.importDocFormats })
       return
     }
-    const path = docPathFromFile(dropped)
+    const path = pathFromDroppedFile(dropped)
     if (!path) {
-      toast({ kind: 'error', title: 'Drop failed', detail: 'Could not read file path.' })
+      toast({ kind: 'error', title: labels.importDropFailed, detail: labels.importDropNoPath })
       return
     }
     void importDocFile(path)

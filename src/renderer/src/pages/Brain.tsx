@@ -67,7 +67,7 @@ export default function Brain() {
     setBrainDeployReindex,
     simpleMode
   } = useStore()
-  const labels = uiLabels(simpleMode)
+  const labels = uiLabels()
   const [advancedOpen, setAdvancedOpen] = useState(!simpleMode)
   const showAdvanced = !simpleMode || advancedOpen
   const [status, setStatus] = useState<BrainStatus | null>(null)

@@ -1,4 +1,4 @@
-/** Human-friendly UI labels — Polish in simple mode, technical in advanced. */
+/** Polish UI labels — simple mode only hides advanced sections, not language. */
 
 export interface UiLabels {
   distill: string
@@ -12,14 +12,43 @@ export interface UiLabels {
   brainPageTitle: string
   brainPageLead: string
   embeddedBrain: string
+  brainServer: string
   searchKnowledge: string
   advanced: string
   simpleMode: string
   simpleModeHint: string
+  systemTray: string
   closeToTray: string
   closeToTrayHint: string
   minimizeToTray: string
   minimizeToTrayHint: string
+  connectPageLead: string
+  embeddedBrainNotRunning: string
+  embeddedBrainNotRunningLink: string
+  settingsTitle: string
+  settingsLead: string
+  vault: string
+  lockVault: string
+  noVaultOpen: string
+  brainBridge: string
+  brainBridgeLead: string
+  snapshot: string
+  outDir: string
+  exportNotes: string
+  mcpClients: string
+  mcpClientsLead: string
+  detectedOnMachine: string
+  notFound: string
+  customOverride: string
+  resetAutoDetect: string
+  snapshots: string
+  verifyIntegrity: string
+  snapshotsEmpty: string
+  snapshotsCount: (n: number) => string
+  unlockVaultForSnapshots: string
+  moreSnapshots: (n: number) => string
+  securityAbout: string
+  previewMode: string
   importTitle: string
   importLead: string
   importPick: string
@@ -34,6 +63,9 @@ export interface UiLabels {
   importDocFormats: string
   importDocSelect: string
   importDocDrop: string
+  importDropFailed: string
+  importDropNoPath: string
+  importUnsupportedFormat: string
   importDocDone: string
   importDocOcrHint: string
   importDocBrainOff: string
@@ -41,90 +73,89 @@ export interface UiLabels {
   importLegalNote: string
 }
 
-export function uiLabels(simple: boolean): UiLabels {
-  if (simple) {
-    return {
-      distill: 'Przygotuj pamięć',
-      distillBacklog: (n) => `Przygotuj pamięć (${n} nowych)`,
-      runPipeline: 'Przygotuj pamięć',
-      deployToBrain: 'Wyślij do wyszukiwarki',
-      embedded: 'Lokalnie',
-      remote: 'Na serwerze',
-      reindex: 'Odśwież indeks',
-      mcpConnect: 'Podłącz Cursora',
-      brainPageTitle: 'Pamięć i wyszukiwarka',
-      brainPageLead: 'Przygotuj rozmowy do wyszukiwania i uruchom lokalną wyszukiwarkę — bez serwera w chmurze.',
-      embeddedBrain: 'Lokalna wyszukiwarka',
-      searchKnowledge: 'Szukaj w swojej pamięci',
-      advanced: 'Zaawansowane',
-      simpleMode: 'Tryb prosty',
-      simpleModeHint: 'Ukrywa serwer zdalny, deploy i ustawienia GPU. Wystarczy vault → backup → wyszukiwarka → Cursor.',
-      closeToTray: 'Zamknij do zasobnika',
-      closeToTrayHint: 'Przycisk X chowa aplikację do traya zamiast kończyć proces. Gdy działa lokalna wyszukiwarka — zawsze.',
-      minimizeToTray: 'Minimalizuj do zasobnika',
-      minimizeToTrayHint: 'Przycisk minimalizacji chowa okno do traya zamiast paska zadań.',
-      importTitle: 'Importuj',
-      importLead: 'Wgraj eksport z Claude.ai, ChatGPT, Gemini albo Grok — trafi do vaultu.',
-      importPick: 'Wybierz plik eksportu',
-      importPickBusy: 'Importuję…',
-      importVaultClosed: 'Najpierw odblokuj vault',
-      importFormats: 'ZIP · JSON · JSONL · MD — rozpoznaje źródło automatycznie',
-      importSelect: 'Wybierz plik…',
-      importChatSection: 'Eksporty czatów',
-      importDocSection: 'Dokumenty',
-      importDocPick: 'Wybierz PDF, DOCX lub EPUB',
-      importDocBusy: 'Importuję dokument…',
-      importDocFormats: 'PDF · DOCX · EPUB · MD · TXT — zaszyfrowane w vault, indeks w wyszukiwarce',
-      importDocSelect: 'Wybierz dokument…',
-      importDocDrop: 'Upuść plik tutaj',
-      importDocDone: 'Dokument zaimportowany',
-      importDocOcrHint: 'Mało tekstu — w v0.3 uruchom OCR dla skanów.',
-      importDocBrainOff: 'Uruchom lokalną wyszukiwarkę (Brain), żeby zindeksować chunki.',
-      importProviders: 'Skąd pobrać eksport',
-      importLegalNote:
-        'Pomnia importuje tylko oficjalne eksporty — bez logowania do kont. Claude Desktop / Gemini wymagają eksportu z wersji webowej.'
-    }
-  }
-  return {
-    distill: 'Distill',
-    distillBacklog: (n) => `Distill backlog (${n})`,
-    runPipeline: 'Run pipeline',
-    deployToBrain: 'Deploy to Brain',
-    embedded: 'Local embedded',
-    remote: 'Remote master',
-    reindex: 'Reindex',
-    mcpConnect: 'Connect to Brain',
-    brainPageTitle: 'Send to Brain',
-    brainPageLead:
-      'Hand your aggregated chats to your Brain server — it distills + indexes (GPU work stays server-side).',
-    embeddedBrain: 'Embedded brain',
-    searchKnowledge: 'Search your knowledge (local RAG)',
-    advanced: 'Advanced',
-    simpleMode: 'Simple mode',
-    simpleModeHint: 'Hides remote brain URL, deploy/SMB/reindex, manual Ollama URL, and VRAM profiles.',
-    closeToTray: 'Close to tray',
-    closeToTrayHint: 'The X button hides Pomnia to the system tray instead of quitting. Always on while embedded brain runs.',
-    minimizeToTray: 'Minimize to tray',
-    minimizeToTrayHint: 'The minimize button hides to tray instead of the taskbar.',
-    importTitle: 'Import',
-    importLead: 'Pull chats you exported from Claude.ai, ChatGPT, Gemini or Grok into your vault.',
-    importPick: 'Choose an export file',
-    importPickBusy: 'Importing…',
-    importVaultClosed: 'Open a vault first',
-    importFormats: 'ZIP · JSON · JSONL · MD — auto-detects the source',
-    importSelect: 'Select export…',
-    importChatSection: 'Chat exports',
-    importDocSection: 'Documents',
-    importDocPick: 'Choose a PDF, DOCX, or EPUB',
-    importDocBusy: 'Importing document…',
-    importDocFormats: 'PDF · DOCX · EPUB · MD · TXT — encrypted in vault, indexed in library.db',
-    importDocSelect: 'Select document…',
-    importDocDrop: 'Drop file here',
-    importDocDone: 'Document imported',
-    importDocOcrHint: 'Sparse text layer — OCR recommended in v0.3 for scans.',
-    importDocBrainOff: 'Start embedded brain to embed chunks into library.db.',
-    importProviders: 'Where to export from',
-    importLegalNote:
-      'Pomnia imports official exports only — no scraping or logging into accounts (fragile + against terms). Claude Desktop / Gemini chats live server-side, so you export them from the web, then import here.'
-  }
+const PL_LABELS: UiLabels = {
+  distill: 'Przygotuj pamięć',
+  distillBacklog: (n) => `Przygotuj pamięć (${n} nowych)`,
+  runPipeline: 'Przygotuj pamięć',
+  deployToBrain: 'Wyślij do wyszukiwarki',
+  embedded: 'Lokalnie',
+  remote: 'Na serwerze',
+  reindex: 'Odśwież indeks',
+  mcpConnect: 'Podłącz Cursora',
+  brainPageTitle: 'Pamięć i wyszukiwarka',
+  brainPageLead:
+    'Przygotuj rozmowy do wyszukiwania i uruchom lokalną wyszukiwarkę — bez serwera w chmurze.',
+  embeddedBrain: 'Lokalna wyszukiwarka',
+  brainServer: 'Serwer Brain',
+  searchKnowledge: 'Szukaj w swojej pamięci',
+  advanced: 'Zaawansowane',
+  simpleMode: 'Tryb prosty',
+  simpleModeHint:
+    'Ukrywa serwer zdalny, deploy i ustawienia GPU. Wystarczy vault → backup → wyszukiwarka → Cursor.',
+  systemTray: 'Zasobnik systemowy',
+  closeToTray: 'Zamknij do zasobnika',
+  closeToTrayHint:
+    'Przycisk X chowa aplikację do traya zamiast kończyć proces. Gdy działa lokalna wyszukiwarka — zawsze.',
+  minimizeToTray: 'Minimalizuj do zasobnika',
+  minimizeToTrayHint: 'Przycisk minimalizacji chowa okno do traya zamiast paska zadań.',
+  connectPageLead:
+    'Skopiuj konfigurację MCP i wklej w Cursorze — Pomnia nigdy nie dotyka Twoich plików.',
+  embeddedBrainNotRunning: 'Lokalna wyszukiwarka nie działa. Otwórz zakładkę',
+  embeddedBrainNotRunningLink: 'Brain',
+  settingsTitle: 'Ustawienia',
+  settingsLead: 'Vault, integracje i bezpieczeństwo.',
+  vault: 'Vault',
+  lockVault: 'Zablokuj',
+  noVaultOpen: 'Brak otwartego vaultu.',
+  brainBridge: 'Most do Brain',
+  brainBridgeLead:
+    'Eksportuj rozmowy ze snapshotu jako notatki markdown — trafią do vaultu Brain i do indeksu RAG.',
+  snapshot: 'Snapshot',
+  outDir: 'Folder docelowy',
+  exportNotes: 'Eksportuj',
+  mcpClients: 'Klienci MCP',
+  mcpClientsLead:
+    'Wybierz, które klienty widać w zakładce Connect. Wykryte pokazują się domyślnie — przypnij brakujące albo ukryj nieużywane.',
+  detectedOnMachine: 'Wykryty na tym komputerze',
+  notFound: 'Nie znaleziono',
+  customOverride: 'własne',
+  resetAutoDetect: 'Przywróć auto-wykrywanie',
+  snapshots: 'Snapshoty',
+  verifyIntegrity: 'Sprawdź integralność',
+  snapshotsEmpty:
+    'Brak snapshotów — uruchom backup z Dashboardu, żeby utworzyć pierwszą zamkniętą kopię.',
+  snapshotsCount: (n) =>
+    `${n} zamkniętych kopii punktowych. Nowe snapshoty tworzysz z Dashboardu.`,
+  unlockVaultForSnapshots: 'Odblokuj vault, żeby zobaczyć snapshoty.',
+  moreSnapshots: (n) => `+ ${n} więcej…`,
+  securityAbout: 'Bezpieczeństwo i informacje',
+  previewMode: 'Tryb podglądu (bez backendu Electron) — dane są przykładowe.',
+  importTitle: 'Importuj',
+  importLead: 'Wgraj eksport z Claude.ai, ChatGPT, Gemini albo Grok — trafi do vaultu.',
+  importPick: 'Wybierz plik eksportu',
+  importPickBusy: 'Importuję…',
+  importVaultClosed: 'Najpierw odblokuj vault',
+  importFormats: 'ZIP · JSON · JSONL · MD — rozpoznaje źródło automatycznie',
+  importSelect: 'Wybierz plik…',
+  importChatSection: 'Eksporty czatów',
+  importDocSection: 'Dokumenty',
+  importDocPick: 'Wybierz PDF, DOCX lub EPUB',
+  importDocBusy: 'Importuję dokument…',
+  importDocFormats: 'PDF · DOCX · EPUB · MD · TXT — zaszyfrowane w vault, indeks w wyszukiwarce',
+  importDocSelect: 'Wybierz dokument…',
+  importDocDrop: 'Upuść plik tutaj',
+  importDropFailed: 'Upuszczenie nie powiodło się',
+  importDropNoPath: 'Nie udało się odczytać ścieżki pliku. Użyj „Wybierz plik…”.',
+  importUnsupportedFormat: 'Nieobsługiwany format',
+  importDocDone: 'Dokument zaimportowany',
+  importDocOcrHint: 'Mało tekstu — w v0.3 uruchom OCR dla skanów.',
+  importDocBrainOff: 'Uruchom lokalną wyszukiwarkę (Brain), żeby zindeksować chunki.',
+  importProviders: 'Skąd pobrać eksport',
+  importLegalNote:
+    'Pomnia importuje tylko oficjalne eksporty — bez logowania do kont. Claude Desktop / Gemini wymagają eksportu z wersji webowej.'
+}
+
+/** @param _simple ignored — kept for call-site compatibility; language does not depend on simple mode */
+export function uiLabels(_simple?: boolean): UiLabels {
+  return PL_LABELS
 }
