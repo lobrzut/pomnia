@@ -1,7 +1,8 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 
 const bridge = {
   platform: process.platform,
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
   scan: () => ipcRenderer.invoke('scan'),
   vaultStatus: () => ipcRenderer.invoke('vault:status'),
   pickDirectory: () => ipcRenderer.invoke('vault:pickDir'),
