@@ -79,8 +79,12 @@ const bridge = {
   connectMcpTokenCreate: (brainUrl: string, name: string, adminToken?: string) =>
     ipcRenderer.invoke('connect:mcpTokenCreate', brainUrl, name, adminToken),
   appSettings: () => ipcRenderer.invoke('app:settings'),
-  appSettingsSet: (patch: { minimizeToTray?: boolean; closeToTray?: boolean }) =>
-    ipcRenderer.invoke('app:settings:set', patch),
+  appSettingsSet: (patch: {
+    minimizeToTray?: boolean
+    closeToTray?: boolean
+    ollamaUrl?: string
+    embeddedBrainAutoStart?: boolean
+  }) => ipcRenderer.invoke('app:settings:set', patch),
   minimize: () => ipcRenderer.send('win:minimize'),
   toggleMaximize: () => ipcRenderer.send('win:maximize'),
   close: () => ipcRenderer.send('win:close')

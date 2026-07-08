@@ -87,7 +87,7 @@ export default function Import() {
         toast({
           kind: 'warn',
           title: labels.importDocQueuedToast,
-          detail,
+          detail: r.indexError ? `${detail} · ${r.indexError}` : detail,
         })
       } else {
         toast({ kind: 'warn', title: labels.importDocQueuedToast, detail })
@@ -267,7 +267,9 @@ export default function Import() {
               <p className="text-xs text-amber-200/90">{labels.importDocOcrHint}</p>
             )}
             {docResult.pendingIndex && (
-              <p className="text-xs text-ink-dim">{labels.importDocQueuedHint}</p>
+              <p className="text-xs text-ink-dim">
+                {docResult.indexError ?? labels.importDocQueuedHint}
+              </p>
             )}
             {!docResult.brainRunning && !docResult.pendingIndex && (
               <p className="text-xs text-ink-dim">{labels.importDocBrainOff}</p>
