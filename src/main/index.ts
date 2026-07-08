@@ -132,20 +132,46 @@ function ollamaFor(url?: string, model?: string): Ollama {
   return new Ollama(cfg)
 }
 
-async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
-  if (!getAppSettings().embeddedBrainAutoStart) return
-  if (brainCore.status().running || brainCore.status().starting) return
+async function notifyLibraryIndexComplete(flush: PendingIndexResult): Promise<void> {
+  if (flush.indexed <= 0 && flush.errors.length === 0) return
+  win?.webContents.send('library:index-complete', flush)
+  if (flush.indexed > 0) {
+    log.info(`library index flush: ${flush.indexed} doc(s), ${flush.chunks} chunk(s)`)
+  }
+  for (const err of flush.errors) log.warn('library index:', err)
+}
+
+/** Index vault docs marked pendingIndex when embedded brain is already running. */
+async function flushPendingLibraryDocs(ollamaUrl?: string): Promise<PendingIndexResult | null> {
+  if (!vault || !vaultPath || !brainCore.status().running) return null
+  if (vault.getPendingIndexDocuments().length === 0) return null
   const url = resolveOllamaUrl(ollamaUrl)
+  activity.update({ kind: 'indexing', phase: 'index', detail: 'oczekujące dokumenty…' })
+  try {
+    const flush = await indexPendingLibraryDocuments(vault, vaultPath, {
+      ollamaUrl: url,
+      skipEnsure: true,
+      onProgress: emitDocImportProgress,
+    })
+    await notifyLibraryIndexComplete(flush)
+    return flush
+  } finally {
+    activity.idle(['indexing', 'doc-import'])
+  }
+}
+
+async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
+  const url = resolveOllamaUrl(ollamaUrl)
+  if (brainCore.status().running) {
+    await flushPendingLibraryDocs(url)
+    return
+  }
+  if (brainCore.status().starting) return
+  if (!getAppSettings().embeddedBrainAutoStart) return
   const ensured = await ensureBrainForIndexing(url)
   if (!ensured.running || !vault || !vaultPath) return
   refreshTrayMenu(win, requestQuit)
-  const flush = await indexPendingLibraryDocuments(vault, vaultPath, {
-    ollamaUrl: url,
-    onProgress: emitDocImportProgress,
-  })
-  if (flush.indexed > 0) {
-    win?.webContents.send('library:index-complete', flush)
-  }
+  await flushPendingLibraryDocs(url)
 }
 
 async function collectLive(sources: SourceId[], limit?: number): Promise<Conversation[]> {
@@ -235,7 +261,8 @@ function registerIpc(): void {
     open: !!vault,
     path: vaultPath ?? undefined,
     name: vault?.getManifest().name,
-    snapshots: vault?.getManifest().snapshots.length ?? 0
+    snapshots: vault?.getManifest().snapshots.length ?? 0,
+    pendingLibraryIndex: vault?.getPendingIndexDocuments().length ?? 0,
   }))
 
   ipcMain.handle('vault:pickDir', async () => {
@@ -291,15 +318,16 @@ function registerIpc(): void {
     vault = await Vault.create(path, name, pass)
     vaultPath = path
     void maybeAutoStartEmbeddedBrain()
-    return { open: true, path, name, snapshots: 0 }
+    return { open: true, path, name, snapshots: 0, pendingLibraryIndex: 0 }
   })
 
   ipcMain.handle('vault:open', async (_e, path: string, pass: string) => {
     vault = await Vault.open(path, pass)
     vaultPath = path
     const m = vault.getManifest()
+    const pendingLibraryIndex = vault.getPendingIndexDocuments().length
     void maybeAutoStartEmbeddedBrain()
-    return { open: true, path, name: m.name, snapshots: m.snapshots.length }
+    return { open: true, path, name: m.name, snapshots: m.snapshots.length, pendingLibraryIndex }
   })
 
   ipcMain.handle('vault:lock', () => {
@@ -595,15 +623,7 @@ function registerIpc(): void {
         ollamaUrl: url,
       })
       await setAppSettings({ embeddedBrainAutoStart: true, ollamaUrl: url })
-      if (vault && vaultPath) {
-        const flush = await indexPendingLibraryDocuments(vault, vaultPath, {
-          ollamaUrl: url,
-          onProgress: emitDocImportProgress,
-        })
-        if (flush.indexed > 0) {
-          win?.webContents.send('library:index-complete', flush)
-        }
-      }
+      await flushPendingLibraryDocs(url)
       refreshTrayMenu(win, requestQuit)
       return brainCore.status()
     } catch (err) {
@@ -746,6 +766,8 @@ function registerIpc(): void {
 
 app.whenReady().then(async () => {
   await migrateLegacyAppData()
+  initFileLog(join(app.getPath('userData'), 'logs'))
+  log.info('Pomnia starting', app.getVersion())
   await fs.mkdir(brainDir(), { recursive: true })
   await migrateBrainIndexFile(brainDir())
   await loadAppSettings()

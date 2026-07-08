@@ -67,18 +67,26 @@ export async function indexPendingLibraryDocuments(
   opts?: {
     skipDocId?: string
     ollamaUrl?: string
+    /** When true, require embedded brain already running — do not auto-start. */
+    skipEnsure?: boolean
     onProgress?: (e: LibraryIndexProgress) => void
   },
 ): Promise<PendingIndexResult> {
   const pending = vault.getPendingIndexDocuments().filter((d) => d.id !== opts?.skipDocId)
   if (pending.length === 0) return { indexed: 0, chunks: 0, errors: [] }
 
-  const ensured = await ensureBrainForIndexing(opts?.ollamaUrl, opts?.onProgress)
-  if (!ensured.running) {
-    return {
-      indexed: 0,
-      chunks: 0,
-      errors: [ensured.error ?? 'Wyszukiwarka niedostępna'],
+  if (opts?.skipEnsure) {
+    if (!brainCore.status().running) {
+      return { indexed: 0, chunks: 0, errors: ['Wyszukiwarka niedostępna'] }
+    }
+  } else {
+    const ensured = await ensureBrainForIndexing(opts?.ollamaUrl, opts?.onProgress)
+    if (!ensured.running) {
+      return {
+        indexed: 0,
+        chunks: 0,
+        errors: [ensured.error ?? 'Wyszukiwarka niedostępna'],
+      }
     }
   }
 
