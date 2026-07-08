@@ -84,7 +84,9 @@ export interface DocImportResult {
   extractionPath: string
   suggestOcr: boolean
   indexed: boolean
+  pendingIndex: boolean
   brainRunning: boolean
+  brainAutoStarted: boolean
   encrypted: boolean
 }
 
@@ -106,6 +108,16 @@ export interface BrainProgressEvent {
   phase: 'collect' | 'distill' | 'index' | 'deploy'
   done: number
   total: number
+  detail?: string
+}
+
+export type ActivityKind = 'idle' | 'distill' | 'doc-import' | 'brain-start' | 'indexing' | 'embed'
+
+export interface ActivityState {
+  kind: ActivityKind
+  phase?: string
+  done?: number
+  total?: number
   detail?: string
 }
 

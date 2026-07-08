@@ -8,8 +8,7 @@
 
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { basename, extname, join } from 'node:path'
-import { app } from 'electron'
+import { basename, extname } from 'node:path'
 import {
   buildExtractedMarkdown,
   extractionPathLabel,
@@ -19,31 +18,22 @@ import {
 import { defaultVaultConfig, ensureLibraryDirs } from '@pomnia/brain-core'
 import { libraryDocLogicalPath, Vault } from '@core/vault.js'
 import { brainCore } from './brainCore.js'
+import { brainCoreDataDir } from './brainPaths.js'
+import {
+  ensureBrainForIndexing,
+  indexPendingLibraryDocuments,
+  type LibraryIndexProgress,
+} from './libraryIndex.js'
+import type { DocImportResult } from './docImportTypes.js'
 
-export interface DocImportResult {
-  docId: string
-  sourcePath: string
-  extractedPath: string
-  format: string
-  pages: number
-  chunks: number
-  sparse: boolean
-  extractionPath: string
-  suggestOcr: boolean
-  indexed: boolean
-  brainRunning: boolean
-  encrypted: boolean
-}
-
-export function brainCoreDataDir(): string {
-  return join(app.getPath('userData'), 'brain-core-data')
-}
+export type { DocImportResult } from './docImportTypes.js'
 
 export async function importDocument(
   vault: Vault,
   vaultDir: string,
   filePath: string,
-  onProgress?: (e: { phase: string; done: number; total: number; detail?: string }) => void,
+  onProgress?: (e: LibraryIndexProgress) => void,
+  ollamaUrl?: string,
 ): Promise<DocImportResult> {
   const dataDir = brainCoreDataDir()
   const vaultCfg = defaultVaultConfig(dataDir)
@@ -82,6 +72,7 @@ export async function importDocument(
       sparse: parsed.meta.sparse,
       extractionPath: extractionPathLabel(parsed),
       importedAt: new Date().toISOString(),
+      pendingIndex: true,
     },
     raw,
     Buffer.from(md, 'utf8'),
@@ -90,8 +81,17 @@ export async function importDocument(
 
   const logicalPath = libraryDocLogicalPath(vaultDir, docId)
 
-  const brainRunning = brainCore.status().running
+  let brainRunning = brainCore.status().running
+  let brainAutoStarted = false
   let chunks = 0
+  let indexed = false
+
+  if (!brainRunning) {
+    const ensured = await ensureBrainForIndexing(ollamaUrl, onProgress)
+    brainRunning = ensured.running
+    brainAutoStarted = ensured.autoStarted
+  }
+
   if (brainRunning) {
     onProgress?.({ phase: 'index', done: 0, total: parsed.pages.length, detail: 'embedding…' })
     const stats = (await brainCore.indexDocument({
@@ -100,7 +100,16 @@ export async function importDocument(
       pages: parsed.pages,
     })) as { chunks?: number }
     chunks = stats?.chunks ?? 0
+    indexed = chunks > 0
     onProgress?.({ phase: 'index', done: parsed.pages.length, total: parsed.pages.length })
+    if (indexed) await vault.markLibraryDocIndexed(docId)
+
+    // Flush any older docs that were queued while Brain was offline.
+    await indexPendingLibraryDocuments(vault, vaultDir, {
+      skipDocId: docId,
+      ollamaUrl,
+      onProgress,
+    })
   }
 
   return {
@@ -113,8 +122,10 @@ export async function importDocument(
     sparse: parsed.meta.sparse,
     extractionPath: extractionPathLabel(parsed),
     suggestOcr: suggestOcr(parsed),
-    indexed: brainRunning && chunks > 0,
+    indexed,
+    pendingIndex: !indexed,
     brainRunning,
+    brainAutoStarted,
     encrypted: true,
   }
 }

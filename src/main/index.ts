@@ -37,13 +37,16 @@ import {
   type ClientId,
   type Conversation,
   type Snapshot,
-  type SourceId
+  type SourceId,
+  localizePipelineProgress,
 } from '@core/index'
 
 import { brainCore } from './brainCore.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
+import { indexPendingLibraryDocuments } from './libraryIndex.js'
 import { getAppSettings, loadAppSettings, setAppSettings, shouldHideOnClose, shouldHideOnMinimize } from './appSettings.js'
 import { destroyTray, initTray, refreshTrayMenu } from './tray.js'
+import { activity, type ActivityUpdate } from './activity.js'
 import { isCursorDbTooLarge } from '@core/adapters/cursor.js'
 import { migrateBrainIndexFile, migrateLegacyAppData } from './migrateLegacy.js'
 
@@ -61,6 +64,32 @@ let brainRunAbort: AbortController | null = null
 function requireVault(): Vault {
   if (!vault) throw new Error('No vault is open')
   return vault
+}
+
+function emitBrainProgress(p: { phase: string; done?: number; total?: number; detail?: string }): void {
+  const kind: ActivityUpdate['kind'] =
+    p.phase === 'index' ? 'embed' : p.phase === 'distill' || p.phase === 'collect' || p.phase === 'deploy' ? 'distill' : 'distill'
+  activity.update({ kind, phase: p.phase, done: p.done, total: p.total, detail: p.detail })
+  const payload = localizePipelineProgress({
+    phase: p.phase,
+    done: p.done ?? 0,
+    total: p.total ?? 0,
+    detail: p.detail,
+  })
+  win?.webContents.send('brain:progress', payload)
+}
+
+function emitDocImportProgress(ev: { phase: string; done: number; total: number; detail?: string }): void {
+  const kind: ActivityUpdate['kind'] =
+    ev.phase === 'index'
+      ? 'indexing'
+      : ev.phase === 'brain-start'
+        ? 'brain-start'
+        : ev.phase === 'encrypt' || ev.phase === 'parse'
+          ? 'doc-import'
+          : 'doc-import'
+  activity.update({ kind, phase: ev.phase, done: ev.done, total: ev.total, detail: ev.detail })
+  win?.webContents.send('doc:import-progress', localizePipelineProgress(ev))
 }
 
 const brainDir = (): string => join(app.getPath('userData'), 'brain-notes')
@@ -171,6 +200,15 @@ function createWindow(): void {
 
 /* ── IPC ───────────────────────────────────────────────────────────────── */
 function registerIpc(): void {
+  activity.wire(
+    (channel, payload) => {
+      if (channel === 'activity:update') win?.webContents.send('activity:update', payload)
+      else win?.webContents.send('activity:idle')
+    },
+    () => refreshTrayMenu(win, requestQuit),
+  )
+  ipcMain.handle('activity:get', () => activity.get())
+
   ipcMain.handle('scan', () => detectAll())
 
   ipcMain.handle('vault:status', () => ({
@@ -206,7 +244,7 @@ function registerIpc(): void {
     return r.canceled ? null : r.filePaths[0]
   })
 
-  ipcMain.handle('doc:import', async (_e, filePath?: string) => {
+  ipcMain.handle('doc:import', async (_e, filePath?: string, ollamaUrl?: string) => {
     const v = requireVault()
     const p =
       filePath ??
@@ -221,7 +259,11 @@ function registerIpc(): void {
     if (!isDocImportPath(p)) {
       throw new Error(`Unsupported document format: ${p}`)
     }
-    return importDocument(v, vaultPath!, p, (ev) => win?.webContents.send('doc:import-progress', ev))
+    try {
+      return await importDocument(v, vaultPath!, p, emitDocImportProgress, ollamaUrl)
+    } finally {
+      activity.idle(['doc-import', 'indexing', 'brain-start'])
+    }
   })
 
   ipcMain.handle('vault:create', async (_e, path: string, name: string, pass: string) => {
@@ -414,11 +456,12 @@ function registerIpc(): void {
           const l = await readLedger()
           convs = convs.filter((c) => !l.processed[c.id])
         }
+        activity.update({ kind: 'distill', phase: 'distill', done: 0, total: convs.length })
         const { notes, skipped, failed } = await distillAll(
           convs,
           o,
           opts.model,
-          (p) => win?.webContents.send('brain:progress', p),
+          emitBrainProgress,
           { signal }
         )
         if (signal.aborted) throw new Error('Distill cancelled')
@@ -428,7 +471,7 @@ function registerIpc(): void {
         const idx = await buildIndex(
           okNotes.map((n) => ({ source: n.source, notePath: n.sessionId, text: n.markdown })),
           o,
-          (done, total) => win?.webContents.send('brain:progress', { phase: 'index', done, total })
+          (done, total) => emitBrainProgress({ phase: 'index', done, total })
         )
         await saveIndex(idx, brainIndexFile())
         const noteIds = new Set(notes.map((n) => n.sessionId))
@@ -437,14 +480,18 @@ function registerIpc(): void {
           .map((c) => c.id)
         await markProcessed(processedIds)
         if (brainCore.status().running) {
-          brainCore.reindex(brainDir()).catch((e) => log.warn('embedded reindex failed:', (e as Error).message))
+          activity.update({ kind: 'indexing', phase: 'reindex', done: 0, total: 1, detail: 'po destylacji…' })
+          brainCore
+            .reindex(brainDir())
+            .catch((e) => log.warn('embedded reindex failed:', (e as Error).message))
+            .finally(() => activity.idle('indexing'))
         }
 
         let deployed = 0
         let deployMethod: 'filesystem' | 'http' | 'none' = 'none'
         let reindexed = false
         if (opts.autoDeploy && opts.deployUrl && okNotes.length > 0) {
-          win?.webContents.send('brain:progress', {
+          emitBrainProgress({
             phase: 'deploy',
             done: 0,
             total: 1,
@@ -460,7 +507,7 @@ function registerIpc(): void {
           deployed = dep.copied
           deployMethod = dep.method
           reindexed = dep.reindex
-          win?.webContents.send('brain:progress', {
+          emitBrainProgress({
             phase: 'deploy',
             done: 1,
             total: 1,
@@ -485,6 +532,7 @@ function registerIpc(): void {
         }
       } finally {
         brainRunAbort = null
+        activity.idle(['distill', 'embed'])
       }
     }
   )
@@ -497,16 +545,42 @@ function registerIpc(): void {
   // ── Embedded brain-core (fork lifecycle) ──
   brainCore.onEvent = (e) => {
     win?.webContents.send('brainCore:event', e)
-    if (e.type === 'ready' || e.type === 'exited') refreshTrayMenu(win, requestQuit)
+    if (e.type === 'reindex-progress' || e.type === 'index-progress') {
+      activity.update({
+        kind: 'indexing',
+        phase: e.type === 'reindex-progress' ? 'reindex' : 'index',
+        done: e.done,
+        total: e.total,
+        detail: e.file,
+      })
+    }
+    if (e.type === 'ready' || e.type === 'exited') {
+      activity.idle('brain-start')
+      refreshTrayMenu(win, requestQuit)
+    }
   }
   ipcMain.handle('brainCore:status', () => brainCore.status())
   ipcMain.handle('brainCore:start', async (_e, ollamaUrl?: string) => {
-    await brainCore.start({
-      dataDir: join(app.getPath('userData'), 'brain-core-data'),
-      ollamaUrl,
-    })
-    refreshTrayMenu(win, requestQuit)
-    return brainCore.status()
+    activity.update({ kind: 'brain-start', phase: 'start', detail: 'uruchamiam…' })
+    try {
+      await brainCore.start({
+        dataDir: join(app.getPath('userData'), 'brain-core-data'),
+        ollamaUrl,
+      })
+      if (vault && vaultPath) {
+        const flush = await indexPendingLibraryDocuments(vault, vaultPath, {
+          ollamaUrl,
+          onProgress: emitDocImportProgress,
+        })
+        if (flush.indexed > 0) {
+          win?.webContents.send('library:index-complete', flush)
+        }
+      }
+      refreshTrayMenu(win, requestQuit)
+      return brainCore.status()
+    } finally {
+      activity.idle(['brain-start', 'doc-import', 'indexing'])
+    }
   })
   ipcMain.handle('brainCore:stop', async () => {
     const s = await brainCore.stop()
@@ -514,9 +588,13 @@ function registerIpc(): void {
     return s
   })
   ipcMain.handle('brainCore:reindex', async () => {
-    // Index the distilled-notes dir — the same place brain:run deploys to.
-    const stats = await brainCore.reindex(brainDir())
-    return { stats }
+    activity.update({ kind: 'indexing', phase: 'reindex' })
+    try {
+      const stats = await brainCore.reindex(brainDir())
+      return { stats }
+    } finally {
+      activity.idle('indexing')
+    }
   })
   ipcMain.handle('app:settings', () => getAppSettings())
   ipcMain.handle('app:settings:set', async (_e, patch: { minimizeToTray?: boolean; closeToTray?: boolean }) =>

@@ -25,7 +25,7 @@ const PROVIDERS: { id: string; how: string }[] = [
 ]
 
 export default function Import() {
-  const { vault, refreshVault, toast, simpleMode } = useStore()
+  const { vault, refreshVault, toast, simpleMode, ollamaUrl } = useStore()
   const labels = uiLabels()
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ sealed: number; sources: { source: string; count: number }[] } | null>(null)
@@ -73,16 +73,27 @@ export default function Import() {
     try {
       const file = filePath ?? (await api.pickDocFile())
       if (!file) return
-      const r = await api.docImport(file)
+      const r = await api.docImport(file, ollamaUrl || undefined)
       if (!r) return
       setDocResult(r)
-      toast({
-        kind: r.indexed ? 'success' : 'warn',
-        title: r.indexed ? `Indexed ${r.chunks} chunks` : 'Document saved (brain offline)',
-        detail: `${r.format.toUpperCase()} · ${r.pages} str. · ${r.extractionPath}${r.suggestOcr ? ' · OCR recommended' : ''}`
-      })
+      const detail = `${r.format.toUpperCase()} · ${labels.importDocPagesBadge(r.pages)} · ${r.extractionPath}${r.suggestOcr ? ' · OCR zalecane' : ''}`
+      if (r.indexed) {
+        toast({
+          kind: 'success',
+          title: labels.importDocIndexedToast(r.chunks),
+          detail,
+        })
+      } else if (r.pendingIndex) {
+        toast({
+          kind: 'warn',
+          title: labels.importDocQueuedToast,
+          detail,
+        })
+      } else {
+        toast({ kind: 'warn', title: labels.importDocQueuedToast, detail })
+      }
     } catch (e) {
-      toast({ kind: 'error', title: 'Document import failed', detail: (e as Error).message })
+      toast({ kind: 'error', title: labels.importDocFailedToast, detail: (e as Error).message })
     } finally {
       setDocBusy(false)
       setDocProgress(null)
@@ -216,7 +227,16 @@ export default function Import() {
         <div className="text-xs text-ink-faint">{labels.importDocFormats}</div>
         {docProgress && docBusy && (
           <div className="text-xs text-ink-dim">
-            {docProgress.phase === 'parse' ? 'Parsing' : 'Indexing'}… {docProgress.detail ?? ''}
+            {docProgress.phase === 'parse'
+              ? labels.importDocProgressParse
+              : docProgress.phase === 'index'
+                ? labels.importDocProgressIndex
+                : docProgress.phase === 'brain-start'
+                  ? labels.importDocProgressBrainStart
+                  : docProgress.phase === 'encrypt'
+                    ? labels.importDocProgressEncrypt
+                    : docProgress.phase}
+            … {docProgress.detail ?? ''}
             {docProgress.total > 1 ? ` (${docProgress.done}/${docProgress.total})` : ''}
           </div>
         )}
@@ -234,19 +254,22 @@ export default function Import() {
             </div>
             <div className="flex flex-wrap gap-1.5">
               <Badge color="iris">{docResult.format.toUpperCase()}</Badge>
-              <Badge color="mint">{docResult.pages} pages</Badge>
+              <Badge color="mint">{labels.importDocPagesBadge(docResult.pages)}</Badge>
               <Badge color="amber">{docResult.extractionPath}</Badge>
-              {docResult.encrypted && <Badge color="mint">encrypted in vault</Badge>}
+              {docResult.encrypted && <Badge color="mint">{labels.importDocEncryptedBadge}</Badge>}
               {docResult.indexed ? (
-                <Badge color="mint">{docResult.chunks} chunks</Badge>
+                <Badge color="mint">{labels.importDocIndexedBadge(docResult.chunks)}</Badge>
               ) : (
-                <Badge color="rose">not indexed</Badge>
+                <Badge color="rose">{labels.importDocNotIndexedBadge}</Badge>
               )}
             </div>
             {docResult.suggestOcr && (
               <p className="text-xs text-amber-200/90">{labels.importDocOcrHint}</p>
             )}
-            {!docResult.brainRunning && (
+            {docResult.pendingIndex && (
+              <p className="text-xs text-ink-dim">{labels.importDocQueuedHint}</p>
+            )}
+            {!docResult.brainRunning && !docResult.pendingIndex && (
               <p className="text-xs text-ink-dim">{labels.importDocBrainOff}</p>
             )}
           </GlassCard>

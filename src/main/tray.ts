@@ -5,6 +5,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, Menu, Tray, nativeImage, type BrowserWindow, type NativeImage } from 'electron'
+import { activity } from './activity.js'
 import { brainCore } from './brainCore.js'
 
 let tray: Tray | null = null
@@ -33,6 +34,7 @@ function brainStatusLabel(): string {
 
 function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
   const embedded = brainCore.status()
+  const busyLine = activity.menuLine()
   return Menu.buildFromTemplate([
     {
       label: 'Otwórz Pomnię',
@@ -42,6 +44,14 @@ function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
       },
     },
     { type: 'separator' },
+    ...(busyLine
+      ? [
+          {
+            label: busyLine,
+            enabled: false,
+          } as const,
+        ]
+      : []),
     {
       label: brainStatusLabel(),
       enabled: false,
@@ -64,11 +74,15 @@ function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
   ])
 }
 
+export function refreshTrayTooltip(): void {
+  tray?.setToolTip(activity.tooltip())
+}
+
 export async function initTray(win: BrowserWindow, onQuit: () => void): Promise<void> {
   if (tray) return
   const icon = await resolveIcon()
   tray = new Tray(icon)
-  tray.setToolTip('Pomnia')
+  refreshTrayTooltip()
   tray.setContextMenu(buildMenu(win, onQuit))
   tray.on('double-click', () => {
     win.show()
@@ -79,6 +93,7 @@ export async function initTray(win: BrowserWindow, onQuit: () => void): Promise<
 }
 
 export function refreshTrayMenu(win: BrowserWindow | null, onQuit: () => void): void {
+  refreshTrayTooltip()
   tray?.setContextMenu(buildMenu(win, onQuit))
 }
 

@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { api } from '../lib/api'
 import { loadBool, loadStr, migrateLegacyStorage, saveBool, saveStr } from '../lib/persist'
-import type { ClientId, DetectedSource, Snapshot, SourceId, VaultStatus, BrainRunResult, BrainStateInfo } from '../lib/types'
+import type { ClientId, DetectedSource, Snapshot, SourceId, VaultStatus, BrainRunResult, BrainStateInfo, ActivityState } from '../lib/types'
+import { formatBrainProgressLabel } from '../lib/labels'
 
 migrateLegacyStorage()
 
@@ -217,6 +218,8 @@ interface State {
   brainRunning: boolean
   brainProgress: { label: string; pct: number } | null
   brainResult: BrainRunResult | null
+  globalActivity: ActivityState
+  initGlobalActivity: () => () => void
   brainState: BrainStateInfo | null
   brainStateLoading: boolean
   loadBrainState: () => Promise<void>
@@ -465,6 +468,16 @@ export const useStore = create<State>((set, get) => ({
   brainRunning: false,
   brainProgress: null,
   brainResult: null,
+  globalActivity: { kind: 'idle' },
+  initGlobalActivity() {
+    void api.activityGet().then((s) => set({ globalActivity: s })).catch(() => {})
+    const offUpdate = api.onActivityUpdate((s) => set({ globalActivity: s }))
+    const offIdle = api.onActivityIdle(() => set({ globalActivity: { kind: 'idle' } }))
+    return () => {
+      offUpdate()
+      offIdle()
+    }
+  },
   brainState: null,
   brainStateLoading: false,
   async loadBrainState() {
@@ -483,7 +496,7 @@ export const useStore = create<State>((set, get) => ({
     const off = api.onBrainProgress((e) =>
       set({
         brainProgress: {
-          label: `${e.phase}${e.detail ? ' · ' + e.detail.slice(0, 40) : ''}`,
+          label: formatBrainProgressLabel(e.phase, e.detail),
           pct:
             e.phase === 'deploy'
               ? 96

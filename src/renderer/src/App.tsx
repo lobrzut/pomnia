@@ -17,12 +17,13 @@ import Onboarding from './pages/Onboarding'
 const PAGES = { dashboard: Dashboard, browse: Browse, import: ImportPage, brain: Brain, connect: Connect, settings: Settings } as const
 
 export default function App() {
-  const { route, scan, refreshVault, vault, toast, onboarded, loadAppSettings } = useStore()
+  const { route, scan, refreshVault, vault, toast, onboarded, loadAppSettings, initGlobalActivity } = useStore()
 
   useEffect(() => {
     void scan()
     void refreshVault()
     void loadAppSettings()
+    const offActivity = initGlobalActivity()
     // Surface otherwise-silent async failures as toasts (diagnostics).
     const onErr = (e: ErrorEvent) => toast({ kind: 'error', title: 'Unexpected error', detail: e.message })
     const onRej = (e: PromiseRejectionEvent) =>
@@ -32,6 +33,7 @@ export default function App() {
     return () => {
       window.removeEventListener('error', onErr)
       window.removeEventListener('unhandledrejection', onRej)
+      offActivity()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

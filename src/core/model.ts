@@ -136,6 +136,10 @@ export interface LibraryDocument {
   sparse: boolean
   extractionPath: string
   importedAt: string
+  /** Encrypted in vault but not yet embedded in library.db — flush when Brain starts. */
+  pendingIndex?: boolean
+  /** ISO timestamp when library.db indexing completed. */
+  indexedAt?: string
 }
 
 /** Encrypted document library manifest (`library.cvb`). */

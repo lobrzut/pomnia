@@ -67,7 +67,18 @@ function WinBtn({ children, onClick, danger }: { children: React.ReactNode; onCl
 }
 
 export function Sidebar() {
-  const { route, setRoute, vault, lockVault, brainRunning, brainProgress } = useStore()
+  const { route, setRoute, vault, lockVault, globalActivity } = useStore()
+  const busy = globalActivity.kind !== 'idle'
+  const busyLabel =
+    busy && globalActivity.detail
+      ? globalActivity.detail.slice(0, 28)
+      : busy
+        ? globalActivity.kind === 'distill'
+          ? 'destylacja…'
+          : globalActivity.kind === 'doc-import'
+            ? 'import…'
+            : 'praca w tle…'
+        : null
   return (
     <nav className="relative z-10 flex w-[208px] shrink-0 flex-col gap-1 px-3 pb-4">
       <div className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
@@ -93,10 +104,10 @@ export function Sidebar() {
             <span className={clsx('relative flex min-w-0 flex-1 flex-col text-left', active ? 'text-ink' : 'text-ink-dim')}>
               <span className="flex items-center gap-1.5">
                 {n.label}
-                {n.id === 'brain' && brainRunning && <Spinner className="h-3 w-3 shrink-0 text-iris" />}
+                {n.id === 'brain' && busy && <Spinner className="h-3 w-3 shrink-0 text-iris" />}
               </span>
-              {n.id === 'brain' && brainRunning && brainProgress && (
-                <span className="truncate text-[10px] font-normal text-ink-faint">{brainProgress.label}</span>
+              {n.id === 'brain' && busyLabel && (
+                <span className="truncate text-[10px] font-normal text-ink-faint">{busyLabel}</span>
               )}
             </span>
           </button>

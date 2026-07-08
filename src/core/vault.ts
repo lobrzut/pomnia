@@ -202,6 +202,26 @@ export class Vault {
     return this.library.documents.find((d) => d.id === id)
   }
 
+  getPendingIndexDocuments(): LibraryDocument[] {
+    return this.library.documents.filter((d) => d.pendingIndex)
+  }
+
+  async setLibraryDocPendingIndex(id: string, pending: boolean): Promise<void> {
+    const doc = this.getLibraryDocument(id)
+    if (!doc) throw new Error(`Library document not found: ${id}`)
+    doc.pendingIndex = pending
+    if (!pending) doc.indexedAt = new Date().toISOString()
+    await this.saveLibrary()
+  }
+
+  async markLibraryDocIndexed(id: string): Promise<void> {
+    const doc = this.getLibraryDocument(id)
+    if (!doc) throw new Error(`Library document not found: ${id}`)
+    doc.pendingIndex = false
+    doc.indexedAt = new Date().toISOString()
+    await this.saveLibrary()
+  }
+
   /** Store source + extracted markdown as encrypted blobs; update library manifest. */
   async addLibraryDocument(
     doc: Omit<LibraryDocument, 'sourceBlobSha' | 'sourceBytes' | 'extractedBlobSha' | 'extractedBytes'>,

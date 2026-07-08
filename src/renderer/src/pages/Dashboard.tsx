@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Check, Database, HardDriveDownload, MessageSquare, RefreshCw, Server, Layers } from 'lucide-react'
 import { Badge, Button, GlassCard, Input, ProgressBar, SourceTile, Spinner } from '../components/ui'
+import { ActivityBanner } from '../components/ActivityBanner'
 import { humanBytes, sourceMeta } from '../lib/format'
 import { useStore } from '../store/useStore'
 
@@ -46,6 +47,7 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto max-w-5xl">
+      <ActivityBanner className="mb-5" />
       <div className="mb-6 flex items-end justify-between">
         <div>
           <h1 className="text-[26px] font-bold tracking-tight text-grad">Command center</h1>
