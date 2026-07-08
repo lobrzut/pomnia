@@ -8,6 +8,20 @@ import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
 import type { DocImportProgressEvent, DocImportResult } from '../lib/types'
 
+const DOC_DROP_EXTENSIONS = new Set(['pdf', 'docx', 'md', 'txt', 'epub'])
+
+function docPathFromFile(file: File): string | null {
+  const path = (file as File & { path?: string }).path
+  if (path) return path
+  return null
+}
+
+function isDocDropFile(file: File): boolean {
+  const name = file.name.toLowerCase()
+  const ext = name.includes('.') ? name.split('.').pop() ?? '' : ''
+  return DOC_DROP_EXTENSIONS.has(ext)
+}
+
 const PROVIDERS: { id: string; how: string }[] = [
   { id: 'claude-ai', how: 'Settings → Privacy → Export data → conversations.json (ZIP)' },
   { id: 'chatgpt', how: 'Settings → Data controls → Export data → conversations.json (ZIP)' },
@@ -21,6 +35,7 @@ export default function Import() {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ sealed: number; sources: { source: string; count: number }[] } | null>(null)
   const [docBusy, setDocBusy] = useState(false)
+  const [docDragOver, setDocDragOver] = useState(false)
   const [docProgress, setDocProgress] = useState<DocImportProgressEvent | null>(null)
   const [docResult, setDocResult] = useState<DocImportResult | null>(null)
 
@@ -55,13 +70,13 @@ export default function Import() {
     }
   }
 
-  async function pickAndImportDoc() {
+  async function importDocFile(filePath?: string) {
     if (!vault.open || docBusy) return
     setDocBusy(true)
     setDocResult(null)
     setDocProgress(null)
     try {
-      const file = await api.pickDocFile()
+      const file = filePath ?? (await api.pickDocFile())
       if (!file) return
       const r = await api.docImport(file)
       if (!r) return
@@ -76,7 +91,40 @@ export default function Import() {
     } finally {
       setDocBusy(false)
       setDocProgress(null)
+      setDocDragOver(false)
     }
+  }
+
+  function handleDocDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (vault.open && !docBusy) setDocDragOver(true)
+  }
+
+  function handleDocDragLeave(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDocDragOver(false)
+  }
+
+  function handleDocDrop(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDocDragOver(false)
+    if (!vault.open || docBusy) return
+
+    const dropped = e.dataTransfer.files[0]
+    if (!dropped) return
+    if (!isDocDropFile(dropped)) {
+      toast({ kind: 'warn', title: 'Unsupported format', detail: labels.importDocFormats })
+      return
+    }
+    const path = docPathFromFile(dropped)
+    if (!path) {
+      toast({ kind: 'error', title: 'Drop failed', detail: 'Could not read file path.' })
+      return
+    }
+    void importDocFile(path)
   }
 
   return (
@@ -141,12 +189,34 @@ export default function Import() {
 
       <div className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-faint">{labels.importDocSection}</div>
 
-      <GlassCard className="mb-5 flex flex-col items-center gap-3 p-8 text-center">
+      <div
+        role="button"
+        tabIndex={vault.open && !docBusy ? 0 : -1}
+        onClick={vault.open && !docBusy ? () => void importDocFile() : undefined}
+        onKeyDown={(e) => {
+          if (vault.open && !docBusy && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault()
+            void importDocFile()
+          }
+        }}
+        onDragOver={handleDocDragOver}
+        onDragLeave={handleDocDragLeave}
+        onDrop={handleDocDrop}
+        className={`glass glass-hover mb-5 flex flex-col items-center gap-3 rounded-[var(--radius-xl)] border border-dashed p-8 text-center transition-colors ${
+          docDragOver ? 'border-iris bg-iris/10 ring-1 ring-iris/40' : 'border-white/10'
+        } ${vault.open && !docBusy ? 'no-drag cursor-pointer' : ''}`}
+      >
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/6">
           {docBusy ? <Spinner className="h-6 w-6 text-iris" /> : <FileText className="h-6 w-6 text-iris" />}
         </div>
         <div className="text-sm font-semibold text-ink">
-          {docBusy ? labels.importDocBusy : vault.open ? labels.importDocPick : labels.importVaultClosed}
+          {docBusy
+            ? labels.importDocBusy
+            : docDragOver
+              ? labels.importDocDrop
+              : vault.open
+                ? labels.importDocPick
+                : labels.importVaultClosed}
         </div>
         <div className="text-xs text-ink-faint">{labels.importDocFormats}</div>
         {docProgress && docBusy && (
@@ -155,10 +225,10 @@ export default function Import() {
             {docProgress.total > 1 ? ` (${docProgress.done}/${docProgress.total})` : ''}
           </div>
         )}
-        <Button onClick={pickAndImportDoc} disabled={docBusy || !vault.open} className="mt-1">
+        <Button onClick={() => void importDocFile()} disabled={docBusy || !vault.open} className="mt-1">
           <Upload className="h-4 w-4" /> {labels.importDocSelect}
         </Button>
-      </GlassCard>
+      </div>
 
       {docResult && (
         <motion.div initial={{ y: 8 }} animate={{ y: 0 }}>
