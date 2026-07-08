@@ -33,7 +33,7 @@ Legenda: **L** = lokalnie w Pomnia, **S** = serwer Brain homelab, **Q** = jakoś
 | **DOCX** | `mammoth` 🔲 v1 | `python-docx` ✅ | dobra | uproszczone | ✅ | ~200 KB JS |
 | **MD / TXT** | passthrough ✅ | passthrough ✅ | pełna | — | ✅ | 0 |
 | **HTML / HTM** | 🔲 (BS4-equivalent) | BeautifulSoup ✅ | dobra | — | ✅ | markitdown-ts ciężki |
-| **EPUB** | 🔲 (`epub.js` / zip+html) | `ebooklib`+BS4 ✅ | dobra | — | ✅ | ~1–3 MB |
+| **EPUB** | `fflate`+HTML ✅ v0.2 | `ebooklib`+BS4 ✅ | dobra | — | ✅ | ~100 KB JS (fflate) |
 | **MOBI/AZW** | 🔲 v2+ | `mobi` lib ✅ | średnia | — | częściowo | Python only dziś |
 | **Obrazy (PNG/JPG)** | Tier 2 OCR / Ollama vision 🔲 | 🔲 | zależy od OCR | — | ✅ | vision = wolne |
 | **ZIP/7z archiwum** | 🔲 rozpakuj → rekursja | `zipfile`/`py7zr` ✅ | — | — | ✅ | fflate już w import czatów |

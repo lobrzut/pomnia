@@ -120,7 +120,7 @@ export async function importDocument(
 }
 
 /** File extensions accepted by the document import picker. */
-export const DOC_IMPORT_EXTENSIONS = ['pdf', 'docx', 'md', 'txt']
+export const DOC_IMPORT_EXTENSIONS = ['pdf', 'docx', 'md', 'txt', 'epub']
 
 export function isDocImportPath(p: string): boolean {
   return DOC_IMPORT_EXTENSIONS.includes(extname(p).slice(1).toLowerCase())

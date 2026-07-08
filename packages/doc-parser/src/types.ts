@@ -8,7 +8,7 @@ export interface ParsedPage {
 
 export interface ParsedDocument {
   sourcePath: string
-  format: 'pdf' | 'docx' | 'md' | 'txt'
+  format: 'pdf' | 'docx' | 'md' | 'txt' | 'epub'
   pages: ParsedPage[]
   markdown: string
   meta: {

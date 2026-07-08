@@ -41,7 +41,7 @@ import {
 } from '@core/index'
 
 import { brainCore } from './brainCore.js'
-import { importDocument } from './docImport.js'
+import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { getAppSettings, loadAppSettings, setAppSettings, shouldHideOnClose, shouldHideOnMinimize } from './appSettings.js'
 import { destroyTray, initTray, refreshTrayMenu } from './tray.js'
 import { isCursorDbTooLarge } from '@core/adapters/cursor.js'
@@ -201,7 +201,7 @@ function registerIpc(): void {
     const r = await dialog.showOpenDialog(win!, {
       title: 'Select document',
       properties: ['openFile'],
-      filters: [{ name: 'Documents', extensions: ['pdf', 'docx', 'md', 'txt'] }]
+      filters: [{ name: 'Documents', extensions: DOC_IMPORT_EXTENSIONS }]
     })
     return r.canceled ? null : r.filePaths[0]
   })
@@ -214,10 +214,13 @@ function registerIpc(): void {
         await dialog.showOpenDialog(win!, {
           title: 'Import document',
           properties: ['openFile'],
-          filters: [{ name: 'Documents', extensions: ['pdf', 'docx', 'md', 'txt'] }]
+          filters: [{ name: 'Documents', extensions: DOC_IMPORT_EXTENSIONS }]
         })
       ).filePaths[0]
     if (!p) return null
+    if (!isDocImportPath(p)) {
+      throw new Error(`Unsupported document format: ${p}`)
+    }
     return importDocument(v, vaultPath!, p, (ev) => win?.webContents.send('doc:import-progress', ev))
   })
 

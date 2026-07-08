@@ -33,6 +33,7 @@ export interface UiLabels {
   importDocBusy: string
   importDocFormats: string
   importDocSelect: string
+  importDocDrop: string
   importDocDone: string
   importDocOcrHint: string
   importDocBrainOff: string
@@ -71,10 +72,11 @@ export function uiLabels(simple: boolean): UiLabels {
       importSelect: 'Wybierz plik…',
       importChatSection: 'Eksporty czatów',
       importDocSection: 'Dokumenty',
-      importDocPick: 'Wybierz PDF lub DOCX',
+      importDocPick: 'Wybierz PDF, DOCX lub EPUB',
       importDocBusy: 'Importuję dokument…',
-      importDocFormats: 'PDF · DOCX · MD · TXT — zaszyfrowane w vault, indeks w wyszukiwarce',
+      importDocFormats: 'PDF · DOCX · EPUB · MD · TXT — zaszyfrowane w vault, indeks w wyszukiwarce',
       importDocSelect: 'Wybierz dokument…',
+      importDocDrop: 'Upuść plik tutaj',
       importDocDone: 'Dokument zaimportowany',
       importDocOcrHint: 'Mało tekstu — w v0.3 uruchom OCR dla skanów.',
       importDocBrainOff: 'Uruchom lokalną wyszukiwarkę (Brain), żeby zindeksować chunki.',
@@ -113,10 +115,11 @@ export function uiLabels(simple: boolean): UiLabels {
     importSelect: 'Select export…',
     importChatSection: 'Chat exports',
     importDocSection: 'Documents',
-    importDocPick: 'Choose a PDF or DOCX',
+    importDocPick: 'Choose a PDF, DOCX, or EPUB',
     importDocBusy: 'Importing document…',
-    importDocFormats: 'PDF · DOCX · MD · TXT — encrypted in vault, indexed in library.db',
+    importDocFormats: 'PDF · DOCX · EPUB · MD · TXT — encrypted in vault, indexed in library.db',
     importDocSelect: 'Select document…',
+    importDocDrop: 'Drop file here',
     importDocDone: 'Document imported',
     importDocOcrHint: 'Sparse text layer — OCR recommended in v0.3 for scans.',
     importDocBrainOff: 'Start embedded brain to embed chunks into library.db.',

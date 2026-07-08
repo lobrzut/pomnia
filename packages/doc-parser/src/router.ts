@@ -1,13 +1,14 @@
 import { extname } from 'node:path'
 
 import { parseDocx } from './docx.js'
+import { parseEpub } from './epub.js'
 import { parsePdf } from './pdf.js'
 import { parseText } from './text.js'
 import type { ParsedDocument, ParsePdfOptions } from './types.js'
 
 export interface ParseDocumentOptions extends ParsePdfOptions {}
 
-const SUPPORTED = new Set(['.pdf', '.docx', '.md', '.markdown', '.txt'])
+const SUPPORTED = new Set(['.pdf', '.docx', '.md', '.markdown', '.txt', '.epub'])
 
 /** Route a file path to the correct Tier 1 parser. */
 export async function parseDocument(
@@ -23,6 +24,8 @@ export async function parseDocument(
       return parsePdf(filePath, options)
     case '.docx':
       return parseDocx(filePath)
+    case '.epub':
+      return parseEpub(filePath)
     case '.md':
     case '.markdown':
     case '.txt':
@@ -39,6 +42,8 @@ export function extractionPathLabel(parsed: ParsedDocument): string {
       return 'unpdf'
     case 'docx':
       return 'mammoth'
+    case 'epub':
+      return 'fflate+html'
     case 'md':
     case 'txt':
       return 'passthrough'
