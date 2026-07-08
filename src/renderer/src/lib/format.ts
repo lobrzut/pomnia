@@ -17,13 +17,13 @@ export function relativeTime(iso?: string): string {
   const then = new Date(iso).getTime()
   const diff = Date.now() - then
   const m = Math.round(diff / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
+  if (m < 1) return 'przed chwilą'
+  if (m < 60) return `${m} min temu`
   const h = Math.round(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return h === 1 ? '1 godz. temu' : `${h} godz. temu`
   const d = Math.round(h / 24)
-  if (d < 30) return `${d}d ago`
-  return new Date(iso).toLocaleDateString()
+  if (d < 30) return d === 1 ? '1 dzień temu' : `${d} dni temu`
+  return new Date(iso).toLocaleDateString('pl-PL')
 }
 
 export interface SourceMeta {

@@ -71,6 +71,14 @@ export interface UiLabels {
   importDocBrainOff: string
   importProviders: string
   importLegalNote: string
+  brainStateTitle: string
+  brainStateLastDistill: (rel: string) => string
+  brainStateLoading: string
+  brainStateChatsInTools: string
+  brainStateDistilled: string
+  brainStateBacklog: string
+  brainStatePendingNew: (n: number) => string
+  cancel: string
 }
 
 const PL_LABELS: UiLabels = {
@@ -152,7 +160,15 @@ const PL_LABELS: UiLabels = {
   importDocBrainOff: 'Uruchom lokalną wyszukiwarkę (Brain), żeby zindeksować chunki.',
   importProviders: 'Skąd pobrać eksport',
   importLegalNote:
-    'Pomnia importuje tylko oficjalne eksporty — bez logowania do kont. Claude Desktop / Gemini wymagają eksportu z wersji webowej.'
+    'Pomnia importuje tylko oficjalne eksporty — bez logowania do kont. Claude Desktop / Gemini wymagają eksportu z wersji webowej.',
+  brainStateTitle: 'Stan Brain',
+  brainStateLastDistill: (rel) => `Ostatnia destylacja ${rel}`,
+  brainStateLoading: 'Wczytywanie stanu pipeline…',
+  brainStateChatsInTools: 'Czaty w narzędziach',
+  brainStateDistilled: 'Zdestylowane',
+  brainStateBacklog: 'Kolejka',
+  brainStatePendingNew: (n) => `+${n} nowych`,
+  cancel: 'Anuluj'
 }
 
 /** @param _simple ignored — kept for call-site compatibility; language does not depend on simple mode */
