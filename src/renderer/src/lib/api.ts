@@ -26,6 +26,7 @@ import type {
 /** The bridge exposed by preload as window.pomnia. */
 export interface PomniaBridge {
   platform: string
+  getPathForFile(file: File): string
   scan(): Promise<DetectedSource[]>
   vaultStatus(): Promise<VaultStatus>
   pickDirectory(): Promise<string | null>
@@ -148,6 +149,10 @@ function mockBridge(): PomniaBridge {
   })
   return {
     platform: 'browser',
+    getPathForFile(file: File) {
+      const legacy = (file as File & { path?: string }).path
+      return legacy ?? `C:/Users/Alice/Downloads/${file.name}`
+    },
     async scan() {
       await new Promise((r) => setTimeout(r, 600))
       return demoSources
