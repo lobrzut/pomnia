@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { uiLabels } from './labels'
+import { formatBrainProgressLabel, uiLabels } from './labels'
 
 describe('uiLabels', () => {
   it('returns Polish labels regardless of simple mode flag', () => {
@@ -44,5 +44,15 @@ describe('uiLabels', () => {
   it('returns the same object reference for any argument', () => {
     expect(uiLabels(true)).toBe(uiLabels(false))
     expect(uiLabels()).toBe(uiLabels(true))
+  })
+})
+
+describe('formatBrainProgressLabel', () => {
+  it('maps distill phase to Polish with detail', () => {
+    expect(formatBrainProgressLabel('distill', 'Session title')).toBe('destylacja · Session title')
+  })
+
+  it('maps encrypt phase to Polish', () => {
+    expect(formatBrainProgressLabel('encrypt')).toBe('szyfrowanie')
   })
 })
