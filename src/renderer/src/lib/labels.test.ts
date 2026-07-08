@@ -14,6 +14,10 @@ describe('uiLabels', () => {
     expect(advanced.distill).toBe('Przygotuj pamięć')
     expect(simple.importDropFailed).toBe('Upuszczenie nie powiodło się')
     expect(simple.importDropNoPath).toContain('Wybierz plik')
+    expect(simple.importDocIndexedToast(12)).toBe('Zindeksowano 12 chunków')
+    expect(simple.importDocQueuedToast).toBe('Zapisano — indeks po uruchomieniu Brain')
+    expect(simple.importDocNotIndexedBadge).toBe('bez indeksu')
+    expect(simple.importDocProgressBrainStart).toBe('Uruchamianie wyszukiwarki')
   })
 
   it('exposes Polish brain state card labels', () => {
@@ -25,6 +29,16 @@ describe('uiLabels', () => {
     expect(labels.cancel).toBe('Anuluj')
     expect(labels.brainStateLastDistill('2 dni temu')).toBe('Ostatnia destylacja 2 dni temu')
     expect(labels.brainStatePendingNew(7)).toBe('+7 nowych')
+  })
+
+  it('formats activity banner in Polish', () => {
+    const labels = uiLabels()
+    expect(
+      labels.activityBanner({ kind: 'distill', done: 3, total: 7, detail: 'Sesja o vault backup' })
+    ).toBe('Trwa: destylacja (3/7) · Sesja o vault backup')
+    expect(labels.activityBanner({ kind: 'doc-import', detail: 'report.epub' })).toBe(
+      'Trwa: import dokumentu · report.epub'
+    )
   })
 
   it('returns the same object reference for any argument', () => {

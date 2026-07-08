@@ -119,6 +119,39 @@ describe('vault — encrypted, content-addressed', () => {
     expect(got?.originalName).toBe('report.pdf')
     expect((await reopened.readLibrarySource('deadbeef_report.pdf')).toString()).toBe(source.toString())
     expect((await reopened.readLibraryExtracted('deadbeef_report.pdf')).toString()).toBe(extracted.toString())
+  })
 
+  it('tracks pending library index in manifest', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'continuum-pending-'))
+    tmpDirs.push(dir)
+    const vaultDir = path.join(dir, 'v.pending')
+
+    const vault = await Vault.create(vaultDir, 'Pending', 'pw-pend')
+    const source = Buffer.from('hello pending doc')
+    const extracted = Buffer.from('---\nformat: txt\n---\n\nHello')
+    await vault.addLibraryDocument(
+      {
+        id: 'abc_note.txt',
+        originalName: 'note.txt',
+        format: 'txt',
+        contentSha: sha256(source),
+        pages: 1,
+        sparse: false,
+        extractionPath: 'passthrough',
+        importedAt: new Date().toISOString(),
+        pendingIndex: true,
+      },
+      source,
+      extracted
+    )
+    expect(vault.getPendingIndexDocuments()).toHaveLength(1)
+
+    await vault.markLibraryDocIndexed('abc_note.txt')
+    expect(vault.getPendingIndexDocuments()).toHaveLength(0)
+    expect(vault.getLibraryDocument('abc_note.txt')?.indexedAt).toBeTruthy()
+
+    const reopened = await Vault.open(vaultDir, 'pw-pend')
+    expect(reopened.getPendingIndexDocuments()).toHaveLength(0)
+    expect(reopened.getLibraryDocument('abc_note.txt')?.indexedAt).toBeTruthy()
   })
 })

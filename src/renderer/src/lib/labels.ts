@@ -1,5 +1,46 @@
 /** Polish UI labels — simple mode only hides advanced sections, not language. */
 
+import type { ActivityState } from './types'
+
+const ACTIVITY_KIND: Record<Exclude<ActivityState['kind'], 'idle'>, string> = {
+  distill: 'destylacja',
+  'doc-import': 'import dokumentu',
+  'brain-start': 'uruchamianie Brain',
+  indexing: 'indeksowanie',
+  embed: 'embeddingi',
+}
+
+const ACTIVITY_PHASE: Record<string, string> = {
+  collect: 'zbieranie',
+  distill: 'destylacja',
+  index: 'indeksowanie',
+  deploy: 'wdrożenie',
+  parse: 'parsowanie',
+  encrypt: 'szyfrowanie',
+  reindex: 'odświeżanie indeksu',
+  start: 'start',
+}
+
+function truncateDetail(s: string, max = 48): string {
+  const t = s.trim()
+  if (t.length <= max) return t
+  return `${t.slice(0, max - 1)}…`
+}
+
+export function formatBrainProgressLabel(phase: string, detail?: string): string {
+  const pl = ACTIVITY_PHASE[phase] ?? phase
+  return detail ? `${pl} · ${truncateDetail(detail, 40)}` : pl
+}
+
+export function formatActivityBanner(state: ActivityState): string {
+  if (state.kind === 'idle') return ''
+  const kind = ACTIVITY_KIND[state.kind]
+  const progress =
+    state.done != null && state.total != null && state.total > 0 ? ` (${state.done}/${state.total})` : ''
+  const detail = state.detail ? ` · ${truncateDetail(state.detail)}` : ''
+  return `Trwa: ${kind}${progress}${detail}`
+}
+
 export interface UiLabels {
   distill: string
   distillBacklog: (n: number) => string
@@ -69,6 +110,19 @@ export interface UiLabels {
   importDocDone: string
   importDocOcrHint: string
   importDocBrainOff: string
+  importDocQueuedHint: string
+  importDocIndexedToast: (chunks: number) => string
+  importDocQueuedToast: string
+  importDocQueuedDetail: string
+  importDocFailedToast: string
+  importDocNotIndexedBadge: string
+  importDocIndexedBadge: (chunks: number) => string
+  importDocPagesBadge: (n: number) => string
+  importDocEncryptedBadge: string
+  importDocProgressParse: string
+  importDocProgressIndex: string
+  importDocProgressBrainStart: string
+  importDocProgressEncrypt: string
   importProviders: string
   importLegalNote: string
   brainStateTitle: string
@@ -79,6 +133,8 @@ export interface UiLabels {
   brainStateBacklog: string
   brainStatePendingNew: (n: number) => string
   cancel: string
+  activityBanner: (state: ActivityState) => string
+  activityTrayBusy: string
 }
 
 const PL_LABELS: UiLabels = {
@@ -158,6 +214,19 @@ const PL_LABELS: UiLabels = {
   importDocDone: 'Dokument zaimportowany',
   importDocOcrHint: 'Mało tekstu — w v0.3 uruchom OCR dla skanów.',
   importDocBrainOff: 'Uruchom lokalną wyszukiwarkę (Brain), żeby zindeksować chunki.',
+  importDocQueuedHint: 'Zapisano w vault — indeks po uruchomieniu Brain.',
+  importDocIndexedToast: (chunks) => `Zindeksowano ${chunks} chunków`,
+  importDocQueuedToast: 'Zapisano — indeks po uruchomieniu Brain',
+  importDocQueuedDetail: 'Dokument jest w vault; indeks powstanie po starcie wyszukiwarki.',
+  importDocFailedToast: 'Import dokumentu nie powiódł się',
+  importDocNotIndexedBadge: 'bez indeksu',
+  importDocIndexedBadge: (chunks) => `${chunks} chunków`,
+  importDocPagesBadge: (n) => `${n} str.`,
+  importDocEncryptedBadge: 'zaszyfrowany w vault',
+  importDocProgressParse: 'Parsowanie',
+  importDocProgressIndex: 'Indeksowanie',
+  importDocProgressBrainStart: 'Uruchamianie wyszukiwarki',
+  importDocProgressEncrypt: 'Szyfrowanie w vault',
   importProviders: 'Skąd pobrać eksport',
   importLegalNote:
     'Pomnia importuje tylko oficjalne eksporty — bez logowania do kont. Claude Desktop / Gemini wymagają eksportu z wersji webowej.',
@@ -168,7 +237,9 @@ const PL_LABELS: UiLabels = {
   brainStateDistilled: 'Zdestylowane',
   brainStateBacklog: 'Kolejka',
   brainStatePendingNew: (n) => `+${n} nowych`,
-  cancel: 'Anuluj'
+  cancel: 'Anuluj',
+  activityBanner: formatActivityBanner,
+  activityTrayBusy: 'Operacja w tle'
 }
 
 /** @param _simple ignored — kept for call-site compatibility; language does not depend on simple mode */

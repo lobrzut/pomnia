@@ -110,6 +110,21 @@ Legenda: **L** = lokalnie w Pomnia, **S** = serwer Brain homelab, **Q** = jakoś
 
 **Reguła:** **Distill** tylko dla **narracji dialogowej** (czaty). **Direct index** dla **gotowego tekstu** (PDF/DOCX/EPUB/MD). Mieszanie = błąd projektowy (LLM nie powinien „streszczać" już napisanego raportu bez wyraźnej prośby usera).
 
+### 3.1 Distill vs `save_conversation` (czat na żywo)
+
+| | **`save_conversation` (MCP w czacie)** | **Distill (Pomnia)** |
+|---|---|---|
+| **Kiedy** | Agent woła na koniec sesji („zapisz do brain") lub po regule w `.cursor/rules` | Ręcznie / „distill backlog" w UI Brain, albo CLI `brain pipeline` |
+| **Wejście** | To, co agent *pamięta* z bieżącej rozmowy | **Surowy log** z adaptera (np. `transcript.jsonl` Antigravity, DB Cursor) |
+| **Kto pisze notatkę** | Agent w czacie (Cursor/Claude/Antigravity) | Lokalny Ollama (qwen) — batch, po fakcie |
+| **Gdzie ląduje plik** | `vault/sessions/` · `saved_via: mcp_save_conversation` | staging `%AppData%/Pomnia/brain-notes/` → deploy → `vault/distilled/` · `distilled_via: pomnia` |
+| **Pełny transkrypt?** | **Nie** — tylko ustrukturyzowany skrót (Summary, Decisions, Files, Commands…) | **Nie** — też skrót, ale wyciągnięty z całego logu (head+tail do ~12k znaków) |
+| **Indeks RAG** | Po reindex → chunki w `library.db` | To samo (+ lokalny `.pomnia-index.json` od razu po distill) |
+
+**To nie są te same pliki.** Inny folder, inna nazwa, inny autor treści. Ta sama sesja *może* mieć oba — to nie duplikat 1:1, tylko dwa opisy tego samego czatu.
+
+**Po co distill, skoro agent zapisuje w czacie?** Bo większość sesji **nigdy** nie dostaje `save_conversation` (tylko gdy poprosisz / reguła). Distill ogarnia **wszystkie** zebrane rozmowy (np. 7× Antigravity) retroaktywnie. Ledger (`distill-ledger.json`) pilnuje, żeby nie przetwarzać tej samej sesji drugi raz.
+
 ---
 
 ## 4. Diagram end-to-end (mermaid)

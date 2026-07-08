@@ -1,4 +1,5 @@
 import type {
+  ActivityState,
   BackupProgressEvent,
   BrainHit,
   BrainPing,
@@ -44,7 +45,7 @@ export interface PomniaBridge {
   vaultConversation(snapshotId: string, id: string): Promise<Conversation | null>
   vaultSearchText(query: string): Promise<TextHit[]>
   importToVault(path: string): Promise<{ sealed: number; sources: { source: string; count: number }[] }>
-  docImport(path?: string): Promise<DocImportResult | null>
+  docImport(path?: string, ollamaUrl?: string): Promise<DocImportResult | null>
   brainExport(snapshotId: string, outDir: string): Promise<{ count: number; dir: string }>
   revealPath(p: string): Promise<void>
   brainStatus(ollamaUrl?: string): Promise<BrainStatus>
@@ -74,6 +75,9 @@ export interface PomniaBridge {
   ollamaPullCancel(): Promise<{ ok: boolean }>
   onOllamaPullProgress(cb: (e: OllamaPullEvent) => void): () => void
   onDocImportProgress(cb: (e: DocImportProgressEvent) => void): () => void
+  activityGet(): Promise<ActivityState>
+  onActivityUpdate(cb: (e: ActivityState) => void): () => void
+  onActivityIdle(cb: () => void): () => void
   brainDeploy(opts: {
     to: 'filesystem' | 'dashboard'
     target?: string
@@ -250,7 +254,9 @@ function mockBridge(): PomniaBridge {
         extractionPath: 'unpdf',
         suggestOcr: false,
         indexed: true,
+        pendingIndex: false,
         brainRunning: true,
+        brainAutoStarted: false,
         encrypted: true,
       }
     },
@@ -344,6 +350,15 @@ function mockBridge(): PomniaBridge {
       return () => mockPullListeners.delete(cb)
     },
     onDocImportProgress() {
+      return () => {}
+    },
+    async activityGet() {
+      return { kind: 'idle' as const }
+    },
+    onActivityUpdate() {
+      return () => {}
+    },
+    onActivityIdle() {
       return () => {}
     },
     async connectStatus() {

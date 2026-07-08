@@ -24,7 +24,7 @@ const bridge = {
   vaultConversation: (snapshotId: string, id: string) => ipcRenderer.invoke('vault:conversation', snapshotId, id),
   vaultSearchText: (query: string) => ipcRenderer.invoke('vault:searchText', query),
   importToVault: (p: string) => ipcRenderer.invoke('import:toVault', p),
-  docImport: (p?: string) => ipcRenderer.invoke('doc:import', p),
+  docImport: (p?: string, ollamaUrl?: string) => ipcRenderer.invoke('doc:import', p, ollamaUrl),
   brainExport: (id: string, outDir: string) => ipcRenderer.invoke('brain:export', id, outDir),
   revealPath: (p: string) => ipcRenderer.invoke('reveal', p),
   brainStatus: (ollamaUrl?: string) => ipcRenderer.invoke('brain:status', ollamaUrl),
@@ -57,6 +57,17 @@ const bridge = {
     const l = (_: IpcRendererEvent, e: unknown) => cb(e)
     ipcRenderer.on('doc:import-progress', l)
     return () => ipcRenderer.removeListener('doc:import-progress', l)
+  },
+  activityGet: () => ipcRenderer.invoke('activity:get'),
+  onActivityUpdate: (cb: (e: unknown) => void) => {
+    const l = (_: IpcRendererEvent, e: unknown) => cb(e)
+    ipcRenderer.on('activity:update', l)
+    return () => ipcRenderer.removeListener('activity:update', l)
+  },
+  onActivityIdle: (cb: () => void) => {
+    const l = () => cb()
+    ipcRenderer.on('activity:idle', l)
+    return () => ipcRenderer.removeListener('activity:idle', l)
   },
   brainDeploy: (opts: unknown) => ipcRenderer.invoke('brain:deploy', opts),
   connectStatus: (brainUrl?: string, token?: string, target?: string) =>

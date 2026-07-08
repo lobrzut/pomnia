@@ -24,6 +24,7 @@ import { VRAM_PROFILES, PROFILE_EMBED_MODEL, PROFILE_EMBED_SIZE } from '@core/br
 import type { BrainHit, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent } from '../lib/types'
 import { uiLabels } from '../lib/labels'
 import { useStore, ollamaUrlFromBrainUrl, dashboardUrlFromBrainUrl } from '../store/useStore'
+import { ActivityBanner } from '../components/ActivityBanner'
 
 const PROFILE_KEY = 'pomnia.brain.profile'
 
@@ -288,6 +289,7 @@ export default function Brain() {
 
       {/* Brain state — live chats vs distill ledger, the "what's left to do" panel */}
       <GlassCard className="mb-5 p-5">
+        <ActivityBanner className="mb-3 !rounded-xl !border-amber/30 !bg-amber/8" />
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
             <Database className="h-4 w-4 text-iris" /> {labels.brainStateTitle}
