@@ -22,13 +22,13 @@ export { vecToBlob, blobToVec } from './rag/vec.js'
 export { search } from './rag/search.js'
 export type { SearchOptions, SearchSource } from './rag/search.js'
 export type { RagIndex, SearchHit } from './rag/types.js'
-export { indexFiles, indexDir } from './rag/indexer.js'
-export type { IndexStats, IndexProgressEvent, IndexFileInput } from './rag/indexer.js'
+export { indexFiles, indexDir, indexDocument } from './rag/indexer.js'
+export type { IndexStats, IndexProgressEvent, IndexFileInput, IndexDocumentInput } from './rag/indexer.js'
 
 // Storage (sqlite-vec + vault filesystem)
 export { openDb } from './storage/db.js'
 export type { OpenDbOptions, BrainDb } from './storage/db.js'
-export { defaultVaultConfig } from './storage/vault.js'
+export { defaultVaultConfig, ensureLibraryDirs } from './storage/vault.js'
 export type { VaultConfig } from './storage/vault.js'
 
 // Config (env + optional TOML/JSON file)

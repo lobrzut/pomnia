@@ -36,6 +36,12 @@ interface ChildMsg {
   total?: number
 }
 
+export interface IndexDocumentPayload {
+  path: string
+  name?: string
+  pages: { page: number; text: string }[]
+}
+
 export interface StartOptions {
   dataDir: string
   ollamaUrl?: string
@@ -115,7 +121,7 @@ export class BrainCoreManager {
         }
       })
       child.on('message', (m: ChildMsg) => {
-        if (m.type === 'reindex-progress') this.onEvent?.(m)
+        if (m.type === 'reindex-progress' || m.type === 'index-progress') this.onEvent?.(m)
       })
       this.child = child
 
@@ -196,6 +202,33 @@ export class BrainCoreManager {
         }
         child.on('message', h)
         child.send({ type: 'reindex', dir })
+      })
+    } finally {
+      this.indexing = false
+    }
+  }
+
+  async indexDocument(doc: IndexDocumentPayload): Promise<unknown> {
+    const child = this.child
+    if (!child || !this.url) throw new Error('embedded brain is not running')
+    if (this.indexing) throw new Error('index already running')
+    this.indexing = true
+    try {
+      return await new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('index-document timeout (10 min)')), 600_000)
+        const h = (m: ChildMsg): void => {
+          if (m.type === 'indexed-document') {
+            clearTimeout(t)
+            child.off('message', h)
+            resolve(m.stats)
+          } else if (m.type === 'error') {
+            clearTimeout(t)
+            child.off('message', h)
+            reject(new Error(m.message ?? 'index-document failed'))
+          }
+        }
+        child.on('message', h)
+        child.send({ type: 'index-document', doc })
       })
     } finally {
       this.indexing = false

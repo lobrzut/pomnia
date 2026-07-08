@@ -3,7 +3,8 @@ import type {
   BrainHit,
   BrainPing,
   BrainProgressEvent,
-  BrainRunResult,
+  DocImportProgressEvent,
+  DocImportResult,
   BrainStateInfo,
   BrainStatus,
   ClientId,
@@ -29,6 +30,7 @@ export interface PomniaBridge {
   vaultStatus(): Promise<VaultStatus>
   pickDirectory(): Promise<string | null>
   pickFile(): Promise<string | null>
+  pickDocFile(): Promise<string | null>
   createVault(path: string, name: string, passphrase: string): Promise<VaultStatus>
   openVault(path: string, passphrase: string): Promise<VaultStatus>
   lockVault(): Promise<void>
@@ -41,6 +43,7 @@ export interface PomniaBridge {
   vaultConversation(snapshotId: string, id: string): Promise<Conversation | null>
   vaultSearchText(query: string): Promise<TextHit[]>
   importToVault(path: string): Promise<{ sealed: number; sources: { source: string; count: number }[] }>
+  docImport(path?: string): Promise<DocImportResult | null>
   brainExport(snapshotId: string, outDir: string): Promise<{ count: number; dir: string }>
   revealPath(p: string): Promise<void>
   brainStatus(ollamaUrl?: string): Promise<BrainStatus>
@@ -69,6 +72,7 @@ export interface PomniaBridge {
   ollamaPull(model: string, ollamaUrl?: string): Promise<{ ok: boolean }>
   ollamaPullCancel(): Promise<{ ok: boolean }>
   onOllamaPullProgress(cb: (e: OllamaPullEvent) => void): () => void
+  onDocImportProgress(cb: (e: DocImportProgressEvent) => void): () => void
   brainDeploy(opts: {
     to: 'filesystem' | 'dashboard'
     target?: string
@@ -157,6 +161,9 @@ function mockBridge(): PomniaBridge {
     async pickFile() {
       return 'C:/Users/Alice/Downloads/claude-export.zip'
     },
+    async pickDocFile() {
+      return 'C:/Users/Alice/Downloads/report.pdf'
+    },
     async createVault(path, name) {
       status = { open: true, path, name, snapshots: 0 }
       return status
@@ -224,6 +231,21 @@ function mockBridge(): PomniaBridge {
     async importToVault() {
       await new Promise((r) => setTimeout(r, 700))
       return { sealed: 42, sources: [{ source: 'claude-ai', count: 38 }, { source: 'chatgpt', count: 4 }] }
+    },
+    async docImport() {
+      await new Promise((r) => setTimeout(r, 900))
+      return {
+        sourcePath: 'C:/…/vault/library/sources/abc_report.pdf',
+        extractedPath: 'C:/…/vault/library/extracted/abc_report.md',
+        format: 'pdf',
+        pages: 12,
+        chunks: 18,
+        sparse: false,
+        extractionPath: 'unpdf',
+        suggestOcr: false,
+        indexed: true,
+        brainRunning: true,
+      }
     },
     async vaultSearchText(query) {
       return [
@@ -313,6 +335,9 @@ function mockBridge(): PomniaBridge {
     onOllamaPullProgress(cb) {
       mockPullListeners.add(cb)
       return () => mockPullListeners.delete(cb)
+    },
+    onDocImportProgress() {
+      return () => {}
     },
     async connectStatus() {
       await new Promise((r) => setTimeout(r, 500))

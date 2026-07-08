@@ -41,6 +41,7 @@ import {
 } from '@core/index'
 
 import { brainCore } from './brainCore.js'
+import { importDocument } from './docImport.js'
 import { getAppSettings, loadAppSettings, setAppSettings, shouldHideOnClose, shouldHideOnMinimize } from './appSettings.js'
 import { destroyTray, initTray, refreshTrayMenu } from './tray.js'
 import { isCursorDbTooLarge } from '@core/adapters/cursor.js'
@@ -194,6 +195,29 @@ function registerIpc(): void {
       filters: [{ name: 'Exports', extensions: ['zip', 'json', 'jsonl', 'md', 'txt'] }]
     })
     return r.canceled ? null : r.filePaths[0]
+  })
+
+  ipcMain.handle('pick:docFile', async () => {
+    const r = await dialog.showOpenDialog(win!, {
+      title: 'Select document',
+      properties: ['openFile'],
+      filters: [{ name: 'Documents', extensions: ['pdf', 'docx', 'md', 'txt'] }]
+    })
+    return r.canceled ? null : r.filePaths[0]
+  })
+
+  ipcMain.handle('doc:import', async (_e, filePath?: string) => {
+    const p =
+      filePath ??
+      (
+        await dialog.showOpenDialog(win!, {
+          title: 'Import document',
+          properties: ['openFile'],
+          filters: [{ name: 'Documents', extensions: ['pdf', 'docx', 'md', 'txt'] }]
+        })
+      ).filePaths[0]
+    if (!p) return null
+    return importDocument(p, (ev) => win?.webContents.send('doc:import-progress', ev))
   })
 
   ipcMain.handle('vault:create', async (_e, path: string, name: string, pass: string) => {

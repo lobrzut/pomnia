@@ -6,6 +6,7 @@ const bridge = {
   vaultStatus: () => ipcRenderer.invoke('vault:status'),
   pickDirectory: () => ipcRenderer.invoke('vault:pickDir'),
   pickFile: () => ipcRenderer.invoke('pick:file'),
+  pickDocFile: () => ipcRenderer.invoke('pick:docFile'),
   createVault: (path: string, name: string, pass: string) => ipcRenderer.invoke('vault:create', path, name, pass),
   openVault: (path: string, pass: string) => ipcRenderer.invoke('vault:open', path, pass),
   lockVault: () => ipcRenderer.invoke('vault:lock'),
@@ -22,6 +23,7 @@ const bridge = {
   vaultConversation: (snapshotId: string, id: string) => ipcRenderer.invoke('vault:conversation', snapshotId, id),
   vaultSearchText: (query: string) => ipcRenderer.invoke('vault:searchText', query),
   importToVault: (p: string) => ipcRenderer.invoke('import:toVault', p),
+  docImport: (p?: string) => ipcRenderer.invoke('doc:import', p),
   brainExport: (id: string, outDir: string) => ipcRenderer.invoke('brain:export', id, outDir),
   revealPath: (p: string) => ipcRenderer.invoke('reveal', p),
   brainStatus: (ollamaUrl?: string) => ipcRenderer.invoke('brain:status', ollamaUrl),
@@ -49,6 +51,11 @@ const bridge = {
     const l = (_: IpcRendererEvent, e: unknown) => cb(e)
     ipcRenderer.on('ollama:pull:progress', l)
     return () => ipcRenderer.removeListener('ollama:pull:progress', l)
+  },
+  onDocImportProgress: (cb: (e: unknown) => void) => {
+    const l = (_: IpcRendererEvent, e: unknown) => cb(e)
+    ipcRenderer.on('doc:import-progress', l)
+    return () => ipcRenderer.removeListener('doc:import-progress', l)
   },
   brainDeploy: (opts: unknown) => ipcRenderer.invoke('brain:deploy', opts),
   connectStatus: (brainUrl?: string, token?: string, target?: string) =>
