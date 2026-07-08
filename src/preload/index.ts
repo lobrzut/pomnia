@@ -58,6 +58,11 @@ const bridge = {
     ipcRenderer.on('doc:import-progress', l)
     return () => ipcRenderer.removeListener('doc:import-progress', l)
   },
+  onLibraryIndexComplete: (cb: (e: unknown) => void) => {
+    const l = (_: IpcRendererEvent, e: unknown) => cb(e)
+    ipcRenderer.on('library:index-complete', l)
+    return () => ipcRenderer.removeListener('library:index-complete', l)
+  },
   activityGet: () => ipcRenderer.invoke('activity:get'),
   onActivityUpdate: (cb: (e: unknown) => void) => {
     const l = (_: IpcRendererEvent, e: unknown) => cb(e)

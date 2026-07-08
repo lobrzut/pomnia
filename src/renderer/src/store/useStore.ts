@@ -481,9 +481,13 @@ export const useStore = create<State>((set, get) => ({
     void api.activityGet().then((s) => set({ globalActivity: s })).catch(() => {})
     const offUpdate = api.onActivityUpdate((s) => set({ globalActivity: s }))
     const offIdle = api.onActivityIdle(() => set({ globalActivity: { kind: 'idle' } }))
+    const offLibrary = api.onLibraryIndexComplete(() => {
+      void get().refreshVault()
+    })
     return () => {
       offUpdate()
       offIdle()
+      offLibrary()
     }
   },
   brainState: null,

@@ -14,6 +14,8 @@ export interface VaultStatus {
   path?: string
   name?: string
   snapshots: number
+  /** Library docs waiting for embedded brain indexing. */
+  pendingLibraryIndex?: number
 }
 
 export interface BackupProgressEvent {

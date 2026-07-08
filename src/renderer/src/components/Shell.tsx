@@ -68,6 +68,7 @@ function WinBtn({ children, onClick, danger }: { children: React.ReactNode; onCl
 
 export function Sidebar() {
   const { route, setRoute, vault, lockVault, globalActivity } = useStore()
+  const pendingLibrary = vault.pendingLibraryIndex ?? 0
   const busy = globalActivity.kind !== 'idle'
   const busyLabel =
     busy && globalActivity.detail
@@ -104,6 +105,11 @@ export function Sidebar() {
             <span className={clsx('relative flex min-w-0 flex-1 flex-col text-left', active ? 'text-ink' : 'text-ink-dim')}>
               <span className="flex items-center gap-1.5">
                 {n.label}
+                {n.id === 'brain' && pendingLibrary > 0 && (
+                  <span className="rounded-full border border-amber/40 bg-amber/15 px-1.5 py-px text-[10px] font-medium leading-none text-amber">
+                    {pendingLibrary} indeksów czeka
+                  </span>
+                )}
                 {n.id === 'brain' && busy && <Spinner className="h-3 w-3 shrink-0 text-iris" />}
               </span>
               {n.id === 'brain' && busyLabel && (

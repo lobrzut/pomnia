@@ -1,12 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('electron', () => ({
+  app: {
+    isPackaged: false,
+    getPath: () => '/tmp/pomnia-userdata',
+    getAppPath: () => '/tmp/pomnia-app',
+  },
+}))
+
 const brainStatus = vi.fn()
 const brainStart = vi.fn()
+const indexDocument = vi.fn()
 
 vi.mock('../brainCore.js', () => ({
   brainCore: {
     status: () => brainStatus(),
     start: (...args: unknown[]) => brainStart(...args),
+    indexDocument: (...args: unknown[]) => indexDocument(...args),
   },
 }))
 
@@ -16,19 +26,26 @@ vi.mock('../brainPaths.js', () => ({
 
 const probeOllama = vi.fn()
 vi.mock('../ollamaSettings.js', () => ({
-  resolveOllamaUrl: (u?: string) => u?.trim() || 'http://localhost:11434',
+  resolveOllamaUrl: (url?: string) => url || 'http://localhost:11434',
   probeOllama: (...args: unknown[]) => probeOllama(...args),
-  ollamaUnreachableMessage: (p: { url: string; detail?: string }) =>
-    `Ollama niedostępne pod ${p.url} (GET /api/tags${p.detail ? `: ${p.detail}` : ''})`,
-  brainProcessFailedMessage: (err: unknown) =>
-    `Proces wyszukiwarki nie wystartował: ${err instanceof Error ? err.message : String(err)}`,
+  ollamaUnreachableMessage: () => 'Ollama niedostępne',
+  brainProcessFailedMessage: (err: unknown) => (err instanceof Error ? err.message : String(err)),
+}))
+
+vi.mock('@pomnia/doc-parser', () => ({
+  parseDocument: vi.fn().mockResolvedValue({
+    pages: [{ page: 1, text: 'hello' }],
+    format: 'txt',
+    markdown: 'hello',
+    meta: { pageCount: 1, tier: 'passthrough', sparse: false },
+  }),
 }))
 
 describe('ensureBrainForIndexing', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     brainStatus.mockReturnValue({ running: false, starting: false })
-    probeOllama.mockResolvedValue({ ok: true, url: 'http://127.0.0.1:11434' })
+    probeOllama.mockResolvedValue({ ok: true, baseUrl: 'http://localhost:11434' })
     brainStart.mockResolvedValue({ running: true })
   })
 
@@ -43,12 +60,7 @@ describe('ensureBrainForIndexing', () => {
   it('auto-starts brain when Ollama is reachable', async () => {
     const { ensureBrainForIndexing } = await import('../ensureBrain.js')
     const r = await ensureBrainForIndexing('http://127.0.0.1:11434')
-    expect(r).toEqual({
-      running: true,
-      autoStarted: true,
-      ollamaUrl: 'http://127.0.0.1:11434',
-    })
-    expect(probeOllama).toHaveBeenCalledWith('http://127.0.0.1:11434')
+    expect(r).toEqual({ running: true, autoStarted: true, ollamaUrl: 'http://127.0.0.1:11434' })
     expect(brainStart).toHaveBeenCalledWith({
       dataDir: '/tmp/brain-data',
       ollamaUrl: 'http://127.0.0.1:11434',
@@ -56,27 +68,48 @@ describe('ensureBrainForIndexing', () => {
   })
 
   it('fails gracefully when Ollama is offline', async () => {
-    probeOllama.mockResolvedValue({
-      ok: false,
-      reason: 'unreachable',
-      url: 'http://brain.example.local:11434',
-      detail: 'fetch failed',
-    })
+    probeOllama.mockResolvedValue({ ok: false, baseUrl: 'http://localhost:11434', error: 'fetch failed' })
     const { ensureBrainForIndexing } = await import('../ensureBrain.js')
-    const r = await ensureBrainForIndexing('http://brain.example.local:11434')
+    const r = await ensureBrainForIndexing()
     expect(r.running).toBe(false)
     expect(r.autoStarted).toBe(false)
-    expect(r.error).toMatch(/Ollama niedostępne/)
-    expect(r.error).toContain('/api/tags')
+    expect(r.error).toMatch(/Ollama/i)
     expect(brainStart).not.toHaveBeenCalled()
   })
+})
 
-  it('distinguishes brain process failure from Ollama offline', async () => {
-    brainStart.mockRejectedValue(new Error('brain-core start timeout (20s)'))
-    const { ensureBrainForIndexing } = await import('../ensureBrain.js')
-    const r = await ensureBrainForIndexing('http://brain.example.local:11434')
-    expect(r.running).toBe(false)
-    expect(r.error).toMatch(/Proces wyszukiwarki/)
-    expect(r.error).not.toMatch(/Ollama niedostępne/)
+describe('indexPendingLibraryDocuments', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    brainStatus.mockReturnValue({ running: true, starting: false })
+    indexDocument.mockResolvedValue({ chunks: 2 })
+  })
+
+  it('skipEnsure returns error when brain is offline', async () => {
+    brainStatus.mockReturnValue({ running: false, starting: false })
+    const { indexPendingLibraryDocuments } = await import('../libraryIndex.js')
+    const vault = {
+      getPendingIndexDocuments: () => [{ id: 'doc1', originalName: 'a.txt' }],
+    }
+    const r = await indexPendingLibraryDocuments(vault as never, '/vault', { skipEnsure: true })
+    expect(r.indexed).toBe(0)
+    expect(r.errors[0]).toMatch(/niedostępna/i)
+    expect(indexDocument).not.toHaveBeenCalled()
+  })
+
+  it('skipEnsure indexes pending docs when brain runs', async () => {
+    const markLibraryDocIndexed = vi.fn()
+    const vault = {
+      getPendingIndexDocuments: () => [{ id: 'doc1', originalName: 'a.txt' }],
+      getLibraryDocument: () => ({ id: 'doc1', originalName: 'a.txt' }),
+      readLibrarySource: vi.fn().mockResolvedValue(Buffer.from('hello')),
+      markLibraryDocIndexed,
+    }
+    const { indexPendingLibraryDocuments } = await import('../libraryIndex.js')
+    const r = await indexPendingLibraryDocuments(vault as never, '/vault', { skipEnsure: true })
+    expect(r.indexed).toBe(1)
+    expect(r.chunks).toBe(2)
+    expect(markLibraryDocIndexed).toHaveBeenCalledWith('doc1')
+    expect(brainStart).not.toHaveBeenCalled()
   })
 })

@@ -92,6 +92,7 @@ export default function Import() {
       } else {
         toast({ kind: 'warn', title: labels.importDocQueuedToast, detail })
       }
+      await refreshVault()
     } catch (e) {
       toast({ kind: 'error', title: labels.importDocFailedToast, detail: (e as Error).message })
     } finally {

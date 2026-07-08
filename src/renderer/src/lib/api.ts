@@ -75,6 +75,7 @@ export interface PomniaBridge {
   ollamaPullCancel(): Promise<{ ok: boolean }>
   onOllamaPullProgress(cb: (e: OllamaPullEvent) => void): () => void
   onDocImportProgress(cb: (e: DocImportProgressEvent) => void): () => void
+  onLibraryIndexComplete(cb: (e: { indexed: number; chunks: number; errors: string[] }) => void): () => void
   activityGet(): Promise<ActivityState>
   onActivityUpdate(cb: (e: ActivityState) => void): () => void
   onActivityIdle(cb: () => void): () => void
@@ -365,6 +366,9 @@ function mockBridge(): PomniaBridge {
       return () => mockPullListeners.delete(cb)
     },
     onDocImportProgress() {
+      return () => {}
+    },
+    onLibraryIndexComplete() {
       return () => {}
     },
     async activityGet() {
