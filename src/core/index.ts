@@ -12,3 +12,10 @@ export { SOURCES, descriptorFor } from './locations.js'
 export * from './brain/index.js'
 export { parseExportBuffer, parseExportFile, parseExportPath } from './import/archives.js'
 export type { ImportResult } from './import/archives.js'
+export {
+  PIPELINE_PHASE_LABELS,
+  formatPipelineProgressLabel,
+  localizePipelineProgress,
+  pipelinePhaseLabel,
+} from './pipelineLabels.js'
+export type { PipelineProgressPayload } from './pipelineLabels.js'

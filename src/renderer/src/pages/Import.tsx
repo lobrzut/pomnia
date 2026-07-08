@@ -227,16 +227,16 @@ export default function Import() {
         <div className="text-xs text-ink-faint">{labels.importDocFormats}</div>
         {docProgress && docBusy && (
           <div className="text-xs text-ink-dim">
-            {docProgress.phase === 'parse'
-              ? labels.importDocProgressParse
-              : docProgress.phase === 'index'
-                ? labels.importDocProgressIndex
-                : docProgress.phase === 'brain-start'
-                  ? labels.importDocProgressBrainStart
-                  : docProgress.phase === 'encrypt'
-                    ? labels.importDocProgressEncrypt
-                    : docProgress.phase}
-            … {docProgress.detail ?? ''}
+            {docProgress.label ??
+              `${docProgress.phase === 'parse'
+                ? labels.importDocProgressParse
+                : docProgress.phase === 'index'
+                  ? labels.importDocProgressIndex
+                  : docProgress.phase === 'brain-start'
+                    ? labels.importDocProgressBrainStart
+                    : docProgress.phase === 'encrypt'
+                      ? labels.importDocProgressEncrypt
+                      : docProgress.phase}…${docProgress.detail ? ` ${docProgress.detail}` : ''}`}
             {docProgress.total > 1 ? ` (${docProgress.done}/${docProgress.total})` : ''}
           </div>
         )}

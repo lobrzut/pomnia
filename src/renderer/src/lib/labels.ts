@@ -1,5 +1,6 @@
 /** Polish UI labels — simple mode only hides advanced sections, not language. */
 
+import { formatPipelineProgressLabel } from '@core/pipelineLabels'
 import type { ActivityState } from './types'
 
 const ACTIVITY_KIND: Record<Exclude<ActivityState['kind'], 'idle'>, string> = {
@@ -10,27 +11,13 @@ const ACTIVITY_KIND: Record<Exclude<ActivityState['kind'], 'idle'>, string> = {
   embed: 'embeddingi',
 }
 
-const ACTIVITY_PHASE: Record<string, string> = {
-  collect: 'zbieranie',
-  distill: 'destylacja',
-  index: 'indeksowanie',
-  deploy: 'wdrożenie',
-  parse: 'parsowanie',
-  encrypt: 'szyfrowanie',
-  reindex: 'odświeżanie indeksu',
-  start: 'start',
-}
-
 function truncateDetail(s: string, max = 48): string {
   const t = s.trim()
   if (t.length <= max) return t
   return `${t.slice(0, max - 1)}…`
 }
 
-export function formatBrainProgressLabel(phase: string, detail?: string): string {
-  const pl = ACTIVITY_PHASE[phase] ?? phase
-  return detail ? `${pl} · ${truncateDetail(detail, 40)}` : pl
-}
+export const formatBrainProgressLabel = formatPipelineProgressLabel
 
 export function formatActivityBanner(state: ActivityState): string {
   if (state.kind === 'idle') return ''

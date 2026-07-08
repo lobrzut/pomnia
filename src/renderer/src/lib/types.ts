@@ -95,6 +95,7 @@ export interface DocImportProgressEvent {
   done: number
   total: number
   detail?: string
+  label?: string
 }
 
 export interface BrainHit {
@@ -109,6 +110,7 @@ export interface BrainProgressEvent {
   done: number
   total: number
   detail?: string
+  label?: string
 }
 
 export type ActivityKind = 'idle' | 'distill' | 'doc-import' | 'brain-start' | 'indexing' | 'embed'

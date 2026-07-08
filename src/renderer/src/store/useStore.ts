@@ -216,7 +216,7 @@ interface State {
 
   /** Distill pipeline — lives in the store so progress survives tab switches. */
   brainRunning: boolean
-  brainProgress: { label: string; pct: number } | null
+  brainProgress: { label: string; pct: number; phase?: string } | null
   brainResult: BrainRunResult | null
   globalActivity: ActivityState
   initGlobalActivity: () => () => void
@@ -492,11 +492,12 @@ export const useStore = create<State>((set, get) => ({
   },
   async runBrainPipeline(opts) {
     if (get().brainRunning) return
-    set({ brainRunning: true, brainProgress: { label: 'starting…', pct: 4 }, brainResult: null })
+    set({ brainRunning: true, brainProgress: { label: 'uruchamianie…', pct: 4, phase: 'start' }, brainResult: null })
     const off = api.onBrainProgress((e) =>
       set({
         brainProgress: {
-          label: formatBrainProgressLabel(e.phase, e.detail),
+          label: e.label ?? formatBrainProgressLabel(e.phase, e.detail),
+          phase: e.phase,
           pct:
             e.phase === 'deploy'
               ? 96

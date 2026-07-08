@@ -258,8 +258,10 @@ export default function Brain() {
     if (!brainRunning && brainResult) return 'done'
     if (brainRunning && brainProgress) {
       if (id === 'collect') return 'done'
-      if (brainProgress.label.startsWith('distill')) return id === 'distill' ? 'active' : id === 'collect' ? 'done' : 'idle'
-      if (brainProgress.label.startsWith('index')) return id === 'index' ? 'active' : id === 'deploy' ? 'idle' : 'done'
+      const phase = brainProgress.phase
+      if (phase === 'distill') return id === 'distill' ? 'active' : id === 'collect' ? 'done' : 'idle'
+      if (phase === 'index' || phase === 'embed') return id === 'index' ? 'active' : id === 'deploy' ? 'idle' : 'done'
+      if (phase === 'deploy') return id === 'deploy' ? 'active' : 'done'
     }
     return 'idle'
   }
