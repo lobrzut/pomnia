@@ -42,4 +42,31 @@ describe('activity manager', () => {
     activity.idle('distill')
     expect(activity.get().kind).toBe('indexing')
   })
+
+  it('pipelineIdle clears distill, embed, and indexing', () => {
+    const broadcast = vi.fn()
+    activity.wire(broadcast, vi.fn())
+
+    activity.update({ kind: 'indexing', phase: 'reindex', detail: 'po destylacji…' })
+    activity.pipelineIdle()
+    expect(activity.get().kind).toBe('idle')
+    expect(broadcast).toHaveBeenCalledWith('activity:idle')
+
+    activity.update({ kind: 'distill', detail: 'przypomnij sobie…' })
+    activity.pipelineIdle()
+    expect(activity.get().kind).toBe('idle')
+
+    activity.update({ kind: 'embed', phase: 'index', done: 2, total: 5 })
+    activity.pipelineIdle()
+    expect(activity.get().kind).toBe('idle')
+  })
+
+  it('idle is a no-op when already idle', () => {
+    const broadcast = vi.fn()
+    activity.wire(broadcast, vi.fn())
+    activity.idle('distill')
+    broadcast.mockClear()
+    activity.idle('distill')
+    expect(broadcast).not.toHaveBeenCalled()
+  })
 })

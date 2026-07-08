@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { api } from '../lib/api'
 import { loadBool, loadStr, migrateLegacyStorage, saveBool, saveStr } from '../lib/persist'
 import type { ClientId, DetectedSource, Snapshot, SourceId, VaultStatus, BrainRunResult, BrainStateInfo, ActivityState } from '../lib/types'
-import { formatBrainProgressLabel } from '../lib/labels'
+import { formatBrainProgressLabel, uiLabels } from '../lib/labels'
 
 migrateLegacyStorage()
 
@@ -480,7 +480,12 @@ export const useStore = create<State>((set, get) => ({
   initGlobalActivity() {
     void api.activityGet().then((s) => set({ globalActivity: s })).catch(() => {})
     const offUpdate = api.onActivityUpdate((s) => set({ globalActivity: s }))
-    const offIdle = api.onActivityIdle(() => set({ globalActivity: { kind: 'idle' } }))
+    const offIdle = api.onActivityIdle(() =>
+      set((s) => ({
+        globalActivity: { kind: 'idle' },
+        ...(s.brainRunning ? { brainRunning: false, brainProgress: null } : {}),
+      })),
+    )
     const offLibrary = api.onLibraryIndexComplete(() => {
       void get().refreshVault()
     })
@@ -505,7 +510,11 @@ export const useStore = create<State>((set, get) => ({
   async runBrainPipeline(opts) {
     if (get().brainRunning) return
     set({ brainRunning: true, brainProgress: { label: 'uruchamianie…', pct: 4, phase: 'start' }, brainResult: null })
-    const off = api.onBrainProgress((e) =>
+    const off = api.onBrainProgress((e) => {
+      if (e.phase === 'idle') {
+        set({ brainProgress: null })
+        return
+      }
       set({
         brainProgress: {
           label: e.label ?? formatBrainProgressLabel(e.phase, e.detail),
@@ -521,7 +530,7 @@ export const useStore = create<State>((set, get) => ({
                 : 0
         }
       })
-    )
+    })
     try {
       const s = get()
       const autoDeploy = s.brainTarget === 'remote' && s.brainAutoDeploy
@@ -538,6 +547,15 @@ export const useStore = create<State>((set, get) => ({
         reindex: true
       })
       set({ brainResult: r })
+      const labels = uiLabels()
+      if (r.emptyBacklog) {
+        get().toast({
+          kind: 'info',
+          title: labels.distillEmptyBacklog,
+          detail: labels.distillEmptyBacklogDetail,
+        })
+        return
+      }
       const fail = r.failed ?? 0
       const deploy = r.deployed ? ` · ${r.deployed} deployed to Brain` : ''
       const reidx = r.reindexed ? ' · reindexed' : r.deployMethod && r.deployMethod !== 'none' && !r.reindexed ? ' · reindex failed' : ''

@@ -71,6 +71,10 @@ function requireVault(): Vault {
 }
 
 function emitBrainProgress(p: { phase: string; done?: number; total?: number; detail?: string }): void {
+  if (p.phase === 'idle') {
+    emitBrainProgressClear()
+    return
+  }
   const kind: ActivityUpdate['kind'] =
     p.phase === 'index' ? 'embed' : p.phase === 'distill' || p.phase === 'collect' || p.phase === 'deploy' ? 'distill' : 'distill'
   activity.update({ kind, phase: p.phase, done: p.done, total: p.total, detail: p.detail })
@@ -81,6 +85,11 @@ function emitBrainProgress(p: { phase: string; done?: number; total?: number; de
     detail: p.detail,
   })
   win?.webContents.send('brain:progress', payload)
+}
+
+function emitBrainProgressClear(): void {
+  activity.pipelineIdle()
+  win?.webContents.send('brain:progress', { phase: 'idle', done: 0, total: 0 })
 }
 
 function emitDocImportProgress(ev: { phase: string; done: number; total: number; detail?: string }): void {
@@ -507,6 +516,22 @@ function registerIpc(): void {
           const l = await readLedger()
           convs = convs.filter((c) => !l.processed[c.id])
         }
+        if (convs.length === 0) {
+          return {
+            notesDir: brainDir(),
+            notes: 0,
+            stubs: 0,
+            garbage: 0,
+            skipped: 0,
+            failed: 0,
+            chunks: 0,
+            dim: 0,
+            deployed: 0,
+            deployMethod: 'none' as const,
+            reindexed: false,
+            emptyBacklog: true,
+          }
+        }
         activity.update({ kind: 'distill', phase: 'distill', done: 0, total: convs.length })
         const { notes, skipped, failed } = await distillAll(
           convs,
@@ -583,7 +608,7 @@ function registerIpc(): void {
         }
       } finally {
         brainRunAbort = null
-        activity.idle(['distill', 'embed'])
+        emitBrainProgressClear()
       }
     }
   )

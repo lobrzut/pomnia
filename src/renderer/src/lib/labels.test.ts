@@ -29,6 +29,7 @@ describe('uiLabels', () => {
     expect(labels.cancel).toBe('Anuluj')
     expect(labels.brainStateLastDistill('2 dni temu')).toBe('Ostatnia destylacja 2 dni temu')
     expect(labels.brainStatePendingNew(7)).toBe('+7 nowych')
+    expect(labels.distillEmptyBacklog).toBe('Brak nowych sesji do destylacji')
   })
 
   it('formats activity banner in Polish', () => {
