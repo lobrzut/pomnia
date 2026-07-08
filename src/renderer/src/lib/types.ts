@@ -73,6 +73,26 @@ export interface BrainRunResult {
   reindexed?: boolean
 }
 
+export interface DocImportResult {
+  sourcePath: string
+  extractedPath: string
+  format: string
+  pages: number
+  chunks: number
+  sparse: boolean
+  extractionPath: string
+  suggestOcr: boolean
+  indexed: boolean
+  brainRunning: boolean
+}
+
+export interface DocImportProgressEvent {
+  phase: string
+  done: number
+  total: number
+  detail?: string
+}
+
 export interface BrainHit {
   score: number
   source: string

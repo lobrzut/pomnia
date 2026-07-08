@@ -6,6 +6,7 @@
  * VS Code / plain grep is intentional.
  */
 
+import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 export interface VaultConfig {
@@ -17,14 +18,28 @@ export interface VaultConfig {
   sessionsDir: string
   /** Special note that gets injected into agent context on every request. */
   userProfilePath: string
+  /** Document library root (`sources/` + `extracted/`). */
+  libraryDir: string
+  librarySourcesDir: string
+  libraryExtractedDir: string
 }
 
 export function defaultVaultConfig(dataDir: string): VaultConfig {
   const root = join(dataDir, 'vault')
+  const libraryDir = join(root, 'library')
   return {
     root,
     distilledDir: join(root, 'distilled'),
     sessionsDir: join(root, 'sessions'),
     userProfilePath: join(root, 'USER.md'),
+    libraryDir,
+    librarySourcesDir: join(libraryDir, 'sources'),
+    libraryExtractedDir: join(libraryDir, 'extracted'),
   }
+}
+
+/** Create vault/library dirs if missing (plaintext brain-core-data in v0.2). */
+export function ensureLibraryDirs(config: VaultConfig): void {
+  mkdirSync(config.librarySourcesDir, { recursive: true })
+  mkdirSync(config.libraryExtractedDir, { recursive: true })
 }

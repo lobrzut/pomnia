@@ -2,16 +2,14 @@
  * Index builder — ingest markdown/text files into library.db.
  *
  * Node-side counterpart of Python `pipeline/rag.py::index_file` for the
- * formats the embedded brain actually produces (distilled .md notes +
- * session .md saves). PDF/EPUB extraction stays out of scope — that is a
- * library-server concern, not an embedded-MVP concern.
+ * formats the embedded brain produces: distilled .md notes, session saves,
+ * and parsed documents (PDF/DOCX via @pomnia/doc-parser).
  *
  * Parity notes:
  *  - chunking: chunk.ts is byte-identical to Python `_chunk_text`
  *  - schema:   db.ts creates the same tables, insert shape matches
  *    (delete-then-insert per file, chunks row → chunks_vec rowid)
- *  - page_num: 1 for non-paged formats, same convention as Python
- *    ("Reuses 'page_num' for non-paged formats … DOCX = 1")
+ *  - page_num: per PDF page; 1 for DOCX/MD/TXT (Python convention)
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -50,6 +48,13 @@ export interface IndexFileInput {
   /** Display name (pdf_name). Defaults to basename(path). */
   name?: string
   text: string
+}
+
+export interface IndexDocumentInput {
+  /** Absolute path to source file in vault/library/sources (pdf_path key). */
+  path: string
+  name?: string
+  pages: { page: number; text: string }[]
 }
 
 /**
@@ -121,6 +126,84 @@ export async function indexFiles(
     onProgress?.({ file: name, done, total: files.length })
   }
 
+  return stats
+}
+
+/**
+ * Index a parsed document with page_num per PDF page (or 1 for DOCX/MD/TXT).
+ * New document imports should use this — not localIndex JSON (library.db only).
+ */
+export async function indexDocument(
+  db: Database.Database,
+  embedder: EmbedClient,
+  doc: IndexDocumentInput,
+  onProgress?: (p: IndexProgressEvent) => void,
+): Promise<IndexStats> {
+  const delVec = db.prepare('DELETE FROM chunks_vec WHERE rowid = ?')
+  const selIds = db.prepare('SELECT id FROM chunks WHERE pdf_path = ?')
+  const delChunks = db.prepare('DELETE FROM chunks WHERE pdf_path = ?')
+  const insChunk = db.prepare(
+    'INSERT INTO chunks (pdf_path, pdf_name, page_num, chunk_idx, text, char_count) VALUES (?, ?, ?, ?, ?, ?)',
+  )
+  const insVec = db.prepare('INSERT INTO chunks_vec (rowid, embedding) VALUES (?, ?)')
+
+  const name = doc.name ?? basename(doc.path)
+  const stats: IndexStats = { files: 0, chunks: 0, empty: 0, prunedFiles: 0 }
+
+  const oldIds = (selIds.all(doc.path) as { id: number }[]).map((r) => r.id)
+  if (oldIds.length > 0) {
+    const wipe = db.transaction((ids: number[]) => {
+      for (const id of ids) delVec.run(BigInt(id))
+      delChunks.run(doc.path)
+    })
+    wipe(oldIds)
+  }
+
+  const pending: { pageNum: number; chunkIdx: number; text: string }[] = []
+  let chunkIdx = 0
+  for (const page of doc.pages) {
+    const chunks = chunkText(page.text)
+    if (chunks.length === 0) continue
+    for (const text of chunks) {
+      pending.push({ pageNum: page.page, chunkIdx, text })
+      chunkIdx += 1
+    }
+  }
+
+  if (pending.length === 0) {
+    stats.empty = 1
+    onProgress?.({ file: name, done: 1, total: 1 })
+    return stats
+  }
+
+  for (let i = 0; i < pending.length; i += BATCH) {
+    const batch = pending.slice(i, i + BATCH)
+    const texts = batch.map((b) => b.text)
+    const vecs = await embedder.embedBatch(texts)
+    if (vecs.length !== texts.length) {
+      throw new Error(`embed count mismatch: got ${vecs.length} for ${texts.length} chunks (${name})`)
+    }
+    const write = db.transaction(() => {
+      for (let j = 0; j < batch.length; j++) {
+        const row = batch[j]!
+        const info = insChunk.run(
+          doc.path,
+          name,
+          BigInt(row.pageNum),
+          BigInt(row.chunkIdx),
+          row.text,
+          BigInt(row.text.length),
+        )
+        insVec.run(BigInt(info.lastInsertRowid), vecToBlob(vecs[j]!))
+      }
+    })
+    write()
+    stats.chunks += batch.length
+    onProgress?.({ file: name, done: Math.min(i + batch.length, pending.length), total: pending.length })
+  }
+
+  stats.files = 1
+  onProgress?.({ file: name, done: pending.length, total: pending.length })
   return stats
 }
 

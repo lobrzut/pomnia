@@ -425,4 +425,24 @@ BRAIN-INTEGRATION.md          host-side pipeline analysis
 
 ---
 
-*Ostatnia aktualizacja: audyt łańcucha 2026-07-08. Aktualizuj ten plik przy każdej fazie ingest dokumentów.*
+## 13. Decyzje produktowe (2026-07-08)
+
+Zamknięte wybory na podstawie review z właścicielem produktu:
+
+| Temat | Decyzja | Uzasadnienie |
+|-------|---------|--------------|
+| **Backup PDF** | Plaintext w `brain-core-data` dla **v0.2**; zaszyfrowany vault dla dokumentów → **v0.3+** | Szybszy MVP; `.pomnia` nadal tylko czaty; docs w `%AppData%/Pomnia/brain-core-data/vault/library/` |
+| **Indeks** | **`library.db` = single source of truth** długoterminowo; `localIndex` JSON = opcjonalny fast staging podczas migracji; **nowe importy dokumentów tylko przez `indexDocument` → library.db** | Jeden chunker (1800/200), jeden embed, jeden MCP `search_library`; unikamy driftu JSON vs SQLite |
+| **OCR (Phase 4)** | **Oba** — domyślnie `tesseract.js` offline; upgrade do Ollama vision gdy Ollama dostępna; UI pokazuje która ścieżka została użyta | Offline-first + lepsza jakość gdy GPU/model vision jest pod ręką; nie blokuje v0.2 |
+
+**v0.2 scope (fazy 1–3 — shipped w tym commicie):**
+
+- `@pomnia/doc-parser`: mammoth + `parseDocument()` router (pdf/docx/md/txt)
+- `brain-core`: `indexDocument()` z `page_num` per strona PDF
+- `vault/library/sources` + `extracted/`
+- IPC `doc:import` + sekcja „Dokumenty" w Import
+- OCR: tylko stub/hook (`ocr.ts`, `suggestOcr`) — implementacja w Phase 4
+
+---
+
+*Ostatnia aktualizacja: v0.2 doc import MVP 2026-07-08. Aktualizuj ten plik przy każdej fazie ingest dokumentów.*

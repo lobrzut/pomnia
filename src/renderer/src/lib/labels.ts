@@ -27,6 +27,15 @@ export interface UiLabels {
   importVaultClosed: string
   importFormats: string
   importSelect: string
+  importChatSection: string
+  importDocSection: string
+  importDocPick: string
+  importDocBusy: string
+  importDocFormats: string
+  importDocSelect: string
+  importDocDone: string
+  importDocOcrHint: string
+  importDocBrainOff: string
   importProviders: string
   importLegalNote: string
 }
@@ -60,6 +69,15 @@ export function uiLabels(simple: boolean): UiLabels {
       importVaultClosed: 'Najpierw odblokuj vault',
       importFormats: 'ZIP · JSON · JSONL · MD — rozpoznaje źródło automatycznie',
       importSelect: 'Wybierz plik…',
+      importChatSection: 'Eksporty czatów',
+      importDocSection: 'Dokumenty',
+      importDocPick: 'Wybierz PDF lub DOCX',
+      importDocBusy: 'Importuję dokument…',
+      importDocFormats: 'PDF · DOCX · MD · TXT — indeks do lokalnej wyszukiwarki',
+      importDocSelect: 'Wybierz dokument…',
+      importDocDone: 'Dokument zaimportowany',
+      importDocOcrHint: 'Mało tekstu — w v0.3 uruchom OCR dla skanów.',
+      importDocBrainOff: 'Uruchom lokalną wyszukiwarkę (Brain), żeby zindeksować chunki.',
       importProviders: 'Skąd pobrać eksport',
       importLegalNote:
         'Pomnia importuje tylko oficjalne eksporty — bez logowania do kont. Claude Desktop / Gemini wymagają eksportu z wersji webowej.'
@@ -93,6 +111,15 @@ export function uiLabels(simple: boolean): UiLabels {
     importVaultClosed: 'Open a vault first',
     importFormats: 'ZIP · JSON · JSONL · MD — auto-detects the source',
     importSelect: 'Select export…',
+    importChatSection: 'Chat exports',
+    importDocSection: 'Documents',
+    importDocPick: 'Choose a PDF or DOCX',
+    importDocBusy: 'Importing document…',
+    importDocFormats: 'PDF · DOCX · MD · TXT — indexes into local library.db',
+    importDocSelect: 'Select document…',
+    importDocDone: 'Document imported',
+    importDocOcrHint: 'Sparse text layer — OCR recommended in v0.3 for scans.',
+    importDocBrainOff: 'Start embedded brain to embed chunks into library.db.',
     importProviders: 'Where to export from',
     importLegalNote:
       'Pomnia imports official exports only — no scraping or logging into accounts (fragile + against terms). Claude Desktop / Gemini chats live server-side, so you export them from the web, then import here.'

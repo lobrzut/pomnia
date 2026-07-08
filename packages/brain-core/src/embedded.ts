@@ -5,6 +5,7 @@
  *   parent → child
  *     { type: 'start', config: Partial<BrainConfig> }
  *     { type: 'reindex', dir: string }        // index every .md/.txt under dir
+ *     { type: 'index-document', doc: IndexDocumentInput }
  *     { type: 'stop' }
  *
  *   child → parent
@@ -23,13 +24,14 @@ import process from 'node:process'
 
 import { defaultConfig, type BrainConfig } from './config/index.js'
 import { EmbedClient } from './rag/embed.js'
-import { indexDir } from './rag/indexer.js'
+import { indexDir, indexDocument, type IndexDocumentInput } from './rag/indexer.js'
 import { createBrainServer, type BrainServer } from './mcp/server.js'
 import { openDb } from './storage/db.js'
 
 type ParentMsg =
   | { type: 'start'; config?: Partial<BrainConfig> }
   | { type: 'reindex'; dir: string }
+  | { type: 'index-document'; doc: IndexDocumentInput }
   | { type: 'stop' }
 
 function send(msg: unknown): void {
@@ -80,6 +82,32 @@ async function handleReindex(dir: string): Promise<void> {
   }
 }
 
+async function handleIndexDocument(doc: IndexDocumentInput): Promise<void> {
+  if (!config) {
+    send({ type: 'error', message: 'index-document before start' })
+    return
+  }
+  if (busy) {
+    send({ type: 'error', message: 'index already running' })
+    return
+  }
+  busy = true
+  try {
+    const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
+    try {
+      const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
+      const stats = await indexDocument(db, embedder, doc, (p) => send({ type: 'index-progress', ...p }))
+      send({ type: 'indexed-document', stats })
+    } finally {
+      db.close()
+    }
+  } catch (err) {
+    send({ type: 'error', message: err instanceof Error ? err.message : String(err) })
+  } finally {
+    busy = false
+  }
+}
+
 async function handleStop(): Promise<void> {
   try {
     await server?.stop()
@@ -98,6 +126,9 @@ process.on('message', (msg: ParentMsg) => {
       break
     case 'reindex':
       void handleReindex(msg.dir)
+      break
+    case 'index-document':
+      void handleIndexDocument(msg.doc)
       break
     case 'stop':
       void handleStop()

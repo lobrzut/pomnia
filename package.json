@@ -28,6 +28,8 @@
     "pack:mac": "npm run build:brain-core && npm run stage:brain-core && electron-vite build && electron-builder --mac"
   },
   "dependencies": {
+    "@pomnia/brain-core": "*",
+    "@pomnia/doc-parser": "*",
     "fflate": "^0.8.3",
     "sql.js": "^1.12.0"
   },
