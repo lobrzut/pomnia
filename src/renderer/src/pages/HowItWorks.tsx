@@ -22,7 +22,8 @@ export default function HowItWorks() {
       </div>
 
       <GlassCard className="overflow-hidden p-4">
-        <div className="mb-3 flex items-center justify-end">
+        <div className="mb-3 flex items-center justify-end gap-2">
+          <span className="text-[10px] italic text-ink-faint">{labels.guideFlowReplayHint}</span>
           <Button variant="soft" onClick={() => setAnimKey((k) => k + 1)}>
             <RotateCcw className="h-3.5 w-3.5" />
             {labels.guideFlowReplay}
