@@ -65,7 +65,22 @@ function mcpQueryDetail(tool: string, args: unknown): string | undefined {
     const q = String((args as { query: unknown }).query).trim()
     if (q) return q.length > 48 ? `${q.slice(0, 47)}…` : q
   }
+  if (tool === 'get_skill' && args && typeof args === 'object' && 'name' in args) {
+    const n = String((args as { name: unknown }).name).trim()
+    if (n) return n.length > 48 ? `${n.slice(0, 47)}…` : n
+  }
   return tool
+}
+
+let lastMcpActivity: { tool: string; detail?: string; ts: number } | null = null
+
+function recordMcpActivity(ev: McpQueryEvent): void {
+  lastMcpActivity = { tool: ev.tool, detail: ev.detail, ts: Date.now() }
+}
+
+export function getMcpActivitySnapshot(): { last: typeof lastMcpActivity; recent: boolean } {
+  const recent = lastMcpActivity != null && Date.now() - lastMcpActivity.ts < 4_000
+  return { last: lastMcpActivity, recent }
 }
 
 export async function createBrainServer(
@@ -114,7 +129,9 @@ export async function createBrainServer(
         const toolName = req.params.name
         const toolArgs = req.params.arguments ?? {}
         if (MCP_QUERY_TOOLS.has(toolName)) {
-          opts?.onMcpQuery?.({ tool: toolName, detail: mcpQueryDetail(toolName, toolArgs) })
+          const ev = { tool: toolName, detail: mcpQueryDetail(toolName, toolArgs) }
+          recordMcpActivity(ev)
+          opts?.onMcpQuery?.(ev)
         }
         try {
           const text = await callTool(toolName, toolArgs, ctx)
@@ -140,6 +157,12 @@ export async function createBrainServer(
           res.statusCode = 200
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ ok: true, service: 'brain-core' }))
+          return
+        }
+        if (pathOnly === '/mcp/activity' || pathOnly === '/mcp/activity/') {
+          res.statusCode = 200
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify(getMcpActivitySnapshot()))
           return
         }
         // All MCP traffic goes through POST/GET/DELETE on `/mcp`. Anything

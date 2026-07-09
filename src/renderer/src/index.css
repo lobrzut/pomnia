@@ -220,6 +220,13 @@
   opacity: 0.5;
   animation: none;
 }
+.flow-diagram--busy .flow-path-agent {
+  opacity: 0.95;
+  stroke: #a5b4fc;
+}
+.flow-diagram--busy .flow-path--dash-live.flow-path-agent {
+  animation-duration: 0.65s;
+}
 .flow-particle-main {
   fill: #34d399;
 }
