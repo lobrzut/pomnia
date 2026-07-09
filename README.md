@@ -1,10 +1,11 @@
 # Pomnia
 
-**Twoja pamięć AI: jedno zaszyfrowane, offline'owe archiwum wszystkich rozmów — przeszukiwalne i gotowe do zasilenia Brain.**
-Pomnia zbiera czaty ze wszystkich Twoich asystentów (Claude Code, Cursor, Claude Desktop, Antigravity, VS Code, Continue) **i** importy z eksportów (Claude.ai, ChatGPT, Gemini, Grok) w jedno miejsce — z lokalnym wyszukiwaniem (zakładka **Chats**) i pipeline'em do **Brain** (distill + index).
-Backup i przenośność Win↔Mac to **mechanizm** pod spodem (sejf = jeden przenośny folder, AES-256-GCM), nie główne hasło.
+**Local-first AI memory for developers** — jedno zaszyfrowane, offline'owe archiwum wszystkich rozmów, przeszukiwalne i gotowe do zasilenia Brain.
 
-> Status: **silnik przetestowany i działa na żywych danych** (419 plików Claude Code + 148 czatów Cursora zbackupowane, zaszyfrowane, zweryfikowane i odtworzone w teście round-trip; 5/5 testów jednostkowych zielonych). UI Electron + React buduje się i odpala.
+Pomnia zbiera czaty ze wszystkich Twoich asystentów (Claude Code, Cursor, Claude Desktop, Antigravity, VS Code, Continue) **i** importy z eksportów (Claude.ai, ChatGPT, Gemini, Grok) oraz dokumenty (PDF, DOCX, EPUB) w jedno miejsce — z lokalnym wyszukiwaniem (zakładka **Chats**), embedded **Brain** (distill + index + MCP) i opcjonalnym deployem na własny serwer.
+
+> **Beta 0.1.2** — silnik przetestowany na żywych danych (419 plików Claude Code + 148 czatów Cursora, round-trip OK). Instalator Windows: `release/Pomnia-0.1.2-setup.exe`.  
+> **Start:** [docs/START-HERE.md](docs/START-HERE.md) · **Audyt:** [docs/AUDYT-POMNIA-2026-07-09.md](docs/AUDYT-POMNIA-2026-07-09.md)
 
 ---
 
@@ -53,7 +54,11 @@ src/renderer/        UI: React 19 + Tailwind v4 + Framer Motion (aurora, glass, 
 
 ## Dla beta testera
 
-> Pełna mapa luk i priorytetów: [docs/ROADMAP-CLARITY.md](docs/ROADMAP-CLARITY.md) · skrót startowy: [docs/START-HERE.md](docs/START-HERE.md)
+> **Jedna strona startowa:** [docs/START-HERE.md](docs/START-HERE.md)  
+> **Audyt produktu (lipiec 2026):** [docs/AUDYT-POMNIA-2026-07-09.md](docs/AUDYT-POMNIA-2026-07-09.md)  
+> Mapa luk i priorytetów: [docs/ROADMAP-CLARITY.md](docs/ROADMAP-CLARITY.md)
+
+**Co jest w tej becie (0.1.2):** vault AES-256, backup adapterów, import ZIP/JSON + PDF/DOCX/EPUB, embedded brain-core (MCP `:7862`), distill przez Ollama, zakładka **Jak to działa** (mapa + animowany diagram), Connect (snippet MCP + sync skills), tray + diagnostyka w Settings. Domyślnie **embedded Brain** — bez homelab URL.
 
 **Minimalna ścieżka (Windows, ~15 min):**
 

@@ -11,7 +11,7 @@
 
 Pomnia ma **działający rdzeń techniczny**: szyfrowany vault, backup czatów, import archiwów, pipeline distill→index→MCP, embedded brain-core w instalatorze Windows. To nie jest prototyp — **419 plików Claude Code + 148 czatów Cursora** przeszły round-trip w testach na żywych danych (README). Instalator **`Pomnia-0.1.2-setup.exe`** (~94 MB) leży w `release/` i jest gotowy do ręcznej dystrybucji beta.
 
-**Główny problem nie jest inżynieryjny, lecz produktowy:** aplikacja nadal „pachnie” homelabem Alice (domyślne IP `brain.example.local`, dwa magazyny o nazwie „vault”, dwa pipeline'y czaty vs dokumenty), a warstwa onboarding/landing **nie domyka obietnicy** dla obcego użytkownika Windows bez Node/Ollama.
+**Główny problem nie jest inżynieryjny, lecz produktowy:** dwa magazyny o nazwie „vault”, dwa pipeline'y czaty vs dokumenty, a warstwa onboarding/landing **nie domyka obietnicy** dla obcego użytkownika Windows bez Node/Ollama. ~~Domyślne IP homelab~~ — **naprawione** w `74db87d` (per-user `app-settings.json`, pusty default remote URL).
 
 ### Sygnalizatory
 
@@ -31,12 +31,12 @@ Pomnia ma **działający rdzeń techniczny**: szyfrowany vault, backup czatów, 
 ### Trzy najważniejsze wnioski
 
 1. **Możesz dać 3–5 beta testerom Windows exe już dziś** — pod warunkiem ręcznego onboarding (Ollama, START-HERE, SmartScreen bypass) i embedded brain, nie remote homelab.
-2. **Obcy użytkownik remote Brain się wyłoży** — domyślne `brain.example.local:7862` w UI, store, CLI i snippet; bez zmiany URL Connect nie zadziała poza Twoją siecią.
-3. **Przed „public beta” brakuje:** usunięcie hardcoded IP, opublikowany release + strona pobierania, wybór logo, naprawa testu brain-core na aktualnym Node.
+2. ~~**Obcy użytkownik remote Brain się wyłoży**~~ — ✅ **FIXED** (`74db87d`): brak domyślnego homelab IP; embedded Brain zalecany na start; remote URL tylko gdy user wpisze.
+3. **Przed „public beta” brakuje:** opublikowany release + strona pobierania, wybór logo, naprawa testu brain-core na aktualnym Node.
 
 ### Rekomendacja na 2 tygodnie
 
-**Tydzień 1 — „5 testerów bez wstydu”:** hardcoded IP → pusty default; `BETA-SMOKE.md`; GitHub Release 0.1.2; landing z linkiem do exe; preflight Ollama przed distill w UI.
+**Tydzień 1 — „5 testerów bez wstydu”:** ~~hardcoded IP → pusty default~~ ✅; `BETA-SMOKE.md`; GitHub Release 0.1.2; landing z linkiem do exe; preflight Ollama przed distill w UI.
 
 **Tydzień 2 — „nie tylko u mnie”:** Antigravity na realnym dumpie; pełny onboarding PL + krok backup w full mode; pierwszy tag `v0.1.3`; smoke brain-core na packaged Windows w CI; decyzja logo → podmiana `resources/icon.ico`.
 
@@ -49,7 +49,7 @@ Pomnia ma **działający rdzeń techniczny**: szyfrowany vault, backup czatów, 
 | Metryka | Wartość |
 |---------|---------|
 | Branch | `master` |
-| HEAD | `b85e410` — *feat(ui): animowany diagram przepływu Pomnia (Jak to działa)* |
+| HEAD | `e14a438` — *fix(ui): FlowDiagram — gałąź dokumentów poniżej* (+ `74db87d` fix hardcoded IP) |
 | Stan working tree | **CLEAN** (poza untracked: audit doc, `_agent_out.txt`, `_icon.txt`, `_pack_full.txt`) |
 | Remote | `origin` → `https://github.com/lobrzut/reliqua.git` (private) |
 | Tagi | **brak** tagów `v*` w repo |
@@ -152,7 +152,7 @@ Legenda: 🟢 **DZIAŁA** · 🟡 **CZĘŚCIOWO** · ⚪ **NIE TESTOWANE** · �
 |---|---------|-------|-----------|
 | 1 | **Dwa „vaulty"** — `.pomnia` vs `brain-core-data/` | Cała appka | 🔴 |
 | 2 | **Dwa pipeline'y** — czaty (distill+LLM) vs dokumenty (direct index) | Import, Brain | 🟡 |
-| 3 | **Embedded vs remote** — domyślnie remote URL Alice | Connect, Onboarding, store | 🔴 |
+| 3 | ~~**Embedded vs remote** — domyślnie remote URL Alice~~ | Connect, Onboarding, store | ✅ FIXED `74db87d` |
 | 4 | **Backup vs Import** — kiedy którego użyć | Dashboard, Import | 🟡 |
 | 5 | **Full onboarding pomija backup** | `Onboarding.tsx` FULL_STEPS | 🟡 |
 | 6 | **Ollama jako ukryta zależność** | Distill milczy bez preflight w UI | 🟡 |
@@ -176,7 +176,7 @@ Legenda: 🟢 **DZIAŁA** · 🟡 **CZĘŚCIOWO** · ⚪ **NIE TESTOWANE** · �
 
 | Ryzyko | Severity | Szczegół | Mitigacja |
 |--------|----------|----------|-----------|
-| **Hardcoded IP brain.example.local** | 🔴 | `Onboarding.tsx`, `Connect.tsx`, `useStore.ts`, `snippet.ts`, `cli/index.ts`, `main/index.ts` | Pusty default + placeholder; URL ze store |
+| ~~**Hardcoded IP brain.example.local**~~ | ✅ FIXED | `74db87d` — per-user `app-settings.json`, pusty default remote | Embedded zalecany; remote tylko user URL |
 | **Ollama wymagane** | 🟡 | distill, embed, doc index — bez Ollama pipeline stoi | Health check ✅; brak preflight blokady przed distill |
 | **Modele ~8 GB RAM** | 🟡 | `qwen2.5:14b` + `nomic-embed-text` | Dokumentacja START-HERE; brak profilu „light" w UI |
 | **Unsigned installer** | 🔴 | SmartScreen blokuje; brak Authenticode | README ma instrukcję; code signing — track osobny |
@@ -189,17 +189,9 @@ Legenda: 🟢 **DZIAŁA** · 🟡 **CZĘŚCIOWO** · ⚪ **NIE TESTOWANE** · �
 | **Token MCP remote** | 🟡 | Wymaga dashboard :7860 lub mint w Connect | Brak instrukcji „skąd token ręcznie" |
 | **Ścieżki deploy SMB** | 🟡 | Przykłady `\\brain.example.local\brain\` w docs | Wizard deploy |
 
-### Mapa hardcoded IP (UI path)
+### ~~Mapa hardcoded IP~~ — FIXED (`74db87d`, 2026-07-09)
 
-```
-Onboarding.tsx:32     REMOTE_URL = 'http://brain.example.local:7862'
-Connect.tsx:28        REMOTE_URL = 'http://brain.example.local:7862'
-useStore.ts:118       localStorage fallback → brain.example.local:7862
-snippet.ts:19         REMOTE_BRAIN_DEFAULT_URL
-main/index.ts:762     fallback remote URL
-labels.ts:387         przykład w copy PL
-api.ts (mock)         demo data z alice IP
-```
+Domyślny homelab URL usunięty z UI/store/snippet/CLI. Remote Brain wymaga jawnego wpisu użytkownika; embedded `127.0.0.1:7862` jest ścieżką domyślną w onboarding.
 
 ---
 
@@ -301,6 +293,7 @@ Asystenci (Claude Code, Cursor, …)
 |------|-------|
 | 2026-07-09 | Pełny audyt repo + ekosystem; testy 73/74; weryfikacja release/; HEAD b85e410 (mapa + animacja) |
 | 2026-07-09 | Powiązane: `docs/ROADMAP-CLARITY.md`, `docs/START-HERE.md` |
+| 2026-07-09 | Bloker #1 hardcoded IP → **FIXED** (`74db87d`); FlowDiagram MCP: skills → search_library |
 
 ---
 
