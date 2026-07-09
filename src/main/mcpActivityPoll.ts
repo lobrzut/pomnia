@@ -1,56 +1,68 @@
 /**
- * Poll remote (or embedded) Brain for recent MCP tool calls — used on the
- * HowItWorks page when Claude Code / Cursor hit Brain outside Pomnia's IPC.
+ * Poll remote Brain for recent MCP tool calls — used on Dashboard / HowItWorks
+ * when Claude Code / Cursor / Antigravity hit Brain outside Pomnia's IPC.
+ *
+ * Embedded brain-core forwards mcp-query over fork IPC — no poll needed there.
  */
 
 import { fetchMcpActivity } from '@core/brain/status.js'
 
 import { getAppSettings } from './appSettings.js'
-import { brainCore } from './brainCore.js'
 
 const POLL_MS = 2_000
 
 let timer: ReturnType<typeof setInterval> | null = null
-let watching = false
+let watchRefs = 0
+let windowFocused = true
 let onQuery: ((ev: { tool?: string; detail?: string }) => void) | null = null
 let lastSeenTs = 0
 
-export function startMcpActivityPoll(onMcpQuery: (ev: { tool?: string; detail?: string }) => void): void {
-  watching = true
-  onQuery = onMcpQuery
-  if (timer) return
+function shouldPoll(): boolean {
+  return watchRefs > 0 && windowFocused && !!onQuery
+}
+
+function ensureTimer(): void {
+  if (timer || !shouldPoll()) return
   timer = setInterval(() => void pollOnce(), POLL_MS)
   void pollOnce()
 }
 
+function clearTimer(): void {
+  if (!timer) return
+  clearInterval(timer)
+  timer = null
+}
+
+export function setMcpActivityWindowFocused(focused: boolean): void {
+  windowFocused = focused
+  if (shouldPoll()) ensureTimer()
+  else clearTimer()
+}
+
+export function startMcpActivityPoll(onMcpQuery: (ev: { tool?: string; detail?: string }) => void): void {
+  watchRefs += 1
+  onQuery = onMcpQuery
+  ensureTimer()
+}
+
 export function stopMcpActivityPoll(): void {
-  watching = false
-  onQuery = null
-  lastSeenTs = 0
-  if (timer) {
-    clearInterval(timer)
-    timer = null
+  watchRefs = Math.max(0, watchRefs - 1)
+  if (watchRefs === 0) {
+    onQuery = null
+    lastSeenTs = 0
+    clearTimer()
   }
 }
 
 async function pollOnce(): Promise<void> {
-  if (!watching || !onQuery) return
+  if (!shouldPoll() || !onQuery) return
 
   const settings = getAppSettings()
   const target = settings.brainTarget ?? 'embedded'
-  let baseUrl: string | null = null
-  let token: string | undefined
+  // Remote only — embedded brain-core emits mcp-query over fork IPC.
+  if (target !== 'remote' || !settings.brainMcpUrl?.trim()) return
 
-  if (target === 'remote' && settings.brainMcpUrl?.trim()) {
-    baseUrl = settings.brainMcpUrl.trim()
-    token = settings.connectToken
-  } else if (brainCore.status().running && brainCore.status().url) {
-    baseUrl = brainCore.status().url!
-  } else {
-    return
-  }
-
-  const resp = await fetchMcpActivity(baseUrl, token)
+  const resp = await fetchMcpActivity(settings.brainMcpUrl.trim(), settings.connectToken)
   if (!resp?.recent || !resp.last?.ts) return
   if (resp.last.ts <= lastSeenTs) return
   lastSeenTs = resp.last.ts

@@ -43,7 +43,7 @@ import {
 } from '@core/index'
 
 import { brainCore } from './brainCore.js'
-import { startMcpActivityPoll, stopMcpActivityPoll } from './mcpActivityPoll.js'
+import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused } from './mcpActivityPoll.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { indexPendingLibraryDocuments, type PendingIndexResult } from './libraryIndex.js'
 import { getAppSettings, loadAppSettings, setAppSettings, shouldHideOnClose, shouldHideOnMinimize } from './appSettings.js'
@@ -230,6 +230,8 @@ function createWindow(): void {
   })
 
   win.on('ready-to-show', () => win?.show())
+  win.on('focus', () => setMcpActivityWindowFocused(true))
+  win.on('blur', () => setMcpActivityWindowFocused(false))
   win.on('close', (e) => {
     if (forceQuit || !shouldHideOnClose(brainCore.status().running)) return
     e.preventDefault()

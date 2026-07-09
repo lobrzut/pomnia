@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Check, Database, HardDriveDownload, MessageSquare, RefreshCw, Server, Layers } from 'lucide-react'
 import { Badge, Button, GlassCard, Input, ProgressBar, SourceTile, Spinner } from '../components/ui'
@@ -7,6 +7,7 @@ import { FlowDiagram } from '../components/FlowDiagram'
 import { StatusStrip } from '../components/StatusStrip'
 import { humanBytes, sourceMeta } from '../lib/format'
 import { uiLabels } from '../lib/labels'
+import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
 
 function Stat({
@@ -48,6 +49,13 @@ export default function Dashboard() {
     [installed]
   )
   const allSelected = installed.length > 0 && installed.every((s) => selected.has(s.id))
+
+  useEffect(() => {
+    void api.mcpActivityWatch(true)
+    return () => {
+      void api.mcpActivityWatch(false)
+    }
+  }, [])
 
   return (
     <div className="mx-auto max-w-5xl">

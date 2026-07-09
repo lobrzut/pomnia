@@ -11,6 +11,7 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { CLIENTS, type ClientId, type ClientSpec } from './snippet.js'
+import { dashboardUrlFromBrainUrl } from './deploy.js'
 
 export type WiredState = 'wired' | 'partial' | 'not_wired' | 'not_installed' | 'config_error'
 
@@ -211,16 +212,36 @@ export async function pingBrain(url: string, token?: string): Promise<BrainPing>
 }
 
 /** Poll Brain for a recent MCP query (search_library, get_skill, …). */
+function normalizeMcpActivity(data: unknown): McpActivityResponse | null {
+  if (!data || typeof data !== 'object') return null
+  const d = data as Record<string, unknown>
+  if (typeof d.recent === 'boolean' && 'last' in d) {
+    return d as McpActivityResponse
+  }
+  if (typeof d.tool === 'string' && typeof d.ts === 'number') {
+    const ts = d.ts
+    const recent = Date.now() - ts < 4_000
+    const detail = String(d.query_preview ?? d.detail ?? d.tool)
+    return { last: { tool: d.tool, detail, ts }, recent }
+  }
+  return null
+}
+
 export async function fetchMcpActivity(baseUrl: string, token?: string): Promise<McpActivityResponse | null> {
   const base = baseUrl.replace(/\/+$/, '').replace(/\/mcp$/, '')
   const headers: Record<string, string> = { accept: 'application/json' }
   if (token) headers.Authorization = `Bearer ${token}`
-  for (const probe of ['/mcp/activity', '/api/mcp/activity']) {
+  const probes = [
+    `${base}/mcp/activity`,
+    `${base}/api/mcp/last-activity`,
+    `${dashboardUrlFromBrainUrl(base)}/api/mcp/last-activity`,
+  ]
+  for (const url of probes) {
     try {
-      const r = await fetch(`${base}${probe}`, { headers, signal: AbortSignal.timeout(3_000) })
+      const r = await fetch(url, { headers, signal: AbortSignal.timeout(3_000) })
       if (!r.ok) continue
-      const data = (await r.json()) as McpActivityResponse
-      if (data && typeof data.recent === 'boolean') return data
+      const normalized = normalizeMcpActivity(await r.json())
+      if (normalized) return normalized
     } catch {
       // try next probe
     }
