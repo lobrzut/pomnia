@@ -178,7 +178,16 @@
 .flow-path {
   stroke-width: 2;
   stroke-dasharray: 8 6;
+}
+.flow-diagram--live .flow-path-main,
+.flow-diagram--live .flow-path-docs,
+.flow-diagram--live .flow-path-optional {
   animation: flow-dash 1.1s linear infinite;
+}
+.flow-diagram--live.flow-diagram--busy .flow-path-main,
+.flow-diagram--live.flow-diagram--busy .flow-path-docs,
+.flow-diagram--live.flow-diagram--busy .flow-path-optional {
+  animation-duration: 0.75s;
 }
 .flow-path-main {
   stroke: #1a5c3a;
