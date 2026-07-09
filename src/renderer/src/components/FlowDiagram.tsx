@@ -464,9 +464,9 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   const fullEdges = useMemo(() => buildEdges(labels.flowEdgeMemoryReturn), [labels.flowEdgeMemoryReturn])
   const agentEdges = useMemo(() => buildAgentEdges(), [])
   const nodes = useMemo(() => {
-    if (mini) return buildMiniLayout(allNodes)
+    if (mini) return buildMiniLayout(allNodes, pip)
     return allNodes
-  }, [allNodes, mini])
+  }, [allNodes, mini, pip])
   const edges = useMemo(() => {
     if (mini) return buildCompactEdges(MINI_NODE_IDS)
     return fullEdges
