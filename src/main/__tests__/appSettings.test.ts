@@ -40,6 +40,13 @@ describe('appSettings tray logic', () => {
     expect(mod.shouldHideOnMinimize()).toBe(true)
   })
 
+  it('floatingMonitorOnMinimize defaults on', async () => {
+    const mod = await import('../appSettings.js')
+    expect(mod.getAppSettings().floatingMonitorOnMinimize).toBe(true)
+    await mod.setAppSettings({ floatingMonitorOnMinimize: false })
+    expect(mod.getAppSettings().floatingMonitorOnMinimize).toBe(false)
+  })
+
   it('persists per-user brain settings', async () => {
     const mod = await import('../appSettings.js')
     await mod.setAppSettings({

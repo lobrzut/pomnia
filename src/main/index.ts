@@ -1,7 +1,7 @@
 import { basename, join } from 'node:path'
 import { promises as fs } from 'node:fs'
 import crypto from 'node:crypto'
-import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron'
+import { BrowserWindow, app, dialog, ipcMain, shell, type WebContents } from 'electron'
 import {
   Ollama,
   Vault,
@@ -48,6 +48,18 @@ import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImp
 import { indexPendingLibraryDocuments, type PendingIndexResult } from './libraryIndex.js'
 import { getAppSettings, loadAppSettings, setAppSettings, shouldHideOnClose, shouldHideOnMinimize } from './appSettings.js'
 import { destroyTray, initTray, refreshTrayMenu } from './tray.js'
+import {
+  destroyFloatingMonitor,
+  getFloatingWebContents,
+  hideFloatingMonitor,
+  hideFloatingWhenMainShown,
+  isFloatingMonitorVisible,
+  maybeShowFloatingOnHide,
+  openMainOnGuide,
+  setFloatingMainWindow,
+  showFloatingMonitor,
+  toggleFloatingMonitor,
+} from './floatingMonitor.js'
 import { activity, type ActivityUpdate } from './activity.js'
 import { isCursorDbTooLarge } from '@core/adapters/cursor.js'
 import { migrateBrainIndexFile, migrateLegacyAppData } from './migrateLegacy.js'
@@ -233,10 +245,14 @@ function createWindow(): void {
   win.on('ready-to-show', () => win?.show())
   win.on('focus', () => setMcpActivityWindowFocused(true))
   win.on('blur', () => setMcpActivityWindowFocused(false))
+  win.on('show', () => hideFloatingWhenMainShown())
+  win.on('minimize', () => maybeShowFloatingOnHide(!!vault))
+  win.on('hide', () => maybeShowFloatingOnHide(!!vault))
   win.on('close', (e) => {
     if (forceQuit || !shouldHideOnClose(brainCore.status().running)) return
     e.preventDefault()
     win?.hide()
+    maybeShowFloatingOnHide(!!vault)
   })
   // Pipe renderer console output (incl. uncaught exceptions logged via
   // window.onerror in App.tsx) into the main-process log — otherwise
@@ -267,14 +283,21 @@ function createWindow(): void {
 
   if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else win.loadFile(join(__dirname, '../renderer/index.html'))
+
+  setFloatingMainWindow(win)
 }
 
 /* ── IPC ───────────────────────────────────────────────────────────────── */
 function registerIpc(): void {
   activity.wire(
     (channel, payload) => {
-      if (channel === 'activity:update') win?.webContents.send('activity:update', payload)
-      else win?.webContents.send('activity:idle')
+      const send = (wc: WebContents) => {
+        if (channel === 'activity:update') wc.send('activity:update', payload)
+        else wc.send('activity:idle')
+      }
+      if (win?.webContents) send(win.webContents)
+      const floating = getFloatingWebContents()
+      if (floating) send(floating)
     },
     () => refreshTrayMenu(win, requestQuit),
   )
@@ -716,11 +739,33 @@ function registerIpc(): void {
         brainTarget?: 'embedded' | 'remote'
         connectToken?: string
         embeddedBrainAutoStart?: boolean
+        onboarded?: boolean
+        floatingMonitorOnMinimize?: boolean
       },
     ) => setAppSettings(patch),
   )
 
+  ipcMain.handle('floating-monitor:show', async () => {
+    await showFloatingMonitor({ force: true })
+    return { visible: isFloatingMonitorVisible() }
+  })
+  ipcMain.handle('floating-monitor:hide', () => {
+    hideFloatingMonitor()
+    return { visible: false }
+  })
+  ipcMain.handle('floating-monitor:toggle', async () => {
+    const visible = await toggleFloatingMonitor()
+    refreshTrayMenu(win, requestQuit)
+    return { visible }
+  })
+  ipcMain.handle('floating-monitor:open-main', () => {
+    openMainOnGuide()
+    return { ok: true }
+  })
+  ipcMain.handle('floating-monitor:is-visible', () => ({ visible: isFloatingMonitorVisible() }))
+
   app.on('before-quit', () => {
+    destroyFloatingMonitor()
     destroyTray()
     void brainCore.stop()
   })
@@ -826,8 +871,13 @@ function registerIpc(): void {
   )
 
   ipcMain.on('win:minimize', () => {
-    if (shouldHideOnMinimize()) win?.hide()
-    else win?.minimize()
+    if (shouldHideOnMinimize()) {
+      win?.hide()
+      maybeShowFloatingOnHide(!!vault)
+    } else {
+      win?.minimize()
+      maybeShowFloatingOnHide(!!vault)
+    }
   })
   ipcMain.on('win:maximize', () => (win?.isMaximized() ? win.unmaximize() : win?.maximize()))
   ipcMain.on('win:close', () => win?.close())

@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { app, Menu, Tray, nativeImage, type BrowserWindow, type NativeImage } from 'electron'
 import { activity } from './activity.js'
 import { brainCore } from './brainCore.js'
+import { isFloatingMonitorVisible, toggleFloatingMonitor } from './floatingMonitor.js'
 
 let tray: Tray | null = null
 
@@ -41,6 +42,14 @@ function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
       click: () => {
         win?.show()
         win?.focus()
+      },
+    },
+    {
+      label: 'Pływający diagram',
+      type: 'checkbox',
+      checked: isFloatingMonitorVisible(),
+      click: () => {
+        void toggleFloatingMonitor().then(() => tray?.setContextMenu(buildMenu(win, onQuit)))
       },
     },
     { type: 'separator' },

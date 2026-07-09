@@ -95,6 +95,12 @@ export interface UiLabels {
   closeToTrayHint: string
   minimizeToTray: string
   minimizeToTrayHint: string
+  floatingMonitor: string
+  floatingMonitorOnMinimize: string
+  floatingMonitorOnMinimizeHint: string
+  floatingMonitorIdleBadge: string
+  floatingMonitorClose: string
+  floatingMonitorOpenHint: string
   connectPageLead: string
   embeddedBrainNotRunning: string
   embeddedBrainNotRunningLink: string
@@ -314,6 +320,13 @@ const PL_LABELS: UiLabels = {
     'Przycisk X chowa aplikację do traya zamiast kończyć proces. Gdy działa lokalna wyszukiwarka — zawsze.',
   minimizeToTray: 'Minimalizuj do zasobnika',
   minimizeToTrayHint: 'Przycisk minimalizacji chowa okno do traya zamiast paska zadań.',
+  floatingMonitor: 'Pływający diagram',
+  floatingMonitorOnMinimize: 'Pokaż przy minimalizacji',
+  floatingMonitorOnMinimizeHint:
+    'Gdy chowasz okno do traya lub minimalizujesz — mały diagram na pulpicie pokazuje na żywo destylację, indeksowanie i zapytania MCP (jak PiP na YouTube).',
+  floatingMonitorIdleBadge: 'Na żywo: bezczynnie',
+  floatingMonitorClose: 'Zamknij pływający diagram',
+  floatingMonitorOpenHint: 'Kliknij, aby otworzyć Pomnię na „Jak to działa”. Podwójne kliknięcie — zamknij.',
   connectPageLead:
     'Skopiuj konfigurację MCP i wklej w Cursorze — Pomnia nigdy nie dotyka Twoich plików.',
   embeddedBrainNotRunning: 'Lokalna wyszukiwarka nie działa. Otwórz zakładkę',
