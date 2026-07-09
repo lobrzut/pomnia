@@ -124,6 +124,21 @@ export interface UiLabels {
   distillEmptyBacklogDetail: string
   activityBanner: (state: ActivityState) => string
   activityTrayBusy: string
+  healthTitle: string
+  healthLead: string
+  healthRefresh: string
+  healthVault: string
+  healthOllama: string
+  healthEmbedModel: string
+  healthChatModel: string
+  healthBrainCore: string
+  healthMcp: string
+  healthDeployPath: string
+  healthOpenLogs: string
+  healthOk: string
+  healthFail: string
+  healthSkip: string
+  healthChecking: string
 }
 
 const PL_LABELS: UiLabels = {
@@ -230,7 +245,22 @@ const PL_LABELS: UiLabels = {
   distillEmptyBacklog: 'Brak nowych sesji do destylacji',
   distillEmptyBacklogDetail: 'Wszystkie czaty z wybranych źródeł są już w ledgerze destylacji.',
   activityBanner: formatActivityBanner,
-  activityTrayBusy: 'Operacja w tle'
+  activityTrayBusy: 'Operacja w tle',
+  healthTitle: 'Diagnostyka',
+  healthLead: 'Szybki przegląd — co musi działać, żeby pamięć i MCP były gotowe.',
+  healthRefresh: 'Odśwież',
+  healthVault: 'Vault',
+  healthOllama: 'Ollama',
+  healthEmbedModel: 'Model embeddingów',
+  healthChatModel: 'Model destylacji',
+  healthBrainCore: 'Lokalna wyszukiwarka',
+  healthMcp: 'Brain MCP',
+  healthDeployPath: 'Folder deploy (opcjonalnie)',
+  healthOpenLogs: 'Otwórz logi',
+  healthOk: 'OK',
+  healthFail: 'Problem',
+  healthSkip: 'Pominięte',
+  healthChecking: 'Sprawdzam…'
 }
 
 /** @param _simple ignored — kept for call-site compatibility; language does not depend on simple mode */

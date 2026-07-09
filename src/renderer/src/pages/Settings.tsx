@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Brain, Clock, FileArchive, FolderOpen, Lock, Minimize2, Plug, RotateCcw, ShieldCheck, Vault } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Activity, Brain, Clock, FileArchive, FolderOpen, Lock, Minimize2, Plug, RefreshCw, RotateCcw, ShieldCheck, Vault } from 'lucide-react'
 import { Button, Field, GlassCard, Input, Spinner, Toggle } from '../components/ui'
 import { ClientIcon } from '../components/ClientIcon'
 import { api, isMock } from '../lib/api'
@@ -9,6 +9,197 @@ import { useStore } from '../store/useStore'
 import type { ClientId, ClientStatus } from '../lib/types'
 
 const ALL_CLIENTS: ClientId[] = ['claude-code', 'cursor', 'antigravity', 'claude-desktop', 'vscode', 'windsurf', 'hermes']
+
+const EMBEDDED_URL = 'http://127.0.0.1:7862'
+
+function hasModel(models: string[], want: string): boolean {
+  return models.some((m) => m === want || m === `${want}:latest` || m.replace(/:latest$/, '') === want)
+}
+
+type HealthRow = { id: string; label: string; ok: boolean | null; detail: string }
+
+function HealthCheck() {
+  const labels = uiLabels()
+  const vault = useStore((s) => s.vault)
+  const ollamaUrl = useStore((s) => s.ollamaUrl)
+  const brainTarget = useStore((s) => s.brainTarget)
+  const remoteBrainUrl = useStore((s) => s.remoteBrainUrl)
+  const brainDeployTarget = useStore((s) => s.brainDeployTarget)
+  const connectToken = useStore((s) => s.connectToken)
+  const simpleMode = useStore((s) => s.simpleMode)
+  const [rows, setRows] = useState<HealthRow[]>([])
+  const [checking, setChecking] = useState(false)
+
+  const effectiveTarget = simpleMode ? 'embedded' : brainTarget
+  const brainUrl = effectiveTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
+
+  const refresh = useCallback(async () => {
+    setChecking(true)
+    const next: HealthRow[] = []
+    try {
+      next.push({
+        id: 'vault',
+        label: labels.healthVault,
+        ok: vault.open,
+        detail: vault.open ? vault.path ?? vault.name ?? labels.healthOk : 'Otwórz lub utwórz vault'
+      })
+
+      let status = null
+      try {
+        status = await api.brainStatus(ollamaUrl || undefined)
+      } catch {
+        status = null
+      }
+      next.push({
+        id: 'ollama',
+        label: labels.healthOllama,
+        ok: !!status?.reachable,
+        detail: status?.reachable ? status.baseUrl : 'Ollama niedostępne — zainstaluj i uruchom ollama.com'
+      })
+
+      const models = status?.models ?? []
+      const embedOk = hasModel(models, status?.embedModel ?? 'nomic-embed-text')
+      next.push({
+        id: 'embed',
+        label: labels.healthEmbedModel,
+        ok: status?.reachable ? embedOk : null,
+        detail: embedOk
+          ? status?.embedModel ?? 'nomic-embed-text'
+          : status?.reachable
+            ? `Brak modelu — ollama pull ${status?.embedModel ?? 'nomic-embed-text'}`
+            : labels.healthSkip
+      })
+
+      const chatOk = hasModel(models, status?.chatModel ?? 'qwen2.5:14b')
+      next.push({
+        id: 'chat',
+        label: labels.healthChatModel,
+        ok: status?.reachable ? chatOk : null,
+        detail: chatOk
+          ? status?.chatModel ?? 'qwen2.5:14b'
+          : status?.reachable
+            ? `Brak modelu — ollama pull ${status?.chatModel ?? 'qwen2.5:14b'}`
+            : labels.healthSkip
+      })
+
+      if (effectiveTarget === 'embedded') {
+        const core = await api.brainCoreStatus()
+        next.push({
+          id: 'core',
+          label: labels.healthBrainCore,
+          ok: core.running,
+          detail: core.running
+            ? core.url ?? labels.healthOk
+            : core.lastError || 'Uruchom w zakładce Brain'
+        })
+      } else {
+        next.push({
+          id: 'core',
+          label: labels.healthBrainCore,
+          ok: null,
+          detail: labels.healthSkip
+        })
+      }
+
+      try {
+        const conn = await api.connectStatus(
+          brainUrl,
+          effectiveTarget === 'remote' ? connectToken || undefined : undefined,
+          effectiveTarget
+        )
+        next.push({
+          id: 'mcp',
+          label: labels.healthMcp,
+          ok: conn.brain.reachable,
+          detail: conn.brain.reachable
+            ? conn.brain.url
+            : conn.brain.error || 'Brain MCP nieosiągalny'
+        })
+      } catch (e) {
+        next.push({
+          id: 'mcp',
+          label: labels.healthMcp,
+          ok: false,
+          detail: (e as Error).message
+        })
+      }
+
+      next.push({
+        id: 'deploy',
+        label: labels.healthDeployPath,
+        ok: null,
+        detail: brainDeployTarget?.trim() || 'Nie skonfigurowano (opcjonalnie)'
+      })
+    } finally {
+      setRows(next)
+      setChecking(false)
+    }
+  }, [
+    vault.open,
+    vault.path,
+    vault.name,
+    ollamaUrl,
+    effectiveTarget,
+    brainUrl,
+    connectToken,
+    brainDeployTarget,
+    labels
+  ])
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+
+  return (
+    <GlassCard className="mb-4 p-5">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+          <Activity className="h-4 w-4 text-mint" /> {labels.healthTitle}
+        </div>
+        <div className="flex gap-2">
+          <Button variant="soft" onClick={() => void api.openLogs()}>
+            <FolderOpen className="h-3.5 w-3.5" /> {labels.healthOpenLogs}
+          </Button>
+          <Button variant="soft" onClick={() => void refresh()} disabled={checking}>
+            {checking ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            {labels.healthRefresh}
+          </Button>
+        </div>
+      </div>
+      <p className="mb-4 text-xs text-ink-dim">{labels.healthLead}</p>
+      <ul className="space-y-2">
+        {rows.length === 0 ? (
+          <li className="flex items-center gap-2 text-xs text-ink-dim">
+            <Spinner className="h-3.5 w-3.5" /> {labels.healthChecking}
+          </li>
+        ) : (
+          rows.map((r) => (
+            <li
+              key={r.id}
+              className="flex items-start gap-3 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5"
+            >
+              <span
+                className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                style={{
+                  background:
+                    r.ok === true ? '#34d399' : r.ok === false ? '#fb7185' : '#5b6178',
+                  boxShadow: r.ok === true ? '0 0 8px #34d39980' : undefined
+                }}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-ink">{r.label}</div>
+                <div className="mt-0.5 break-all font-mono text-[11px] text-ink-dim">{r.detail}</div>
+              </div>
+              <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-ink-faint">
+                {r.ok === true ? labels.healthOk : r.ok === false ? labels.healthFail : '—'}
+              </span>
+            </li>
+          ))
+        )}
+      </ul>
+    </GlassCard>
+  )
+}
 
 export default function Settings() {
   const {
@@ -20,13 +211,17 @@ export default function Settings() {
     setConnectClientVisible,
     resetConnectClient,
     settingsExportDir,
+    brainDeployTarget,
     setSettingsExportDir,
     simpleMode,
     setSimpleMode,
     minimizeToTray,
     closeToTray,
     setMinimizeToTray,
-    setCloseToTray
+    setCloseToTray,
+    brainTarget,
+    remoteBrainUrl,
+    connectToken
   } = useStore()
   const labels = uiLabels()
   const [exportSnap, setExportSnap] = useState(snapshots[0]?.id ?? '')
@@ -48,11 +243,16 @@ export default function Settings() {
   }
 
   useEffect(() => {
+    const url = (simpleMode ? 'embedded' : brainTarget) === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
     api
-      .connectStatus('http://brain.example.local:7862')
+      .connectStatus(
+        url,
+        !simpleMode && brainTarget === 'remote' ? connectToken || undefined : undefined,
+        simpleMode ? 'embedded' : brainTarget
+      )
       .then((r) => setClients(r.clients))
       .catch(() => {})
-  }, [])
+  }, [simpleMode, brainTarget, remoteBrainUrl, connectToken])
 
   async function pickExport() {
     const d = await api.pickDirectory()
@@ -109,6 +309,8 @@ export default function Settings() {
           </div>
         </div>
       </GlassCard>
+
+      <HealthCheck />
 
       <GlassCard className="mb-4 p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">

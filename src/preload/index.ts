@@ -90,6 +90,7 @@ const bridge = {
     ollamaUrl?: string
     embeddedBrainAutoStart?: boolean
   }) => ipcRenderer.invoke('app:settings:set', patch),
+  openLogs: () => ipcRenderer.invoke('app:openLogs') as Promise<string>,
   minimize: () => ipcRenderer.send('win:minimize'),
   toggleMaximize: () => ipcRenderer.send('win:maximize'),
   close: () => ipcRenderer.send('win:close')

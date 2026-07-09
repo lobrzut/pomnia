@@ -122,6 +122,7 @@ export interface PomniaBridge {
     ollamaUrl?: string
     embeddedBrainAutoStart?: boolean
   }>
+  openLogs(): Promise<string>
   minimize(): void
   toggleMaximize(): void
   close(): void
@@ -442,6 +443,9 @@ function mockBridge(): PomniaBridge {
     },
     async appSettingsSet(patch) {
       return { minimizeToTray: patch.minimizeToTray ?? false, closeToTray: patch.closeToTray ?? true }
+    },
+    async openLogs() {
+      return '/mock/logs'
     },
     minimize() {},
     toggleMaximize() {},
