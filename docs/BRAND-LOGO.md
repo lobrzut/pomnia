@@ -1,6 +1,6 @@
 # Pomnia — logo & branding (Slavic green rebrand)
 
-> **Status:** koncepcje wygenerowane 2026-07-07 · refinements flat 2026-07-07 · **depth pass (anti-flat)** 2026-07-07 · **finaliści depth** 2026-07-07 · **bold series (anti-mild)** 2026-07-07 wieczór · **nie** podmieniamy jeszcze `resources/icon.ico` — czekamy na wybór **jednego** finału.
+> **Status:** koncepcje wygenerowane 2026-07-07 · refinements flat 2026-07-07 · **depth pass (anti-flat)** 2026-07-07 · **finaliści depth** 2026-07-07 · **bold series (anti-mild)** 2026-07-07 wieczór · **tymczasowa ikona app (2026-07-09):** `logo-bold-vault-v1.png` → `resources/icon.png` + `icon.ico` — do czasu wyboru **jednego** finału.
 
 ## Bold series — feedback „za miękkie” (2026-07-07, wieczór)
 
@@ -282,7 +282,9 @@ Patrz: [`assets/comfyui/logo-concept.json`](../assets/comfyui/logo-concept.json)
 5. Aktualizacja `.cursor/comfy-project.json` (paleta zielona)
 6. Landing + UI: zamiana akcentów violet/cyan na forest/moss/amber
 
-**Nie rób kroku 4 bez explicit „wybieram X” od użytkownika.**
+**Tymczasowo (2026-07-09):** wdrożono **bold-vault-v1** jako placeholder — finalny wybór nadal otwarty.
+
+**Nie rób kroku 4 bez explicit „wybieram X” od użytkownika** (poza świadomym placeholderem jak powyżej).
 
 ---
 
