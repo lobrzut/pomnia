@@ -182,6 +182,7 @@ export interface UiLabels {
   guideFlowOptionalLegend: string
   guideFlowMiniTitle: string
   guideFlowMiniExpand: string
+  flowEdgeMemoryReturn: string
   flowNodeAiLabel: string
   flowNodeAiHint: string
   flowNodeAiDisk: string
@@ -361,7 +362,7 @@ const PL_LABELS: UiLabels = {
   guideTitle: 'Mapa Pomnia',
   guideSubtitle: 'Jak to działa',
   guideLead:
-    'Gdzie co się dzieje — od surowych logów asystentów po wyszukiwanie w Cursorze. Bez chmury, dopóki sam nie włączysz deployu.',
+    'Gdzie co się dzieje — od surowych logów asystentów po wyszukiwanie przez MCP. Bez chmury, dopóki sam nie włączysz deployu.',
   guideStep1Title: 'Krok 1 — Zbieranie',
   guideStep1Body:
     'Cursor, Claude Code, Antigravity… — Pomnia czyta żywe logi z dysku albo importuje eksporty ZIP/JSON.',
@@ -378,10 +379,10 @@ const PL_LABELS: UiLabels = {
   guideStep4Body:
     'Embedded brain buduje library.db — chunki + embeddingi lokalnie na tym komputerze.',
   guideStep4Where: 'Brain → Lokalna wyszukiwarka',
-  guideStep5Title: 'Krok 5 — Cursor',
+  guideStep5Title: 'Krok 5 — Agent przez MCP',
   guideStep5Body:
-    'Connect MCP — agent woła search_library podczas kodowania i przypomina sobie kontekst.',
-  guideStep5Where: 'Connect → Podłącz Cursora',
+    'Klient MCP (Cursor i inne) — agent woła search_library podczas pracy i przypomina sobie kontekst z lokalnego indeksu.',
+  guideStep5Where: 'Connect · search_library · mcp.json',
   guideStepOptionalTitle: 'Opcjonalnie — serwer Brain',
   guideStepOptionalBody:
     'Deploy kopii notatek na opcjonalny serwer Brain w sieci LAN — wspólna pamięć dla wielu maszyn.',
@@ -399,9 +400,10 @@ const PL_LABELS: UiLabels = {
   guideFlowOptionalLegend: 'Opcjonalnie',
   guideFlowMiniTitle: 'Przepływ danych',
   guideFlowMiniExpand: 'Pełna mapa →',
+  flowEdgeMemoryReturn: 'odpowiedź z pamięci',
   flowNodeAiLabel: 'Narzędzia AI',
   flowNodeAiHint: 'Cursor, Claude Code, Antigravity — surowe logi sesji na dysku lokalnym.',
-  flowNodeAiDisk: '%AppData%\\Cursor · ~/.claude',
+  flowNodeAiDisk: 'Cursor · Claude · Antigravity',
   flowNodeVaultLabel: 'Vault .pomnia',
   flowNodeVaultHint: 'Zaszyfrowane archiwum snapshotów backupów i dokumentów library.cvb.',
   flowNodeVaultDisk: 'folder *.pomnia',
@@ -414,9 +416,10 @@ const PL_LABELS: UiLabels = {
   flowNodeLibraryLabel: 'library.db',
   flowNodeLibraryHint: 'Embedded brain: chunki tekstu + wektory embeddingów lokalnie na tym PC.',
   flowNodeLibraryDisk: 'brain-core-data/library.db',
-  flowNodeMcpLabel: 'Cursor MCP',
-  flowNodeMcpHint: 'Agent woła search_library podczas kodowania — przypomina sobie kontekst.',
-  flowNodeMcpDisk: 'Connect → mcp.json',
+  flowNodeMcpLabel: 'Agent przez MCP',
+  flowNodeMcpHint:
+    'Podczas pracy agent w Cursorze (lub innym kliencie MCP) pyta lokalny indeks przez search_library.',
+  flowNodeMcpDisk: 'Connect · search_library · mcp.json',
   flowNodeImportLabel: 'Import',
   flowNodeImportHint: 'PDF, EPUB, ZIP — trafia do vaultu bez destylacji LLM.',
   flowNodeImportDisk: 'vault/library.cvb',
