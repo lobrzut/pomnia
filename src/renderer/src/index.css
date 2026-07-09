@@ -199,6 +199,12 @@
   opacity: 0.35;
   animation: none;
 }
+.flow-path-agent {
+  stroke: #818cf8;
+  stroke-dasharray: 4 6;
+  opacity: 0.5;
+  animation: none;
+}
 .flow-particle-main {
   fill: #34d399;
 }
