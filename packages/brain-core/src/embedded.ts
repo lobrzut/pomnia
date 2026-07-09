@@ -48,7 +48,9 @@ async function handleStart(partial?: Partial<BrainConfig>): Promise<void> {
     return
   }
   config = { ...defaultConfig(), ...partial, auth: { ...defaultConfig().auth, ...partial?.auth } }
-  server = await createBrainServer(config)
+  server = await createBrainServer(config, {
+    onMcpQuery: (ev) => send({ type: 'mcp-query', tool: ev.tool, detail: ev.detail }),
+  })
   await server.start()
   send({ type: 'ready', url: server.url })
 }

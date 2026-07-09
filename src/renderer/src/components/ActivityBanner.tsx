@@ -1,4 +1,4 @@
-import { FileText, Layers, Loader2, Rocket, Sparkles } from 'lucide-react'
+import { FileText, Layers, Loader2, Plug, Rocket, Sparkles } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Button, ProgressBar } from './ui'
 import { uiLabels } from '../lib/labels'
@@ -11,6 +11,7 @@ const ICONS: Record<Exclude<ActivityKind, 'idle'>, LucideIcon> = {
   'brain-start': Rocket,
   indexing: Layers,
   embed: Loader2,
+  'mcp-query': Plug,
 }
 
 function pct(state: ActivityState): number | undefined {

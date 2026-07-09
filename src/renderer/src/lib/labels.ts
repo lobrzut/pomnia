@@ -9,6 +9,7 @@ const ACTIVITY_KIND: Record<Exclude<ActivityState['kind'], 'idle'>, string> = {
   'brain-start': 'uruchamianie Brain',
   indexing: 'indeksowanie',
   embed: 'embeddingi',
+  'mcp-query': 'zapytanie MCP',
 }
 
 function truncateDetail(s: string, max = 48): string {
@@ -195,12 +196,10 @@ export interface UiLabels {
   guideFlowMiniTitle: string
   guideFlowMiniExpand: string
   flowEdgeMemoryReturn: string
-  flowAgentLayerTitle: string
+  flowAgentConsumptionCaption: string
   flowAgentLayerSkills: string
-  flowAgentLayerSkillsDetail: string
+  flowAgentLayerSkillsOptional: string
   flowAgentLayerSearch: string
-  flowAgentLayerSearchDetail: string
-  flowAgentLayerCaption: string
   flowIllustrationCaption: string
   flowNodeAiLabel: string
   flowNodeAiHint: string
@@ -415,11 +414,12 @@ const PL_LABELS: UiLabels = {
   guideDiagramToggle: 'Pokaż diagram',
   guideDiagramHide: 'Ukryj diagram',
   guideFlowReplay: 'Odtwórz demo',
-  guideFlowReplayHint: 'Przewodnik animacji — nie odzwierciedla aktywności w tle',
+  guideFlowReplayHint: 'Przycisk odtwarza demo kroków — na żywo: destylacja, import i zapytania MCP',
   guideFlowMainLegend: 'Ścieżka czatów',
   guideFlowDocsLegend: 'Ścieżka dokumentów',
   guideFlowOptionalLegend: 'Opcjonalnie',
-  guideFlowAgentLegend: 'Warstwa agenta',
+  guideFlowAgentLegend: 'Zapytanie agenta',
+  flowAgentConsumptionCaption: 'Konsumpcja (nie zapis):',
   guideFlowMiniTitle: 'Przepływ danych',
   guideFlowMiniExpand: 'Pełna mapa →',
   flowEdgeMemoryReturn: 'odpowiedź z pamięci',
@@ -441,12 +441,9 @@ const PL_LABELS: UiLabels = {
   flowNodeMcpLabel: 'Agent przez MCP',
   flowNodeMcpHint: 'Agent (Cursor i inni) łączy się przez MCP — most do lokalnej wyszukiwarki Brain.',
   flowNodeMcpDisk: 'Connect · mcp.json',
-  flowAgentLayerTitle: 'Podczas pracy agenta',
-  flowAgentLayerSkills: 'Skills (opcjonalnie)',
-  flowAgentLayerSkillsDetail: 'get_skill — procedury z Brain lub Connect',
+  flowAgentLayerSkills: 'skills',
+  flowAgentLayerSkillsOptional: 'opcj.',
   flowAgentLayerSearch: 'search_library',
-  flowAgentLayerSearchDetail: 'RAG z library.db',
-  flowAgentLayerCaption: 'To nie jest zapis pamięci — agent pyta w trakcie kodowania',
   flowWaitingCaption:
     'Oczekiwanie — animacja ruszy przy destylacji, imporcie lub indeksowaniu',
   flowIllustrationCaption:

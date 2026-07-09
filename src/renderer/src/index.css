@@ -256,13 +256,13 @@
   animation: flow-node-pulse-loop 1.6s ease-in-out infinite;
   border-color: #fbbf2488 !important;
 }
-.flow-node--embedded > div:first-child {
+.flow-node--embedded > div:first-child,
+.flow-node--mcp.flow-node--pulse > div:first-child {
   box-shadow: 0 0 14px #818cf844, inset 0 0 8px #34d39922;
   border-color: #818cf866 !important;
 }
-.flow-agent-sidecar--live > div {
-  border-color: #818cf888 !important;
-  box-shadow: 0 0 18px #818cf833;
+.flow-node--mcp > div:first-child {
+  transition: box-shadow 0.35s, border-color 0.35s;
 }
 @keyframes flow-node-pulse-loop {
   0%,

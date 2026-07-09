@@ -30,8 +30,14 @@ import { openDb } from '../storage/db.js'
 import { defaultVaultConfig } from '../storage/vault.js'
 import { callTool, listTools, type ToolContext } from './tools/index.js'
 
+export interface McpQueryEvent {
+  tool: string
+  detail?: string
+}
+
 export interface BrainServerOptions {
   config: BrainConfig
+  onMcpQuery?: (ev: McpQueryEvent) => void
 }
 
 export interface BrainServer {
@@ -46,7 +52,26 @@ export interface BrainServer {
  * this is safe to call from Pomnia's Electron main and the standalone daemon
  * without spending resources up front.
  */
-export async function createBrainServer(config: BrainConfig): Promise<BrainServer> {
+const MCP_QUERY_TOOLS = new Set([
+  'search_library',
+  'get_skill',
+  'run_skill',
+  'list_skills',
+  'list_cli_skills',
+])
+
+function mcpQueryDetail(tool: string, args: unknown): string | undefined {
+  if (tool === 'search_library' && args && typeof args === 'object' && 'query' in args) {
+    const q = String((args as { query: unknown }).query).trim()
+    if (q) return q.length > 48 ? `${q.slice(0, 47)}…` : q
+  }
+  return tool
+}
+
+export async function createBrainServer(
+  config: BrainConfig,
+  opts?: Pick<BrainServerOptions, 'onMcpQuery'>,
+): Promise<BrainServer> {
   const vault = defaultVaultConfig(config.dataDir)
 
   // Lazy resources — opened at start(), closed at stop().
@@ -86,8 +111,13 @@ export async function createBrainServer(config: BrainConfig): Promise<BrainServe
       // tools/call — dispatch to the right handler in `tools/index.ts`.
       mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         if (!ctx) throw new Error('brain-core: tools called before context ready')
+        const toolName = req.params.name
+        const toolArgs = req.params.arguments ?? {}
+        if (MCP_QUERY_TOOLS.has(toolName)) {
+          opts?.onMcpQuery?.({ tool: toolName, detail: mcpQueryDetail(toolName, toolArgs) })
+        }
         try {
-          const text = await callTool(req.params.name, req.params.arguments ?? {}, ctx)
+          const text = await callTool(toolName, toolArgs, ctx)
           return { content: [{ type: 'text', text }] }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err)

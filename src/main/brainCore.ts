@@ -34,6 +34,8 @@ interface ChildMsg {
   file?: string
   done?: number
   total?: number
+  tool?: string
+  detail?: string
 }
 
 export interface IndexDocumentPayload {
@@ -121,7 +123,9 @@ export class BrainCoreManager {
         }
       })
       child.on('message', (m: ChildMsg) => {
-        if (m.type === 'reindex-progress' || m.type === 'index-progress') this.onEvent?.(m)
+        if (m.type === 'reindex-progress' || m.type === 'index-progress' || m.type === 'mcp-query') {
+          this.onEvent?.(m)
+        }
       })
       this.child = child
 

@@ -47,6 +47,16 @@ describe('flowActivity', () => {
     expect(plan.forwardEdges.has('e-notes-library')).toBe(true)
   })
 
+  it('enables reverse agent path for mcp-query', () => {
+    const plan = planFlowVisual(
+      { kind: 'mcp-query', detail: 'vault backup' },
+      { demoActive: false, embeddedRunning: false, brainPipelineRunning: false },
+    )
+    expect(plan.reverseAgent).toBe(true)
+    expect(plan.pulseNodes.has('mcp')).toBe(true)
+    expect(plan.pulseNodes.has('library')).toBe(true)
+  })
+
   it('idle with embedded brain glows library path', () => {
     const plan = planFlowVisual(
       { kind: 'idle' },
