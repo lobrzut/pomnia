@@ -14,6 +14,7 @@ import {
   Sparkles
 } from 'lucide-react'
 import clsx from 'clsx'
+import { FlowDiagram } from './FlowDiagram'
 import { GlassCard } from './ui'
 import { uiLabels } from '../lib/labels'
 import { useStore, type Route } from '../store/useStore'
@@ -194,28 +195,9 @@ export function GuideMap({ onOpenTab, compact }: { onOpenTab?: (tab: Route) => v
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden"
               >
-                <pre className="mt-3 rounded-xl border border-white/8 bg-black/30 p-4 text-[11px] leading-relaxed text-ink-dim">
-{`Cursor/Claude/Antigravity
-        │
-        ▼
-  surowe logi na dysku
-        │
-        ▼
-  Backup / Import ──► Vault *.pomnia (zaszyfrowany)
-        │
-        ├─► czaty ──► Destylacja (Ollama) ──► brain-notes/
-        │                      │
-        │                      ▼
-        │              library.db (chunki + embed)
-        │                      │
-        └─► PDF/EPUB ──► indeks BEZ distill ──┘
-                               │
-                               ▼
-                    Cursor MCP search_library
-                               │
-                               ▼
-              (opcjonalnie) deploy → serwer 201`}
-                </pre>
+                <div className="mt-3">
+                  <FlowDiagram variant="mini" onNavigate={onOpenTab} />
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

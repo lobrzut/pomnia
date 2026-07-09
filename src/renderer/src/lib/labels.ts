@@ -176,6 +176,39 @@ export interface UiLabels {
   guideOpenTab: string
   guideDiagramToggle: string
   guideDiagramHide: string
+  guideFlowReplay: string
+  guideFlowMainLegend: string
+  guideFlowDocsLegend: string
+  guideFlowOptionalLegend: string
+  guideFlowMiniTitle: string
+  guideFlowMiniExpand: string
+  flowNodeAiLabel: string
+  flowNodeAiHint: string
+  flowNodeAiDisk: string
+  flowNodeVaultLabel: string
+  flowNodeVaultHint: string
+  flowNodeVaultDisk: string
+  flowNodeDistillLabel: string
+  flowNodeDistillHint: string
+  flowNodeDistillDisk: string
+  flowNodeNotesLabel: string
+  flowNodeNotesHint: string
+  flowNodeNotesDisk: string
+  flowNodeLibraryLabel: string
+  flowNodeLibraryHint: string
+  flowNodeLibraryDisk: string
+  flowNodeMcpLabel: string
+  flowNodeMcpHint: string
+  flowNodeMcpDisk: string
+  flowNodeImportLabel: string
+  flowNodeImportHint: string
+  flowNodeImportDisk: string
+  flowNodeDocsIndexLabel: string
+  flowNodeDocsIndexHint: string
+  flowNodeDocsIndexDisk: string
+  flowNodeDeployLabel: string
+  flowNodeDeployHint: string
+  flowNodeDeployDisk: string
   helpDontKnowStart: string
   statusStripTitle: string
   statusVault: string
@@ -360,6 +393,39 @@ const PL_LABELS: UiLabels = {
   guideOpenTab: 'Otwórz zakładkę',
   guideDiagramToggle: 'Pokaż diagram',
   guideDiagramHide: 'Ukryj diagram',
+  guideFlowReplay: 'Odtwórz animację',
+  guideFlowMainLegend: 'Ścieżka czatów',
+  guideFlowDocsLegend: 'Ścieżka dokumentów',
+  guideFlowOptionalLegend: 'Opcjonalnie',
+  guideFlowMiniTitle: 'Przepływ danych',
+  guideFlowMiniExpand: 'Pełna mapa →',
+  flowNodeAiLabel: 'Narzędzia AI',
+  flowNodeAiHint: 'Cursor, Claude Code, Antigravity — surowe logi sesji na dysku lokalnym.',
+  flowNodeAiDisk: '%AppData%\\Cursor · ~/.claude',
+  flowNodeVaultLabel: 'Vault .pomnia',
+  flowNodeVaultHint: 'Zaszyfrowane archiwum snapshotów backupów i dokumentów library.cvb.',
+  flowNodeVaultDisk: 'folder *.pomnia',
+  flowNodeDistillLabel: 'Destylacja',
+  flowNodeDistillHint: 'Ollama (qwen) skraca rozmowy do zwięzłych notatek — nie pełne kopie czatów.',
+  flowNodeDistillDisk: 'localhost:11434',
+  flowNodeNotesLabel: 'brain-notes',
+  flowNodeNotesHint: 'Zdestylowane skróty sesji gotowe do indeksowania.',
+  flowNodeNotesDisk: 'brain-notes/distilled',
+  flowNodeLibraryLabel: 'library.db',
+  flowNodeLibraryHint: 'Embedded brain: chunki tekstu + wektory embeddingów lokalnie na tym PC.',
+  flowNodeLibraryDisk: 'brain-core-data/library.db',
+  flowNodeMcpLabel: 'Cursor MCP',
+  flowNodeMcpHint: 'Agent woła search_library podczas kodowania — przypomina sobie kontekst.',
+  flowNodeMcpDisk: 'Connect → mcp.json',
+  flowNodeImportLabel: 'Import',
+  flowNodeImportHint: 'PDF, EPUB, ZIP — trafia do vaultu bez destylacji LLM.',
+  flowNodeImportDisk: 'vault/library.cvb',
+  flowNodeDocsIndexLabel: 'Indeks',
+  flowNodeDocsIndexHint: 'Chunk + embed bezpośrednio — omija krok destylacji.',
+  flowNodeDocsIndexDisk: 'library.db (docs)',
+  flowNodeDeployLabel: 'Deploy Brain',
+  flowNodeDeployHint: 'Opcjonalna kopia notatek na serwer homelab (np. LAN :7860).',
+  flowNodeDeployDisk: 'Brain homelab',
   helpDontKnowStart: 'Nie wiem od czego zacząć →',
   statusStripTitle: 'Gdzie jesteś teraz',
   statusVault: 'Vault',

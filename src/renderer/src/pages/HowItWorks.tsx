@@ -1,11 +1,14 @@
-import { Map } from 'lucide-react'
-import { GuideMap } from '../components/GuideMap'
+import { useState } from 'react'
+import { Map, RotateCcw } from 'lucide-react'
+import { FlowDiagram } from '../components/FlowDiagram'
+import { Button, GlassCard } from '../components/ui'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
 
 export default function HowItWorks() {
   const labels = uiLabels()
   const setRoute = useStore((s) => s.setRoute)
+  const [animKey, setAnimKey] = useState(0)
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -17,7 +20,16 @@ export default function HowItWorks() {
         <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.guideTitle}</h1>
         <p className="mt-1 max-w-2xl text-sm text-ink-dim">{labels.guideLead}</p>
       </div>
-      <GuideMap onOpenTab={setRoute} />
+
+      <GlassCard className="overflow-hidden p-4">
+        <div className="mb-3 flex items-center justify-end">
+          <Button variant="soft" onClick={() => setAnimKey((k) => k + 1)}>
+            <RotateCcw className="h-3.5 w-3.5" />
+            {labels.guideFlowReplay}
+          </Button>
+        </div>
+        <FlowDiagram variant="full" animKey={animKey} onNavigate={setRoute} />
+      </GlassCard>
     </div>
   )
 }
