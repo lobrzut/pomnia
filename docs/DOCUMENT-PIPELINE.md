@@ -125,6 +125,22 @@ Legenda: **L** = lokalnie w Pomnia, **S** = serwer Brain homelab, **Q** = jakoś
 
 **Po co distill, skoro agent zapisuje w czacie?** Bo większość sesji **nigdy** nie dostaje `save_conversation` (tylko gdy poprosisz / reguła). Distill ogarnia **wszystkie** zebrane rozmowy (np. 7× Antigravity) retroaktywnie. Ledger (`distill-ledger.json`) pilnuje, żeby nie przetwarzać tej samej sesji drugi raz.
 
+### 3.2 Most do Brain (`brainExport`) — kiedy, a kiedy nie
+
+UI: **Ustawienia → Most do Brain** (`Settings.tsx`). Kod: `core/brainExport.ts`, IPC `brain:export`.
+
+| | **Most do Brain** | **Distill + Deploy** | **`save_conversation`** |
+|---|---|---|---|
+| **Co robi** | Zapisuje **pełny transkrypt** każdej wiadomości jako `.md` | Ollama robi **skrót** (Summary, Decisions, …) i wysyła na serwer | Agent w czacie zapisuje **skrót** na koniec sesji |
+| **Skąd bierze dane** | Jeden wybrany **snapshot** z vaultu Pomnia | Wszystkie (lub backlog) rozmowy z adapterów / vaultu | Bieżąca rozmowa w Cursorze/Claude |
+| **Gdzie ląduje** | `vault/sessions/` · `exported_via: pomnia` | `vault/distilled/` · `distilled_via: pomnia` | `vault/sessions/` · `saved_via: mcp_save_conversation` |
+| **LLM / Ollama** | Nie | Tak (lokalnie) | Tak (agent w czacie) |
+| **Reindex RAG** | Ręcznie na serwerze Brain po wrzuceniu plików | Automatycznie przy deploy | Po reindex |
+
+**Kiedy używać mostu:** szybki dump surowych rozmów do folderu Brain (np. mount SMB na `…/vault/sessions`), bez Ollamy; chcesz zachować **cały** tekst (distill przycina długie logi). **Kiedy pominąć:** normalny flow to zakładka **Brain** → „Przygotuj pamięć" → „Wyślij do wyszukiwarki"; albo agent już woła `save_conversation`. Snapshot z **0 czatów** (np. Claude Desktop bez trybu agenta) — nic do eksportu.
+
+**Claude Desktop · 0 czatów:** zwykły chat Desktop jest w chmurze Anthropic. Pomnia wyciąga rozmowy tylko z lokalnych JSONL (`claude-code-sessions`, `local-agent-mode-sessions`, `claude-code`). Bez tych folderów snapshot ma pliki konfiguracyjne (MCP, restore), ale **0 rozmów**.
+
 ---
 
 ## 4. Diagram end-to-end (mermaid)
