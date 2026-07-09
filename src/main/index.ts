@@ -527,6 +527,7 @@ function registerIpc(): void {
       brainRunAbort?.abort()
       brainRunAbort = new AbortController()
       const signal = brainRunAbort.signal
+      let triggerFinale = false
       try {
         const o = ollamaFor(opts.ollamaUrl, opts.model)
         if (!(await o.reachable())) throw new Error(`Ollama offline at ${o.cfg.baseUrl}`)
@@ -578,10 +579,7 @@ function registerIpc(): void {
         await markProcessed(processedIds)
         if (brainCore.status().running) {
           activity.update({ kind: 'indexing', phase: 'reindex', done: 0, total: 1, detail: 'po destylacji…' })
-          brainCore
-            .reindex(brainDir())
-            .catch((e) => log.warn('embedded reindex failed:', (e as Error).message))
-            .finally(() => activity.idle('indexing'))
+          await brainCore.reindex(brainDir()).catch((e) => log.warn('embedded reindex failed:', (e as Error).message))
         }
 
         let deployed = 0
@@ -614,6 +612,7 @@ function registerIpc(): void {
           })
         }
 
+        triggerFinale = true
         return {
           notesDir: dir,
           notes: okNotes.length,
@@ -629,7 +628,8 @@ function registerIpc(): void {
         }
       } finally {
         brainRunAbort = null
-        emitBrainProgressClear()
+        if (triggerFinale) activity.pipelineFinale()
+        else emitBrainProgressClear()
       }
     }
   )

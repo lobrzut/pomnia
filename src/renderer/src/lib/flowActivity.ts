@@ -55,6 +55,10 @@ export interface FlowVisualPlan {
   demoTour: boolean
   /** Particle count on agent reverse path (mcp-query uses 3). */
   agentParticlePasses: number
+  /** One-shot staggered pulses (distill finale) vs looping (live mcp-query). */
+  agentParticlesOneShot: boolean
+  /** MCP node omnidirectional ripple during distill finale. */
+  mcpFinaleGlow: boolean
 }
 
 const DEMO_FORWARD = new Set([...FLOW_MAIN_EDGES.slice(0, 4), ...FLOW_DOCS_EDGES])
@@ -72,6 +76,8 @@ export function planFlowVisual(
       embeddedGlow: false,
       demoTour: true,
       agentParticlePasses: 0,
+      agentParticlesOneShot: false,
+      mcpFinaleGlow: false,
     }
   }
 
@@ -84,6 +90,8 @@ export function planFlowVisual(
       embeddedGlow: opts.embeddedRunning,
       demoTour: false,
       agentParticlePasses: 0,
+      agentParticlesOneShot: false,
+      mcpFinaleGlow: false,
     }
   }
 
@@ -92,6 +100,8 @@ export function planFlowVisual(
   const dash = new Set<'main' | 'docs' | 'optional' | 'agent'>()
   let reverseAgent = false
   let agentParticlePasses = 0
+  let agentParticlesOneShot = false
+  let mcpFinaleGlow = false
 
   switch (activity.kind) {
     case 'distill':
@@ -142,6 +152,15 @@ export function planFlowVisual(
       pulse.add('mcp')
       agentParticlePasses = 3
       break
+    case 'finale':
+      reverseAgent = true
+      dash.add('agent')
+      pulse.add('library')
+      pulse.add('mcp')
+      agentParticlePasses = 3
+      agentParticlesOneShot = true
+      mcpFinaleGlow = true
+      break
     default:
       break
   }
@@ -162,5 +181,7 @@ export function planFlowVisual(
     embeddedGlow: false,
     demoTour: false,
     agentParticlePasses: reverseAgent ? Math.max(agentParticlePasses, 1) : 0,
+    agentParticlesOneShot,
+    mcpFinaleGlow,
   }
 }

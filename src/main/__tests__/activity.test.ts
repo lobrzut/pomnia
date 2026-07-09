@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { activity, activityTrayTooltip, type ActivityState } from '../activity.js'
+import { activity, activityTrayTooltip, PIPELINE_FINALE_MS, type ActivityState } from '../activity.js'
 
 describe('activityTrayTooltip', () => {
   it('returns Pomnia when idle', () => {
@@ -68,5 +68,43 @@ describe('activity manager', () => {
     broadcast.mockClear()
     activity.idle('distill')
     expect(broadcast).not.toHaveBeenCalled()
+  })
+
+  it('pipelineFinale plays brief finale then idles', () => {
+    vi.useFakeTimers()
+    const broadcast = vi.fn()
+    activity.wire(broadcast, vi.fn())
+
+    activity.update({ kind: 'embed', phase: 'index', done: 5, total: 5 })
+    activity.pipelineFinale()
+    expect(activity.get().kind).toBe('finale')
+    expect(broadcast).toHaveBeenCalledWith('activity:update', expect.objectContaining({ kind: 'finale' }))
+
+    vi.advanceTimersByTime(PIPELINE_FINALE_MS)
+    expect(activity.get().kind).toBe('idle')
+    expect(broadcast).toHaveBeenCalledWith('activity:idle')
+
+    vi.useRealTimers()
+  })
+
+  it('pipelineFinale yields to real mcp-query', () => {
+    activity.wire(vi.fn(), vi.fn())
+    activity.update({ kind: 'mcp-query', phase: 'search_library', detail: 'vault' })
+    activity.pipelineFinale()
+    expect(activity.get().kind).toBe('mcp-query')
+  })
+
+  it('real mcp-query cancels pending finale timer', () => {
+    vi.useFakeTimers()
+    const broadcast = vi.fn()
+    activity.wire(broadcast, vi.fn())
+
+    activity.pipelineFinale()
+    activity.update({ kind: 'mcp-query', phase: 'get_skill' })
+    expect(activity.get().kind).toBe('mcp-query')
+    vi.advanceTimersByTime(PIPELINE_FINALE_MS)
+    expect(activity.get().kind).toBe('mcp-query')
+
+    vi.useRealTimers()
   })
 })

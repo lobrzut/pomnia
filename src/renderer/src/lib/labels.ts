@@ -10,6 +10,7 @@ const ACTIVITY_KIND: Record<Exclude<ActivityState['kind'], 'idle'>, string> = {
   indexing: 'indeksowanie',
   embed: 'embeddingi',
   'mcp-query': 'zapytanie MCP',
+  finale: 'indeks gotowy',
 }
 
 function truncateDetail(s: string, max = 48): string {
@@ -36,6 +37,7 @@ export function formatFlowLastMcpBadge(tool: string): string {
 
 export function formatFlowLiveBadge(state: ActivityState): string {
   if (state.kind === 'idle') return ''
+  if (state.kind === 'finale') return 'Gotowe: pamięć zindeksowana'
   if (state.kind === 'mcp-query') {
     const tool = state.phase ?? ''
     const toolNames = new Set(['search_library', 'get_skill', 'run_skill', 'list_skills', 'list_cli_skills'])
@@ -148,6 +150,7 @@ export interface UiLabels {
   activityBanner: (state: ActivityState) => string
   flowLiveBadge: (state: ActivityState) => string
   flowLastMcpBadge: (tool: string) => string
+  flowFinaleCaption: string
   flowWaitingCaption: string
   guideFlowReplayHint: string
   activityTrayBusy: string
@@ -460,6 +463,7 @@ const PL_LABELS: UiLabels = {
   flowAgentLayerSkills: 'skills',
   flowAgentLayerSkillsOptional: 'opcj.',
   flowAgentLayerSearch: 'search_library',
+  flowFinaleCaption: 'Indeks gotowy — pamięć dostępna dla agenta',
   flowWaitingCaption:
     'Oczekiwanie — animacja ruszy przy destylacji, imporcie, indeksowaniu lub zapytaniu MCP',
   flowIllustrationCaption:
