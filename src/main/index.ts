@@ -64,6 +64,9 @@ function requestQuit(): void {
 let vault: Vault | null = null
 let vaultPath: string | null = null
 let brainRunAbort: AbortController | null = null
+let mcpQueryIdleTimer: ReturnType<typeof setTimeout> | null = null
+
+const MCP_QUERY_IDLE_MS = 3_500
 
 function requireVault(): Vault {
   if (!vault) throw new Error('No vault is open')
@@ -629,6 +632,14 @@ function registerIpc(): void {
         total: e.total,
         detail: e.file,
       })
+    }
+    if (e.type === 'mcp-query') {
+      activity.update({ kind: 'mcp-query', detail: e.detail ?? e.tool })
+      if (mcpQueryIdleTimer) clearTimeout(mcpQueryIdleTimer)
+      mcpQueryIdleTimer = setTimeout(() => {
+        activity.idle('mcp-query')
+        mcpQueryIdleTimer = null
+      }, MCP_QUERY_IDLE_MS)
     }
     if (e.type === 'ready' || e.type === 'exited') {
       activity.idle('brain-start')

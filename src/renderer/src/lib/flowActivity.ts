@@ -11,7 +11,7 @@ export const FLOW_MAIN_EDGES = [
 
 export const FLOW_DOCS_EDGES = ['e-import-vault', 'e-vault-docs', 'e-docs-library'] as const
 
-export const FLOW_AGENT_EDGES = ['e-library-agent', 'e-agent-mcp'] as const
+export const FLOW_AGENT_EDGES = ['e-library-mcp-query'] as const
 
 const BRAIN_ACTIVITY: ReadonlySet<ActivityKind> = new Set(['brain-start', 'indexing', 'embed'])
 
@@ -129,6 +129,12 @@ export function planFlowVisual(
       dash.add('main')
       reverseAgent = opts.brainPipelineRunning || opts.embeddedRunning
       if (reverseAgent) dash.add('agent')
+      break
+    case 'mcp-query':
+      reverseAgent = true
+      dash.add('agent')
+      pulse.add('library')
+      pulse.add('mcp')
       break
     default:
       break

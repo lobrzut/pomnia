@@ -118,7 +118,7 @@ export interface BrainProgressEvent {
   label?: string
 }
 
-export type ActivityKind = 'idle' | 'distill' | 'doc-import' | 'brain-start' | 'indexing' | 'embed'
+export type ActivityKind = 'idle' | 'distill' | 'doc-import' | 'brain-start' | 'indexing' | 'embed' | 'mcp-query'
 
 export interface ActivityState {
   kind: ActivityKind

@@ -2,7 +2,7 @@
  * Global background-operation state — shared by IPC, tray tooltip, and renderer banners.
  */
 
-export type ActivityKind = 'idle' | 'distill' | 'doc-import' | 'brain-start' | 'indexing' | 'embed'
+export type ActivityKind = 'idle' | 'distill' | 'doc-import' | 'brain-start' | 'indexing' | 'embed' | 'mcp-query'
 
 export interface ActivityUpdate {
   kind: Exclude<ActivityKind, 'idle'>
@@ -26,6 +26,7 @@ const TRAY_KIND: Record<Exclude<ActivityKind, 'idle'>, string> = {
   'brain-start': 'uruchamianie Brain',
   indexing: 'indeksowanie',
   embed: 'embeddingi',
+  'mcp-query': 'zapytanie MCP',
 }
 
 function truncate(s: string, max: number): string {
