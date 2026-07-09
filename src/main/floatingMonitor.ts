@@ -7,7 +7,7 @@ import { BrowserWindow, screen, type WebContents } from 'electron'
 import { getAppSettings, setAppSettings } from './appSettings.js'
 
 const WIDTH = 400
-const HEIGHT = 220
+const HEIGHT = 240
 const SNAP_THRESHOLD = 96
 
 let floatingWin: BrowserWindow | null = null

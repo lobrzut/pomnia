@@ -10,11 +10,13 @@ export default function FloatingMonitor() {
   const globalActivity = useStore((s) => s.globalActivity)
   const onboarded = useStore((s) => s.onboarded)
   const initGlobalActivity = useStore((s) => s.initGlobalActivity)
+  const loadAppSettings = useStore((s) => s.loadAppSettings)
 
   useEffect(() => {
+    void loadAppSettings()
     const off = initGlobalActivity()
     return off
-  }, [initGlobalActivity])
+  }, [initGlobalActivity, loadAppSettings])
 
   useEffect(() => {
     if (!onboarded) void api.floatingMonitorHide()
@@ -26,7 +28,7 @@ export default function FloatingMonitor() {
       : formatFlowLiveBadge(globalActivity)
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[#06070d]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="drag flex h-7 shrink-0 items-center justify-between gap-2 border-b border-white/8 px-2">
         <span className="min-w-0 truncate text-[10px] font-medium text-emerald/90">{badge}</span>
         <button
@@ -40,15 +42,22 @@ export default function FloatingMonitor() {
         </button>
       </div>
 
-      <button
-        type="button"
-        className="no-drag flex min-h-0 flex-1 flex-col outline-none"
+      <div
+        role="button"
+        tabIndex={0}
+        className="no-drag flex min-h-0 flex-1 cursor-pointer flex-col outline-none"
         onClick={() => void api.floatingMonitorOpenMain()}
         onDoubleClick={() => void api.floatingMonitorHide()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            void api.floatingMonitorOpenMain()
+          }
+        }}
         title={labels.floatingMonitorOpenHint}
       >
-        <FlowDiagram variant="pip" className="h-full flex-1 rounded-none border-0" />
-      </button>
+        <FlowDiagram variant="pip" className="min-h-0 flex-1 rounded-none border-0" />
+      </div>
     </div>
   )
 }

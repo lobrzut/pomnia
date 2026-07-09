@@ -26,7 +26,11 @@ function isFloatingMonitorRoute(): boolean {
 
 export default function App() {
   if (isFloatingMonitorRoute()) {
-    return <FloatingMonitor />
+    return (
+      <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#06070d]">
+        <FloatingMonitor />
+      </div>
+    )
   }
 
   const { route, setRoute, scan, refreshVault, vault, toast, onboarded, loadAppSettings, initGlobalActivity } = useStore()

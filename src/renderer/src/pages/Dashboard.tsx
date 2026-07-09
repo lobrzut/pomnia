@@ -3,9 +3,8 @@ import { motion } from 'framer-motion'
 import { Check, Database, HardDriveDownload, MessageSquare, RefreshCw, Server, Layers } from 'lucide-react'
 import { Badge, Button, GlassCard, Input, ProgressBar, SourceTile, Spinner } from '../components/ui'
 import { ActivityBanner } from '../components/ActivityBanner'
-import { FlowDiagram } from '../components/FlowDiagram'
 import { StatusStrip } from '../components/StatusStrip'
-import { humanBytes, sourceMeta } from '../lib/format'
+import { humanBytes, relativeTime, sourceMeta } from '../lib/format'
 import { uiLabels } from '../lib/labels'
 import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
@@ -36,8 +35,23 @@ function Stat({
 }
 
 export default function Dashboard() {
-  const { sources, scanning, scan, selected, toggleSelected, selectAll, backup, backingUp, backupPhase, vault, backupNote, setBackupNote, setRoute } =
-    useStore()
+  const {
+    sources,
+    scanning,
+    scan,
+    selected,
+    toggleSelected,
+    selectAll,
+    backup,
+    backingUp,
+    backupPhase,
+    vault,
+    backupNote,
+    setBackupNote,
+    setRoute,
+    brainState,
+    globalActivity
+  } = useStore()
   const labels = uiLabels()
 
   const installed = useMemo(() => sources.filter((s) => s.installed), [sources])
@@ -49,6 +63,12 @@ export default function Dashboard() {
     [installed]
   )
   const allSelected = installed.length > 0 && installed.every((s) => selected.has(s.id))
+  const activityLine =
+    globalActivity.kind !== 'idle' && globalActivity.kind !== 'finale'
+      ? labels.dashboardActivityNow(globalActivity)
+      : brainState?.lastRun
+        ? labels.dashboardActivityLast(relativeTime(brainState.lastRun))
+        : labels.dashboardActivityNone
 
   useEffect(() => {
     void api.mcpActivityWatch(true)
@@ -62,15 +82,16 @@ export default function Dashboard() {
       <ActivityBanner className="mb-5" />
       <StatusStrip />
 
-      <GlassCard delay={0.01} className="mb-5 overflow-hidden p-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint">{labels.guideFlowMiniTitle}</span>
-          <button type="button" onClick={() => setRoute('guide')} className="no-drag text-[11px] font-medium text-iris hover:text-cyan">
-            {labels.guideFlowMiniExpand}
-          </button>
-        </div>
-        <FlowDiagram variant="mini" onNavigate={setRoute} />
-      </GlassCard>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1 text-xs text-ink-dim">
+        <span>{activityLine}</span>
+        <button
+          type="button"
+          onClick={() => setRoute('guide')}
+          className="no-drag shrink-0 font-medium text-iris hover:text-cyan"
+        >
+          {labels.guideFlowMiniExpand}
+        </button>
+      </div>
 
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>

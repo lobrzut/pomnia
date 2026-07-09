@@ -179,9 +179,10 @@ export interface UiLabels {
   flowLastMcpBadge: (tool: string) => string
   flowFinaleCaption: string
   flowWaitingCaption: string
-  flowSimplifiedToggle: string
-  flowSimplifiedToggleHint: string
   flowMiniStatus: (state: ActivityState) => string
+  dashboardActivityNow: (state: ActivityState) => string
+  dashboardActivityLast: (relative: string) => string
+  dashboardActivityNone: string
   guideFlowReplayHint: string
   activityTrayBusy: string
   healthTitle: string
@@ -241,7 +242,6 @@ export interface UiLabels {
   guideFlowDocsLegend: string
   guideFlowOptionalLegend: string
   guideFlowAgentLegend: string
-  guideFlowMiniTitle: string
   guideFlowMiniExpand: string
   flowEdgeMemoryReturn: string
   flowAgentConsumptionCaption: string
@@ -477,7 +477,6 @@ const PL_LABELS: UiLabels = {
   guideFlowOptionalLegend: 'Opcjonalnie',
   guideFlowAgentLegend: 'Zapytanie agenta',
   flowAgentConsumptionCaption: 'Konsumpcja (nie zapis):',
-  guideFlowMiniTitle: 'Przepływ danych',
   guideFlowMiniExpand: 'Pełna mapa →',
   flowEdgeMemoryReturn: 'odpowiedź z pamięci',
   flowNodeAiLabel: 'Narzędzia AI',
@@ -503,9 +502,10 @@ const PL_LABELS: UiLabels = {
   flowAgentLayerSearch: 'search_library',
   flowFinaleCaption: 'Indeks gotowy — pamięć dostępna dla agenta',
   flowWaitingCaption: 'Gdy coś się dzieje, podświetli się tylko aktywna ścieżka',
-  flowSimplifiedToggle: 'Uproszczony widok',
-  flowSimplifiedToggleHint: '4 kroki: Zbiór → Vault → Pamięć → Agent',
-  flowMiniStatus: (state) => (state.kind === 'idle' ? 'Bezczynnie — pełna mapa w „Jak to działa”' : formatFlowFocusBanner(state)),
+  flowMiniStatus: (state) => (state.kind === 'idle' ? 'Bezczynnie' : formatFlowFocusBanner(state)),
+  dashboardActivityNow: (state) => formatFlowFocusBanner(state),
+  dashboardActivityLast: (relative) => `Ostatnia aktywność: destylacja ${relative}`,
+  dashboardActivityNone: 'Brak ostatniej destylacji — uruchom Brain, aby przygotować pamięć',
   flowIllustrationCaption:
     'Oczekiwanie — animacja ruszy przy destylacji, imporcie, indeksowaniu lub zapytaniu MCP',
   flowNodeImportLabel: 'Import',
