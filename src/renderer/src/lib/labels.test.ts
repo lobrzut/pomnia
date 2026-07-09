@@ -42,6 +42,18 @@ describe('uiLabels', () => {
     )
   })
 
+  it('exposes guide and status strip labels in Polish', () => {
+    const labels = uiLabels()
+    expect(labels.navGuide).toBe('Jak to działa')
+    expect(labels.guideTitle).toBe('Mapa Pomnia')
+    expect(labels.guideStep1Title).toBe('Krok 1 — Zbieranie')
+    expect(labels.guideDocsTitle).toBe('Dokumenty (PDF / EPUB)')
+    expect(labels.statusStripTitle).toBe('Gdzie jesteś teraz')
+    expect(labels.helpDontKnowStart).toBe('Nie wiem od czego zacząć →')
+    expect(labels.dashboardTitle).toBe('Centrum dowodzenia')
+    expect(labels.lockVaultBtn).toBe('Zablokuj vault')
+  })
+
   it('returns the same object reference for any argument', () => {
     expect(uiLabels(true)).toBe(uiLabels(false))
     expect(uiLabels()).toBe(uiLabels(true))

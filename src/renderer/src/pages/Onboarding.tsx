@@ -21,8 +21,10 @@ import {
 import clsx from 'clsx'
 import { Button, Field, Input, Spinner } from '../components/ui'
 import { ErrorBoundary } from '../components/ErrorBoundary'
+import { GuideOverlay } from '../components/GuideMap'
 import { ClientIcon } from '../components/ClientIcon'
 import { api } from '../lib/api'
+import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
 import type { BrainStatus, BrainTarget, ClientId, ClientStatus, EmbeddedBrainStatus, Snippet } from '../lib/types'
 
@@ -216,8 +218,13 @@ const VALUE_PROPS = [
 ]
 
 function WelcomeStep({ simpleMode, onNext }: { simpleMode: boolean; onNext: () => void }) {
+  const labels = uiLabels()
+  const [guideOpen, setGuideOpen] = useState(false)
+
   return (
-    <div className="glass rounded-3xl p-9 text-center">
+    <>
+      <AnimatePresence>{guideOpen && <GuideOverlay onClose={() => setGuideOpen(false)} />}</AnimatePresence>
+      <div className="glass rounded-3xl p-9 text-center">
       <div className="relative mx-auto mb-6 h-20 w-20">
         <motion.div
           className="absolute inset-0 rounded-3xl accent-grad opacity-30 blur-xl"
@@ -261,7 +268,15 @@ function WelcomeStep({ simpleMode, onNext }: { simpleMode: boolean; onNext: () =
       <Button onClick={onNext} className="mt-8 w-full">
         <Sparkles className="h-4 w-4" /> {simpleMode ? 'Zaczynamy' : 'Konfiguracja w 2 minuty'}
       </Button>
+      <button
+        type="button"
+        onClick={() => setGuideOpen(true)}
+        className="no-drag mt-4 text-xs font-medium text-iris hover:text-cyan"
+      >
+        {labels.helpDontKnowStart}
+      </button>
     </div>
+    </>
   )
 }
 

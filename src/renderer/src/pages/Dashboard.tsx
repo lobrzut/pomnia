@@ -3,7 +3,9 @@ import { motion } from 'framer-motion'
 import { Check, Database, HardDriveDownload, MessageSquare, RefreshCw, Server, Layers } from 'lucide-react'
 import { Badge, Button, GlassCard, Input, ProgressBar, SourceTile, Spinner } from '../components/ui'
 import { ActivityBanner } from '../components/ActivityBanner'
+import { StatusStrip } from '../components/StatusStrip'
 import { humanBytes, sourceMeta } from '../lib/format'
+import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
 
 function Stat({
@@ -32,8 +34,9 @@ function Stat({
 }
 
 export default function Dashboard() {
-  const { sources, scanning, scan, selected, toggleSelected, selectAll, backup, backingUp, backupPhase, vault, backupNote, setBackupNote } =
+  const { sources, scanning, scan, selected, toggleSelected, selectAll, backup, backingUp, backupPhase, vault, backupNote, setBackupNote, setRoute } =
     useStore()
+  const labels = uiLabels()
 
   const installed = useMemo(() => sources.filter((s) => s.installed), [sources])
   const totals = useMemo(
@@ -48,12 +51,18 @@ export default function Dashboard() {
   return (
     <div className="mx-auto max-w-5xl">
       <ActivityBanner className="mb-5" />
-      <div className="mb-6 flex items-end justify-between">
+      <StatusStrip />
+      <div className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-[26px] font-bold tracking-tight text-grad">Command center</h1>
-          <p className="mt-1 text-sm text-ink-dim">
-            Capture every assistant into one encrypted, searchable AI memory — backup is just the mechanism.
-          </p>
+          <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.dashboardTitle}</h1>
+          <p className="mt-1 text-sm text-ink-dim">{labels.dashboardLead}</p>
+          <button
+            type="button"
+            onClick={() => setRoute('guide')}
+            className="no-drag mt-2 text-xs font-medium text-iris hover:text-cyan"
+          >
+            {labels.helpDontKnowStart}
+          </button>
         </div>
         <Button variant="soft" onClick={() => scan()} disabled={scanning}>
           {scanning ? <Spinner className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />}

@@ -50,3 +50,16 @@ export const SOURCE_META: Record<string, SourceMeta> = {
 export function sourceMeta(id: SourceId | string): SourceMeta {
   return SOURCE_META[id] ?? SOURCE_META.generic
 }
+
+/** Shorten filesystem paths for compact UI strips. */
+export function shortPath(p: string, max = 36): string {
+  if (!p) return '—'
+  const norm = p.replace(/\\/g, '/')
+  if (norm.length <= max) return norm
+  const parts = norm.split('/').filter(Boolean)
+  if (parts.length >= 2) {
+    const tail = parts.slice(-2).join('/')
+    if (tail.length <= max - 1) return `…/${tail}`
+  }
+  return `…${norm.slice(-max + 1)}`
+}

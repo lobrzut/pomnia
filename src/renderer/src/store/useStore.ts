@@ -6,7 +6,7 @@ import { formatBrainProgressLabel, uiLabels } from '../lib/labels'
 
 migrateLegacyStorage()
 
-export type Route = 'dashboard' | 'browse' | 'import' | 'brain' | 'connect' | 'settings'
+export type Route = 'dashboard' | 'browse' | 'import' | 'brain' | 'connect' | 'settings' | 'guide'
 
 /**
  * Connect-tab client visibility override. Default behaviour shows only clients
