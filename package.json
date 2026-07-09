@@ -1,7 +1,7 @@
 {
   "name": "pomnia",
   "version": "0.1.2",
-  "description": "Pomnia — local-first encrypted vault for AI assistant chat history (Claude Code, Claude Desktop, Cursor, Antigravity, VS Code).",
+  "description": "Pomnia — local-first AI memory for developers: encrypted vault, distill pipeline, embedded Brain MCP.",
   "homepage": "https://pomnia.ai",
   "author": "alice",
   "license": "MIT",

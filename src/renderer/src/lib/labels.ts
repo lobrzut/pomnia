@@ -418,8 +418,8 @@ const PL_LABELS: UiLabels = {
   flowNodeLibraryDisk: 'brain-core-data/library.db',
   flowNodeMcpLabel: 'Agent przez MCP',
   flowNodeMcpHint:
-    'Podczas pracy agent w Cursorze (lub innym kliencie MCP) pyta lokalny indeks przez search_library.',
-  flowNodeMcpDisk: 'Connect · search_library · mcp.json',
+    'Agent (Cursor i inni): najpierw skills (opcjonalnie), potem search_library — lokalny indeks RAG.',
+  flowNodeMcpDisk: 'Connect · skills → search_library · mcp.json',
   flowNodeImportLabel: 'Import',
   flowNodeImportHint: 'PDF, EPUB, ZIP — trafia do vaultu bez destylacji LLM.',
   flowNodeImportDisk: 'vault/library.cvb',
