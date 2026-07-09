@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   ArrowRight,
   BookOpen,
@@ -14,7 +13,6 @@ import {
   Sparkles
 } from 'lucide-react'
 import clsx from 'clsx'
-import { FlowDiagram } from './FlowDiagram'
 import { GlassCard } from './ui'
 import { uiLabels } from '../lib/labels'
 import { useStore, type Route } from '../store/useStore'
@@ -82,7 +80,6 @@ function StepCard({
 
 export function GuideMap({ onOpenTab, compact }: { onOpenTab?: (tab: Route) => void; compact?: boolean }) {
   const labels = uiLabels()
-  const [diagramOpen, setDiagramOpen] = useState(false)
 
   const mainFlow: FlowStep[] = [
     {
@@ -176,32 +173,15 @@ export function GuideMap({ onOpenTab, compact }: { onOpenTab?: (tab: Route) => v
         <StepCard step={optionalStep} index={6} onOpenTab={onOpenTab} />
       </GlassCard>
 
-      {!compact && (
-        <div>
-          <button
-            type="button"
-            onClick={() => setDiagramOpen((o) => !o)}
-            className="no-drag flex items-center gap-2 text-xs font-medium text-iris hover:text-cyan"
-          >
-            <BrainCircuit className="h-3.5 w-3.5" />
-            {diagramOpen ? labels.guideDiagramHide : labels.guideDiagramToggle}
-            <ChevronDown className={clsx('h-3.5 w-3.5 transition-transform', diagramOpen && 'rotate-180')} />
-          </button>
-          <AnimatePresence>
-            {diagramOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-3">
-                  <FlowDiagram variant="mini" onNavigate={onOpenTab} />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+      {!compact && onOpenTab && (
+        <button
+          type="button"
+          onClick={() => onOpenTab('guide')}
+          className="no-drag flex items-center gap-2 text-xs font-medium text-iris hover:text-cyan"
+        >
+          <BrainCircuit className="h-3.5 w-3.5" />
+          {labels.guideFlowMiniExpand}
+        </button>
       )}
     </div>
   )

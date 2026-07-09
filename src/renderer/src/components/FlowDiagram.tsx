@@ -18,18 +18,18 @@ const AMBER = '#fbbf24'
 /** SVG viewBox height — keep in sync with node y% (y% = y / VIEWBOX_H * 100). */
 const VIEWBOX_H = 360
 const FLOW_MAIN_Y = 92
-const FLOW_RETURN_Y = 106
+const FLOW_RETURN_Y = 134
 /** Horizontal corridor for docs/optional connectors — below main subtitles, above docs icons. */
 const FLOW_ROUTE_Y = 218
 const FLOW_DOCS_Y = 300
 const FLOW_DEPLOY_Y = 316
-/** Horizontal corridor for agent query path — between main line and docs branch. */
-const FLOW_AGENT_JUNCTION_Y = 148
-/** Pill between library and MCP — above blue agent path, clear of MCP title. */
-const FLOW_MEMORY_LABEL_Y = 118
+/** Horizontal corridor for agent query path — below memory return label. */
+const FLOW_AGENT_JUNCTION_Y = 168
+/** Pill on return path — below node subtitles, above agent junction. */
+const FLOW_MEMORY_LABEL_Y = 134
 /** Main-row x positions (%). Wider gap library ↔ MCP reduces label overlap. */
-const FLOW_LIBRARY_X = 70
-const FLOW_MCP_X = 97
+const FLOW_LIBRARY_X = 65
+const FLOW_MCP_X = 94
 
 export interface FlowDiagramProps {
   variant?: 'full' | 'mini' | 'pip'
@@ -219,24 +219,15 @@ function buildEdges(memoryReturnLabel: string): FlowEdge[] {
   ]
 }
 
-/** Mini dashboard: Vault → Pamięć → Agent (3 nodes). */
+/** PiP monitor: Vault → Pamięć → Agent (3 nodes). */
 const MINI_NODE_IDS = ['vault', 'library', 'mcp'] as const
-/** Beginner simplified view: Zbiór → Vault → Pamięć → Agent. */
-const SIMPLIFIED_NODE_IDS = ['ai', 'vault', 'library', 'mcp'] as const
 
-function buildMiniLayout(nodes: FlowNodeDef[]): FlowNodeDef[] {
+function buildMiniLayout(nodes: FlowNodeDef[], pip = false): FlowNodeDef[] {
   const xs = [22, 50, 78]
+  const y = pip ? Math.round((FLOW_MAIN_Y / VIEWBOX_H) * 100) : 36
   return MINI_NODE_IDS.map((id, i) => {
     const base = nodes.find((n) => n.id === id)!
-    return { ...base, x: xs[i], y: 36 }
-  })
-}
-
-function buildSimplifiedLayout(nodes: FlowNodeDef[]): FlowNodeDef[] {
-  const xs = [12, 35, 62, 88]
-  return SIMPLIFIED_NODE_IDS.map((id, i) => {
-    const base = nodes.find((n) => n.id === id)!
-    return { ...base, x: xs[i], y: Math.round((FLOW_MAIN_Y / VIEWBOX_H) * 100) }
+    return { ...base, x: xs[i], y }
   })
 }
 
@@ -472,18 +463,15 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   const allNodes = useMemo(() => buildNodes(labels, mini), [labels, mini])
   const fullEdges = useMemo(() => buildEdges(labels.flowEdgeMemoryReturn), [labels.flowEdgeMemoryReturn])
   const agentEdges = useMemo(() => buildAgentEdges(), [])
-  const [simplified, setSimplified] = useState(false)
   const nodes = useMemo(() => {
     if (mini) return buildMiniLayout(allNodes)
-    if (simplified) return buildSimplifiedLayout(allNodes)
     return allNodes
-  }, [allNodes, mini, simplified])
+  }, [allNodes, mini])
   const edges = useMemo(() => {
     if (mini) return buildCompactEdges(MINI_NODE_IDS)
-    if (simplified) return buildCompactEdges(SIMPLIFIED_NODE_IDS)
     return fullEdges
-  }, [fullEdges, mini, simplified])
-  const displayAgentEdges = mini || simplified ? [] : agentEdges
+  }, [fullEdges, mini])
+  const displayAgentEdges = mini ? [] : agentEdges
   const globalActivity = useStore((s) => s.globalActivity)
   const brainRunning = useStore((s) => s.brainRunning)
   const isBusy = globalActivity.kind !== 'idle'
@@ -584,8 +572,8 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
             : labels.guideLead
 
   const focusMode = visual.focusMode && !demoActive
-  const showFocusBanner = focusMode && (mini || !simplified) && !pip
-  const showLegend = !mini && !flowLive && !simplified
+  const showFocusBanner = focusMode && !pip
+  const showLegend = !mini && !flowLive
   const showWaitingCaption = !flowLive && !hoverId && !isFinale
 
   function isNodeActive(nodeId: string): boolean {
@@ -627,7 +615,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   return (
     <div
       className={clsx(
-        'flow-diagram overflow-hidden border border-white/8',
+        'flow-diagram relative overflow-hidden border border-white/8',
         pip ? 'rounded-none bg-[#06070d]' : 'rounded-2xl',
         mini && !pip ? 'bg-black/25' : !pip ? 'bg-gradient-to-b from-[#06070d] to-[#0a1210]' : '',
         flowLive && 'flow-diagram--live',
@@ -678,7 +666,12 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
         </div>
       )}
 
-      <div className={clsx('relative w-full', pip ? 'min-h-0 flex-1' : mini ? 'h-[140px]' : 'h-[360px]')}>
+      <div
+        className={clsx(
+          'relative w-full',
+          pip ? 'min-h-[168px] flex-1' : mini ? 'h-[140px]' : 'h-[360px]',
+        )}
+      >
         {!mini && (
           <div
             className="pointer-events-none absolute inset-0 opacity-40"
@@ -712,7 +705,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
             const dashLive = visual.dashBranches.has(edge.branch as 'main' | 'docs' | 'optional')
             const showForward =
               visual.forwardEdges.has(edge.id) ||
-              ((mini || simplified) &&
+              (mini &&
                 isEdgeActive(edge.id) &&
                 edge.branch === 'main' &&
                 (visual.dashBranches.has('main') || visual.dashBranches.has('docs')))
@@ -759,14 +752,14 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
           })}
         </svg>
 
-        {!mini && !simplified && (
+        {!mini && (
           <div
             className={clsx(
-              'pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border border-emerald/30 bg-[#06070d] px-2.5 py-1 text-[9px] font-semibold text-emerald/80 shadow-md transition-opacity',
+              'pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border border-emerald/35 bg-[#06070d]/98 px-2 py-0.5 text-[8px] font-semibold tracking-wide text-emerald/85 shadow-md backdrop-blur-sm transition-opacity',
               focusMode && !visual.activeEdgeIds.has('e-library-mcp-return') && 'opacity-30',
             )}
             style={{
-              left: `${(FLOW_LIBRARY_X + FLOW_MCP_X) / 2}%`,
+              left: `${FLOW_LIBRARY_X + (FLOW_MCP_X - FLOW_LIBRARY_X) * 0.42}%`,
               top: `${(FLOW_MEMORY_LABEL_Y / VIEWBOX_H) * 100}%`,
             }}
           >
@@ -812,23 +805,6 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
 
       {!mini && (
         <div className="border-t border-white/6 bg-black/30 px-4 py-2.5">
-          {!flowLive && (
-            <div className="mb-2 flex items-center justify-center">
-              <button
-                type="button"
-                onClick={() => setSimplified((s) => !s)}
-                className={clsx(
-                  'no-drag rounded-full border px-3 py-1 text-[10px] font-medium transition-colors',
-                  simplified
-                    ? 'border-iris/50 bg-iris/15 text-iris'
-                    : 'border-white/12 text-ink-faint hover:border-white/25 hover:text-ink-dim',
-                )}
-                title={labels.flowSimplifiedToggleHint}
-              >
-                {labels.flowSimplifiedToggle}
-              </button>
-            </div>
-          )}
           <p className="min-h-[2rem] text-center text-xs leading-relaxed text-ink-dim">{hint}</p>
           {showWaitingCaption && (
             <p className="mt-0.5 text-center text-[10px] italic text-ink-faint">{labels.flowWaitingCaption}</p>
