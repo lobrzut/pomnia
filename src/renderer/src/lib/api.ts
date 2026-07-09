@@ -115,6 +115,8 @@ export interface PomniaBridge {
     brainTarget?: 'embedded' | 'remote'
     connectToken?: string
     embeddedBrainAutoStart?: boolean
+    onboarded?: boolean
+    floatingMonitorOnMinimize?: boolean
   }>
   appSettingsSet(patch: {
     minimizeToTray?: boolean
@@ -125,6 +127,8 @@ export interface PomniaBridge {
     brainTarget?: 'embedded' | 'remote'
     connectToken?: string
     embeddedBrainAutoStart?: boolean
+    onboarded?: boolean
+    floatingMonitorOnMinimize?: boolean
   }): Promise<{
     minimizeToTray: boolean
     closeToTray: boolean
@@ -134,8 +138,16 @@ export interface PomniaBridge {
     brainTarget?: 'embedded' | 'remote'
     connectToken?: string
     embeddedBrainAutoStart?: boolean
+    onboarded?: boolean
+    floatingMonitorOnMinimize?: boolean
   }>
   openLogs(): Promise<string>
+  floatingMonitorShow(): Promise<{ visible: boolean }>
+  floatingMonitorHide(): Promise<{ visible: boolean }>
+  floatingMonitorToggle(): Promise<{ visible: boolean }>
+  floatingMonitorOpenMain(): Promise<{ ok: boolean }>
+  floatingMonitorIsVisible(): Promise<{ visible: boolean }>
+  onAppNavigate(cb: (route: string) => void): () => void
   minimize(): void
   toggleMaximize(): void
   close(): void
@@ -455,13 +467,36 @@ function mockBridge(): PomniaBridge {
       }
     },
     async appSettings() {
-      return { minimizeToTray: false, closeToTray: true }
+      return { minimizeToTray: false, closeToTray: true, floatingMonitorOnMinimize: true }
     },
     async appSettingsSet(patch) {
-      return { minimizeToTray: patch.minimizeToTray ?? false, closeToTray: patch.closeToTray ?? true }
+      return {
+        minimizeToTray: patch.minimizeToTray ?? false,
+        closeToTray: patch.closeToTray ?? true,
+        floatingMonitorOnMinimize: patch.floatingMonitorOnMinimize ?? true,
+        onboarded: patch.onboarded,
+      }
     },
     async openLogs() {
       return '/mock/logs'
+    },
+    async floatingMonitorShow() {
+      return { visible: true }
+    },
+    async floatingMonitorHide() {
+      return { visible: false }
+    },
+    async floatingMonitorToggle() {
+      return { visible: true }
+    },
+    async floatingMonitorOpenMain() {
+      return { ok: true }
+    },
+    async floatingMonitorIsVisible() {
+      return { visible: false }
+    },
+    onAppNavigate() {
+      return () => {}
     },
     minimize() {},
     toggleMaximize() {},

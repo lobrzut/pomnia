@@ -219,6 +219,8 @@ export default function Settings() {
     closeToTray,
     setMinimizeToTray,
     setCloseToTray,
+    floatingMonitorOnMinimize,
+    setFloatingMonitorOnMinimize,
     brainTarget,
     remoteBrainUrl,
     connectToken
@@ -306,6 +308,17 @@ export default function Settings() {
               <p className="mt-1 text-xs text-ink-dim">{labels.minimizeToTrayHint}</p>
             </div>
             <Toggle checked={minimizeToTray} onChange={setMinimizeToTray} aria-label={labels.minimizeToTray} />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-ink">{labels.floatingMonitorOnMinimize}</div>
+              <p className="mt-1 text-xs text-ink-dim">{labels.floatingMonitorOnMinimizeHint}</p>
+            </div>
+            <Toggle
+              checked={floatingMonitorOnMinimize}
+              onChange={setFloatingMonitorOnMinimize}
+              aria-label={labels.floatingMonitorOnMinimize}
+            />
           </div>
         </div>
       </GlassCard>

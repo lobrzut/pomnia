@@ -94,8 +94,20 @@ const bridge = {
     brainTarget?: 'embedded' | 'remote'
     connectToken?: string
     embeddedBrainAutoStart?: boolean
+    onboarded?: boolean
+    floatingMonitorOnMinimize?: boolean
   }) => ipcRenderer.invoke('app:settings:set', patch),
   openLogs: () => ipcRenderer.invoke('app:openLogs') as Promise<string>,
+  floatingMonitorShow: () => ipcRenderer.invoke('floating-monitor:show') as Promise<{ visible: boolean }>,
+  floatingMonitorHide: () => ipcRenderer.invoke('floating-monitor:hide') as Promise<{ visible: boolean }>,
+  floatingMonitorToggle: () => ipcRenderer.invoke('floating-monitor:toggle') as Promise<{ visible: boolean }>,
+  floatingMonitorOpenMain: () => ipcRenderer.invoke('floating-monitor:open-main') as Promise<{ ok: boolean }>,
+  floatingMonitorIsVisible: () => ipcRenderer.invoke('floating-monitor:is-visible') as Promise<{ visible: boolean }>,
+  onAppNavigate: (cb: (route: string) => void) => {
+    const l = (_: IpcRendererEvent, route: string) => cb(route)
+    ipcRenderer.on('app:navigate', l)
+    return () => ipcRenderer.removeListener('app:navigate', l)
+  },
   minimize: () => ipcRenderer.send('win:minimize'),
   toggleMaximize: () => ipcRenderer.send('win:maximize'),
   close: () => ipcRenderer.send('win:close')

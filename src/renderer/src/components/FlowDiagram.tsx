@@ -32,7 +32,7 @@ const FLOW_LIBRARY_X = 70
 const FLOW_MCP_X = 97
 
 export interface FlowDiagramProps {
-  variant?: 'full' | 'mini'
+  variant?: 'full' | 'mini' | 'pip'
   /** Increment to replay onboarding demo tour (manual only). */
   animKey?: number
   onNavigate?: (route: Route) => void
@@ -467,7 +467,8 @@ function FlowParticle({
 
 export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, className }: FlowDiagramProps) {
   const labels = uiLabels()
-  const mini = variant === 'mini'
+  const pip = variant === 'pip'
+  const mini = variant === 'mini' || pip
   const allNodes = useMemo(() => buildNodes(labels, mini), [labels, mini])
   const fullEdges = useMemo(() => buildEdges(labels.flowEdgeMemoryReturn), [labels.flowEdgeMemoryReturn])
   const agentEdges = useMemo(() => buildAgentEdges(), [])
@@ -583,7 +584,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
             : labels.guideLead
 
   const focusMode = visual.focusMode && !demoActive
-  const showFocusBanner = focusMode && (mini || !simplified)
+  const showFocusBanner = focusMode && (mini || !simplified) && !pip
   const showLegend = !mini && !flowLive && !simplified
   const showWaitingCaption = !flowLive && !hoverId && !isFinale
 
@@ -626,8 +627,9 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   return (
     <div
       className={clsx(
-        'flow-diagram overflow-hidden rounded-2xl border border-white/8',
-        mini ? 'bg-black/25' : 'bg-gradient-to-b from-[#06070d] to-[#0a1210]',
+        'flow-diagram overflow-hidden border border-white/8',
+        pip ? 'rounded-none bg-[#06070d]' : 'rounded-2xl',
+        mini && !pip ? 'bg-black/25' : !pip ? 'bg-gradient-to-b from-[#06070d] to-[#0a1210]' : '',
         flowLive && 'flow-diagram--live',
         isBusy && 'flow-diagram--busy',
         focusMode && 'flow-diagram--focus',
@@ -635,6 +637,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
         isFinale && 'flow-diagram--finale',
         !flowLive && visual.embeddedGlow && 'flow-diagram--embedded-idle',
         !flowLive && !visual.embeddedGlow && 'flow-diagram--idle',
+        pip && 'flex min-h-0 flex-1 flex-col border-0',
         className
       )}
     >
@@ -675,7 +678,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
         </div>
       )}
 
-      <div className={clsx('relative w-full', mini ? 'h-[140px]' : 'h-[360px]')}>
+      <div className={clsx('relative w-full', pip ? 'min-h-0 flex-1' : mini ? 'h-[140px]' : 'h-[360px]')}>
         {!mini && (
           <div
             className="pointer-events-none absolute inset-0 opacity-40"
@@ -801,7 +804,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
         })}
       </div>
 
-      {mini && (
+      {mini && !pip && (
         <p className="border-t border-white/6 bg-black/25 px-3 py-1.5 text-center text-[10px] text-ink-dim">
           {labels.flowMiniStatus(globalActivity)}
         </p>

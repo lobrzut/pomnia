@@ -228,8 +228,10 @@ interface State {
   /** Tray — main-process settings mirrored here for the Settings UI. */
   minimizeToTray: boolean
   closeToTray: boolean
+  floatingMonitorOnMinimize: boolean
   setMinimizeToTray: (on: boolean) => void
   setCloseToTray: (on: boolean) => void
+  setFloatingMonitorOnMinimize: (on: boolean) => void
   loadAppSettings: () => Promise<void>
 
   /** Distill pipeline — lives in the store so progress survives tab switches. */
@@ -266,6 +268,7 @@ export const useStore = create<State>((set, get) => ({
     } catch {
       /* storage unavailable — flag stays in-memory for this session */
     }
+    void api.appSettingsSet({ onboarded: true }).catch(() => {})
     set({ onboarded: true })
   },
 
@@ -474,6 +477,7 @@ export const useStore = create<State>((set, get) => ({
 
   minimizeToTray: false,
   closeToTray: true,
+  floatingMonitorOnMinimize: true,
   async loadAppSettings() {
     try {
       const s = await api.appSettings()
@@ -516,6 +520,7 @@ export const useStore = create<State>((set, get) => ({
       set({
         minimizeToTray: s.minimizeToTray,
         closeToTray: s.closeToTray,
+        floatingMonitorOnMinimize: s.floatingMonitorOnMinimize !== false,
         ollamaUrl,
         remoteBrainUrl,
         brainTarget,
@@ -531,6 +536,11 @@ export const useStore = create<State>((set, get) => ({
   },
   setCloseToTray: (closeToTray) => {
     void api.appSettingsSet({ closeToTray }).then((s) => set({ closeToTray: s.closeToTray }))
+  },
+  setFloatingMonitorOnMinimize: (floatingMonitorOnMinimize) => {
+    void api.appSettingsSet({ floatingMonitorOnMinimize }).then((s) =>
+      set({ floatingMonitorOnMinimize: s.floatingMonitorOnMinimize !== false }),
+    )
   },
 
   brainRunning: false,

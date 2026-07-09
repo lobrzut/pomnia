@@ -26,12 +26,19 @@ export interface AppSettings {
   connectToken?: string
   /** Auto-start embedded brain on vault open when the user had it running last session. */
   embeddedBrainAutoStart?: boolean
+  /** First-run wizard completed — floating monitor skips onboarding. */
+  onboarded?: boolean
+  /** Show PiP flow monitor when the main window is minimized or hidden to tray. */
+  floatingMonitorOnMinimize?: boolean
+  /** Last floating monitor window position (multi-monitor). */
+  floatingMonitorPosition?: { x: number; y: number }
 }
 
 const DEFAULTS: AppSettings = {
   minimizeToTray: false,
   closeToTray: true,
   embeddedBrainAutoStart: false,
+  floatingMonitorOnMinimize: true,
 }
 
 let cached: AppSettings = { ...DEFAULTS }
@@ -55,6 +62,9 @@ export async function loadAppSettings(): Promise<AppSettings> {
       brainTarget: parsed.brainTarget,
       connectToken: parsed.connectToken,
       embeddedBrainAutoStart: parsed.embeddedBrainAutoStart ?? DEFAULTS.embeddedBrainAutoStart,
+      onboarded: parsed.onboarded,
+      floatingMonitorOnMinimize: parsed.floatingMonitorOnMinimize ?? DEFAULTS.floatingMonitorOnMinimize,
+      floatingMonitorPosition: parsed.floatingMonitorPosition,
     }
   } catch {
     cached = { ...DEFAULTS }

@@ -15,11 +15,21 @@ import Settings from './pages/Settings'
 import VaultGate from './pages/VaultGate'
 import Onboarding from './pages/Onboarding'
 import HowItWorks from './pages/HowItWorks'
+import FloatingMonitor from './pages/FloatingMonitor'
 
 const PAGES = { dashboard: Dashboard, browse: Browse, import: ImportPage, brain: Brain, connect: Connect, settings: Settings, guide: HowItWorks } as const
 
+function isFloatingMonitorRoute(): boolean {
+  const hash = window.location.hash.replace(/^#/, '')
+  return hash === '/floating-monitor' || hash === 'floating-monitor'
+}
+
 export default function App() {
-  const { route, scan, refreshVault, vault, toast, onboarded, loadAppSettings, initGlobalActivity } = useStore()
+  if (isFloatingMonitorRoute()) {
+    return <FloatingMonitor />
+  }
+
+  const { route, setRoute, scan, refreshVault, vault, toast, onboarded, loadAppSettings, initGlobalActivity } = useStore()
 
   useEffect(() => {
     void scan()
@@ -32,9 +42,15 @@ export default function App() {
         brainDeployUrl: s.brainDeployUrl || undefined,
         brainTarget: s.brainTarget,
         connectToken: s.connectToken || undefined,
+        ...(s.onboarded ? { onboarded: true } : {}),
       }).catch(() => {})
     })
     const offActivity = initGlobalActivity()
+    const offNavigate = api.onAppNavigate((r) => {
+      if (r === 'guide' || r === 'dashboard' || r === 'browse' || r === 'import' || r === 'brain' || r === 'connect' || r === 'settings') {
+        setRoute(r)
+      }
+    })
     // Surface otherwise-silent async failures as toasts (diagnostics).
     const onErr = (e: ErrorEvent) => toast({ kind: 'error', title: 'Unexpected error', detail: e.message })
     const onRej = (e: PromiseRejectionEvent) =>
@@ -45,6 +61,7 @@ export default function App() {
       window.removeEventListener('error', onErr)
       window.removeEventListener('unhandledrejection', onRej)
       offActivity()
+      offNavigate()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
