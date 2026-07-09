@@ -1,21 +1,37 @@
 import { motion } from 'framer-motion'
-import { Boxes, BrainCircuit, Import as ImportIcon, LayoutDashboard, Lock, MessagesSquare, Minus, Plug, Settings as Cog, Square, X } from 'lucide-react'
+import { Boxes, BrainCircuit, Import as ImportIcon, LayoutDashboard, Lock, Map, MessagesSquare, Minus, Plug, Settings as Cog, Square, X } from 'lucide-react'
 import clsx from 'clsx'
 import { Spinner } from './ui'
 import { api, isMock } from '../lib/api'
+import { uiLabels } from '../lib/labels'
 import { useStore, type Route } from '../store/useStore'
 
-const NAV: { id: Route; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'browse', label: 'Chats', icon: MessagesSquare },
-  { id: 'import', label: 'Import', icon: ImportIcon },
-  { id: 'brain', label: 'Brain', icon: BrainCircuit },
-  { id: 'connect', label: 'Connect', icon: Plug },
-  { id: 'settings', label: 'Settings', icon: Cog }
-]
+const NAV_ICONS: Record<Route, typeof LayoutDashboard> = {
+  dashboard: LayoutDashboard,
+  browse: MessagesSquare,
+  import: ImportIcon,
+  brain: BrainCircuit,
+  connect: Plug,
+  settings: Cog,
+  guide: Map
+}
+
+function navItems(): { id: Route; label: string; icon: typeof LayoutDashboard }[] {
+  const L = uiLabels()
+  return [
+    { id: 'dashboard', label: L.navDashboard, icon: NAV_ICONS.dashboard },
+    { id: 'guide', label: L.navGuide, icon: NAV_ICONS.guide },
+    { id: 'browse', label: L.navBrowse, icon: NAV_ICONS.browse },
+    { id: 'import', label: L.navImport, icon: NAV_ICONS.import },
+    { id: 'brain', label: L.navBrain, icon: NAV_ICONS.brain },
+    { id: 'connect', label: L.navConnect, icon: NAV_ICONS.connect },
+    { id: 'settings', label: L.navSettings, icon: NAV_ICONS.settings }
+  ]
+}
 
 export function TitleBar() {
   const vault = useStore((s) => s.vault)
+  const labels = uiLabels()
   return (
     // z-50: must stay above VaultGate's lock overlay (z-40) — on a frameless
     // window these minimize/maximize/close buttons are the only way to control
@@ -34,7 +50,7 @@ export function TitleBar() {
             className={clsx('h-1.5 w-1.5 rounded-full', vault.open ? 'bg-mint' : 'bg-ink-faint')}
             style={vault.open ? { boxShadow: '0 0 10px #34d399' } : undefined}
           />
-          <span className="text-xs text-ink-dim">{vault.open ? vault.name : 'locked'}</span>
+          <span className="text-xs text-ink-dim">{vault.open ? vault.name : labels.vaultLocked}</span>
         </div>
       </div>
 
@@ -68,6 +84,8 @@ function WinBtn({ children, onClick, danger }: { children: React.ReactNode; onCl
 
 export function Sidebar() {
   const { route, setRoute, vault, lockVault, globalActivity } = useStore()
+  const labels = uiLabels()
+  const NAV = navItems()
   const pendingLibrary = vault.pendingLibraryIndex ?? 0
   const busy = globalActivity.kind !== 'idle'
   const busyLabel =
@@ -83,7 +101,7 @@ export function Sidebar() {
   return (
     <nav className="relative z-10 flex w-[208px] shrink-0 flex-col gap-1 px-3 pb-4">
       <div className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
-        Navigate
+        {labels.navNavigate}
       </div>
       {NAV.map((n) => {
         const active = route === n.id
@@ -127,7 +145,7 @@ export function Sidebar() {
             className="no-drag flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-dim transition-colors hover:bg-white/6 hover:text-ink"
           >
             <Lock className="h-[18px] w-[18px]" />
-            Lock vault
+            {labels.lockVaultBtn}
           </button>
         )}
       </div>

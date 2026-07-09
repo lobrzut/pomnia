@@ -1,5 +1,16 @@
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import { relativeTime } from './format'
+import { relativeTime, shortPath } from './format'
+
+describe('shortPath', () => {
+  it('shortens long paths with tail segments', () => {
+    expect(shortPath('C:/Users/Alice/Documents/MyVault.pomnia')).toContain('MyVault.pomnia')
+    expect(shortPath('')).toBe('—')
+  })
+
+  it('keeps short paths unchanged', () => {
+    expect(shortPath('/home/vault')).toBe('/home/vault')
+  })
+})
 
 describe('relativeTime', () => {
   afterEach(() => {

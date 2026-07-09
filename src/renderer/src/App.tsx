@@ -14,8 +14,9 @@ import Connect from './pages/Connect'
 import Settings from './pages/Settings'
 import VaultGate from './pages/VaultGate'
 import Onboarding from './pages/Onboarding'
+import HowItWorks from './pages/HowItWorks'
 
-const PAGES = { dashboard: Dashboard, browse: Browse, import: ImportPage, brain: Brain, connect: Connect, settings: Settings } as const
+const PAGES = { dashboard: Dashboard, browse: Browse, import: ImportPage, brain: Brain, connect: Connect, settings: Settings, guide: HowItWorks } as const
 
 export default function App() {
   const { route, scan, refreshVault, vault, toast, onboarded, loadAppSettings, initGlobalActivity } = useStore()

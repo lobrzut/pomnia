@@ -8,6 +8,8 @@
 
 Nic nie idzie do chmury, dopóki sam nie skonfigurujesz deployu na swój serwer.
 
+> **W aplikacji:** zakładka **Jak to działa** (Mapa Pomnia) w menu bocznym — wizualny przepływ po polsku + pasek „Gdzie jesteś teraz” na Dashboardzie. Link „Nie wiem od czego zacząć →” też tam prowadzi.
+
 ## Dwa magazyny — nie myl ich!
 
 | Nazwa | Gdzie | Co trzyma |
@@ -87,7 +89,8 @@ Jeśli Cursor backup pokazuje 0 czatów — użyj Import.
 
 | Problem | Gdzie |
 |---------|-------|
-| Status systemu | Settings → Diagnostyka |
+| Nie wiem jak to działa | **Jak to działa** (menu) lub Dashboard → „Nie wiem od czego zacząć” |
+| Status systemu | Dashboard → pasek „Gdzie jesteś teraz” · Settings → Diagnostyka |
 | Logi | `%AppData%/Pomnia/logs/` |
 | Pełny pipeline dokumentów | [DOCUMENT-PIPELINE.md](./DOCUMENT-PIPELINE.md) |
 | Integracja z homelab Brain | [BRAIN-INTEGRATION.md](../BRAIN-INTEGRATION.md) |

@@ -139,6 +139,60 @@ export interface UiLabels {
   healthFail: string
   healthSkip: string
   healthChecking: string
+  navDashboard: string
+  navBrowse: string
+  navImport: string
+  navBrain: string
+  navConnect: string
+  navSettings: string
+  navGuide: string
+  navNavigate: string
+  lockVaultBtn: string
+  vaultLocked: string
+  guideTitle: string
+  guideSubtitle: string
+  guideLead: string
+  guideStep1Title: string
+  guideStep1Body: string
+  guideStep1Where: string
+  guideStep2Title: string
+  guideStep2Body: string
+  guideStep2Where: string
+  guideStep3Title: string
+  guideStep3Body: string
+  guideStep3Where: string
+  guideStep4Title: string
+  guideStep4Body: string
+  guideStep4Where: string
+  guideStep5Title: string
+  guideStep5Body: string
+  guideStep5Where: string
+  guideStepOptionalTitle: string
+  guideStepOptionalBody: string
+  guideStepOptionalWhere: string
+  guideDocsTitle: string
+  guideDocsBody: string
+  guideDocsWhere: string
+  guideOpenTab: string
+  guideDiagramToggle: string
+  guideDiagramHide: string
+  helpDontKnowStart: string
+  statusStripTitle: string
+  statusVault: string
+  statusVaultOpen: string
+  statusVaultClosed: string
+  statusBrain: string
+  statusBrainRunning: string
+  statusBrainStopped: string
+  statusOllama: string
+  statusOllamaOk: string
+  statusOllamaFail: string
+  statusLastDistill: string
+  statusNoDistill: string
+  statusPendingDocs: (n: number) => string
+  statusPendingDocsNone: string
+  dashboardTitle: string
+  dashboardLead: string
 }
 
 const PL_LABELS: UiLabels = {
@@ -260,7 +314,70 @@ const PL_LABELS: UiLabels = {
   healthOk: 'OK',
   healthFail: 'Problem',
   healthSkip: 'Pominięte',
-  healthChecking: 'Sprawdzam…'
+  healthChecking: 'Sprawdzam…',
+  navDashboard: 'Dashboard',
+  navBrowse: 'Czaty',
+  navImport: 'Import',
+  navBrain: 'Brain',
+  navConnect: 'Connect',
+  navSettings: 'Ustawienia',
+  navGuide: 'Jak to działa',
+  navNavigate: 'Nawigacja',
+  lockVaultBtn: 'Zablokuj vault',
+  vaultLocked: 'zablokowany',
+  guideTitle: 'Mapa Pomnia',
+  guideSubtitle: 'Jak to działa',
+  guideLead:
+    'Gdzie co się dzieje — od surowych logów asystentów po wyszukiwanie w Cursorze. Bez chmury, dopóki sam nie włączysz deployu.',
+  guideStep1Title: 'Krok 1 — Zbieranie',
+  guideStep1Body:
+    'Cursor, Claude Code, Antigravity… — Pomnia czyta żywe logi z dysku albo importuje eksporty ZIP/JSON.',
+  guideStep1Where: 'Dashboard → Backup · Import',
+  guideStep2Title: 'Krok 2 — Vault Pomnia',
+  guideStep2Body:
+    'Folder *.pomnia (zaszyfrowany) — snapshoty backupów + dokumenty library.cvb. To archiwum, nie wyszukiwarka.',
+  guideStep2Where: 'Dashboard · Ustawienia → Vault',
+  guideStep3Title: 'Krok 3 — Destylacja',
+  guideStep3Body:
+    'Ollama (qwen) skraca rozmowy do notatek w brain-notes/ — skróty, NIE pełne kopie czatów.',
+  guideStep3Where: 'Brain → Przygotuj pamięć',
+  guideStep4Title: 'Krok 4 — Wyszukiwarka',
+  guideStep4Body:
+    'Embedded brain buduje library.db — chunki + embeddingi lokalnie na tym komputerze.',
+  guideStep4Where: 'Brain → Lokalna wyszukiwarka',
+  guideStep5Title: 'Krok 5 — Cursor',
+  guideStep5Body:
+    'Connect MCP — agent woła search_library podczas kodowania i przypomina sobie kontekst.',
+  guideStep5Where: 'Connect → Podłącz Cursora',
+  guideStepOptionalTitle: 'Opcjonalnie — Brain homelab',
+  guideStepOptionalBody:
+    'Deploy kopii notatek na serwer LAN (np. brain.example.local) — wspólna pamięć dla wielu maszyn.',
+  guideStepOptionalWhere: 'Brain → Zaawansowane → Deploy',
+  guideDocsTitle: 'Dokumenty (PDF / EPUB)',
+  guideDocsBody:
+    'Import → vault (zaszyfrowane) → bezpośredni indeks embeddingów. BEZ destylacji LLM — tylko chunk + embed.',
+  guideDocsWhere: 'Import → Dokumenty',
+  guideOpenTab: 'Otwórz zakładkę',
+  guideDiagramToggle: 'Pokaż diagram',
+  guideDiagramHide: 'Ukryj diagram',
+  helpDontKnowStart: 'Nie wiem od czego zacząć →',
+  statusStripTitle: 'Gdzie jesteś teraz',
+  statusVault: 'Vault',
+  statusVaultOpen: 'otwarty',
+  statusVaultClosed: 'zamknięty',
+  statusBrain: 'Brain lokalny',
+  statusBrainRunning: 'działa',
+  statusBrainStopped: 'wyłączony',
+  statusOllama: 'Ollama',
+  statusOllamaOk: 'OK',
+  statusOllamaFail: 'brak połączenia',
+  statusLastDistill: 'Ostatnia destylacja',
+  statusNoDistill: 'jeszcze nie było',
+  statusPendingDocs: (n) => `${n} dok. czeka na indeks`,
+  statusPendingDocsNone: 'brak oczekujących',
+  dashboardTitle: 'Centrum dowodzenia',
+  dashboardLead:
+    'Zbierz rozmowy ze wszystkich asystentów do jednego zaszyfrowanego vaultu — backup to tylko mechanizm.',
 }
 
 /** @param _simple ignored — kept for call-site compatibility; language does not depend on simple mode */
