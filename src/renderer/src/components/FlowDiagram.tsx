@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bot, CloudUpload, Database, FileText, HardDriveDownload, Layers, Plug, Search, Sparkles, Wand2 } from 'lucide-react'
+import { Bot, CloudUpload, Database, FileText, HardDriveDownload, Layers, Plug, Search, Sparkles } from 'lucide-react'
 import clsx from 'clsx'
 import type { LucideIcon } from 'lucide-react'
 import { api } from '../lib/api'
@@ -16,14 +16,17 @@ const SLAVIC_GREEN = '#1a5c3a'
 const DOCS_ORANGE = '#fb923c'
 const AMBER = '#fbbf24'
 /** SVG viewBox height — keep in sync with node y% (y% = y / VIEWBOX_H * 100). */
-const VIEWBOX_H = 280
-const FLOW_MAIN_Y = 95
-const FLOW_RETURN_Y = 118
+const VIEWBOX_H = 360
+const FLOW_MAIN_Y = 92
+const FLOW_RETURN_Y = 106
 /** Horizontal corridor for docs/optional connectors — below main subtitles, above docs icons. */
-const FLOW_ROUTE_Y = 175
-const FLOW_DOCS_Y = 246
+const FLOW_ROUTE_Y = 218
+const FLOW_DOCS_Y = 300
+const FLOW_DEPLOY_Y = 316
 /** Horizontal corridor for agent query path — between main line and docs branch. */
-const FLOW_AGENT_JUNCTION_Y = 132
+const FLOW_AGENT_JUNCTION_Y = 148
+/** Dedicated label slot between library and MCP — clear of all connector lines. */
+const FLOW_MEMORY_LABEL_Y = 126
 
 export interface FlowDiagramProps {
   variant?: 'full' | 'mini'
@@ -60,8 +63,9 @@ function sx(pct: number): number {
 }
 
 function buildNodes(L: ReturnType<typeof uiLabels>, mini: boolean): FlowNodeDef[] {
-  const mainY = mini ? 36 : 34
-  const branchY = mini ? 90 : 88
+  const mainY = mini ? 36 : Math.round((FLOW_MAIN_Y / VIEWBOX_H) * 100)
+  const branchY = mini ? 90 : Math.round((FLOW_DOCS_Y / VIEWBOX_H) * 100)
+  const deployY = mini ? 94 : Math.round((FLOW_DEPLOY_Y / VIEWBOX_H) * 100)
   return [
     {
       id: 'ai',
@@ -161,8 +165,8 @@ function buildNodes(L: ReturnType<typeof uiLabels>, mini: boolean): FlowNodeDef[
     },
     {
       id: 'deploy',
-      x: 93,
-      y: branchY,
+      x: 96,
+      y: deployY,
       icon: CloudUpload,
       label: L.flowNodeDeployLabel,
       hint: L.flowNodeDeployHint,
@@ -203,7 +207,12 @@ function buildEdges(memoryReturnLabel: string): FlowEdge[] {
       branch: 'docs',
       particleDelay: 0.75
     },
-    { id: 'e-library-deploy', d: `M ${sx(71)} ${my} L ${sx(71)} ${by} L ${sx(93)} ${by}`, branch: 'optional', particleDelay: 1.4 }
+    {
+      id: 'e-library-deploy',
+      d: `M ${sx(71)} ${my} L ${sx(71)} ${FLOW_DEPLOY_Y} L ${sx(96)} ${FLOW_DEPLOY_Y}`,
+      branch: 'optional',
+      particleDelay: 1.4
+    }
   ]
 }
 
@@ -273,7 +282,7 @@ function FlowNode({
         isMcp && 'flow-node--mcp',
         node.branch === 'optional' && 'flow-node--optional',
         node.branch === 'docs' && 'flow-node--docs',
-        mini ? 'w-[68px]' : isMcp ? 'w-[128px]' : 'w-[112px]',
+        mini ? 'w-[68px]' : isMcp ? 'w-[108px]' : 'w-[108px]',
       )}
       style={{ left: `${node.x}%`, top: `${node.y}%`, transform: 'translate(-50%, -50%)' }}
     >
@@ -304,16 +313,10 @@ function FlowNode({
           />
         </div>
         {isMcp && labels && (
-          <div className="mt-1.5 w-full space-y-0.5 border-t border-white/8 pt-1.5 text-left">
-            <div className="flex items-center gap-1 font-mono text-[8px] leading-tight text-ink-dim">
-              <Wand2 className="h-2.5 w-2.5 shrink-0 text-iris/70" />
-              <span>{labels.flowAgentLayerSkills}</span>
-              <span className="text-ink-faint">({labels.flowAgentLayerSkillsOptional})</span>
-            </div>
-            <div className="flex items-center gap-1 font-mono text-[8px] leading-tight text-cyan/90">
-              <Search className="h-2.5 w-2.5 shrink-0 text-cyan/70" />
-              <span>{labels.flowAgentLayerSearch}</span>
-            </div>
+          <div className="mt-1.5 w-full border-t border-white/8 pt-1.5 text-center font-mono text-[8px] leading-tight">
+            <span className="text-iris/80">{labels.flowAgentLayerSkills}</span>
+            <span className="text-ink-faint"> · </span>
+            <span className="text-cyan/90">{labels.flowAgentLayerSearch}</span>
           </div>
         )}
       </div>
@@ -326,7 +329,7 @@ function FlowNode({
         {node.label}
       </span>
       {!mini && (
-        <span className="relative z-20 mt-1 max-w-[120px] truncate rounded-md bg-[#06070d]/95 px-1.5 py-0.5 font-mono text-[9px] text-ink-faint backdrop-blur-sm">
+        <span className="relative z-20 mt-1 max-w-[108px] line-clamp-2 rounded-md bg-[#06070d]/95 px-1.5 py-0.5 text-center font-mono text-[8px] leading-snug text-ink-faint backdrop-blur-sm">
           {node.disk}
         </span>
       )}
@@ -473,7 +476,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
         </div>
       )}
 
-      <div className={clsx('relative w-full', mini ? 'h-[140px]' : 'h-[280px]')}>
+      <div className={clsx('relative w-full', mini ? 'h-[140px]' : 'h-[360px]')}>
         {!mini && (
           <div
             className="pointer-events-none absolute inset-0 opacity-40"
@@ -514,18 +517,6 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
                   fill="none"
                   markerEnd={edge.branch === 'return' ? 'url(#flow-arrow-return)' : undefined}
                 />
-                {edge.label && !mini && (
-                  <text
-                    x={(sx(71) + sx(93)) / 2}
-                    y={FLOW_RETURN_Y + 16}
-                    textAnchor="middle"
-                    fill="#94a3b8"
-                    fontSize="9"
-                    opacity="0.55"
-                  >
-                    {edge.label}
-                  </text>
-                )}
                 {showForward && <FlowParticle edge={edge} dur={particleDur} mini={mini} />}
               </g>
             )
@@ -546,6 +537,18 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
             )
           })}
         </svg>
+
+        {!mini && (
+          <div
+            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-[#06070d]/90 px-2 py-0.5 text-[9px] italic text-emerald/60 backdrop-blur-sm"
+            style={{
+              left: `${(71 + 93) / 2}%`,
+              top: `${(FLOW_MEMORY_LABEL_Y / VIEWBOX_H) * 100}%`,
+            }}
+          >
+            — {labels.flowEdgeMemoryReturn} —
+          </div>
+        )}
 
         {nodes.map((node) => {
           const demoHighlight = demoActive && node.step === demoStep
@@ -570,12 +573,12 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
       </div>
 
       {!mini && (
-        <div className="border-t border-white/6 bg-black/30 px-4 py-3">
-          <p className="min-h-[2.5rem] text-center text-xs leading-relaxed text-ink-dim">{hint}</p>
+        <div className="border-t border-white/6 bg-black/30 px-4 py-2.5">
+          <p className="min-h-[2rem] text-center text-xs leading-relaxed text-ink-dim">{hint}</p>
           {showWaitingCaption && (
-            <p className="mt-1 text-center text-[10px] italic text-ink-faint">{labels.flowWaitingCaption}</p>
+            <p className="mt-0.5 text-center text-[10px] italic text-ink-faint">{labels.flowWaitingCaption}</p>
           )}
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-4 text-[10px] font-medium uppercase tracking-wider text-ink-faint">
+          <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[9px] font-medium uppercase tracking-wider text-ink-faint">
             <span className="flex items-center gap-1.5">
               <span className="h-1 w-4 rounded-full" style={{ background: SLAVIC_GREEN }} />
               {labels.guideFlowMainLegend}
@@ -593,17 +596,6 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
               {labels.guideFlowAgentLegend}
             </span>
           </div>
-          <p className="mt-2 flex flex-wrap items-center justify-center gap-2 text-[10px] text-ink-faint">
-            <span>{labels.flowAgentConsumptionCaption}</span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-iris/25 bg-iris/8 px-2 py-0.5 font-mono text-[9px] text-iris/90">
-              <Wand2 className="h-2.5 w-2.5" />
-              {labels.flowAgentLayerSkills}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-cyan/25 bg-cyan/8 px-2 py-0.5 font-mono text-[9px] text-cyan/90">
-              <Search className="h-2.5 w-2.5" />
-              {labels.flowAgentLayerSearch}
-            </span>
-          </p>
         </div>
       )}
     </div>
