@@ -27,7 +27,7 @@ export interface OllamaConfig {
 
 export function defaultOllamaConfig(): OllamaConfig {
   return {
-    baseUrl: process.env.POMNIA_OLLAMA || process.env.RELIQUA_OLLAMA || 'http://localhost:11434',
+    baseUrl: process.env.POMNIA_OLLAMA || process.env.RELIQUA_OLLAMA || 'http://127.0.0.1:11434',
     chatModel: process.env.POMNIA_OLLAMA_MODEL || process.env.RELIQUA_OLLAMA_MODEL || 'qwen2.5:14b',
     embedModel: process.env.POMNIA_EMBED_MODEL || process.env.RELIQUA_EMBED_MODEL || 'nomic-embed-text'
   }

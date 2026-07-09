@@ -687,6 +687,10 @@ function registerIpc(): void {
         minimizeToTray?: boolean
         closeToTray?: boolean
         ollamaUrl?: string
+        brainMcpUrl?: string
+        brainDeployUrl?: string
+        brainTarget?: 'embedded' | 'remote'
+        connectToken?: string
         embeddedBrainAutoStart?: boolean
       },
     ) => setAppSettings(patch),
@@ -757,9 +761,19 @@ function registerIpc(): void {
 
   // ── Connect to Brain (status read + copy-paste snippets, no auto-deploy) ──
   ipcMain.handle('connect:status', async (_e, brainUrl?: string, token?: string, target?: 'embedded' | 'remote') => {
+    const saved = getAppSettings()
     const url =
-      brainUrl ||
-      (target === 'embedded' ? 'http://127.0.0.1:7862' : 'http://brain.example.local:7862')
+      brainUrl?.trim() ||
+      (target === 'embedded'
+        ? 'http://127.0.0.1:7862'
+        : saved.brainMcpUrl?.trim() || '')
+    if (!url) {
+      const [clients] = await Promise.all([checkAllClients()])
+      return {
+        clients,
+        brain: { url: '', reachable: false, error: 'Brak skonfigurowanego URL serwera Brain' },
+      }
+    }
     const [clients, brain] = await Promise.all([
       checkAllClients(),
       pingBrain(url, target === 'embedded' ? undefined : token),

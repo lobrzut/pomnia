@@ -382,9 +382,9 @@ const PL_LABELS: UiLabels = {
   guideStep5Body:
     'Connect MCP — agent woła search_library podczas kodowania i przypomina sobie kontekst.',
   guideStep5Where: 'Connect → Podłącz Cursora',
-  guideStepOptionalTitle: 'Opcjonalnie — Brain homelab',
+  guideStepOptionalTitle: 'Opcjonalnie — serwer Brain',
   guideStepOptionalBody:
-    'Deploy kopii notatek na serwer LAN (np. brain.example.local) — wspólna pamięć dla wielu maszyn.',
+    'Deploy kopii notatek na opcjonalny serwer Brain w sieci LAN — wspólna pamięć dla wielu maszyn.',
   guideStepOptionalWhere: 'Brain → Zaawansowane → Deploy',
   guideDocsTitle: 'Dokumenty (PDF / EPUB)',
   guideDocsBody:
@@ -424,8 +424,8 @@ const PL_LABELS: UiLabels = {
   flowNodeDocsIndexHint: 'Chunk + embed bezpośrednio — omija krok destylacji.',
   flowNodeDocsIndexDisk: 'library.db (docs)',
   flowNodeDeployLabel: 'Deploy Brain',
-  flowNodeDeployHint: 'Opcjonalna kopia notatek na serwer homelab (np. LAN :7860).',
-  flowNodeDeployDisk: 'Brain homelab',
+  flowNodeDeployHint: 'Opcjonalna kopia notatek na zdalny serwer Brain (np. LAN :7860).',
+  flowNodeDeployDisk: 'Opcjonalny serwer Brain',
   helpDontKnowStart: 'Nie wiem od czego zacząć →',
   statusStripTitle: 'Gdzie jesteś teraz',
   statusVault: 'Vault',

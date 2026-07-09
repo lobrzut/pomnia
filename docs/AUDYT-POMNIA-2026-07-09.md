@@ -239,7 +239,7 @@ api.ts (mock)         demo data z alice IP
 
 | # | Zadanie | Effort | Faza | Dlaczego |
 |---|---------|--------|------|----------|
-| 1 | Usunąć default `brain.example.local` z UI/store/snippet | S | A | Bloker remote dla obcych |
+| 1 | ~~Usunąć default `brain.example.local` z UI/store/snippet~~ ✅ **2026-07-09** | S | A | Bloker remote dla obcych |
 | 2 | `docs/BETA-SMOKE.md` + checklist 15 min | S | B | Powtarzalna weryfikacja przed każdym exe |
 | 3 | GitHub Release 0.1.2 z `Pomnia-0.1.2-setup.exe` | S | C | Oficjalny link dla testerów |
 | 4 | Landing: link pobierania + naprawa 503 | S | C | Waitlist ≠ produkt |
@@ -261,7 +261,7 @@ api.ts (mock)         demo data z alice IP
 - [ ] Każdy przechodzi `BETA-SMOKE.md` na czystym Windows 11 **bez Node**
 - [ ] Health check zielony: Ollama + nomic-embed-text + vault + MCP
 - [ ] Cursor Connect na ≥2 różnych maszynach
-- [ ] Zero `brain.example.local` w ścieżce UI
+- [x] Zero `brain.example.local` w ścieżce UI *(naprawione 2026-07-09 — per-user `app-settings.json`)*
 - [ ] Jeden link START-HERE + download exe
 
 ---

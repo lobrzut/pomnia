@@ -88,6 +88,10 @@ const bridge = {
     minimizeToTray?: boolean
     closeToTray?: boolean
     ollamaUrl?: string
+    brainMcpUrl?: string
+    brainDeployUrl?: string
+    brainTarget?: 'embedded' | 'remote'
+    connectToken?: string
     embeddedBrainAutoStart?: boolean
   }) => ipcRenderer.invoke('app:settings:set', patch),
   openLogs: () => ipcRenderer.invoke('app:openLogs') as Promise<string>,

@@ -183,23 +183,30 @@ async function cmdBrain(p: Parsed): Promise<void> {
       console.log(`  ${C.dim('chat:')} ${ollama.cfg.chatModel}  ${C.dim('embed:')} ${ollama.cfg.embedModel}  ${C.dim(`(${models.length} models)`)}`)
     }
 
-    // 2) Brain server (optional — only if --brain or default 192.168.x given)
-    const brainUrl = typeof p.flags.brain === 'string' ? String(p.flags.brain).replace(/\/$/, '')
-                   : typeof p.flags.url   === 'string' ? String(p.flags.url).replace(/\/$/, '')
-                   : 'http://brain.example.local:7862'
-    const token = typeof p.flags.token === 'string' ? p.flags.token : process.env.BRAIN_TOKEN
-    const ping = await pingBrain(brainUrl, token)
-    console.log(`\n  Brain  @ ${C.cyan(brainUrl)} — ${ping.reachable ? C.green(`reachable (HTTP ${ping.status})`) : C.red('unreachable')}`)
-    if (ping.reachable && ping.data) {
-      const s = ping.data as Record<string, unknown>
-      const bits = [
-        s.notes && `${s.notes} notes`,
-        s.sessions && `${s.sessions} sessions`,
-        s.library_docs && `${s.library_docs} docs`,
-      ].filter(Boolean).join(', ')
-      if (bits) console.log(`  ${C.dim(String(bits))}`)
-    } else if (ping.error) {
-      console.log(`  ${C.dim(ping.error)}`)
+    // 2) Brain server (optional — only if --brain or --url passed)
+    const brainUrl =
+      typeof p.flags.brain === 'string'
+        ? String(p.flags.brain).replace(/\/$/, '')
+        : typeof p.flags.url === 'string'
+          ? String(p.flags.url).replace(/\/$/, '')
+          : undefined
+    if (brainUrl) {
+      const token = typeof p.flags.token === 'string' ? p.flags.token : process.env.BRAIN_TOKEN
+      const ping = await pingBrain(brainUrl, token)
+      console.log(`\n  Brain  @ ${C.cyan(brainUrl)} — ${ping.reachable ? C.green(`reachable (HTTP ${ping.status})`) : C.red('unreachable')}`)
+      if (ping.reachable && ping.data) {
+        const s = ping.data as Record<string, unknown>
+        const bits = [
+          s.notes && `${s.notes} notes`,
+          s.sessions && `${s.sessions} sessions`,
+          s.library_docs && `${s.library_docs} docs`,
+        ].filter(Boolean).join(', ')
+        if (bits) console.log(`  ${C.dim(String(bits))}`)
+      } else if (ping.error) {
+        console.log(`  ${C.dim(ping.error)}`)
+      }
+    } else {
+      console.log(`\n  ${C.dim('Brain — pominięty (podaj --url lub --brain)')}`)
     }
 
     // 3) MCP clients — what's actually wired
@@ -297,7 +304,11 @@ async function cmdBrain(p: Parsed): Promise<void> {
       console.log(C.dim('\n  Usage: brain snippet --client <id> --url http://brain:7862 [--token btk_…]\n'))
       return
     }
-    const url = String(p.flags.url || 'http://brain.example.local:7862').replace(/\/$/, '')
+    const url = typeof p.flags.url === 'string' ? String(p.flags.url).replace(/\/$/, '') : ''
+    if (!url) {
+      console.log(C.red('\n  --url required (np. http://twoj-serwer:7862)\n'))
+      return
+    }
     const token = typeof p.flags.token === 'string' ? p.flags.token : process.env.BRAIN_TOKEN
     const targetOS = (process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'darwin' : 'linux') as
       | 'win32'

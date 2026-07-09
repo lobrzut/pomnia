@@ -109,17 +109,29 @@ export interface PomniaBridge {
     minimizeToTray: boolean
     closeToTray: boolean
     ollamaUrl?: string
+    brainMcpUrl?: string
+    brainDeployUrl?: string
+    brainTarget?: 'embedded' | 'remote'
+    connectToken?: string
     embeddedBrainAutoStart?: boolean
   }>
   appSettingsSet(patch: {
     minimizeToTray?: boolean
     closeToTray?: boolean
     ollamaUrl?: string
+    brainMcpUrl?: string
+    brainDeployUrl?: string
+    brainTarget?: 'embedded' | 'remote'
+    connectToken?: string
     embeddedBrainAutoStart?: boolean
   }): Promise<{
     minimizeToTray: boolean
     closeToTray: boolean
     ollamaUrl?: string
+    brainMcpUrl?: string
+    brainDeployUrl?: string
+    brainTarget?: 'embedded' | 'remote'
+    connectToken?: string
     embeddedBrainAutoStart?: boolean
   }>
   openLogs(): Promise<string>
@@ -384,22 +396,22 @@ function mockBridge(): PomniaBridge {
     async connectStatus() {
       await new Promise((r) => setTimeout(r, 500))
       return {
-        brain: { url: 'http://brain.example.local:7862/healthz', reachable: true, status: 200, data: { notes: 1731, sessions: 49, library_docs: 42 } },
+        brain: { url: 'https://brain.example.com:7862/healthz', reachable: true, status: 200, data: { notes: 1731, sessions: 49, library_docs: 42 } },
         clients: [
           { id: 'claude-code', label: 'Claude Code (CLI)', configPath: '~/.claude.json', configExists: true, state: 'wired',
             servers: [
-              { key: 'brain-rag', present: true, url: 'http://brain.example.local:7862/sse', transport: 'http' },
-              { key: 'brain-vault', present: true, url: 'http://brain.example.local:7862/servers/brain-vault/sse', transport: 'http' },
-              { key: 'brain-library', present: true, url: 'http://brain.example.local:7862/servers/brain-library/sse', transport: 'http' }
+              { key: 'brain-rag', present: true, url: 'https://brain.example.com:7862/sse', transport: 'http' },
+              { key: 'brain-vault', present: true, url: 'https://brain.example.com:7862/servers/brain-vault/sse', transport: 'http' },
+              { key: 'brain-library', present: true, url: 'https://brain.example.com:7862/servers/brain-library/sse', transport: 'http' }
             ], issues: [] },
           { id: 'cursor', label: 'Cursor', configPath: '~/.cursor/mcp.json', configExists: true, state: 'wired',
             servers: [
-              { key: 'brain-rag', present: true, url: 'http://brain.example.local:7862/sse' },
-              { key: 'brain-vault', present: true, url: 'http://brain.example.local:7862/servers/brain-vault/sse' },
-              { key: 'brain-library', present: true, url: 'http://brain.example.local:7862/servers/brain-library/sse' }
+              { key: 'brain-rag', present: true, url: 'https://brain.example.com:7862/sse' },
+              { key: 'brain-vault', present: true, url: 'https://brain.example.com:7862/servers/brain-vault/sse' },
+              { key: 'brain-library', present: true, url: 'https://brain.example.com:7862/servers/brain-library/sse' }
             ], issues: [] },
           { id: 'antigravity', label: 'Antigravity (Google IDE)', configPath: '~/.gemini/antigravity-ide/mcp_config.json', configExists: true, state: 'partial',
-            servers: [{ key: 'brain-rag', present: true, url: 'http://brain.example.local:7862/mcp', transport: 'streamable-http' }],
+            servers: [{ key: 'brain-rag', present: true, url: 'https://brain.example.com:7862/mcp', transport: 'streamable-http' }],
             issues: ['brain-vault: missing', 'brain-library: missing'] },
           { id: 'claude-desktop', label: 'Claude Desktop', configPath: '~/AppData/Roaming/Claude/claude_desktop_config.json', configExists: false, state: 'not_wired', servers: [], issues: ['config file does not exist'] },
           { id: 'vscode', label: 'VS Code (1.103+ native MCP)', configPath: '~/AppData/Roaming/Code/User/mcp.json', configExists: false, state: 'not_wired', servers: [], issues: ['config file does not exist'] },

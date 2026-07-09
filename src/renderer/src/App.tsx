@@ -25,8 +25,14 @@ export default function App() {
     void scan()
     void refreshVault()
     void loadAppSettings().then(() => {
-      const url = useStore.getState().ollamaUrl
-      if (url) void api.appSettingsSet({ ollamaUrl: url }).catch(() => {})
+      const s = useStore.getState()
+      void api.appSettingsSet({
+        ollamaUrl: s.ollamaUrl || undefined,
+        brainMcpUrl: s.remoteBrainUrl || undefined,
+        brainDeployUrl: s.brainDeployUrl || undefined,
+        brainTarget: s.brainTarget,
+        connectToken: s.connectToken || undefined,
+      }).catch(() => {})
     })
     const offActivity = initGlobalActivity()
     // Surface otherwise-silent async failures as toasts (diagnostics).

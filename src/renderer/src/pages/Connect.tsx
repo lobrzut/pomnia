@@ -19,13 +19,14 @@ import {
 } from 'lucide-react'
 import { Badge, Button, GlassCard, Input, Spinner } from '../components/ui'
 import { ClientIcon, CLIENT_BRAND } from '../components/ClientIcon'
+import { EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from '@core/brain/snippet'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
 import type { BrainTarget, ClientId, ClientStatus, Snippet, WiredState } from '../lib/types'
 
-const EMBEDDED_URL = 'http://127.0.0.1:7862'
-const REMOTE_URL = 'http://brain.example.local:7862'
+const EMBEDDED_URL = EMBEDDED_BRAIN_DEFAULT_URL
+const REMOTE_URL_PLACEHOLDER = REMOTE_BRAIN_URL_PLACEHOLDER
 
 const CLIENT_ORDER: ClientId[] = [
   'claude-code',
@@ -277,7 +278,7 @@ export default function Connect() {
             onChange={(e) => {
               if (brainTarget === 'remote') setRemoteBrainUrl(e.target.value)
             }}
-            placeholder={brainTarget === 'embedded' ? EMBEDDED_URL : REMOTE_URL}
+            placeholder={brainTarget === 'embedded' ? EMBEDDED_URL : REMOTE_URL_PLACEHOLDER}
             className="w-64"
             readOnly={brainTarget === 'embedded'}
           />
