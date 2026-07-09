@@ -18,6 +18,8 @@ import type { Route } from '../store/useStore'
 const SLAVIC_GREEN = '#1a5c3a'
 const DOCS_ORANGE = '#fb923c'
 const AMBER = '#fbbf24'
+const FLOW_MAIN_Y = 68
+const FLOW_RETURN_Y = FLOW_MAIN_Y + 22
 
 export interface FlowDiagramProps {
   variant?: 'full' | 'mini'
@@ -42,8 +44,9 @@ interface FlowNodeDef {
 interface FlowEdge {
   id: string
   d: string
-  branch: 'main' | 'docs' | 'optional'
+  branch: 'main' | 'docs' | 'optional' | 'return'
   particleDelay?: number
+  label?: string
 }
 
 /** Map horizontal % to SVG viewBox x (0–1000). */
@@ -165,16 +168,23 @@ function buildNodes(L: ReturnType<typeof uiLabels>, mini: boolean): FlowNodeDef[
   ]
 }
 
-function buildEdges(): FlowEdge[] {
-  const my = 68
+function buildEdges(memoryReturnLabel: string): FlowEdge[] {
+  const my = FLOW_MAIN_Y
   const by = 156
   const j = 96
+  const ry = FLOW_RETURN_Y
   return [
     { id: 'e-ai-vault', d: `M ${sx(7)} ${my} L ${sx(23)} ${my}`, branch: 'main', particleDelay: 0 },
     { id: 'e-vault-distill', d: `M ${sx(23)} ${my} L ${sx(39)} ${my}`, branch: 'main', particleDelay: 0.25 },
     { id: 'e-distill-notes', d: `M ${sx(39)} ${my} L ${sx(55)} ${my}`, branch: 'main', particleDelay: 0.5 },
     { id: 'e-notes-library', d: `M ${sx(55)} ${my} L ${sx(71)} ${my}`, branch: 'main', particleDelay: 0.75 },
     { id: 'e-library-mcp', d: `M ${sx(71)} ${my} L ${sx(93)} ${my}`, branch: 'main', particleDelay: 1 },
+    {
+      id: 'e-library-mcp-return',
+      d: `M ${sx(71)} ${ry} L ${sx(93)} ${ry}`,
+      branch: 'return',
+      label: memoryReturnLabel
+    },
     {
       id: 'e-import-vault',
       d: `M ${sx(7)} ${by} L ${sx(7)} ${j} L ${sx(23)} ${j} L ${sx(23)} ${my}`,
@@ -195,6 +205,7 @@ function buildEdges(): FlowEdge[] {
 function edgeClass(branch: FlowEdge['branch']): string {
   if (branch === 'docs') return 'flow-path flow-path-docs'
   if (branch === 'optional') return 'flow-path flow-path-optional'
+  if (branch === 'return') return 'flow-path flow-path-return'
   return 'flow-path flow-path-main'
 }
 
@@ -257,7 +268,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   const labels = uiLabels()
   const mini = variant === 'mini'
   const nodes = useMemo(() => buildNodes(labels, mini), [labels, mini])
-  const edges = useMemo(() => buildEdges(), [])
+  const edges = useMemo(() => buildEdges(labels.flowEdgeMemoryReturn), [labels.flowEdgeMemoryReturn])
   const [activeStep, setActiveStep] = useState(-1)
   const [hoverId, setHoverId] = useState<string | null>(null)
 
@@ -304,25 +315,42 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
+            <marker id="flow-arrow-return" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#34d399" opacity="0.45" />
+            </marker>
           </defs>
           {edges.map((edge) => (
             <g key={edge.id}>
-              <path d={edge.d} className={edgeClass(edge.branch)} fill="none" />
-              <circle
-                r={mini ? 2 : 3}
-                className={
-                  edge.branch === 'docs' ? 'flow-particle-docs' : edge.branch === 'optional' ? 'flow-particle-optional' : 'flow-particle-main'
-                }
-                filter={mini ? undefined : 'url(#flow-glow)'}
-                opacity={mini ? 0.5 : 1}
-              >
-                <animateMotion
-                  dur={`${mini ? 3.2 : 2.4}s`}
-                  repeatCount="indefinite"
-                  path={edge.d}
-                  begin={`${edge.particleDelay ?? 0}s`}
-                />
-              </circle>
+              <path d={edge.d} className={edgeClass(edge.branch)} fill="none" markerEnd={edge.branch === 'return' ? 'url(#flow-arrow-return)' : undefined} />
+              {edge.label && !mini && (
+                <text
+                  x={(sx(71) + sx(93)) / 2}
+                  y={FLOW_RETURN_Y + 14}
+                  textAnchor="middle"
+                  fill="#94a3b8"
+                  fontSize="9"
+                  opacity="0.55"
+                >
+                  {edge.label}
+                </text>
+              )}
+              {edge.branch !== 'return' && (
+                <circle
+                  r={mini ? 2 : 3}
+                  className={
+                    edge.branch === 'docs' ? 'flow-particle-docs' : edge.branch === 'optional' ? 'flow-particle-optional' : 'flow-particle-main'
+                  }
+                  filter={mini ? undefined : 'url(#flow-glow)'}
+                  opacity={mini ? 0.5 : 1}
+                >
+                  <animateMotion
+                    dur={`${mini ? 3.2 : 2.4}s`}
+                    repeatCount="indefinite"
+                    path={edge.d}
+                    begin={`${edge.particleDelay ?? 0}s`}
+                  />
+                </circle>
+              )}
             </g>
           ))}
         </svg>

@@ -193,6 +193,12 @@
   stroke-dasharray: 4 7;
   opacity: 0.45;
 }
+.flow-path-return {
+  stroke: #34d399;
+  stroke-dasharray: 3 8;
+  opacity: 0.35;
+  animation: none;
+}
 .flow-particle-main {
   fill: #34d399;
 }
