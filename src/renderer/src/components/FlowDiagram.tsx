@@ -253,6 +253,7 @@ function FlowNode({
   active,
   pulsing,
   embeddedGlow,
+  mcpFinaleGlow,
   mini,
   onNavigate,
   labels,
@@ -261,6 +262,7 @@ function FlowNode({
   active: boolean
   pulsing: boolean
   embeddedGlow: boolean
+  mcpFinaleGlow?: boolean
   mini: boolean
   onNavigate?: (route: Route) => void
   labels?: UiLabels
@@ -282,6 +284,7 @@ function FlowNode({
         active && 'flow-node--active',
         pulsing && 'flow-node--pulse',
         embeddedGlow && 'flow-node--embedded',
+        mcpFinaleGlow && node.id === 'mcp' && 'flow-node--mcp-finale',
         isMcp && 'flow-node--mcp',
         node.branch === 'optional' && 'flow-node--optional',
         node.branch === 'docs' && 'flow-node--docs',
@@ -368,12 +371,14 @@ function FlowParticle({
   dur,
   mini,
   passIndex = 0,
+  oneShot = false,
 }: {
   edge: FlowEdge
   reverse?: boolean
   dur: number
   mini: boolean
   passIndex?: number
+  oneShot?: boolean
 }) {
   const particleClass =
     edge.branch === 'agent'
@@ -384,7 +389,7 @@ function FlowParticle({
           ? 'flow-particle-optional'
           : 'flow-particle-main'
 
-  const stagger = passIndex * (dur / 3.2)
+  const stagger = oneShot ? passIndex * 0.38 : passIndex * (dur / 3.2)
 
   return (
     <circle
@@ -395,7 +400,8 @@ function FlowParticle({
     >
       <animateMotion
         dur={`${dur}s`}
-        repeatCount="indefinite"
+        repeatCount={oneShot ? 1 : 'indefinite'}
+        fill={oneShot ? 'remove' : undefined}
         path={edge.d}
         begin={`${(edge.particleDelay ?? 0) + stagger}s`}
         keyPoints={reverse ? '1;0' : '0;1'}
@@ -421,6 +427,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   const [embeddedRunning, setEmbeddedRunning] = useState(false)
   const [lastMcpVisible, setLastMcpVisible] = useState(false)
   const [lastMcpTool, setLastMcpTool] = useState('')
+  const [finaleKey, setFinaleKey] = useState(0)
   const svgRef = useRef<SVGSVGElement>(null)
   const prevAnimKey = useRef(animKey)
   const lastMcpTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -437,9 +444,12 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   )
 
   const flowLive = isBusy || demoActive
+  const isFinale = globalActivity.kind === 'finale'
   const isMcpQuery = globalActivity.kind === 'mcp-query'
-  const particleDur = particleDuration(globalActivity, mini, demoActive)
+  const particleDur =
+    isFinale ? (mini ? 0.68 : 0.52) : particleDuration(globalActivity, mini, demoActive)
   const agentPasses = visual.agentParticlePasses
+  const agentOneShot = visual.agentParticlesOneShot
   const progressStep = isBusy && globalActivity.kind === 'distill' ? distillProgressStep(globalActivity) : undefined
 
   useEffect(() => {
@@ -448,6 +458,10 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
     if (flowLive) svg.unpauseAnimations()
     else svg.pauseAnimations()
   }, [flowLive])
+
+  useEffect(() => {
+    if (globalActivity.kind === 'finale') setFinaleKey((k) => k + 1)
+  }, [globalActivity.kind])
 
   useEffect(() => {
     if (globalActivity.kind !== 'mcp-query') return
@@ -496,13 +510,15 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   const hint =
     hoverId != null
       ? (nodes.find((n) => n.id === hoverId)?.hint ?? labels.guideLead)
-      : demoActive
-        ? (nodes.find((n) => n.step === demoStep)?.hint ?? labels.guideLead)
-        : isBusy && globalActivity.detail
-          ? globalActivity.detail
-          : labels.guideLead
+      : isFinale
+        ? labels.flowFinaleCaption
+        : demoActive
+          ? (nodes.find((n) => n.step === demoStep)?.hint ?? labels.guideLead)
+          : isBusy && globalActivity.kind !== 'finale' && globalActivity.detail
+            ? globalActivity.detail
+            : labels.guideLead
 
-  const showWaitingCaption = !flowLive && !hoverId
+  const showWaitingCaption = !flowLive && !hoverId && !isFinale
 
   return (
     <div
@@ -512,6 +528,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
         flowLive && 'flow-diagram--live',
         isBusy && 'flow-diagram--busy',
         isMcpQuery && 'flow-diagram--mcp-query',
+        isFinale && 'flow-diagram--finale',
         !flowLive && visual.embeddedGlow && 'flow-diagram--embedded-idle',
         !flowLive && !visual.embeddedGlow && 'flow-diagram--idle',
         className
@@ -528,7 +545,18 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
         </div>
       )}
 
-      {isBusy && (
+      {isFinale && !mini && (
+        <div
+          className="absolute left-1/2 top-3 z-40 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-emerald/45 bg-[#06070d]/95 px-3 py-1.5 text-[11px] shadow-lg backdrop-blur-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <Sparkles className="h-3 w-3 text-emerald" aria-hidden />
+          <span className="font-semibold text-emerald/95">{labels.flowFinaleCaption}</span>
+        </div>
+      )}
+
+      {isBusy && !isFinale && (
         <div
           className={clsx(
             'absolute z-40 flex items-center gap-1.5 rounded-full border border-emerald/35 bg-[#06070d]/92 px-2.5 py-1 shadow-lg backdrop-blur-sm',
@@ -601,12 +629,13 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
                 {showReverse &&
                   Array.from({ length: agentPasses }, (_, i) => (
                     <FlowParticle
-                      key={`${edge.id}-p${i}`}
+                      key={`${edge.id}-p${i}-${agentOneShot ? finaleKey : 'loop'}`}
                       edge={edge}
                       reverse
-                      dur={particleDur * 1.1}
+                      dur={particleDur * (agentOneShot ? 1 : 1.1)}
                       mini={mini}
                       passIndex={i}
+                      oneShot={agentOneShot}
                     />
                   ))}
               </g>
@@ -632,6 +661,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
           const progressHighlight = progressStep != null && node.step === progressStep
           const embeddedGlow =
             visual.embeddedGlow && (node.id === 'library' || node.id === 'mcp')
+          const mcpFinaleGlow = visual.mcpFinaleGlow && node.id === 'mcp'
           return (
             <div key={node.id} onMouseEnter={() => setHoverId(node.id)}>
               <FlowNode
@@ -642,6 +672,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
                 active={demoHighlight || progressHighlight}
                 pulsing={livePulse}
                 embeddedGlow={embeddedGlow}
+                mcpFinaleGlow={mcpFinaleGlow}
               />
             </div>
           )

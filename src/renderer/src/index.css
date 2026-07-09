@@ -244,6 +244,44 @@
     inset 0 0 12px #818cf822;
   border-color: #a5b4fc !important;
 }
+.flow-diagram--finale .flow-path-agent {
+  opacity: 1;
+  stroke: #6ee7b7;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 5px #34d39966);
+}
+.flow-diagram--finale .flow-path--dash-live.flow-path-agent {
+  animation-duration: 0.45s;
+}
+.flow-diagram--finale .flow-particle-agent {
+  fill: #6ee7b7;
+  filter: drop-shadow(0 0 6px #34d399aa);
+}
+.flow-node--mcp-finale > div:first-child {
+  animation: flow-mcp-finale-ripple 0.72s ease-out 3;
+  border-color: #6ee7b799 !important;
+}
+@keyframes flow-mcp-finale-ripple {
+  0% {
+    box-shadow:
+      0 0 0 0 #34d39900,
+      0 0 0 0 #818cf800;
+  }
+  35% {
+    box-shadow:
+      0 -10px 22px #34d39955,
+      0 10px 22px #34d39955,
+      -10px 0 22px #818cf855,
+      10px 0 22px #818cf855,
+      0 0 28px #6ee7b766,
+      inset 0 0 14px #818cf822;
+  }
+  100% {
+    box-shadow:
+      0 0 12px #34d39933,
+      inset 0 0 8px #818cf815;
+  }
+}
 .flow-diagram--busy .flow-path--dash-live.flow-path-agent {
   animation-duration: 0.65s;
 }

@@ -87,4 +87,16 @@ describe('flowActivity', () => {
     const state: ActivityState = { kind: 'distill', done: 3, total: 7 }
     expect(distillProgressStep(state)).toBe(2)
   })
+
+  it('plans distill finale with one-shot agent pulses', () => {
+    const plan = planFlowVisual(
+      { kind: 'finale' },
+      { demoActive: false, embeddedRunning: false, brainPipelineRunning: false },
+    )
+    expect(plan.reverseAgent).toBe(true)
+    expect(plan.agentParticlePasses).toBe(3)
+    expect(plan.agentParticlesOneShot).toBe(true)
+    expect(plan.mcpFinaleGlow).toBe(true)
+    expect(plan.pulseNodes.has('mcp')).toBe(true)
+  })
 })

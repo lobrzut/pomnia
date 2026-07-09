@@ -2,7 +2,15 @@
  * Global background-operation state — shared by IPC, tray tooltip, and renderer banners.
  */
 
-export type ActivityKind = 'idle' | 'distill' | 'doc-import' | 'brain-start' | 'indexing' | 'embed' | 'mcp-query'
+export type ActivityKind =
+  | 'idle'
+  | 'distill'
+  | 'doc-import'
+  | 'brain-start'
+  | 'indexing'
+  | 'embed'
+  | 'mcp-query'
+  | 'finale'
 
 export interface ActivityUpdate {
   kind: Exclude<ActivityKind, 'idle'>
@@ -27,6 +35,7 @@ const TRAY_KIND: Record<Exclude<ActivityKind, 'idle'>, string> = {
   indexing: 'indeksowanie',
   embed: 'embeddingi',
   'mcp-query': 'zapytanie MCP',
+  finale: 'indeks gotowy',
 }
 
 function truncate(s: string, max: number): string {
@@ -51,10 +60,16 @@ export function activityMenuLabel(state: ActivityState): string | null {
 
 type BroadcastFn = (channel: 'activity:update' | 'activity:idle', payload?: ActivityState) => void
 
+/** Post-distill celebration pulse on the flow diagram (~2.5s). */
+export const PIPELINE_FINALE_MS = 2600
+
+const PIPELINE_KINDS: ActivityKind[] = ['distill', 'embed', 'indexing']
+
 class ActivityManager {
   private state: ActivityState = { kind: 'idle' }
   private broadcast: BroadcastFn | null = null
   private onChange: (() => void) | null = null
+  private finaleTimer: ReturnType<typeof setTimeout> | null = null
 
   wire(broadcast: BroadcastFn, onChange?: () => void): void {
     this.broadcast = broadcast
@@ -65,7 +80,15 @@ class ActivityManager {
     return { ...this.state }
   }
 
+  private clearFinaleTimer(): void {
+    if (this.finaleTimer) {
+      clearTimeout(this.finaleTimer)
+      this.finaleTimer = null
+    }
+  }
+
   update(patch: ActivityUpdate): void {
+    this.clearFinaleTimer()
     this.state = { ...patch }
     this.broadcast?.('activity:update', this.get())
     this.onChange?.()
@@ -83,7 +106,26 @@ class ActivityManager {
 
   /** Clear brain pipeline activity (distill / embed / indexing) after run completes. */
   pipelineIdle(): void {
-    this.idle(['distill', 'embed', 'indexing'])
+    if (this.state.kind === 'finale') return
+    this.clearFinaleTimer()
+    this.idle(PIPELINE_KINDS)
+  }
+
+  /** Brief flow-diagram finale after a successful distill + index / reindex. */
+  pipelineFinale(): void {
+    if (this.state.kind === 'mcp-query') return
+    this.clearFinaleTimer()
+    this.state = { kind: 'finale' }
+    this.broadcast?.('activity:update', this.get())
+    this.onChange?.()
+    this.finaleTimer = setTimeout(() => {
+      this.finaleTimer = null
+      if (this.state.kind === 'finale') {
+        this.state = { kind: 'idle' }
+        this.broadcast?.('activity:idle')
+        this.onChange?.()
+      }
+    }, PIPELINE_FINALE_MS)
   }
 
   tooltip(): string {

@@ -22,7 +22,7 @@ function pct(state: ActivityState): number | undefined {
 export function ActivityBanner({ className = '' }: { className?: string }) {
   const labels = uiLabels()
   const { globalActivity, brainRunning, cancelBrainPipeline } = useStore()
-  if (globalActivity.kind === 'idle') return null
+  if (globalActivity.kind === 'idle' || globalActivity.kind === 'finale') return null
 
   const Icon = ICONS[globalActivity.kind]
   const progress = pct(globalActivity)
