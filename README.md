@@ -51,6 +51,38 @@ src/preload/         Bezpieczny most contextBridge → window.pomnia
 src/renderer/        UI: React 19 + Tailwind v4 + Framer Motion (aurora, glass, spring)
 ```
 
+## Dla beta testera
+
+> Pełna mapa luk i priorytetów: [docs/ROADMAP-CLARITY.md](docs/ROADMAP-CLARITY.md) · skrót startowy: [docs/START-HERE.md](docs/START-HERE.md)
+
+**Minimalna ścieżka (Windows, ~15 min):**
+
+1. Zainstaluj **Ollama** ([ollama.com](https://ollama.com)) i pobierz modele:
+   ```bash
+   ollama pull nomic-embed-text
+   ollama pull qwen2.5:14b
+   ```
+2. Uruchom Pomnia → kreator: **Vault** (hasło!) → **Backup** czatów z Dashboard.
+3. Zakładka **Brain** → sprawdź zielony status Ollama → **Distill backlog** (wymaga GPU/RAM na qwen).
+4. Zakładka **Connect** → wybierz **Local embedded** → skopiuj snippet MCP do Cursora (`Settings → MCP`).
+5. **Settings → Diagnostyka** — wszystkie punkty zielone = gotowe.
+
+**Częste problemy:**
+
+| Objaw | Co zrobić |
+|-------|-----------|
+| Distill nie startuje | Ollama offline lub brak `qwen2.5:14b` — Brain tab → Pull model |
+| Brak wyników wyszukiwania w Brain | Brak `nomic-embed-text` — wymagany do embeddingów |
+| Cursor „Not connected" | Wklej snippet z Connect; zrestartuj Cursor |
+| Cursor 0 czatów po backupie | Duży `state.vscdb` — użyj **Import** z eksportu zamiast live backup |
+| SmartScreen blokuje instalator | Unsigned build — „Więcej informacji → Uruchom mimo to" |
+
+**Czego nie obiecujemy w tej becie:** instalator Linux, OCR skanów PDF, sync chmurowy, podpisany kod (jeszcze).
+
+Logi aplikacji: `%AppData%/Pomnia/logs/` (Windows).
+
+---
+
 ## Uruchomienie
 
 ```bash

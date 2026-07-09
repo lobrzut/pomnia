@@ -673,6 +673,12 @@ function registerIpc(): void {
     }
   })
   ipcMain.handle('app:settings', () => getAppSettings())
+  ipcMain.handle('app:openLogs', async () => {
+    const dir = join(app.getPath('userData'), 'logs')
+    await fs.mkdir(dir, { recursive: true })
+    await shell.openPath(dir)
+    return dir
+  })
   ipcMain.handle(
     'app:settings:set',
     async (
