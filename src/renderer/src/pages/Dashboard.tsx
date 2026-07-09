@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Check, Database, HardDriveDownload, MessageSquare, RefreshCw, Server, Layers } from 'lucide-react'
 import { Badge, Button, GlassCard, Input, ProgressBar, SourceTile, Spinner } from '../components/ui'
 import { ActivityBanner } from '../components/ActivityBanner'
+import { FlowDiagram } from '../components/FlowDiagram'
 import { StatusStrip } from '../components/StatusStrip'
 import { humanBytes, sourceMeta } from '../lib/format'
 import { uiLabels } from '../lib/labels'
@@ -52,6 +53,17 @@ export default function Dashboard() {
     <div className="mx-auto max-w-5xl">
       <ActivityBanner className="mb-5" />
       <StatusStrip />
+
+      <GlassCard delay={0.01} className="mb-5 overflow-hidden p-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint">{labels.guideFlowMiniTitle}</span>
+          <button type="button" onClick={() => setRoute('guide')} className="no-drag text-[11px] font-medium text-iris hover:text-cyan">
+            {labels.guideFlowMiniExpand}
+          </button>
+        </div>
+        <FlowDiagram variant="mini" onNavigate={setRoute} />
+      </GlassCard>
+
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
           <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.dashboardTitle}</h1>
