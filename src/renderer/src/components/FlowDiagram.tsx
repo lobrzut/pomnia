@@ -219,6 +219,45 @@ function buildEdges(memoryReturnLabel: string): FlowEdge[] {
   ]
 }
 
+/** Mini dashboard: Vault → Pamięć → Agent (3 nodes). */
+const MINI_NODE_IDS = ['vault', 'library', 'mcp'] as const
+/** Beginner simplified view: Zbiór → Vault → Pamięć → Agent. */
+const SIMPLIFIED_NODE_IDS = ['ai', 'vault', 'library', 'mcp'] as const
+
+function buildMiniLayout(nodes: FlowNodeDef[]): FlowNodeDef[] {
+  const xs = [22, 50, 78]
+  return MINI_NODE_IDS.map((id, i) => {
+    const base = nodes.find((n) => n.id === id)!
+    return { ...base, x: xs[i], y: 36 }
+  })
+}
+
+function buildSimplifiedLayout(nodes: FlowNodeDef[]): FlowNodeDef[] {
+  const xs = [12, 35, 62, 88]
+  return SIMPLIFIED_NODE_IDS.map((id, i) => {
+    const base = nodes.find((n) => n.id === id)!
+    return { ...base, x: xs[i], y: Math.round((FLOW_MAIN_Y / VIEWBOX_H) * 100) }
+  })
+}
+
+function buildCompactEdges(ids: readonly string[], branch: FlowEdge['branch'] = 'main'): FlowEdge[] {
+  const my = FLOW_MAIN_Y
+  const edges: FlowEdge[] = []
+  for (let i = 0; i < ids.length - 1; i++) {
+    const from = ids[i]
+    const to = ids[i + 1]
+    const fromNode = from === 'ai' ? 12 : from === 'vault' ? (ids.length === 3 ? 22 : 35) : from === 'library' ? (ids.length === 3 ? 50 : 62) : 88
+    const toNode = to === 'vault' ? (ids.length === 3 ? 22 : 35) : to === 'library' ? (ids.length === 3 ? 50 : 62) : to === 'mcp' ? (ids.length === 3 ? 78 : 88) : 12
+    edges.push({
+      id: `e-compact-${from}-${to}`,
+      d: `M ${sx(fromNode)} ${my} L ${sx(toNode)} ${my}`,
+      branch,
+      particleDelay: i * 0.3,
+    })
+  }
+  return edges
+}
+
 function buildAgentEdges(): FlowEdge[] {
   const my = FLOW_MAIN_Y
   const jy = FLOW_AGENT_JUNCTION_Y
@@ -234,7 +273,12 @@ function buildAgentEdges(): FlowEdge[] {
   ]
 }
 
-function edgeClass(branch: FlowEdge['branch'], dashLive: boolean): string {
+function edgeClass(
+  branch: FlowEdge['branch'],
+  dashLive: boolean,
+  dimmed: boolean,
+  focused: boolean,
+): string {
   const base =
     branch === 'docs'
       ? 'flow-path flow-path-docs'
@@ -245,7 +289,12 @@ function edgeClass(branch: FlowEdge['branch'], dashLive: boolean): string {
           : branch === 'agent'
             ? 'flow-path flow-path-agent'
             : 'flow-path flow-path-main'
-  return dashLive ? `${base} flow-path--dash-live` : base
+  return clsx(
+    base,
+    dashLive && 'flow-path--dash-live',
+    dimmed && 'flow-path--dimmed',
+    focused && 'flow-path--focused',
+  )
 }
 
 function FlowNode({
@@ -254,6 +303,7 @@ function FlowNode({
   pulsing,
   embeddedGlow,
   mcpFinaleGlow,
+  dimmed,
   mini,
   onNavigate,
   labels,
@@ -263,6 +313,7 @@ function FlowNode({
   pulsing: boolean
   embeddedGlow: boolean
   mcpFinaleGlow?: boolean
+  dimmed?: boolean
   mini: boolean
   onNavigate?: (route: Route) => void
   labels?: UiLabels
@@ -285,6 +336,7 @@ function FlowNode({
         pulsing && 'flow-node--pulse',
         embeddedGlow && 'flow-node--embedded',
         mcpFinaleGlow && node.id === 'mcp' && 'flow-node--mcp-finale',
+        dimmed && 'flow-node--dimmed',
         isMcp && 'flow-node--mcp',
         node.branch === 'optional' && 'flow-node--optional',
         node.branch === 'docs' && 'flow-node--docs',
@@ -416,9 +468,21 @@ function FlowParticle({
 export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, className }: FlowDiagramProps) {
   const labels = uiLabels()
   const mini = variant === 'mini'
-  const nodes = useMemo(() => buildNodes(labels, mini), [labels, mini])
-  const edges = useMemo(() => buildEdges(labels.flowEdgeMemoryReturn), [labels.flowEdgeMemoryReturn])
+  const allNodes = useMemo(() => buildNodes(labels, mini), [labels, mini])
+  const fullEdges = useMemo(() => buildEdges(labels.flowEdgeMemoryReturn), [labels.flowEdgeMemoryReturn])
   const agentEdges = useMemo(() => buildAgentEdges(), [])
+  const [simplified, setSimplified] = useState(false)
+  const nodes = useMemo(() => {
+    if (mini) return buildMiniLayout(allNodes)
+    if (simplified) return buildSimplifiedLayout(allNodes)
+    return allNodes
+  }, [allNodes, mini, simplified])
+  const edges = useMemo(() => {
+    if (mini) return buildCompactEdges(MINI_NODE_IDS)
+    if (simplified) return buildCompactEdges(SIMPLIFIED_NODE_IDS)
+    return fullEdges
+  }, [fullEdges, mini, simplified])
+  const displayAgentEdges = mini || simplified ? [] : agentEdges
   const globalActivity = useStore((s) => s.globalActivity)
   const brainRunning = useStore((s) => s.brainRunning)
   const isBusy = globalActivity.kind !== 'idle'
@@ -518,7 +582,46 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
             ? globalActivity.detail
             : labels.guideLead
 
+  const focusMode = visual.focusMode && !demoActive
+  const showFocusBanner = focusMode && (mini || !simplified)
+  const showLegend = !mini && !flowLive && !simplified
   const showWaitingCaption = !flowLive && !hoverId && !isFinale
+
+  function isNodeActive(nodeId: string): boolean {
+    if (!focusMode) return true
+    if (visual.activeNodeIds.has(nodeId)) return true
+    if (mini) {
+      const kind = globalActivity.kind
+      if (kind === 'mcp-query' || kind === 'finale') return nodeId === 'library' || nodeId === 'mcp'
+      if (kind === 'doc-import') return nodeId === 'vault' || nodeId === 'library'
+      if (kind === 'distill' || kind === 'indexing' || kind === 'embed' || kind === 'brain-start') {
+        return MINI_NODE_IDS.includes(nodeId as (typeof MINI_NODE_IDS)[number])
+      }
+    }
+    return false
+  }
+
+  function isEdgeActive(edgeId: string): boolean {
+    if (!focusMode) return true
+    if (visual.activeEdgeIds.has(edgeId)) return true
+    if (mini) {
+      if (edgeId === 'e-compact-vault-library') {
+        return globalActivity.kind === 'distill' ||
+          globalActivity.kind === 'doc-import' ||
+          globalActivity.kind === 'indexing' ||
+          globalActivity.kind === 'embed' ||
+          globalActivity.kind === 'brain-start'
+      }
+      if (edgeId === 'e-compact-library-mcp') {
+        return globalActivity.kind === 'mcp-query' ||
+          globalActivity.kind === 'finale' ||
+          globalActivity.kind === 'indexing' ||
+          globalActivity.kind === 'embed' ||
+          (globalActivity.kind === 'distill' && globalActivity.phase === 'reindex')
+      }
+    }
+    return false
+  }
 
   return (
     <div
@@ -527,6 +630,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
         mini ? 'bg-black/25' : 'bg-gradient-to-b from-[#06070d] to-[#0a1210]',
         flowLive && 'flow-diagram--live',
         isBusy && 'flow-diagram--busy',
+        focusMode && 'flow-diagram--focus',
         isMcpQuery && 'flow-diagram--mcp-query',
         isFinale && 'flow-diagram--finale',
         !flowLive && visual.embeddedGlow && 'flow-diagram--embedded-idle',
@@ -534,7 +638,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
         className
       )}
     >
-      {lastMcpVisible && !mini && (
+      {lastMcpVisible && !mini && !focusMode && (
         <div
           className="absolute left-3 top-3 z-40 flex items-center gap-1.5 rounded-full border border-iris/40 bg-[#06070d]/95 px-2.5 py-1 text-[10px] shadow-lg backdrop-blur-sm"
           role="status"
@@ -545,28 +649,29 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
         </div>
       )}
 
-      {isFinale && !mini && (
-        <div
-          className="absolute left-1/2 top-3 z-40 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-emerald/45 bg-[#06070d]/95 px-3 py-1.5 text-[11px] shadow-lg backdrop-blur-sm"
-          role="status"
-          aria-live="polite"
-        >
-          <Sparkles className="h-3 w-3 text-emerald" aria-hidden />
-          <span className="font-semibold text-emerald/95">{labels.flowFinaleCaption}</span>
-        </div>
-      )}
-
-      {isBusy && !isFinale && (
+      {showFocusBanner && (
         <div
           className={clsx(
-            'absolute z-40 flex items-center gap-1.5 rounded-full border border-emerald/35 bg-[#06070d]/92 px-2.5 py-1 shadow-lg backdrop-blur-sm',
-            mini ? 'left-2 top-2 text-[8px]' : 'right-3 top-3 text-[10px]'
+            'absolute left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border shadow-xl backdrop-blur-md',
+            mini
+              ? 'top-2 max-w-[92%] border-emerald/40 bg-[#06070d]/94 px-2.5 py-1 text-[9px]'
+              : 'top-4 max-w-[90%] border-emerald/45 bg-[#06070d]/92 px-4 py-2.5 text-sm',
+            isFinale && 'border-iris/45',
+            isMcpQuery && !isFinale && 'border-iris/40',
           )}
           role="status"
           aria-live="polite"
         >
-          <span className="flow-live-dot" aria-hidden />
-          <span className="font-semibold text-emerald">{labels.flowLiveBadge(globalActivity)}</span>
+          <span className={clsx('flow-live-dot shrink-0', mini && 'h-1.5 w-1.5')} aria-hidden />
+          <span
+            className={clsx(
+              'font-semibold leading-snug',
+              isFinale || isMcpQuery ? 'text-iris' : 'text-emerald',
+              mini && 'text-[9px]',
+            )}
+          >
+            {labels.flowFocusBanner(globalActivity)}
+          </span>
         </div>
       )}
 
@@ -602,31 +707,39 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
           </defs>
           {edges.map((edge) => {
             const dashLive = visual.dashBranches.has(edge.branch as 'main' | 'docs' | 'optional')
-            const showForward = visual.forwardEdges.has(edge.id)
+            const showForward =
+              visual.forwardEdges.has(edge.id) ||
+              ((mini || simplified) &&
+                isEdgeActive(edge.id) &&
+                edge.branch === 'main' &&
+                (visual.dashBranches.has('main') || visual.dashBranches.has('docs')))
+            const edgeActive = isEdgeActive(edge.id)
             return (
               <g key={edge.id}>
                 <path
                   d={edge.d}
-                  className={edgeClass(edge.branch, dashLive)}
+                  className={edgeClass(edge.branch, dashLive, focusMode && !edgeActive, focusMode && edgeActive)}
                   fill="none"
                   markerEnd={edge.branch === 'return' ? 'url(#flow-arrow-return)' : undefined}
                 />
-                {showForward && <FlowParticle edge={edge} dur={particleDur} mini={mini} />}
+                {showForward && edgeActive && <FlowParticle edge={edge} dur={particleDur} mini={mini} />}
               </g>
             )
           })}
-          {agentEdges.map((edge) => {
+          {displayAgentEdges.map((edge) => {
             const dashLive = visual.dashBranches.has('agent')
             const showReverse = visual.reverseAgent
+            const edgeActive = isEdgeActive(edge.id)
             return (
               <g key={edge.id}>
                 <path
                   d={edge.d}
-                  className={edgeClass(edge.branch, dashLive)}
+                  className={edgeClass(edge.branch, dashLive, focusMode && !edgeActive, focusMode && edgeActive)}
                   fill="none"
                   markerEnd={showReverse ? 'url(#flow-arrow-agent)' : undefined}
                 />
                 {showReverse &&
+                  edgeActive &&
                   Array.from({ length: agentPasses }, (_, i) => (
                     <FlowParticle
                       key={`${edge.id}-p${i}-${agentOneShot ? finaleKey : 'loop'}`}
@@ -643,9 +756,12 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
           })}
         </svg>
 
-        {!mini && (
+        {!mini && !simplified && (
           <div
-            className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border border-emerald/30 bg-[#06070d] px-2.5 py-1 text-[9px] font-semibold text-emerald/80 shadow-md"
+            className={clsx(
+              'pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border border-emerald/30 bg-[#06070d] px-2.5 py-1 text-[9px] font-semibold text-emerald/80 shadow-md transition-opacity',
+              focusMode && !visual.activeEdgeIds.has('e-library-mcp-return') && 'opacity-30',
+            )}
             style={{
               left: `${(FLOW_LIBRARY_X + FLOW_MCP_X) / 2}%`,
               top: `${(FLOW_MEMORY_LABEL_Y / VIEWBOX_H) * 100}%`,
@@ -662,47 +778,78 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
           const embeddedGlow =
             visual.embeddedGlow && (node.id === 'library' || node.id === 'mcp')
           const mcpFinaleGlow = visual.mcpFinaleGlow && node.id === 'mcp'
+          const nodeActive = isNodeActive(node.id)
           return (
-            <div key={node.id} onMouseEnter={() => setHoverId(node.id)}>
+            <div
+              key={node.id}
+              className={clsx(focusMode && !nodeActive && 'flow-node-wrap--dimmed')}
+              onMouseEnter={() => setHoverId(node.id)}
+            >
               <FlowNode
                 node={node}
                 mini={mini}
                 labels={labels}
                 onNavigate={onNavigate}
                 active={demoHighlight || progressHighlight}
-                pulsing={livePulse}
+                pulsing={livePulse && nodeActive}
                 embeddedGlow={embeddedGlow}
                 mcpFinaleGlow={mcpFinaleGlow}
+                dimmed={focusMode && !nodeActive}
               />
             </div>
           )
         })}
       </div>
 
+      {mini && (
+        <p className="border-t border-white/6 bg-black/25 px-3 py-1.5 text-center text-[10px] text-ink-dim">
+          {labels.flowMiniStatus(globalActivity)}
+        </p>
+      )}
+
       {!mini && (
         <div className="border-t border-white/6 bg-black/30 px-4 py-2.5">
+          {!flowLive && (
+            <div className="mb-2 flex items-center justify-center">
+              <button
+                type="button"
+                onClick={() => setSimplified((s) => !s)}
+                className={clsx(
+                  'no-drag rounded-full border px-3 py-1 text-[10px] font-medium transition-colors',
+                  simplified
+                    ? 'border-iris/50 bg-iris/15 text-iris'
+                    : 'border-white/12 text-ink-faint hover:border-white/25 hover:text-ink-dim',
+                )}
+                title={labels.flowSimplifiedToggleHint}
+              >
+                {labels.flowSimplifiedToggle}
+              </button>
+            </div>
+          )}
           <p className="min-h-[2rem] text-center text-xs leading-relaxed text-ink-dim">{hint}</p>
           {showWaitingCaption && (
             <p className="mt-0.5 text-center text-[10px] italic text-ink-faint">{labels.flowWaitingCaption}</p>
           )}
-          <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[9px] font-medium uppercase tracking-wider text-ink-faint">
-            <span className="flex items-center gap-1.5">
-              <span className="h-1 w-4 rounded-full" style={{ background: SLAVIC_GREEN }} />
-              {labels.guideFlowMainLegend}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-1 w-4 rounded-full bg-[#fb923c]" />
-              {labels.guideFlowDocsLegend}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-1 w-4 rounded-full border border-dashed border-amber/60" />
-              {labels.guideFlowOptionalLegend}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-1 w-4 rounded-full border border-dashed border-iris/60" />
-              {labels.guideFlowAgentLegend}
-            </span>
-          </div>
+          {showLegend && (
+            <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[9px] font-medium uppercase tracking-wider text-ink-faint">
+              <span className="flex items-center gap-1.5">
+                <span className="h-1 w-4 rounded-full" style={{ background: SLAVIC_GREEN }} />
+                {labels.guideFlowMainLegend}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-1 w-4 rounded-full bg-[#fb923c]" />
+                {labels.guideFlowDocsLegend}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-1 w-4 rounded-full border border-dashed border-amber/60" />
+                {labels.guideFlowOptionalLegend}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-1 w-4 rounded-full border border-dashed border-iris/60" />
+                {labels.guideFlowAgentLegend}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -53,6 +53,26 @@ export function formatFlowLiveBadge(state: ActivityState): string {
   return `Na żywo: ${kind}${progress}`
 }
 
+/** Large on-diagram status banner during focus mode. */
+export function formatFlowFocusBanner(state: ActivityState): string {
+  if (state.kind === 'idle') return ''
+  if (state.kind === 'finale') return 'Teraz: indeks gotowy — pamięć dostępna dla agenta'
+  if (state.kind === 'mcp-query') {
+    const tool = state.phase ?? ''
+    const toolNames = new Set(['search_library', 'get_skill', 'run_skill', 'list_skills', 'list_cli_skills'])
+    if (tool === 'search_library' || (state.detail && !toolNames.has(state.detail))) {
+      return 'Teraz: wyszukiwanie w Brain'
+    }
+    if (tool === 'get_skill' || tool === 'run_skill') return 'Teraz: ładowanie skilla z Brain'
+    return 'Teraz: zapytanie MCP'
+  }
+  const kind = ACTIVITY_KIND[state.kind]
+  const progress =
+    state.done != null && state.total != null && state.total > 0 ? ` ${state.done}/${state.total}` : ''
+  const detail = state.detail ? ` · ${truncateDetail(state.detail, 40)}` : ''
+  return `Teraz: ${kind}${progress}${detail}`
+}
+
 export interface UiLabels {
   distill: string
   distillBacklog: (n: number) => string
@@ -149,9 +169,13 @@ export interface UiLabels {
   distillEmptyBacklogDetail: string
   activityBanner: (state: ActivityState) => string
   flowLiveBadge: (state: ActivityState) => string
+  flowFocusBanner: (state: ActivityState) => string
   flowLastMcpBadge: (tool: string) => string
   flowFinaleCaption: string
   flowWaitingCaption: string
+  flowSimplifiedToggle: string
+  flowSimplifiedToggleHint: string
+  flowMiniStatus: (state: ActivityState) => string
   guideFlowReplayHint: string
   activityTrayBusy: string
   healthTitle: string
@@ -370,6 +394,7 @@ const PL_LABELS: UiLabels = {
   distillEmptyBacklogDetail: 'Wszystkie czaty z wybranych źródeł są już w ledgerze destylacji.',
   activityBanner: formatActivityBanner,
   flowLiveBadge: formatFlowLiveBadge,
+  flowFocusBanner: formatFlowFocusBanner,
   flowLastMcpBadge: formatFlowLastMcpBadge,
   activityTrayBusy: 'Operacja w tle',
   healthTitle: 'Diagnostyka',
@@ -464,8 +489,10 @@ const PL_LABELS: UiLabels = {
   flowAgentLayerSkillsOptional: 'opcj.',
   flowAgentLayerSearch: 'search_library',
   flowFinaleCaption: 'Indeks gotowy — pamięć dostępna dla agenta',
-  flowWaitingCaption:
-    'Oczekiwanie — animacja ruszy przy destylacji, imporcie, indeksowaniu lub zapytaniu MCP',
+  flowWaitingCaption: 'Gdy coś się dzieje, podświetli się tylko aktywna ścieżka',
+  flowSimplifiedToggle: 'Uproszczony widok',
+  flowSimplifiedToggleHint: '4 kroki: Zbiór → Vault → Pamięć → Agent',
+  flowMiniStatus: (state) => (state.kind === 'idle' ? 'Bezczynnie — pełna mapa w „Jak to działa”' : formatFlowFocusBanner(state)),
   flowIllustrationCaption:
     'Oczekiwanie — animacja ruszy przy destylacji, imporcie, indeksowaniu lub zapytaniu MCP',
   flowNodeImportLabel: 'Import',

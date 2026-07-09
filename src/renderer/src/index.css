@@ -191,6 +191,35 @@
 .flow-diagram--idle .flow-path-agent {
   opacity: 0.55;
 }
+.flow-diagram--focus .flow-path--dimmed {
+  opacity: 0.3 !important;
+  animation: none;
+}
+.flow-diagram--focus .flow-path--focused {
+  opacity: 1;
+}
+.flow-diagram--focus .flow-path--focused.flow-path-main {
+  opacity: 0.95;
+}
+.flow-diagram--focus .flow-path--focused.flow-path-docs {
+  opacity: 0.9;
+}
+.flow-diagram--focus .flow-node--dimmed {
+  opacity: 0.3;
+}
+.flow-diagram--focus .flow-node-wrap--dimmed {
+  opacity: 0.3;
+}
+.flow-diagram--finale .flow-path-main,
+.flow-diagram--finale .flow-path-docs,
+.flow-diagram--finale .flow-path-optional,
+.flow-diagram--finale .flow-path-return {
+  opacity: 0.3 !important;
+  animation: none;
+}
+.flow-diagram--finale .flow-node--dimmed {
+  opacity: 0.3;
+}
 .flow-diagram--embedded-idle .flow-path-main,
 .flow-diagram--embedded-idle .flow-path-agent {
   opacity: 0.7;
