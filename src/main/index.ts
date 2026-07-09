@@ -67,9 +67,10 @@ let vaultPath: string | null = null
 let brainRunAbort: AbortController | null = null
 let mcpQueryIdleTimer: ReturnType<typeof setTimeout> | null = null
 
-const MCP_QUERY_IDLE_MS = 3_500
+const MCP_QUERY_IDLE_MS = 8_000
 
 function emitMcpQueryActivity(ev: { tool?: string; detail?: string }): void {
+  log.info(`mcp-query activity: tool=${ev.tool ?? '?'}${ev.detail ? ` detail=${ev.detail}` : ''}`)
   activity.update({ kind: 'mcp-query', phase: ev.tool, detail: ev.detail ?? ev.tool })
   if (mcpQueryIdleTimer) clearTimeout(mcpQueryIdleTimer)
   mcpQueryIdleTimer = setTimeout(() => {

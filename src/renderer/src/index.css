@@ -224,6 +224,26 @@
   opacity: 0.95;
   stroke: #a5b4fc;
 }
+.flow-diagram--mcp-query .flow-path-agent {
+  opacity: 1;
+  stroke: #c7d2fe;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px #818cf888);
+}
+.flow-diagram--mcp-query .flow-path--dash-live.flow-path-agent {
+  animation-duration: 0.55s;
+}
+.flow-diagram--mcp-query .flow-particle-agent {
+  fill: #c7d2fe;
+  filter: drop-shadow(0 0 8px #818cf8cc);
+}
+.flow-diagram--mcp-query .flow-node--mcp.flow-node--pulse > div:first-child {
+  box-shadow:
+    0 0 28px #818cf888,
+    0 0 12px #34d39955,
+    inset 0 0 12px #818cf822;
+  border-color: #a5b4fc !important;
+}
 .flow-diagram--busy .flow-path--dash-live.flow-path-agent {
   animation-duration: 0.65s;
 }

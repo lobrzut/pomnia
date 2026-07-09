@@ -211,7 +211,8 @@ export async function pingBrain(url: string, token?: string): Promise<BrainPing>
   return { url: base, reachable: false, error: 'no probe succeeded' }
 }
 
-/** Poll Brain for a recent MCP query (search_library, get_skill, …). */
+/** How long a polled MCP hit stays "recent" on the Brain side (ms). */
+export const MCP_ACTIVITY_RECENT_MS = 10_000
 function normalizeMcpActivity(data: unknown): McpActivityResponse | null {
   if (!data || typeof data !== 'object') return null
   const d = data as Record<string, unknown>
@@ -220,7 +221,7 @@ function normalizeMcpActivity(data: unknown): McpActivityResponse | null {
   }
   if (typeof d.tool === 'string' && typeof d.ts === 'number') {
     const ts = d.ts
-    const recent = Date.now() - ts < 4_000
+    const recent = Date.now() - ts < MCP_ACTIVITY_RECENT_MS
     const detail = String(d.query_preview ?? d.detail ?? d.tool)
     return { last: { tool: d.tool, detail, ts }, recent }
   }

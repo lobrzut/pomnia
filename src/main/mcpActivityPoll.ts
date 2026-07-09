@@ -6,10 +6,11 @@
  */
 
 import { fetchMcpActivity } from '@core/brain/status.js'
+import { log } from '@core/index.js'
 
 import { getAppSettings } from './appSettings.js'
 
-const POLL_MS = 2_000
+const POLL_MS = 1_500
 
 let timer: ReturnType<typeof setInterval> | null = null
 let watchRefs = 0
@@ -66,5 +67,6 @@ async function pollOnce(): Promise<void> {
   if (!resp?.recent || !resp.last?.ts) return
   if (resp.last.ts <= lastSeenTs) return
   lastSeenTs = resp.last.ts
+  log.info(`mcp-query poll: tool=${resp.last.tool}${resp.last.detail ? ` detail=${resp.last.detail}` : ''}`)
   onQuery({ tool: resp.last.tool, detail: resp.last.detail })
 }

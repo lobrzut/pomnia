@@ -41,6 +41,7 @@ describe('uiLabels', () => {
     expect(labels.flowLiveBadge({ kind: 'mcp-query', phase: 'search_library', detail: 'vault' })).toBe(
       'Na żywo: wyszukiwanie w Brain',
     )
+    expect(labels.flowLastMcpBadge('search_library')).toBe('Ostatnie: search_library · przed chwilą')
     expect(labels.activityBanner({ kind: 'doc-import', detail: 'report.epub' })).toBe(
       'Trwa: import dokumentu · report.epub'
     )

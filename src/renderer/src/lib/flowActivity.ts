@@ -53,6 +53,8 @@ export interface FlowVisualPlan {
   dashBranches: ReadonlySet<'main' | 'docs' | 'optional' | 'agent'>
   embeddedGlow: boolean
   demoTour: boolean
+  /** Particle count on agent reverse path (mcp-query uses 3). */
+  agentParticlePasses: number
 }
 
 const DEMO_FORWARD = new Set([...FLOW_MAIN_EDGES.slice(0, 4), ...FLOW_DOCS_EDGES])
@@ -69,6 +71,7 @@ export function planFlowVisual(
       dashBranches: new Set(['main', 'docs']),
       embeddedGlow: false,
       demoTour: true,
+      agentParticlePasses: 0,
     }
   }
 
@@ -80,6 +83,7 @@ export function planFlowVisual(
       dashBranches: new Set(),
       embeddedGlow: opts.embeddedRunning,
       demoTour: false,
+      agentParticlePasses: 0,
     }
   }
 
@@ -87,6 +91,7 @@ export function planFlowVisual(
   const pulse = new Set<string>()
   const dash = new Set<'main' | 'docs' | 'optional' | 'agent'>()
   let reverseAgent = false
+  let agentParticlePasses = 0
 
   switch (activity.kind) {
     case 'distill':
@@ -135,6 +140,7 @@ export function planFlowVisual(
       dash.add('agent')
       pulse.add('library')
       pulse.add('mcp')
+      agentParticlePasses = 3
       break
     default:
       break
@@ -145,6 +151,7 @@ export function planFlowVisual(
     dash.add('agent')
     pulse.add('library')
     pulse.add('mcp')
+    if (agentParticlePasses === 0) agentParticlePasses = 1
   }
 
   return {
@@ -154,5 +161,6 @@ export function planFlowVisual(
     dashBranches: dash,
     embeddedGlow: false,
     demoTour: false,
+    agentParticlePasses: reverseAgent ? Math.max(agentParticlePasses, 1) : 0,
   }
 }

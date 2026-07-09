@@ -55,6 +55,7 @@ describe('flowActivity', () => {
     expect(plan.reverseAgent).toBe(true)
     expect(plan.pulseNodes.has('mcp')).toBe(true)
     expect(plan.pulseNodes.has('library')).toBe(true)
+    expect(plan.agentParticlePasses).toBe(3)
   })
 
   it('idle with embedded brain glows library path', () => {
