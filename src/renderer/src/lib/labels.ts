@@ -29,6 +29,11 @@ export function formatActivityBanner(state: ActivityState): string {
   return `Trwa: ${kind}${progress}${detail}`
 }
 
+export function formatFlowLastMcpBadge(tool: string): string {
+  const t = tool.trim() || 'MCP'
+  return `Ostatnie: ${t} · przed chwilą`
+}
+
 export function formatFlowLiveBadge(state: ActivityState): string {
   if (state.kind === 'idle') return ''
   if (state.kind === 'mcp-query') {
@@ -142,6 +147,7 @@ export interface UiLabels {
   distillEmptyBacklogDetail: string
   activityBanner: (state: ActivityState) => string
   flowLiveBadge: (state: ActivityState) => string
+  flowLastMcpBadge: (tool: string) => string
   flowWaitingCaption: string
   guideFlowReplayHint: string
   activityTrayBusy: string
@@ -361,6 +367,7 @@ const PL_LABELS: UiLabels = {
   distillEmptyBacklogDetail: 'Wszystkie czaty z wybranych źródeł są już w ledgerze destylacji.',
   activityBanner: formatActivityBanner,
   flowLiveBadge: formatFlowLiveBadge,
+  flowLastMcpBadge: formatFlowLastMcpBadge,
   activityTrayBusy: 'Operacja w tle',
   healthTitle: 'Diagnostyka',
   healthLead: 'Szybki przegląd — co musi działać, żeby pamięć i MCP były gotowe.',

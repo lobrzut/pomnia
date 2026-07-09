@@ -25,8 +25,11 @@ const FLOW_DOCS_Y = 300
 const FLOW_DEPLOY_Y = 316
 /** Horizontal corridor for agent query path — between main line and docs branch. */
 const FLOW_AGENT_JUNCTION_Y = 148
-/** Dedicated label slot between library and MCP — clear of all connector lines. */
-const FLOW_MEMORY_LABEL_Y = 126
+/** Pill between library and MCP — above blue agent path, clear of MCP title. */
+const FLOW_MEMORY_LABEL_Y = 118
+/** Main-row x positions (%). Wider gap library ↔ MCP reduces label overlap. */
+const FLOW_LIBRARY_X = 70
+const FLOW_MCP_X = 97
 
 export interface FlowDiagramProps {
   variant?: 'full' | 'mini'
@@ -117,7 +120,7 @@ function buildNodes(L: ReturnType<typeof uiLabels>, mini: boolean): FlowNodeDef[
     },
     {
       id: 'library',
-      x: 71,
+      x: FLOW_LIBRARY_X,
       y: mainY,
       icon: Layers,
       label: L.flowNodeLibraryLabel,
@@ -129,7 +132,7 @@ function buildNodes(L: ReturnType<typeof uiLabels>, mini: boolean): FlowNodeDef[
     },
     {
       id: 'mcp',
-      x: 93,
+      x: FLOW_MCP_X,
       y: mainY,
       icon: Plug,
       label: L.flowNodeMcpLabel,
@@ -186,11 +189,11 @@ function buildEdges(memoryReturnLabel: string): FlowEdge[] {
     { id: 'e-ai-vault', d: `M ${sx(7)} ${my} L ${sx(23)} ${my}`, branch: 'main', particleDelay: 0 },
     { id: 'e-vault-distill', d: `M ${sx(23)} ${my} L ${sx(39)} ${my}`, branch: 'main', particleDelay: 0.25 },
     { id: 'e-distill-notes', d: `M ${sx(39)} ${my} L ${sx(55)} ${my}`, branch: 'main', particleDelay: 0.5 },
-    { id: 'e-notes-library', d: `M ${sx(55)} ${my} L ${sx(71)} ${my}`, branch: 'main', particleDelay: 0.75 },
-    { id: 'e-library-mcp', d: `M ${sx(71)} ${my} L ${sx(93)} ${my}`, branch: 'main', particleDelay: 1 },
+    { id: 'e-notes-library', d: `M ${sx(55)} ${my} L ${sx(FLOW_LIBRARY_X)} ${my}`, branch: 'main', particleDelay: 0.75 },
+    { id: 'e-library-mcp', d: `M ${sx(FLOW_LIBRARY_X)} ${my} L ${sx(FLOW_MCP_X)} ${my}`, branch: 'main', particleDelay: 1 },
     {
       id: 'e-library-mcp-return',
-      d: `M ${sx(71)} ${ry} L ${sx(93)} ${ry}`,
+      d: `M ${sx(FLOW_LIBRARY_X)} ${ry} L ${sx(FLOW_MCP_X)} ${ry}`,
       branch: 'return',
       label: memoryReturnLabel
     },
@@ -203,13 +206,13 @@ function buildEdges(memoryReturnLabel: string): FlowEdge[] {
     { id: 'e-vault-docs', d: `M ${sx(23)} ${my} L ${sx(23)} ${by} L ${sx(55)} ${by}`, branch: 'docs', particleDelay: 0.45 },
     {
       id: 'e-docs-library',
-      d: `M ${sx(55)} ${by} L ${sx(55)} ${j} L ${sx(71)} ${j} L ${sx(71)} ${my}`,
+      d: `M ${sx(55)} ${by} L ${sx(55)} ${j} L ${sx(FLOW_LIBRARY_X)} ${j} L ${sx(FLOW_LIBRARY_X)} ${my}`,
       branch: 'docs',
       particleDelay: 0.75
     },
     {
       id: 'e-library-deploy',
-      d: `M ${sx(71)} ${my} L ${sx(71)} ${FLOW_DEPLOY_Y} L ${sx(96)} ${FLOW_DEPLOY_Y}`,
+      d: `M ${sx(FLOW_LIBRARY_X)} ${my} L ${sx(FLOW_LIBRARY_X)} ${FLOW_DEPLOY_Y} L ${sx(96)} ${FLOW_DEPLOY_Y}`,
       branch: 'optional',
       particleDelay: 1.4
     }
@@ -219,8 +222,8 @@ function buildEdges(memoryReturnLabel: string): FlowEdge[] {
 function buildAgentEdges(): FlowEdge[] {
   const my = FLOW_MAIN_Y
   const jy = FLOW_AGENT_JUNCTION_Y
-  const libX = sx(71)
-  const mcpX = sx(93)
+  const libX = sx(FLOW_LIBRARY_X)
+  const mcpX = sx(FLOW_MCP_X)
   return [
     {
       id: 'e-library-mcp-query',
@@ -282,56 +285,78 @@ function FlowNode({
         isMcp && 'flow-node--mcp',
         node.branch === 'optional' && 'flow-node--optional',
         node.branch === 'docs' && 'flow-node--docs',
-        mini ? 'w-[68px]' : isMcp ? 'w-[108px]' : 'w-[108px]',
+        mini ? 'w-[68px]' : isMcp ? 'w-[124px]' : 'w-[108px]',
       )}
       style={{ left: `${node.x}%`, top: `${node.y}%`, transform: 'translate(-50%, -50%)' }}
     >
-      <div
-        className={clsx(
-          'relative z-10 flex flex-col items-center rounded-xl border',
-          mini ? 'h-7 w-7 items-center justify-center' : isMcp ? 'w-full px-2 pb-2 pt-2.5' : 'h-11 w-11 items-center justify-center',
-          active && 'border-amber/60',
-          !active && node.branch === 'main' && 'border-[#1a5c3a66]',
-          !active && node.branch === 'docs' && 'border-[#fb923c44]',
-          !active && node.branch === 'optional' && 'border-dashed border-amber/30',
-          isMcp && !active && 'border-iris/35',
-        )}
-        style={{
-          background: isMcp
-            ? 'linear-gradient(180deg, #818cf818 0%, #06070dcc 100%)'
-            : node.branch === 'main'
-              ? `${SLAVIC_GREEN}33`
-              : node.branch === 'docs'
-                ? `${DOCS_ORANGE}22`
-                : `${AMBER}15`,
-        }}
-      >
-        <div className={clsx('flex items-center justify-center', !mini && !isMcp && 'h-full w-full')}>
-          <Icon
-            className={mini ? 'h-3 w-3' : 'h-4 w-4'}
-            style={{ color: isMcp ? '#a5b4fc' : node.branch === 'main' ? '#34d399' : node.branch === 'docs' ? DOCS_ORANGE : AMBER }}
-          />
-        </div>
-        {isMcp && labels && (
-          <div className="mt-1.5 w-full border-t border-white/8 pt-1.5 text-center font-mono text-[8px] leading-tight">
-            <span className="text-iris/80">{labels.flowAgentLayerSkills}</span>
+      {isMcp && labels ? (
+        <div
+          className={clsx(
+            'relative z-10 flex w-full flex-col items-center gap-1.5 rounded-xl border px-2.5 py-2.5',
+            active && 'border-amber/60',
+            !active && 'border-iris/35',
+          )}
+          style={{
+            background: 'linear-gradient(180deg, #818cf818 0%, #06070dcc 100%)',
+          }}
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-iris/25 bg-black/30">
+            <Icon className="h-4 w-4" style={{ color: '#a5b4fc' }} />
+          </div>
+          <span className="w-full text-[11px] font-semibold leading-tight text-ink">{node.label}</span>
+          <span className="w-full font-mono text-[8px] leading-tight text-iris/80">
+            {labels.flowAgentLayerSkills}
             <span className="text-ink-faint"> · </span>
             <span className="text-cyan/90">{labels.flowAgentLayerSearch}</span>
+          </span>
+          <span className="w-full border-t border-white/8 pt-1.5 font-mono text-[8px] leading-snug text-ink-faint">
+            {node.disk}
+          </span>
+        </div>
+      ) : (
+        <>
+          <div
+            className={clsx(
+              'relative z-10 flex flex-col items-center rounded-xl border',
+              mini ? 'h-7 w-7 items-center justify-center' : 'h-11 w-11 items-center justify-center',
+              active && 'border-amber/60',
+              !active && node.branch === 'main' && 'border-[#1a5c3a66]',
+              !active && node.branch === 'docs' && 'border-[#fb923c44]',
+              !active && node.branch === 'optional' && 'border-dashed border-amber/30',
+            )}
+            style={{
+              background:
+                node.branch === 'main'
+                  ? `${SLAVIC_GREEN}33`
+                  : node.branch === 'docs'
+                    ? `${DOCS_ORANGE}22`
+                    : `${AMBER}15`,
+            }}
+          >
+            <div className={clsx('flex items-center justify-center', !mini && 'h-full w-full')}>
+              <Icon
+                className={mini ? 'h-3 w-3' : 'h-4 w-4'}
+                style={{
+                  color:
+                    node.branch === 'main' ? '#34d399' : node.branch === 'docs' ? DOCS_ORANGE : AMBER,
+                }}
+              />
+            </div>
           </div>
-        )}
-      </div>
-      <span
-        className={clsx(
-          'relative z-20 mt-2 rounded-md bg-[#06070d]/90 px-1.5 py-0.5 font-semibold leading-tight text-ink backdrop-blur-sm',
-          mini ? 'text-[8px]' : 'text-[11px]',
-        )}
-      >
-        {node.label}
-      </span>
-      {!mini && (
-        <span className="relative z-20 mt-1 max-w-[108px] line-clamp-2 rounded-md bg-[#06070d]/95 px-1.5 py-0.5 text-center font-mono text-[8px] leading-snug text-ink-faint backdrop-blur-sm">
-          {node.disk}
-        </span>
+          <span
+            className={clsx(
+              'relative z-20 mt-2 rounded-md bg-[#06070d]/90 px-1.5 py-0.5 font-semibold leading-tight text-ink backdrop-blur-sm',
+              mini ? 'text-[8px]' : 'text-[11px]',
+            )}
+          >
+            {node.label}
+          </span>
+          {!mini && (
+            <span className="relative z-20 mt-1 max-w-[108px] line-clamp-2 rounded-md bg-[#06070d]/95 px-1.5 py-0.5 text-center font-mono text-[8px] leading-snug text-ink-faint backdrop-blur-sm">
+              {node.disk}
+            </span>
+          )}
+        </>
       )}
     </button>
   )
@@ -341,12 +366,14 @@ function FlowParticle({
   edge,
   reverse,
   dur,
-  mini
+  mini,
+  passIndex = 0,
 }: {
   edge: FlowEdge
   reverse?: boolean
   dur: number
   mini: boolean
+  passIndex?: number
 }) {
   const particleClass =
     edge.branch === 'agent'
@@ -357,13 +384,20 @@ function FlowParticle({
           ? 'flow-particle-optional'
           : 'flow-particle-main'
 
+  const stagger = passIndex * (dur / 3.2)
+
   return (
-    <circle r={mini ? 2 : 3} className={particleClass} filter={mini ? undefined : 'url(#flow-glow)'} opacity={mini ? 0.55 : 1}>
+    <circle
+      r={mini ? 2 : edge.branch === 'agent' ? 3.5 : 3}
+      className={particleClass}
+      filter={mini ? undefined : 'url(#flow-glow)'}
+      opacity={mini ? 0.55 : edge.branch === 'agent' ? 1 : 1}
+    >
       <animateMotion
         dur={`${dur}s`}
         repeatCount="indefinite"
         path={edge.d}
-        begin={`${edge.particleDelay ?? 0}s`}
+        begin={`${(edge.particleDelay ?? 0) + stagger}s`}
         keyPoints={reverse ? '1;0' : '0;1'}
         keyTimes="0;1"
         calcMode="linear"
@@ -385,8 +419,11 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   const [demoStep, setDemoStep] = useState(-1)
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [embeddedRunning, setEmbeddedRunning] = useState(false)
+  const [lastMcpVisible, setLastMcpVisible] = useState(false)
+  const [lastMcpTool, setLastMcpTool] = useState('')
   const svgRef = useRef<SVGSVGElement>(null)
   const prevAnimKey = useRef(animKey)
+  const lastMcpTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const demoActive = demoStep >= 0
   const visual = useMemo(
@@ -400,7 +437,9 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   )
 
   const flowLive = isBusy || demoActive
+  const isMcpQuery = globalActivity.kind === 'mcp-query'
   const particleDur = particleDuration(globalActivity, mini, demoActive)
+  const agentPasses = visual.agentParticlePasses
   const progressStep = isBusy && globalActivity.kind === 'distill' ? distillProgressStep(globalActivity) : undefined
 
   useEffect(() => {
@@ -409,6 +448,21 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
     if (flowLive) svg.unpauseAnimations()
     else svg.pauseAnimations()
   }, [flowLive])
+
+  useEffect(() => {
+    if (globalActivity.kind !== 'mcp-query') return
+    const tool = globalActivity.phase ?? globalActivity.detail ?? 'MCP'
+    setLastMcpTool(tool)
+    setLastMcpVisible(true)
+    if (lastMcpTimer.current) clearTimeout(lastMcpTimer.current)
+    lastMcpTimer.current = setTimeout(() => {
+      setLastMcpVisible(false)
+      lastMcpTimer.current = null
+    }, 10_000)
+    return () => {
+      if (lastMcpTimer.current) clearTimeout(lastMcpTimer.current)
+    }
+  }, [globalActivity])
 
   useEffect(() => {
     let cancelled = false
@@ -457,11 +511,23 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
         mini ? 'bg-black/25' : 'bg-gradient-to-b from-[#06070d] to-[#0a1210]',
         flowLive && 'flow-diagram--live',
         isBusy && 'flow-diagram--busy',
+        isMcpQuery && 'flow-diagram--mcp-query',
         !flowLive && visual.embeddedGlow && 'flow-diagram--embedded-idle',
         !flowLive && !visual.embeddedGlow && 'flow-diagram--idle',
         className
       )}
     >
+      {lastMcpVisible && !mini && (
+        <div
+          className="absolute left-3 top-3 z-40 flex items-center gap-1.5 rounded-full border border-iris/40 bg-[#06070d]/95 px-2.5 py-1 text-[10px] shadow-lg backdrop-blur-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <Plug className="h-3 w-3 text-iris" aria-hidden />
+          <span className="font-medium text-iris/90">{labels.flowLastMcpBadge(lastMcpTool)}</span>
+        </div>
+      )}
+
       {isBusy && (
         <div
           className={clsx(
@@ -532,7 +598,17 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
                   fill="none"
                   markerEnd={showReverse ? 'url(#flow-arrow-agent)' : undefined}
                 />
-                {showReverse && <FlowParticle edge={edge} reverse dur={particleDur * 1.1} mini={mini} />}
+                {showReverse &&
+                  Array.from({ length: agentPasses }, (_, i) => (
+                    <FlowParticle
+                      key={`${edge.id}-p${i}`}
+                      edge={edge}
+                      reverse
+                      dur={particleDur * 1.1}
+                      mini={mini}
+                      passIndex={i}
+                    />
+                  ))}
               </g>
             )
           })}
@@ -540,13 +616,13 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
 
         {!mini && (
           <div
-            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-[#06070d]/90 px-2 py-0.5 text-[9px] italic text-emerald/60 backdrop-blur-sm"
+            className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border border-emerald/30 bg-[#06070d] px-2.5 py-1 text-[9px] font-semibold text-emerald/80 shadow-md"
             style={{
-              left: `${(71 + 93) / 2}%`,
+              left: `${(FLOW_LIBRARY_X + FLOW_MCP_X) / 2}%`,
               top: `${(FLOW_MEMORY_LABEL_Y / VIEWBOX_H) * 100}%`,
             }}
           >
-            — {labels.flowEdgeMemoryReturn} —
+            {labels.flowEdgeMemoryReturn}
           </div>
         )}
 

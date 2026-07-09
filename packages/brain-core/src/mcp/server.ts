@@ -79,7 +79,7 @@ function recordMcpActivity(ev: McpQueryEvent): void {
 }
 
 export function getMcpActivitySnapshot(): { last: typeof lastMcpActivity; recent: boolean } {
-  const recent = lastMcpActivity != null && Date.now() - lastMcpActivity.ts < 4_000
+  const recent = lastMcpActivity != null && Date.now() - lastMcpActivity.ts < 10_000
   return { last: lastMcpActivity, recent }
 }
 
