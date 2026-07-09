@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bot,
   CloudUpload,
@@ -15,7 +15,7 @@ import clsx from 'clsx'
 import type { LucideIcon } from 'lucide-react'
 import { uiLabels } from '../lib/labels'
 import type { UiLabels } from '../lib/labels'
-import type { Route } from '../store/useStore'
+import { useStore, type Route } from '../store/useStore'
 
 const SLAVIC_GREEN = '#1a5c3a'
 const DOCS_ORANGE = '#fb923c'
@@ -347,8 +347,22 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   const nodes = useMemo(() => buildNodes(labels, mini), [labels, mini])
   const edges = useMemo(() => buildEdges(labels.flowEdgeMemoryReturn), [labels.flowEdgeMemoryReturn])
   const agentEdges = useMemo(() => buildAgentEdges(), [])
+  const globalActivity = useStore((s) => s.globalActivity)
+  const isBusy = globalActivity.kind !== 'idle'
   const [activeStep, setActiveStep] = useState(-1)
   const [hoverId, setHoverId] = useState<string | null>(null)
+  const [diagramHover, setDiagramHover] = useState(false)
+  const svgRef = useRef<SVGSVGElement>(null)
+
+  const flowLive = isBusy || activeStep >= 0 || hoverId != null || diagramHover
+  const particleDur = isBusy ? (mini ? 2.2 : 1.5) : mini ? 3.2 : 2.4
+
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    if (flowLive) svg.unpauseAnimations()
+    else svg.pauseAnimations()
+  }, [flowLive])
 
   useEffect(() => {
     setActiveStep(-1)
@@ -372,9 +386,15 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
       className={clsx(
         'flow-diagram overflow-hidden rounded-2xl border border-white/8',
         mini ? 'bg-black/25' : 'bg-gradient-to-b from-[#06070d] to-[#0a1210]',
+        flowLive && 'flow-diagram--live',
+        isBusy && 'flow-diagram--busy',
         className
       )}
-      onMouseLeave={() => setHoverId(null)}
+      onMouseEnter={() => setDiagramHover(true)}
+      onMouseLeave={() => {
+        setDiagramHover(false)
+        setHoverId(null)
+      }}
     >
       <div className={clsx('relative w-full', mini ? 'h-[140px]' : 'h-[280px]')}>
         {!mini && (
@@ -385,6 +405,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
         )}
 
         <svg
+          ref={svgRef}
           className="pointer-events-none absolute inset-0 z-0 h-full w-full"
           viewBox={`0 0 1000 ${VIEWBOX_H}`}
           preserveAspectRatio="none"
@@ -420,7 +441,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
                   {edge.label}
                 </text>
               )}
-              {edge.branch !== 'return' && (
+              {flowLive && edge.branch !== 'return' && (
                 <circle
                   r={mini ? 2 : 3}
                   className={
@@ -430,7 +451,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
                   opacity={mini ? 0.5 : 1}
                 >
                   <animateMotion
-                    dur={`${mini ? 3.2 : 2.4}s`}
+                    dur={`${particleDur}s`}
                     repeatCount="indefinite"
                     path={edge.d}
                     begin={`${edge.particleDelay ?? 0}s`}
@@ -463,6 +484,9 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
       {!mini && (
         <div className="border-t border-white/6 bg-black/30 px-4 py-3">
           <p className="min-h-[2.5rem] text-center text-xs leading-relaxed text-ink-dim">{hint}</p>
+          {!flowLive && (
+            <p className="mt-1 text-center text-[10px] italic text-ink-faint">{labels.flowIllustrationCaption}</p>
+          )}
           <div className="mt-2 flex flex-wrap items-center justify-center gap-4 text-[10px] font-medium uppercase tracking-wider text-ink-faint">
             <span className="flex items-center gap-1.5">
               <span className="h-1 w-4 rounded-full" style={{ background: SLAVIC_GREEN }} />

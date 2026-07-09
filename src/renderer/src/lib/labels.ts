@@ -190,6 +190,7 @@ export interface UiLabels {
   flowAgentLayerSearch: string
   flowAgentLayerSearchDetail: string
   flowAgentLayerCaption: string
+  flowIllustrationCaption: string
   flowNodeAiLabel: string
   flowNodeAiHint: string
   flowNodeAiDisk: string
@@ -433,6 +434,7 @@ const PL_LABELS: UiLabels = {
   flowAgentLayerSearch: 'search_library',
   flowAgentLayerSearchDetail: 'RAG z library.db',
   flowAgentLayerCaption: 'To nie jest zapis pamięci — agent pyta w trakcie kodowania',
+  flowIllustrationCaption: 'Animacja ilustracyjna — nie oznacza aktywności w tle',
   flowNodeImportLabel: 'Import',
   flowNodeImportHint: 'PDF, EPUB, ZIP — trafia do vaultu bez destylacji LLM.',
   flowNodeImportDisk: 'vault/library.cvb',
