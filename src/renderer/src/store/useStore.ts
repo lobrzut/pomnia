@@ -115,10 +115,28 @@ export function ollamaUrlFromBrainUrl(brainUrl: string): string {
 
 function loadRemoteBrainUrl(): string {
   try {
-    return localStorage.getItem(REMOTE_BRAIN_URL_KEY) || 'http://brain.example.local:7862'
+    return localStorage.getItem(REMOTE_BRAIN_URL_KEY) || ''
   } catch {
-    return 'http://brain.example.local:7862'
+    return ''
   }
+}
+
+function hasLocalStorageKey(key: string): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem(key) !== null
+  } catch {
+    return false
+  }
+}
+
+function syncBrainAppSettings(patch: {
+  ollamaUrl?: string
+  brainMcpUrl?: string
+  brainDeployUrl?: string
+  brainTarget?: BrainTarget
+  connectToken?: string
+}): void {
+  void api.appSettingsSet(patch).catch(() => {})
 }
 
 function loadBrainTarget(): BrainTarget {
@@ -374,23 +392,26 @@ export const useStore = create<State>((set, get) => ({
     } catch {
       /* ignore */
     }
+    syncBrainAppSettings({ brainTarget })
     set({ brainTarget })
   },
 
   remoteBrainUrl: loadRemoteBrainUrl(),
   setRemoteBrainUrl: (remoteBrainUrl) => {
     try {
-      localStorage.setItem(REMOTE_BRAIN_URL_KEY, remoteBrainUrl)
+      if (remoteBrainUrl) localStorage.setItem(REMOTE_BRAIN_URL_KEY, remoteBrainUrl)
+      else localStorage.removeItem(REMOTE_BRAIN_URL_KEY)
     } catch {
       /* ignore */
     }
+    syncBrainAppSettings({ brainMcpUrl: remoteBrainUrl || undefined })
     set({ remoteBrainUrl })
   },
 
   ollamaUrl: loadOllamaUrl(),
   setOllamaUrl: (ollamaUrl) => {
     saveOllamaUrl(ollamaUrl)
-    void api.appSettingsSet({ ollamaUrl: ollamaUrl || undefined }).catch(() => {})
+    syncBrainAppSettings({ ollamaUrl: ollamaUrl || undefined })
     set({ ollamaUrl })
   },
 
@@ -406,6 +427,7 @@ export const useStore = create<State>((set, get) => ({
   brainDeployUrl: loadBrainDeployUrl(),
   setBrainDeployUrl: (brainDeployUrl) => {
     saveStr(BRAIN_DEPLOY_URL_KEY, brainDeployUrl)
+    syncBrainAppSettings({ brainDeployUrl: brainDeployUrl || undefined })
     set({ brainDeployUrl })
   },
   brainDeployTarget: loadBrainDeployTarget(),
@@ -422,6 +444,7 @@ export const useStore = create<State>((set, get) => ({
   connectToken: loadStr(CONNECT_TOKEN_KEY),
   setConnectToken: (connectToken) => {
     saveStr(CONNECT_TOKEN_KEY, connectToken)
+    syncBrainAppSettings({ connectToken: connectToken || undefined })
     set({ connectToken })
   },
 
@@ -454,14 +477,51 @@ export const useStore = create<State>((set, get) => ({
   async loadAppSettings() {
     try {
       const s = await api.appSettings()
-      set((state) => ({
-        minimizeToTray: s.minimizeToTray,
-        closeToTray: s.closeToTray,
-        ollamaUrl: state.ollamaUrl || s.ollamaUrl || '',
-      }))
-      if (!get().ollamaUrl && s.ollamaUrl) {
+      const state = get()
+
+      // Hydrate from app-settings when localStorage has no value (migration / new machine).
+      // Existing localStorage values (incl. alice's brain.example.local) are never overwritten.
+      if (!hasLocalStorageKey(REMOTE_BRAIN_URL_KEY) && s.brainMcpUrl) {
+        try {
+          localStorage.setItem(REMOTE_BRAIN_URL_KEY, s.brainMcpUrl)
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!hasLocalStorageKey(BRAIN_TARGET_KEY) && s.brainTarget) {
+        try {
+          localStorage.setItem(BRAIN_TARGET_KEY, s.brainTarget)
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!hasLocalStorageKey(BRAIN_DEPLOY_URL_KEY) && s.brainDeployUrl) {
+        saveStr(BRAIN_DEPLOY_URL_KEY, s.brainDeployUrl)
+      }
+      if (!hasLocalStorageKey(CONNECT_TOKEN_KEY) && s.connectToken) {
+        saveStr(CONNECT_TOKEN_KEY, s.connectToken)
+      }
+      if (!hasLocalStorageKey(OLLAMA_URL_KEY) && s.ollamaUrl) {
         saveOllamaUrl(s.ollamaUrl)
       }
+
+      const remoteBrainUrl = state.remoteBrainUrl || s.brainMcpUrl || loadRemoteBrainUrl()
+      const brainTarget = hasLocalStorageKey(BRAIN_TARGET_KEY)
+        ? state.brainTarget
+        : (s.brainTarget ?? state.brainTarget)
+      const brainDeployUrl = state.brainDeployUrl || s.brainDeployUrl || loadBrainDeployUrl()
+      const connectToken = state.connectToken || s.connectToken || loadStr(CONNECT_TOKEN_KEY)
+      const ollamaUrl = state.ollamaUrl || s.ollamaUrl || ''
+
+      set({
+        minimizeToTray: s.minimizeToTray,
+        closeToTray: s.closeToTray,
+        ollamaUrl,
+        remoteBrainUrl,
+        brainTarget,
+        brainDeployUrl,
+        connectToken,
+      })
     } catch {
       /* preview mode / unavailable */
     }

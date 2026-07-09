@@ -26,10 +26,11 @@ import { ClientIcon } from '../components/ClientIcon'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
+import { EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from '@core/brain/snippet'
 import type { BrainStatus, BrainTarget, ClientId, ClientStatus, EmbeddedBrainStatus, Snippet } from '../lib/types'
 
-const EMBEDDED_URL = 'http://127.0.0.1:7862'
-const REMOTE_URL = 'http://brain.example.local:7862'
+const EMBEDDED_URL = EMBEDDED_BRAIN_DEFAULT_URL
+const REMOTE_URL_PLACEHOLDER = REMOTE_BRAIN_URL_PLACEHOLDER
 
 /**
  * First-run onboarding wizard. Full-screen overlay shown instead of VaultGate
@@ -462,6 +463,30 @@ function EngineStep({
   const [status, setStatus] = useState<BrainStatus | null>(null)
   const [mode, setMode] = useState<BrainTarget>('embedded')
   const [remoteUrl, setRemoteUrl] = useState(remoteBrainUrl)
+  const [remoteTesting, setRemoteTesting] = useState(false)
+  const [remoteOk, setRemoteOk] = useState<boolean | null>(null)
+  const [remoteDetail, setRemoteDetail] = useState('')
+
+  async function testRemote() {
+    const url = remoteUrl.trim()
+    if (!url) return
+    setRemoteTesting(true)
+    setRemoteOk(null)
+    try {
+      const r = await api.connectStatus(url, undefined, 'remote')
+      setRemoteOk(r.brain.reachable)
+      setRemoteDetail(
+        r.brain.reachable
+          ? 'Serwer Brain odpowiada'
+          : r.brain.error || 'Brak połączenia — sprawdź URL i sieć',
+      )
+    } catch (e) {
+      setRemoteOk(false)
+      setRemoteDetail((e as Error).message)
+    } finally {
+      setRemoteTesting(false)
+    }
+  }
 
   async function check() {
     setChecking(true)
@@ -479,11 +504,12 @@ function EngineStep({
   }, [])
 
   const found = !!status?.reachable
-  const canContinue = mode === 'remote' || found
+  const remoteUrlTrimmed = remoteUrl.trim()
+  const canContinue = mode === 'embedded' ? found : remoteUrlTrimmed.length > 0
 
   function continueWithMode() {
     setBrainTarget(mode)
-    if (mode === 'remote') setRemoteBrainUrl(remoteUrl.trim() || REMOTE_URL)
+    if (mode === 'remote' && remoteUrlTrimmed) setRemoteBrainUrl(remoteUrlTrimmed)
     onDone(mode)
   }
 
@@ -491,7 +517,7 @@ function EngineStep({
     <StepCard
       icon={Cpu}
       title="How will Brain run?"
-      lead="Pick local embedded brain (built into Pomnia) or your homelab master. Ollama on this machine powers embeddings for the local path."
+      lead="Pick local embedded brain (built into Pomnia) or an optional remote Brain server. Ollama on this machine powers embeddings for the local path."
     >
       <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <button
@@ -523,10 +549,29 @@ function EngineStep({
       </div>
 
       {mode === 'remote' && (
-        <div className="mb-4">
+        <div className="mb-4 space-y-2">
           <Field label="Master MCP URL">
-            <Input value={remoteUrl} onChange={(e) => setRemoteUrl(e.target.value)} placeholder={REMOTE_URL} />
+            <Input
+              value={remoteUrl}
+              onChange={(e) => {
+                setRemoteUrl(e.target.value)
+                setRemoteOk(null)
+              }}
+              placeholder={REMOTE_URL_PLACEHOLDER}
+            />
           </Field>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="soft" onClick={() => void testRemote()} disabled={!remoteUrlTrimmed || remoteTesting}>
+              {remoteTesting ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              Test połączenia
+            </Button>
+            {remoteOk === true && (
+              <span className="text-[11px] font-medium text-mint">{remoteDetail}</span>
+            )}
+            {remoteOk === false && (
+              <span className="text-[11px] text-amber">{remoteDetail}</span>
+            )}
+          </div>
         </div>
       )}
 

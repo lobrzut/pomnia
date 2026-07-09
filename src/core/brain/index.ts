@@ -16,7 +16,7 @@ export { deployFilesystem, deployDashboard, triggerReindex, noteFilename, dashbo
 export type { DeployDistilledResult } from './deploy.js'
 export { listAllSkills, syncSkills, readLocalIndex } from './skills.js'
 export type { SkillKind, SkillListEntry, SkillSyncResult } from './skills.js'
-export { CLIENTS, getClient, listClients, buildSnippet, BRAIN_BRIEF_MD, BRAIN_BRIEF_EMBEDDED_MD, EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_DEFAULT_URL } from './snippet.js'
+export { CLIENTS, getClient, listClients, buildSnippet, BRAIN_BRIEF_MD, BRAIN_BRIEF_EMBEDDED_MD, EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from './snippet.js'
 export type { ClientId, ClientSpec, Snippet, SnippetBrief, BrainTarget } from './snippet.js'
 export { checkClient, checkAllClients, pingBrain } from './status.js'
 export type { ClientStatus, WiredState, BrainPing } from './status.js'

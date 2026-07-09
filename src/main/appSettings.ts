@@ -7,6 +7,8 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
 
+export type BrainTargetSetting = 'embedded' | 'remote'
+
 export interface AppSettings {
   /** Minimize button hides to tray instead of the taskbar. */
   minimizeToTray: boolean
@@ -14,6 +16,14 @@ export interface AppSettings {
   closeToTray: boolean
   /** Saved Ollama base URL (synced from renderer localStorage). Main uses this when IPC omits ollamaUrl. */
   ollamaUrl?: string
+  /** Remote Brain MCP base URL (synced from renderer — pomnia.brain.remoteUrl). */
+  brainMcpUrl?: string
+  /** Brain dashboard deploy URL (:7860) for distilled notes push. */
+  brainDeployUrl?: string
+  /** embedded = local brain-core; remote = user's LAN/cloud Brain server. */
+  brainTarget?: BrainTargetSetting
+  /** Bearer token for remote Brain MCP (synced from renderer). */
+  connectToken?: string
   /** Auto-start embedded brain on vault open when the user had it running last session. */
   embeddedBrainAutoStart?: boolean
 }
@@ -40,6 +50,10 @@ export async function loadAppSettings(): Promise<AppSettings> {
       minimizeToTray: parsed.minimizeToTray ?? DEFAULTS.minimizeToTray,
       closeToTray: parsed.closeToTray ?? DEFAULTS.closeToTray,
       ollamaUrl: parsed.ollamaUrl,
+      brainMcpUrl: parsed.brainMcpUrl,
+      brainDeployUrl: parsed.brainDeployUrl,
+      brainTarget: parsed.brainTarget,
+      connectToken: parsed.connectToken,
       embeddedBrainAutoStart: parsed.embeddedBrainAutoStart ?? DEFAULTS.embeddedBrainAutoStart,
     }
   } catch {

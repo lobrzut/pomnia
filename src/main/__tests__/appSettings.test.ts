@@ -39,4 +39,21 @@ describe('appSettings tray logic', () => {
     await mod.setAppSettings({ minimizeToTray: true })
     expect(mod.shouldHideOnMinimize()).toBe(true)
   })
+
+  it('persists per-user brain settings', async () => {
+    const mod = await import('../appSettings.js')
+    await mod.setAppSettings({
+      ollamaUrl: 'http://127.0.0.1:11434',
+      brainMcpUrl: 'http://brain.example.local:7862',
+      brainDeployUrl: 'http://brain.example.local:7860',
+      brainTarget: 'remote',
+      connectToken: 'btk_test',
+    })
+    const s = mod.getAppSettings()
+    expect(s.ollamaUrl).toBe('http://127.0.0.1:11434')
+    expect(s.brainMcpUrl).toBe('http://brain.example.local:7862')
+    expect(s.brainDeployUrl).toBe('http://brain.example.local:7860')
+    expect(s.brainTarget).toBe('remote')
+    expect(s.connectToken).toBe('btk_test')
+  })
 })

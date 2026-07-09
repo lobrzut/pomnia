@@ -8,7 +8,7 @@ vi.mock('../appSettings.js', () => ({
 
 vi.mock('@core/brain/ollama.js', () => ({
   defaultOllamaConfig: () => ({
-    baseUrl: 'http://localhost:11434',
+    baseUrl: 'http://127.0.0.1:11434',
     chatModel: 'qwen',
     embedModel: 'nomic-embed-text',
   }),
@@ -32,9 +32,9 @@ describe('resolveOllamaUrl', () => {
     expect(resolveOllamaUrl('')).toBe('http://brain.example.local:11434')
   })
 
-  it('defaults to localhost when nothing saved', async () => {
+  it('defaults to 127.0.0.1 when nothing saved', async () => {
     const { resolveOllamaUrl } = await import('../ollamaSettings.js')
-    expect(resolveOllamaUrl()).toBe('http://localhost:11434')
+    expect(resolveOllamaUrl()).toBe('http://127.0.0.1:11434')
   })
 })
 
