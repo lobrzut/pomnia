@@ -31,6 +31,15 @@ export function formatActivityBanner(state: ActivityState): string {
 
 export function formatFlowLiveBadge(state: ActivityState): string {
   if (state.kind === 'idle') return ''
+  if (state.kind === 'mcp-query') {
+    const tool = state.phase ?? ''
+    const toolNames = new Set(['search_library', 'get_skill', 'run_skill', 'list_skills', 'list_cli_skills'])
+    if (tool === 'search_library' || (state.detail && !toolNames.has(state.detail))) {
+      return 'Na żywo: wyszukiwanie w Brain'
+    }
+    if (tool === 'get_skill' || tool === 'run_skill') return 'Na żywo: skill z Brain'
+    return 'Na żywo: zapytanie MCP'
+  }
   const kind = ACTIVITY_KIND[state.kind]
   const progress =
     state.done != null && state.total != null && state.total > 0 ? ` ${state.done}/${state.total}` : ''
@@ -445,9 +454,9 @@ const PL_LABELS: UiLabels = {
   flowAgentLayerSkillsOptional: 'opcj.',
   flowAgentLayerSearch: 'search_library',
   flowWaitingCaption:
-    'Oczekiwanie — animacja ruszy przy destylacji, imporcie lub indeksowaniu',
+    'Oczekiwanie — animacja ruszy przy destylacji, imporcie, indeksowaniu lub zapytaniu MCP',
   flowIllustrationCaption:
-    'Oczekiwanie — animacja ruszy przy destylacji, imporcie lub indeksowaniu',
+    'Oczekiwanie — animacja ruszy przy destylacji, imporcie, indeksowaniu lub zapytaniu MCP',
   flowNodeImportLabel: 'Import',
   flowNodeImportHint: 'PDF, EPUB, ZIP — trafia do vaultu bez destylacji LLM.',
   flowNodeImportDisk: 'vault/library.cvb',

@@ -43,6 +43,7 @@ import {
 } from '@core/index'
 
 import { brainCore } from './brainCore.js'
+import { startMcpActivityPoll, stopMcpActivityPoll } from './mcpActivityPoll.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { indexPendingLibraryDocuments, type PendingIndexResult } from './libraryIndex.js'
 import { getAppSettings, loadAppSettings, setAppSettings, shouldHideOnClose, shouldHideOnMinimize } from './appSettings.js'
@@ -67,6 +68,15 @@ let brainRunAbort: AbortController | null = null
 let mcpQueryIdleTimer: ReturnType<typeof setTimeout> | null = null
 
 const MCP_QUERY_IDLE_MS = 3_500
+
+function emitMcpQueryActivity(ev: { tool?: string; detail?: string }): void {
+  activity.update({ kind: 'mcp-query', phase: ev.tool, detail: ev.detail ?? ev.tool })
+  if (mcpQueryIdleTimer) clearTimeout(mcpQueryIdleTimer)
+  mcpQueryIdleTimer = setTimeout(() => {
+    activity.idle('mcp-query')
+    mcpQueryIdleTimer = null
+  }, MCP_QUERY_IDLE_MS)
+}
 
 function requireVault(): Vault {
   if (!vault) throw new Error('No vault is open')
@@ -266,6 +276,11 @@ function registerIpc(): void {
     () => refreshTrayMenu(win, requestQuit),
   )
   ipcMain.handle('activity:get', () => activity.get())
+  ipcMain.handle('mcpActivity:watch', (_e, active: boolean) => {
+    if (active) startMcpActivityPoll(emitMcpQueryActivity)
+    else stopMcpActivityPoll()
+    return { ok: true }
+  })
 
   ipcMain.handle('scan', () => detectAll())
 
@@ -634,12 +649,7 @@ function registerIpc(): void {
       })
     }
     if (e.type === 'mcp-query') {
-      activity.update({ kind: 'mcp-query', detail: e.detail ?? e.tool })
-      if (mcpQueryIdleTimer) clearTimeout(mcpQueryIdleTimer)
-      mcpQueryIdleTimer = setTimeout(() => {
-        activity.idle('mcp-query')
-        mcpQueryIdleTimer = null
-      }, MCP_QUERY_IDLE_MS)
+      emitMcpQueryActivity({ tool: e.tool, detail: e.detail })
     }
     if (e.type === 'ready' || e.type === 'exited') {
       activity.idle('brain-start')

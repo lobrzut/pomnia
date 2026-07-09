@@ -38,6 +38,9 @@ describe('uiLabels', () => {
       labels.activityBanner({ kind: 'distill', done: 3, total: 7, detail: 'Sesja o vault backup' })
     ).toBe('Trwa: destylacja (3/7) · Sesja o vault backup')
     expect(labels.flowLiveBadge({ kind: 'distill', done: 3, total: 7 })).toBe('Na żywo: destylacja 3/7')
+    expect(labels.flowLiveBadge({ kind: 'mcp-query', phase: 'search_library', detail: 'vault' })).toBe(
+      'Na żywo: wyszukiwanie w Brain',
+    )
     expect(labels.activityBanner({ kind: 'doc-import', detail: 'report.epub' })).toBe(
       'Trwa: import dokumentu · report.epub'
     )

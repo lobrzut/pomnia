@@ -64,6 +64,7 @@ const bridge = {
     return () => ipcRenderer.removeListener('library:index-complete', l)
   },
   activityGet: () => ipcRenderer.invoke('activity:get'),
+  mcpActivityWatch: (active: boolean) => ipcRenderer.invoke('mcpActivity:watch', active),
   onActivityUpdate: (cb: (e: unknown) => void) => {
     const l = (_: IpcRendererEvent, e: unknown) => cb(e)
     ipcRenderer.on('activity:update', l)

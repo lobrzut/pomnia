@@ -77,6 +77,7 @@ export interface PomniaBridge {
   onDocImportProgress(cb: (e: DocImportProgressEvent) => void): () => void
   onLibraryIndexComplete(cb: (e: { indexed: number; chunks: number; errors: string[] }) => void): () => void
   activityGet(): Promise<ActivityState>
+  mcpActivityWatch(active: boolean): Promise<{ ok: boolean }>
   onActivityUpdate(cb: (e: ActivityState) => void): () => void
   onActivityIdle(cb: () => void): () => void
   brainDeploy(opts: {
@@ -386,6 +387,9 @@ function mockBridge(): PomniaBridge {
     },
     async activityGet() {
       return { kind: 'idle' as const }
+    },
+    async mcpActivityWatch() {
+      return { ok: true }
     },
     onActivityUpdate() {
       return () => {}

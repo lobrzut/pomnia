@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Map, RotateCcw } from 'lucide-react'
 import { FlowDiagram } from '../components/FlowDiagram'
 import { Button, GlassCard } from '../components/ui'
+import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
 
@@ -9,6 +10,13 @@ export default function HowItWorks() {
   const labels = uiLabels()
   const setRoute = useStore((s) => s.setRoute)
   const [animKey, setAnimKey] = useState(0)
+
+  useEffect(() => {
+    void api.mcpActivityWatch(true)
+    return () => {
+      void api.mcpActivityWatch(false)
+    }
+  }, [])
 
   return (
     <div className="mx-auto max-w-5xl">

@@ -42,6 +42,17 @@ export interface BrainPing {
   error?: string
 }
 
+export interface McpActivityRecord {
+  tool: string
+  detail?: string
+  ts: number
+}
+
+export interface McpActivityResponse {
+  last: McpActivityRecord | null
+  recent: boolean
+}
+
 /** Detect a single server's URL across the various shapes clients use. */
 function pickUrl(srv: any): { url?: string; transport?: string; hasToken?: boolean } {
   if (!srv || typeof srv !== 'object') return {}
@@ -197,4 +208,22 @@ export async function pingBrain(url: string, token?: string): Promise<BrainPing>
     }
   }
   return { url: base, reachable: false, error: 'no probe succeeded' }
+}
+
+/** Poll Brain for a recent MCP query (search_library, get_skill, …). */
+export async function fetchMcpActivity(baseUrl: string, token?: string): Promise<McpActivityResponse | null> {
+  const base = baseUrl.replace(/\/+$/, '').replace(/\/mcp$/, '')
+  const headers: Record<string, string> = { accept: 'application/json' }
+  if (token) headers.Authorization = `Bearer ${token}`
+  for (const probe of ['/mcp/activity', '/api/mcp/activity']) {
+    try {
+      const r = await fetch(`${base}${probe}`, { headers, signal: AbortSignal.timeout(3_000) })
+      if (!r.ok) continue
+      const data = (await r.json()) as McpActivityResponse
+      if (data && typeof data.recent === 'boolean') return data
+    } catch {
+      // try next probe
+    }
+  }
+  return null
 }
