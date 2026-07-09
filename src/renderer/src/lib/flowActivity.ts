@@ -59,6 +59,36 @@ export interface FlowVisualPlan {
   agentParticlesOneShot: boolean
   /** MCP node omnidirectional ripple during distill finale. */
   mcpFinaleGlow: boolean
+  /** Dim inactive nodes/paths — highlight only the active segment. */
+  focusMode: boolean
+  activeNodeIds: ReadonlySet<string>
+  activeEdgeIds: ReadonlySet<string>
+}
+
+function finalizeFocusPlan(
+  activity: ActivityState,
+  demoActive: boolean,
+  forward: Set<string>,
+  pulse: Set<string>,
+  reverseAgent: boolean,
+): Pick<FlowVisualPlan, 'focusMode' | 'activeNodeIds' | 'activeEdgeIds'> {
+  const focusMode = activity.kind !== 'idle' && !demoActive
+  const activeNodeIds = new Set(pulse)
+  const activeEdgeIds = new Set(forward)
+
+  if (reverseAgent) {
+    for (const id of FLOW_AGENT_EDGES) activeEdgeIds.add(id)
+  }
+
+  if (activity.kind === 'finale' || activity.kind === 'mcp-query') {
+    activeEdgeIds.clear()
+    for (const id of FLOW_AGENT_EDGES) activeEdgeIds.add(id)
+    activeNodeIds.clear()
+    activeNodeIds.add('library')
+    activeNodeIds.add('mcp')
+  }
+
+  return { focusMode, activeNodeIds, activeEdgeIds }
 }
 
 const DEMO_FORWARD = new Set([...FLOW_MAIN_EDGES.slice(0, 4), ...FLOW_DOCS_EDGES])
@@ -78,6 +108,9 @@ export function planFlowVisual(
       agentParticlePasses: 0,
       agentParticlesOneShot: false,
       mcpFinaleGlow: false,
+      focusMode: false,
+      activeNodeIds: new Set<string>(),
+      activeEdgeIds: new Set<string>(),
     }
   }
 
@@ -92,6 +125,9 @@ export function planFlowVisual(
       agentParticlePasses: 0,
       agentParticlesOneShot: false,
       mcpFinaleGlow: false,
+      focusMode: false,
+      activeNodeIds: new Set<string>(),
+      activeEdgeIds: new Set<string>(),
     }
   }
 
@@ -173,6 +209,8 @@ export function planFlowVisual(
     if (agentParticlePasses === 0) agentParticlePasses = 1
   }
 
+  const focus = finalizeFocusPlan(activity, opts.demoActive, forward, pulse, reverseAgent)
+
   return {
     forwardEdges: forward,
     reverseAgent,
@@ -183,5 +221,6 @@ export function planFlowVisual(
     agentParticlePasses: reverseAgent ? Math.max(agentParticlePasses, 1) : 0,
     agentParticlesOneShot,
     mcpFinaleGlow,
+    ...focus,
   }
 }

@@ -38,14 +38,18 @@ describe('uiLabels', () => {
       labels.activityBanner({ kind: 'distill', done: 3, total: 7, detail: 'Sesja o vault backup' })
     ).toBe('Trwa: destylacja (3/7) · Sesja o vault backup')
     expect(labels.flowLiveBadge({ kind: 'distill', done: 3, total: 7 })).toBe('Na żywo: destylacja 3/7')
+    expect(labels.flowFocusBanner({ kind: 'distill', done: 3, total: 7 })).toBe('Teraz: destylacja 3/7')
     expect(labels.flowLiveBadge({ kind: 'mcp-query', phase: 'search_library', detail: 'vault' })).toBe(
       'Na żywo: wyszukiwanie w Brain',
+    )
+    expect(labels.flowFocusBanner({ kind: 'mcp-query', phase: 'search_library', detail: 'vault' })).toBe(
+      'Teraz: wyszukiwanie w Brain',
     )
     expect(labels.flowLastMcpBadge('search_library')).toBe('Ostatnie: search_library · przed chwilą')
     expect(labels.activityBanner({ kind: 'doc-import', detail: 'report.epub' })).toBe(
       'Trwa: import dokumentu · report.epub'
     )
-    expect(labels.flowWaitingCaption).toContain('Oczekiwanie')
+    expect(labels.flowWaitingCaption).toContain('aktywna ścieżka')
     expect(labels.guideFlowReplay).toBe('Odtwórz demo')
   })
 

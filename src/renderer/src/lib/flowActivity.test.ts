@@ -56,6 +56,23 @@ describe('flowActivity', () => {
     expect(plan.pulseNodes.has('mcp')).toBe(true)
     expect(plan.pulseNodes.has('library')).toBe(true)
     expect(plan.agentParticlePasses).toBe(3)
+    expect(plan.focusMode).toBe(true)
+    expect(plan.activeEdgeIds.has('e-library-mcp-query')).toBe(true)
+    expect(plan.activeNodeIds.has('vault')).toBe(false)
+  })
+
+  it('finale focuses blue agent path only', () => {
+    const plan = planFlowVisual(
+      { kind: 'finale' },
+      { demoActive: false, embeddedRunning: false, brainPipelineRunning: false },
+    )
+    expect(plan.reverseAgent).toBe(true)
+    expect(plan.agentParticlesOneShot).toBe(true)
+    expect(plan.mcpFinaleGlow).toBe(true)
+    expect(plan.activeEdgeIds.has('e-library-mcp-query')).toBe(true)
+    expect(plan.activeEdgeIds.has('e-ai-vault')).toBe(false)
+    expect(plan.activeNodeIds.has('library')).toBe(true)
+    expect(plan.activeNodeIds.has('mcp')).toBe(true)
   })
 
   it('idle with embedded brain glows library path', () => {
