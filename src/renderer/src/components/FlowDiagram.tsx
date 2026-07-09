@@ -18,8 +18,13 @@ import type { Route } from '../store/useStore'
 const SLAVIC_GREEN = '#1a5c3a'
 const DOCS_ORANGE = '#fb923c'
 const AMBER = '#fbbf24'
-const FLOW_MAIN_Y = 68
-const FLOW_RETURN_Y = FLOW_MAIN_Y + 22
+/** SVG viewBox height — keep in sync with node y% (y% = y / VIEWBOX_H * 100). */
+const VIEWBOX_H = 280
+const FLOW_MAIN_Y = 95
+const FLOW_RETURN_Y = 118
+/** Horizontal corridor for docs/optional connectors — below main subtitles, above docs icons. */
+const FLOW_ROUTE_Y = 175
+const FLOW_DOCS_Y = 246
 
 export interface FlowDiagramProps {
   variant?: 'full' | 'mini'
@@ -56,7 +61,7 @@ function sx(pct: number): number {
 
 function buildNodes(L: ReturnType<typeof uiLabels>, mini: boolean): FlowNodeDef[] {
   const mainY = mini ? 36 : 34
-  const branchY = mini ? 82 : 78
+  const branchY = mini ? 90 : 88
   return [
     {
       id: 'ai',
@@ -170,8 +175,8 @@ function buildNodes(L: ReturnType<typeof uiLabels>, mini: boolean): FlowNodeDef[
 
 function buildEdges(memoryReturnLabel: string): FlowEdge[] {
   const my = FLOW_MAIN_Y
-  const by = 156
-  const j = 96
+  const by = FLOW_DOCS_Y
+  const j = FLOW_ROUTE_Y
   const ry = FLOW_RETURN_Y
   return [
     { id: 'e-ai-vault', d: `M ${sx(7)} ${my} L ${sx(23)} ${my}`, branch: 'main', particleDelay: 0 },
@@ -230,19 +235,19 @@ function FlowNode({
       disabled={!clickable}
       onClick={() => node.route && onNavigate?.(node.route)}
       className={clsx(
-        'flow-node no-drag absolute z-10 flex flex-col items-center text-center transition-transform',
+        'flow-node no-drag absolute z-20 flex flex-col items-center text-center transition-transform',
         clickable && 'cursor-pointer hover:scale-[1.04]',
         !clickable && 'cursor-default',
         active && 'flow-node--active',
         node.branch === 'optional' && 'flow-node--optional',
         node.branch === 'docs' && 'flow-node--docs',
-        mini ? 'w-[68px]' : 'w-[108px]'
+        mini ? 'w-[68px]' : 'w-[112px]'
       )}
       style={{ left: `${node.x}%`, top: `${node.y}%`, transform: 'translate(-50%, -50%)' }}
     >
       <div
         className={clsx(
-          'flex items-center justify-center rounded-xl border',
+          'relative z-10 flex items-center justify-center rounded-xl border',
           mini ? 'h-7 w-7' : 'h-11 w-11',
           active && 'border-amber/60',
           !active && node.branch === 'main' && 'border-[#1a5c3a66]',
@@ -258,8 +263,19 @@ function FlowNode({
           style={{ color: node.branch === 'main' ? '#34d399' : node.branch === 'docs' ? DOCS_ORANGE : AMBER }}
         />
       </div>
-      <span className={clsx('mt-1 font-semibold leading-tight text-ink', mini ? 'text-[8px]' : 'text-[11px]')}>{node.label}</span>
-      {!mini && <span className="mt-0.5 max-w-[100px] truncate font-mono text-[9px] text-ink-faint">{node.disk}</span>}
+      <span
+        className={clsx(
+          'relative z-20 mt-2 rounded-md bg-[#06070d]/90 px-1.5 py-0.5 font-semibold leading-tight text-ink backdrop-blur-sm',
+          mini ? 'text-[8px]' : 'text-[11px]'
+        )}
+      >
+        {node.label}
+      </span>
+      {!mini && (
+        <span className="relative z-20 mt-1 max-w-[108px] truncate rounded-md bg-[#06070d]/95 px-1.5 py-0.5 font-mono text-[9px] text-ink-faint backdrop-blur-sm">
+          {node.disk}
+        </span>
+      )}
     </button>
   )
 }
@@ -298,7 +314,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
       )}
       onMouseLeave={() => setHoverId(null)}
     >
-      <div className={clsx('relative w-full', mini ? 'h-[118px]' : 'h-[220px]')}>
+      <div className={clsx('relative w-full', mini ? 'h-[140px]' : 'h-[280px]')}>
         {!mini && (
           <div
             className="pointer-events-none absolute inset-0 opacity-40"
@@ -306,7 +322,12 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
           />
         )}
 
-        <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1000 200" preserveAspectRatio="none" aria-hidden>
+        <svg
+          className="pointer-events-none absolute inset-0 z-0 h-full w-full"
+          viewBox={`0 0 1000 ${VIEWBOX_H}`}
+          preserveAspectRatio="none"
+          aria-hidden
+        >
           <defs>
             <filter id="flow-glow">
               <feGaussianBlur stdDeviation="2" result="blur" />
@@ -325,7 +346,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
               {edge.label && !mini && (
                 <text
                   x={(sx(71) + sx(93)) / 2}
-                  y={FLOW_RETURN_Y + 14}
+                  y={FLOW_RETURN_Y + 16}
                   textAnchor="middle"
                   fill="#94a3b8"
                   fontSize="9"
