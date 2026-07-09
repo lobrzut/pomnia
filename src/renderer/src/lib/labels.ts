@@ -28,6 +28,14 @@ export function formatActivityBanner(state: ActivityState): string {
   return `Trwa: ${kind}${progress}${detail}`
 }
 
+export function formatFlowLiveBadge(state: ActivityState): string {
+  if (state.kind === 'idle') return ''
+  const kind = ACTIVITY_KIND[state.kind]
+  const progress =
+    state.done != null && state.total != null && state.total > 0 ? ` ${state.done}/${state.total}` : ''
+  return `Na żywo: ${kind}${progress}`
+}
+
 export interface UiLabels {
   distill: string
   distillBacklog: (n: number) => string
@@ -123,6 +131,9 @@ export interface UiLabels {
   distillEmptyBacklog: string
   distillEmptyBacklogDetail: string
   activityBanner: (state: ActivityState) => string
+  flowLiveBadge: (state: ActivityState) => string
+  flowWaitingCaption: string
+  guideFlowReplayHint: string
   activityTrayBusy: string
   healthTitle: string
   healthLead: string
@@ -341,6 +352,7 @@ const PL_LABELS: UiLabels = {
   distillEmptyBacklog: 'Brak nowych sesji do destylacji',
   distillEmptyBacklogDetail: 'Wszystkie czaty z wybranych źródeł są już w ledgerze destylacji.',
   activityBanner: formatActivityBanner,
+  flowLiveBadge: formatFlowLiveBadge,
   activityTrayBusy: 'Operacja w tle',
   healthTitle: 'Diagnostyka',
   healthLead: 'Szybki przegląd — co musi działać, żeby pamięć i MCP były gotowe.',
@@ -402,7 +414,8 @@ const PL_LABELS: UiLabels = {
   guideOpenTab: 'Otwórz zakładkę',
   guideDiagramToggle: 'Pokaż diagram',
   guideDiagramHide: 'Ukryj diagram',
-  guideFlowReplay: 'Odtwórz animację',
+  guideFlowReplay: 'Odtwórz demo',
+  guideFlowReplayHint: 'Przewodnik animacji — nie odzwierciedla aktywności w tle',
   guideFlowMainLegend: 'Ścieżka czatów',
   guideFlowDocsLegend: 'Ścieżka dokumentów',
   guideFlowOptionalLegend: 'Opcjonalnie',
@@ -434,7 +447,10 @@ const PL_LABELS: UiLabels = {
   flowAgentLayerSearch: 'search_library',
   flowAgentLayerSearchDetail: 'RAG z library.db',
   flowAgentLayerCaption: 'To nie jest zapis pamięci — agent pyta w trakcie kodowania',
-  flowIllustrationCaption: 'Animacja ilustracyjna — nie oznacza aktywności w tle',
+  flowWaitingCaption:
+    'Oczekiwanie — animacja ruszy przy destylacji, imporcie lub indeksowaniu',
+  flowIllustrationCaption:
+    'Oczekiwanie — animacja ruszy przy destylacji, imporcie lub indeksowaniu',
   flowNodeImportLabel: 'Import',
   flowNodeImportHint: 'PDF, EPUB, ZIP — trafia do vaultu bez destylacji LLM.',
   flowNodeImportDisk: 'vault/library.cvb',

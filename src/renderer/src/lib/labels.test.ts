@@ -37,9 +37,12 @@ describe('uiLabels', () => {
     expect(
       labels.activityBanner({ kind: 'distill', done: 3, total: 7, detail: 'Sesja o vault backup' })
     ).toBe('Trwa: destylacja (3/7) · Sesja o vault backup')
+    expect(labels.flowLiveBadge({ kind: 'distill', done: 3, total: 7 })).toBe('Na żywo: destylacja 3/7')
     expect(labels.activityBanner({ kind: 'doc-import', detail: 'report.epub' })).toBe(
       'Trwa: import dokumentu · report.epub'
     )
+    expect(labels.flowWaitingCaption).toContain('Oczekiwanie')
+    expect(labels.guideFlowReplay).toBe('Odtwórz demo')
   })
 
   it('exposes guide and status strip labels in Polish', () => {
