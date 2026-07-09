@@ -180,9 +180,16 @@ export interface UiLabels {
   guideFlowMainLegend: string
   guideFlowDocsLegend: string
   guideFlowOptionalLegend: string
+  guideFlowAgentLegend: string
   guideFlowMiniTitle: string
   guideFlowMiniExpand: string
   flowEdgeMemoryReturn: string
+  flowAgentLayerTitle: string
+  flowAgentLayerSkills: string
+  flowAgentLayerSkillsDetail: string
+  flowAgentLayerSearch: string
+  flowAgentLayerSearchDetail: string
+  flowAgentLayerCaption: string
   flowNodeAiLabel: string
   flowNodeAiHint: string
   flowNodeAiDisk: string
@@ -381,8 +388,8 @@ const PL_LABELS: UiLabels = {
   guideStep4Where: 'Brain → Lokalna wyszukiwarka',
   guideStep5Title: 'Krok 5 — Agent przez MCP',
   guideStep5Body:
-    'Klient MCP (Cursor i inne) — agent woła search_library podczas pracy i przypomina sobie kontekst z lokalnego indeksu.',
-  guideStep5Where: 'Connect · search_library · mcp.json',
+    'Klient MCP (Cursor i inne) łączy agenta z lokalną wyszukiwarką. Podczas kodowania agent może wołać search_library (RAG) i opcjonalnie ładować skills — to nie jest zapis do pamięci, tylko pytanie w trakcie pracy.',
+  guideStep5Where: 'Connect · search_library · get_skill',
   guideStepOptionalTitle: 'Opcjonalnie — serwer Brain',
   guideStepOptionalBody:
     'Deploy kopii notatek na opcjonalny serwer Brain w sieci LAN — wspólna pamięć dla wielu maszyn.',
@@ -398,6 +405,7 @@ const PL_LABELS: UiLabels = {
   guideFlowMainLegend: 'Ścieżka czatów',
   guideFlowDocsLegend: 'Ścieżka dokumentów',
   guideFlowOptionalLegend: 'Opcjonalnie',
+  guideFlowAgentLegend: 'Warstwa agenta',
   guideFlowMiniTitle: 'Przepływ danych',
   guideFlowMiniExpand: 'Pełna mapa →',
   flowEdgeMemoryReturn: 'odpowiedź z pamięci',
@@ -417,9 +425,14 @@ const PL_LABELS: UiLabels = {
   flowNodeLibraryHint: 'Embedded brain: chunki tekstu + wektory embeddingów lokalnie na tym PC.',
   flowNodeLibraryDisk: 'brain-core-data/library.db',
   flowNodeMcpLabel: 'Agent przez MCP',
-  flowNodeMcpHint:
-    'Agent (Cursor i inni): najpierw skills (opcjonalnie), potem search_library — lokalny indeks RAG.',
-  flowNodeMcpDisk: 'Connect · skills → search_library · mcp.json',
+  flowNodeMcpHint: 'Agent (Cursor i inni) łączy się przez MCP — most do lokalnej wyszukiwarki Brain.',
+  flowNodeMcpDisk: 'Connect · mcp.json',
+  flowAgentLayerTitle: 'Podczas pracy agenta',
+  flowAgentLayerSkills: 'Skills (opcjonalnie)',
+  flowAgentLayerSkillsDetail: 'get_skill — procedury z Brain lub Connect',
+  flowAgentLayerSearch: 'search_library',
+  flowAgentLayerSearchDetail: 'RAG z library.db',
+  flowAgentLayerCaption: 'To nie jest zapis pamięci — agent pyta w trakcie kodowania',
   flowNodeImportLabel: 'Import',
   flowNodeImportHint: 'PDF, EPUB, ZIP — trafia do vaultu bez destylacji LLM.',
   flowNodeImportDisk: 'vault/library.cvb',

@@ -8,11 +8,13 @@ import {
   Layers,
   Plug,
   Search,
-  Sparkles
+  Sparkles,
+  Wand2
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { LucideIcon } from 'lucide-react'
 import { uiLabels } from '../lib/labels'
+import type { UiLabels } from '../lib/labels'
 import type { Route } from '../store/useStore'
 
 const SLAVIC_GREEN = '#1a5c3a'
@@ -25,6 +27,9 @@ const FLOW_RETURN_Y = 118
 /** Horizontal corridor for docs/optional connectors — below main subtitles, above docs icons. */
 const FLOW_ROUTE_Y = 175
 const FLOW_DOCS_Y = 246
+/** Vertical corridor for agent-layer sidecar — between main line and docs branch. */
+const FLOW_AGENT_Y = 158
+const FLOW_AGENT_JUNCTION_Y = 132
 
 export interface FlowDiagramProps {
   variant?: 'full' | 'mini'
@@ -49,7 +54,7 @@ interface FlowNodeDef {
 interface FlowEdge {
   id: string
   d: string
-  branch: 'main' | 'docs' | 'optional' | 'return'
+  branch: 'main' | 'docs' | 'optional' | 'return' | 'agent'
   particleDelay?: number
   label?: string
 }
@@ -207,10 +212,32 @@ function buildEdges(memoryReturnLabel: string): FlowEdge[] {
   ]
 }
 
+function buildAgentEdges(): FlowEdge[] {
+  const my = FLOW_MAIN_Y
+  const ay = FLOW_AGENT_Y
+  const jy = FLOW_AGENT_JUNCTION_Y
+  const libX = sx(71)
+  const agentX = sx(84)
+  const mcpX = sx(93)
+  return [
+    {
+      id: 'e-library-agent',
+      d: `M ${libX} ${my} L ${libX} ${jy} L ${agentX} ${jy} L ${agentX} ${ay}`,
+      branch: 'agent'
+    },
+    {
+      id: 'e-agent-mcp',
+      d: `M ${agentX} ${ay} L ${agentX} ${jy} L ${mcpX} ${jy} L ${mcpX} ${my}`,
+      branch: 'agent'
+    }
+  ]
+}
+
 function edgeClass(branch: FlowEdge['branch']): string {
   if (branch === 'docs') return 'flow-path flow-path-docs'
   if (branch === 'optional') return 'flow-path flow-path-optional'
   if (branch === 'return') return 'flow-path flow-path-return'
+  if (branch === 'agent') return 'flow-path flow-path-agent'
   return 'flow-path flow-path-main'
 }
 
@@ -280,11 +307,46 @@ function FlowNode({
   )
 }
 
+function AgentLayerSidecar({ labels }: { labels: UiLabels }) {
+  return (
+    <div
+      className="pointer-events-none absolute z-30 w-[148px]"
+      style={{ left: '84%', top: `${(FLOW_AGENT_Y / VIEWBOX_H) * 100}%`, transform: 'translate(-50%, -42%)' }}
+    >
+      <div className="rounded-xl border border-dashed border-iris/45 bg-[#080c18]/95 px-2.5 py-2 shadow-lg shadow-black/40 backdrop-blur-sm">
+        <p className="mb-1.5 text-center text-[9px] font-semibold uppercase tracking-wide text-iris">
+          {labels.flowAgentLayerTitle}
+        </p>
+        <ul className="space-y-1.5">
+          <li className="flex items-start gap-1.5">
+            <Wand2 className="mt-0.5 h-3 w-3 shrink-0 text-iris/80" />
+            <div className="min-w-0 text-left">
+              <span className="block text-[10px] font-semibold leading-tight text-ink">{labels.flowAgentLayerSkills}</span>
+              <span className="block font-mono text-[8px] leading-snug text-ink-faint">{labels.flowAgentLayerSkillsDetail}</span>
+            </div>
+          </li>
+          <li className="flex items-start gap-1.5">
+            <Search className="mt-0.5 h-3 w-3 shrink-0 text-cyan/80" />
+            <div className="min-w-0 text-left">
+              <span className="block text-[10px] font-semibold leading-tight text-ink">{labels.flowAgentLayerSearch}</span>
+              <span className="block font-mono text-[8px] leading-snug text-ink-faint">{labels.flowAgentLayerSearchDetail}</span>
+            </div>
+          </li>
+        </ul>
+        <p className="mt-2 border-t border-white/6 pt-1.5 text-center text-[8px] italic leading-snug text-ink-faint">
+          {labels.flowAgentLayerCaption}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, className }: FlowDiagramProps) {
   const labels = uiLabels()
   const mini = variant === 'mini'
   const nodes = useMemo(() => buildNodes(labels, mini), [labels, mini])
   const edges = useMemo(() => buildEdges(labels.flowEdgeMemoryReturn), [labels.flowEdgeMemoryReturn])
+  const agentEdges = useMemo(() => buildAgentEdges(), [])
   const [activeStep, setActiveStep] = useState(-1)
   const [hoverId, setHoverId] = useState<string | null>(null)
 
@@ -339,6 +401,9 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
             <marker id="flow-arrow-return" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
               <path d="M0,0 L6,3 L0,6 Z" fill="#34d399" opacity="0.45" />
             </marker>
+            <marker id="flow-arrow-agent" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#818cf8" opacity="0.55" />
+            </marker>
           </defs>
           {edges.map((edge) => (
             <g key={edge.id}>
@@ -374,7 +439,19 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
               )}
             </g>
           ))}
+          {!mini &&
+            agentEdges.map((edge) => (
+              <path
+                key={edge.id}
+                d={edge.d}
+                className={edgeClass(edge.branch)}
+                fill="none"
+                markerEnd="url(#flow-arrow-agent)"
+              />
+            ))}
         </svg>
+
+        {!mini && <AgentLayerSidecar labels={labels} />}
 
         {nodes.map((node) => (
           <div key={node.id} onMouseEnter={() => setHoverId(node.id)}>
@@ -398,6 +475,10 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
             <span className="flex items-center gap-1.5">
               <span className="h-1 w-4 rounded-full border border-dashed border-amber/60" />
               {labels.guideFlowOptionalLegend}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-1 w-4 rounded-full border border-dashed border-iris/60" />
+              {labels.guideFlowAgentLegend}
             </span>
           </div>
         </div>
