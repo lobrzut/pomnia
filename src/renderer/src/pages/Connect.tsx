@@ -22,7 +22,7 @@ import { ClientIcon, CLIENT_BRAND } from '../components/ClientIcon'
 import { EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from '@core/brain/snippet'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
-import { useStore } from '../store/useStore'
+import { useStore, dashboardUrlFromBrainUrl } from '../store/useStore'
 import type { BrainTarget, ClientId, ClientStatus, Snippet, WiredState } from '../lib/types'
 
 const EMBEDDED_URL = EMBEDDED_BRAIN_DEFAULT_URL
@@ -41,13 +41,13 @@ const CLIENT_ORDER: ClientId[] = [
 function stateMeta(state: WiredState): { label: string; color: string; Icon: typeof CheckCircle2 } {
   switch (state) {
     case 'wired':
-      return { label: 'Connected', color: '#34d399', Icon: CheckCircle2 }
+      return { label: 'Połączony', color: '#34d399', Icon: CheckCircle2 }
     case 'partial':
-      return { label: 'Partial', color: '#fbbf24', Icon: AlertTriangle }
+      return { label: 'Niepełny', color: '#fbbf24', Icon: AlertTriangle }
     case 'config_error':
-      return { label: 'Config error', color: '#fb7185', Icon: AlertTriangle }
+      return { label: 'Błąd config', color: '#fb7185', Icon: AlertTriangle }
     default:
-      return { label: 'Not connected', color: '#5b6178', Icon: Circle }
+      return { label: 'Brak', color: '#5b6178', Icon: Circle }
   }
 }
 
@@ -80,10 +80,10 @@ export default function Connect() {
 
   async function mintToken() {
     if (minting) return
-    const dashboardUrl = brainUrl.replace(/:\d+$/, ':7860')
+    const dashboardUrl = dashboardUrlFromBrainUrl(brainUrl)
     const suggested = `pomnia-${new Date().toISOString().slice(0, 10)}`
     const name = window.prompt(
-      'Name for the new token (identifies where it lives — helps if you need to revoke it later):',
+      'Nazwa tokena (np. macbook, windows — ułatwia późniejsze odwołanie):',
       suggested,
     )
     if (!name) return
@@ -93,14 +93,27 @@ export default function Connect() {
       setConnectToken(r.token)
       toast({
         kind: 'success',
-        title: `Token minted: ${r.name}`,
-        detail: `Saved into the token field. Regenerate the snippet to include it.`,
+        title: `Token: ${r.name}`,
+        detail: 'Zapisany w polu — snippet odświeży się automatycznie.',
       })
+      // Token is in React state async — pass explicitly for immediate rebuild.
+      if (picked) {
+        setSnippetLoading(true)
+        try {
+          setSnippet(
+            await api.connectSnippet(picked, brainUrl, r.token, effectiveTarget)
+          )
+        } catch {
+          /* ignore — user can re-pick */
+        } finally {
+          setSnippetLoading(false)
+        }
+      }
     } catch (e) {
       toast({
         kind: 'error',
-        title: 'Could not mint token',
-        detail: (e as Error).message,
+        title: 'Nie udało się utworzyć tokena',
+        detail: `${(e as Error).message} — otwórz dashboard :7860 i wklej token ręcznie.`,
       })
     } finally {
       setMinting(false)
@@ -157,17 +170,23 @@ export default function Connect() {
     try {
       setSnippet(await api.connectSnippet(id, brainUrl, effectiveTarget === 'remote' ? connectToken || undefined : undefined, effectiveTarget))
     } catch (e) {
-      toast({ kind: 'error', title: 'Could not build snippet', detail: (e as Error).message })
+      toast({ kind: 'error', title: 'Nie udało się zbudować snippeta', detail: (e as Error).message })
     } finally {
       setSnippetLoading(false)
     }
+  }
+
+  // Re-build snippet after mint / when user finishes editing URL or token.
+  async function refreshSnippetIfPicked() {
+    if (!picked) return
+    void pick(picked)
   }
 
   async function copy(text: string, key: string, label: string) {
     await navigator.clipboard.writeText(text)
     setCopied(key)
     window.setTimeout(() => setCopied((c) => (c === key ? null : c)), 1600)
-    toast({ kind: 'success', title: 'Copied', detail: label })
+    toast({ kind: 'success', title: 'Skopiowano', detail: label })
   }
 
   async function syncSkills() {
@@ -176,18 +195,18 @@ export default function Connect() {
       // Skills live on the dashboard (:7860), not the MCP gateway/auth-proxy
       // (:7862) that brainUrl normally points at for client status + snippets —
       // two different services on two different ports. Derive by convention.
-      const dashboardUrl = brainUrl.replace(/:7862\b/, ':7860')
-      const r = await api.connectSkillsSync(dashboardUrl, connectToken || undefined)
+      const skillsDash = dashboardUrlFromBrainUrl(brainUrl)
+      const r = await api.connectSkillsSync(skillsDash, connectToken || undefined)
       toast(
         r.errors.length
-          ? { kind: 'warn', title: `Synced ${r.written} skill(s)`, detail: `${r.errors.length} error(s) — see console` }
+          ? { kind: 'warn', title: `Zsynchronizowano ${r.written} skill(i)`, detail: `${r.errors.length} błąd(ów) — konsola` }
           : r.written === 0
-            ? { kind: 'info', title: 'No skills to sync', detail: 'The Brain server has no skills yet.' }
-            : { kind: 'success', title: `Synced ${r.written} skill(s)`, detail: 'Available offline now.' }
+            ? { kind: 'info', title: 'Brak skilli', detail: 'Serwer Brain nie ma jeszcze skilli.' }
+            : { kind: 'success', title: `Zsynchronizowano ${r.written} skill(i)`, detail: 'Dostępne offline.' }
       )
       if (r.errors.length) console.warn('skill sync errors', r.errors)
     } catch (e) {
-      toast({ kind: 'error', title: 'Skill sync failed', detail: (e as Error).message })
+      toast({ kind: 'error', title: 'Sync skilli nieudany', detail: (e as Error).message })
     } finally {
       setSyncing(false)
     }
@@ -200,6 +219,14 @@ export default function Connect() {
   const visibleClients = CLIENT_ORDER.filter(isVisible)
   const hiddenCount = CLIENT_ORDER.length - visibleClients.length
   const connectedCount = visibleClients.filter((id) => clients.find((c) => c.id === id)?.state === 'wired').length
+  const dashboardUrl = effectiveTarget === 'remote' && brainUrl ? dashboardUrlFromBrainUrl(brainUrl) : ''
+  const partialClients = clients.filter((c) => c.state === 'partial' && isVisible(c.id))
+  const checklistDone = {
+    url: effectiveTarget === 'embedded' || !!remoteBrainUrl.trim(),
+    token: effectiveTarget === 'embedded' || !!connectToken.trim(),
+    copy: copied === 'code' || copied === 'cursor-full',
+    reload: connectedCount > 0,
+  }
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -210,8 +237,51 @@ export default function Connect() {
         <div>
           <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.mcpConnect}</h1>
           <p className="text-sm text-ink-dim">{labels.connectPageLead}</p>
+          <p className="mt-1 text-[11px] text-ink-faint">{labels.connectMacNoAppHint}</p>
         </div>
       </div>
+
+      {/* First-time checklist (remote) */}
+      {!simpleMode && effectiveTarget === 'remote' && (
+        <GlassCard className="mb-5 p-5">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+            <ListChecks className="h-4 w-4 text-iris" /> {labels.connectChecklistTitle}
+          </div>
+          <ol className="space-y-2">
+            <ChecklistRow done={checklistDone.url} label={labels.connectStepUrl} />
+            <ChecklistRow done={checklistDone.token} label={labels.connectStepToken} />
+            <ChecklistRow done={checklistDone.copy} label={labels.connectStepCopy} />
+            <ChecklistRow done={checklistDone.reload} label={labels.connectStepReload} />
+          </ol>
+        </GlassCard>
+      )}
+
+      {/* Incomplete mcp.json warning */}
+      {partialClients.length > 0 && (
+        <GlassCard className="mb-5 border border-amber/30 bg-amber/5 p-5">
+          <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-amber">
+            <AlertTriangle className="h-4 w-4" /> {labels.connectPartialTitle}
+          </div>
+          <p className="mb-2 text-[12px] leading-relaxed text-ink-dim">{labels.connectPartialDetail}</p>
+          <ul className="mb-3 space-y-1 text-[11px] text-ink-faint">
+            {partialClients.map((c) => (
+              <li key={c.id}>
+                <strong className="text-ink-dim">{c.label}</strong>
+                {c.issues.length ? ` — ${c.issues.filter((i) => i.includes('missing') || i.includes('incomplete')).join('; ')}` : ''}
+              </li>
+            ))}
+          </ul>
+          <Button
+            variant="soft"
+            onClick={() => {
+              const id = (partialClients.find((c) => c.id === 'cursor') ?? partialClients[0]).id
+              void pick(id)
+            }}
+          >
+            <Copy className="h-3.5 w-3.5" /> {labels.connectPartialFix}
+          </Button>
+        </GlassCard>
+      )}
 
       {/* Brain server + URL */}
       <GlassCard className="mb-5 p-5">
@@ -278,6 +348,7 @@ export default function Connect() {
             onChange={(e) => {
               if (brainTarget === 'remote') setRemoteBrainUrl(e.target.value)
             }}
+            onBlur={() => void refreshSnippetIfPicked()}
             placeholder={brainTarget === 'embedded' ? EMBEDDED_URL : REMOTE_URL_PLACEHOLDER}
             className="w-64"
             readOnly={brainTarget === 'embedded'}
@@ -288,20 +359,31 @@ export default function Connect() {
               <Input
                 value={connectToken}
                 onChange={(e) => setConnectToken(e.target.value)}
-                placeholder="Bearer token (optional)"
+                onBlur={() => void refreshSnippetIfPicked()}
+                placeholder={labels.connectTokenPlaceholder}
                 type="password"
                 className="w-56"
               />
-              <Button variant="soft" onClick={() => void mintToken()} disabled={minting}>
+              <Button variant="soft" onClick={() => void mintToken()} disabled={minting || !brainUrl.trim()}>
                 {minting ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
-                New token
+                Nowy token
               </Button>
+              {dashboardUrl && (
+                <Button
+                  variant="soft"
+                  onClick={() => window.open(dashboardUrl, '_blank', 'noopener,noreferrer')}
+                >
+                  <KeyRound className="h-3.5 w-3.5" /> {labels.connectOpenDashboard}
+                </Button>
+              )}
             </>
           )}
           <span className="text-[11px] text-ink-faint">
             {simpleMode || brainTarget === 'embedded'
-              ? 'Snippets point at localhost — one MCP server, no token.'
-              : 'Changing URL or token? Refresh, then re-pick a client.'}
+              ? 'Snippety wskazują na localhost — jeden serwer MCP, bez tokena.'
+              : !connectToken.trim()
+                ? labels.connectTokenRequired
+                : 'Zmiana URL/tokena odświeża snippet automatycznie.'}
           </span>
         </div>
       </GlassCard>
@@ -390,9 +472,22 @@ export default function Connect() {
               <div className="mb-4 flex items-center gap-3">
                 <ClientIcon id={picked} size={36} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-ink">Set up {snippet.label}</div>
+                  <div className="text-sm font-semibold text-ink">Konfiguracja: {snippet.label}</div>
                   <div className="truncate text-[11px] text-ink-faint">{CLIENT_BRAND[picked].tagline}</div>
                 </div>
+                <Button
+                  onClick={() =>
+                    void copy(snippet.fullFileJson, 'cursor-full', labels.connectCopyForCursor)
+                  }
+                  className="shrink-0"
+                >
+                  {copied === 'cursor-full' ? (
+                    <Check className="h-3.5 w-3.5 text-mint" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                  {labels.connectCopyForCursor}
+                </Button>
                 <button
                   onClick={() => setPicked(null)}
                   className="no-drag rounded-lg p-1.5 text-ink-faint transition-colors hover:bg-white/8 hover:text-ink"
@@ -402,12 +497,20 @@ export default function Connect() {
                 </button>
               </div>
 
+              {effectiveTarget === 'remote' && (
+                <div className="mb-3 flex flex-wrap gap-1.5">
+                  <Badge color="#22d3ee">brain-rag</Badge>
+                  <Badge color="#22d3ee">brain-vault</Badge>
+                  <Badge color="#22d3ee">brain-library</Badge>
+                </div>
+              )}
+
               {/* Steps */}
               <ol className="mb-4 space-y-2.5">
                 <Step n={1}>
-                  Open or create this file:
+                  Otwórz lub utwórz plik:
                   <button
-                    onClick={() => void copy(snippet.filePath, 'path', 'file path')}
+                    onClick={() => void copy(snippet.filePath, 'path', 'ścieżka pliku')}
                     className="no-drag group ml-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-white/10 bg-black/30 px-2 py-1 align-middle text-[11px] text-ink-dim transition-colors hover:border-iris/40 hover:text-ink"
                   >
                     <span className="truncate">{snippet.filePath}</span>
@@ -419,17 +522,17 @@ export default function Connect() {
                   </button>
                 </Step>
                 <Step n={2}>
-                  Pick your case, then copy the config and paste it in:
+                  Wybierz tryb, skopiuj config i wklej:
                 </Step>
               </ol>
 
               {/* Segmented mode toggle */}
               <div className="mb-2.5 inline-flex rounded-xl border border-white/10 bg-black/30 p-1">
                 <SegBtn active={mode === 'new'} onClick={() => setMode('new')} Icon={FilePlus2}>
-                  New / empty file
+                  Nowy / pusty plik
                 </SegBtn>
                 <SegBtn active={mode === 'merge'} onClick={() => setMode('merge')} Icon={GitMerge}>
-                  Merge into existing
+                  Merge do istniejącego
                 </SegBtn>
               </div>
 
@@ -440,25 +543,25 @@ export default function Connect() {
                     void copy(
                       mode === 'new' ? snippet.fullFileJson : snippet.mergeJson,
                       'code',
-                      mode === 'new' ? 'full file' : 'merge snippet'
+                      mode === 'new' ? 'pełny plik' : 'merge snippet'
                     )
                   }
                   className="no-drag absolute right-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-ink transition-colors hover:bg-white/14"
                 >
                   {copied === 'code' ? (
                     <>
-                      <Check className="h-3.5 w-3.5 text-mint" /> Copied
+                      <Check className="h-3.5 w-3.5 text-mint" /> Skopiowano
                     </>
                   ) : (
                     <>
-                      <Copy className="h-3.5 w-3.5" /> Copy
+                      <Copy className="h-3.5 w-3.5" /> Kopiuj
                     </>
                   )}
                 </button>
                 <p className="mb-1.5 text-[11px] text-ink-faint">
                   {mode === 'new'
-                    ? 'Paste as the entire file content.'
-                    : `Merge these keys into the "${snippet.mcpKey}" object you already have.`}
+                    ? 'Wklej jako całą zawartość pliku.'
+                    : `Dodaj te klucze do obiektu "${snippet.mcpKey}".`}
                 </p>
                 <pre className="max-h-56 overflow-auto rounded-xl border border-white/8 bg-black/40 p-3.5 pt-9 text-[11px] leading-relaxed text-cyan">
                   {mode === 'new' ? snippet.fullFileJson : snippet.mergeJson}
@@ -479,10 +582,10 @@ export default function Connect() {
                 <KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-faint" />
                 <p className="text-[11px] leading-relaxed text-ink-faint">
                   {brainTarget === 'embedded'
-                    ? 'Embedded mode: single brain-rag server at /mcp — no Bearer token.'
+                    ? 'Tryb lokalny: jeden serwer brain-rag na /mcp — bez Bearer tokena.'
                     : connectToken
-                      ? 'Token is baked into the headers — keep this file private (chmod 600 if possible).'
-                      : 'No token added. If your Brain proxy is auth-gated, paste a token above first, then re-copy.'}
+                      ? 'Token jest w headers — trzymaj plik prywatny (chmod 600).'
+                      : labels.connectTokenRequired}
                 </p>
               </div>
 
@@ -491,14 +594,14 @@ export default function Connect() {
                 <div className="mt-5 rounded-2xl border border-amber/25 bg-amber/5 p-4">
                   <div className="mb-2 flex items-center gap-2">
                     <BookOpenText className="h-4 w-4 text-amber" />
-                    <span className="text-sm font-semibold text-ink">Agent brief (optional)</span>
-                    <Badge color="#fbbf24">recommended</Badge>
+                    <span className="text-sm font-semibold text-ink">Brief agenta (opcjonalnie)</span>
+                    <Badge color="#fbbf24">zalecane</Badge>
                   </div>
                   <p className="mb-3 text-[11px] leading-relaxed text-ink-dim">
-                    Instructions the agent auto-reads every session. Without them the agent knows brain
-                    tools exist but decides when to use them — with them it calls <code>get_user_profile</code>,
-                    <code> search_library</code> before technical answers, and <code>save_conversation</code> when
-                    you say &laquo;zapisz do brain&raquo;. Copy-paste, we don&apos;t touch the file.
+                    Instrukcje, które agent czyta przy starcie sesji. Bez nich wie, że narzędzia istnieją,
+                    ale sam decyduje kiedy ich użyć — z briefem woła <code>get_user_profile</code>,
+                    <code> search_library</code> przed odpowiedziami technicznymi i <code>save_conversation</code> gdy
+                    powiesz &laquo;zapisz do brain&raquo;. Copy-paste — nie ruszamy pliku.
                   </p>
                   <ol className="mb-3 space-y-2.5">
                     <Step n={1}>
@@ -566,6 +669,19 @@ export default function Connect() {
         </Button>
       </GlassCard>
     </div>
+  )
+}
+
+function ChecklistRow({ done, label }: { done: boolean; label: string }) {
+  return (
+    <li className="flex items-center gap-2.5 text-[13px]">
+      {done ? (
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-mint" />
+      ) : (
+        <Circle className="h-4 w-4 shrink-0 text-ink-faint" />
+      )}
+      <span className={done ? 'text-ink-dim' : 'text-ink-faint'}>{label}</span>
+    </li>
   )
 }
 

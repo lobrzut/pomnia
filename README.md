@@ -70,6 +70,7 @@ src/renderer/        UI: React 19 + Tailwind v4 + Framer Motion (aurora, glass, 
 2. Uruchom Pomnia → kreator: **Vault** (hasło!) → **Backup** czatów z Dashboard.
 3. Zakładka **Brain** → sprawdź zielony status Ollama → **Distill backlog** (wymaga GPU/RAM na qwen).
 4. Zakładka **Connect** → wybierz **Local embedded** → skopiuj snippet MCP do Cursora (`Settings → MCP`).
+   - **Mac bez DMG:** użyj [`landing/cursor-mcp.html`](landing/cursor-mcp.html) / [docs/CURSOR-MCP.md](docs/CURSOR-MCP.md) (URL `:7862` + token → pełny 3-serwerowy `mcp.json`).
 5. **Settings → Diagnostyka** — wszystkie punkty zielone = gotowe.
 
 **Częste problemy:**

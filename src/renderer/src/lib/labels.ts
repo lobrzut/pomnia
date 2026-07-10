@@ -102,6 +102,19 @@ export interface UiLabels {
   floatingMonitorClose: string
   floatingMonitorOpenHint: string
   connectPageLead: string
+  connectChecklistTitle: string
+  connectStepUrl: string
+  connectStepToken: string
+  connectStepCopy: string
+  connectStepReload: string
+  connectCopyForCursor: string
+  connectTokenPlaceholder: string
+  connectTokenRequired: string
+  connectOpenDashboard: string
+  connectPartialTitle: string
+  connectPartialDetail: string
+  connectPartialFix: string
+  connectMacNoAppHint: string
   embeddedBrainNotRunning: string
   embeddedBrainNotRunningLink: string
   settingsTitle: string
@@ -332,6 +345,21 @@ const PL_LABELS: UiLabels = {
   floatingMonitorOpenHint: 'Kliknij, aby otworzyć Pomnię na „Jak to działa”. Podwójne kliknięcie — zamknij.',
   connectPageLead:
     'Skopiuj konfigurację MCP i wklej w Cursorze — Pomnia nigdy nie dotyka Twoich plików.',
+  connectChecklistTitle: 'Pierwsze podłączenie (4 kroki)',
+  connectStepUrl: 'URL Brain MCP (:7862)',
+  connectStepToken: 'Token Bearer z dashboardu (:7860)',
+  connectStepCopy: 'Kopiuj pełny mcp.json (3 serwery)',
+  connectStepReload: 'Reload Window w Cursorze',
+  connectCopyForCursor: 'Kopiuj mcp.json dla Cursora',
+  connectTokenPlaceholder: 'Bearer token (wymagany dla remote)',
+  connectTokenRequired: 'Bez tokena remote MCP zwykle nie zadziała — wklej lub utwórz poniżej.',
+  connectOpenDashboard: 'Otwórz dashboard tokenów',
+  connectPartialTitle: 'Niepełny mcp.json — brak vault/library',
+  connectPartialDetail:
+    'Wykryto tylko część serwerów Brain. Remote wymaga brain-rag + brain-vault + brain-library.',
+  connectPartialFix: 'Skopiuj pełny config poniżej i nadpisz / zmerguj mcp.json',
+  connectMacNoAppHint:
+    'Na Macu bez aplikacji: landing/cursor-mcp.html albo docs/CURSOR-MCP.md — ten sam pełny JSON.',
   embeddedBrainNotRunning: 'Lokalna wyszukiwarka nie działa. Otwórz zakładkę',
   embeddedBrainNotRunningLink: 'Brain',
   settingsTitle: 'Ustawienia',
