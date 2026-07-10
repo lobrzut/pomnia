@@ -1,5 +1,6 @@
 import type {
   ActivityState,
+  LastActivityReplay,
   BackupProgressEvent,
   BrainHit,
   BrainPing,
@@ -77,6 +78,7 @@ export interface PomniaBridge {
   onDocImportProgress(cb: (e: DocImportProgressEvent) => void): () => void
   onLibraryIndexComplete(cb: (e: { indexed: number; chunks: number; errors: string[] }) => void): () => void
   activityGet(): Promise<ActivityState>
+  activityLastReplay(): Promise<LastActivityReplay | null>
   mcpActivityWatch(active: boolean): Promise<{ ok: boolean }>
   onActivityUpdate(cb: (e: ActivityState) => void): () => void
   onActivityIdle(cb: () => void): () => void
@@ -399,6 +401,9 @@ function mockBridge(): PomniaBridge {
     },
     async activityGet() {
       return { kind: 'idle' as const }
+    },
+    async activityLastReplay() {
+      return null
     },
     async mcpActivityWatch() {
       return { ok: true }

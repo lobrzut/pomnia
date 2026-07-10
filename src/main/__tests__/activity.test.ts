@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+import { promises as fs } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { activity, activityTrayTooltip, PIPELINE_FINALE_MS, type ActivityState } from '../activity.js'
 
 describe('activityTrayTooltip', () => {
@@ -106,5 +109,23 @@ describe('activity manager', () => {
     expect(activity.get().kind).toBe('mcp-query')
 
     vi.useRealTimers()
+  })
+
+  it('persists replay snapshot when session ends', async () => {
+    const { initActivityReplayStore, getLastActivityReplay, loadLastActivityReplay, flushActivityReplayStore } =
+      await import('../activityReplayStore.js')
+    const dir = await fs.mkdtemp(join(tmpdir(), 'pomnia-act-'))
+    initActivityReplayStore(dir)
+
+    activity.wire(vi.fn(), vi.fn())
+    activity.update({ kind: 'mcp-query', phase: 'search_library', detail: 'vault query' })
+    activity.idle('mcp-query')
+
+    await flushActivityReplayStore()
+    await loadLastActivityReplay()
+    const replay = getLastActivityReplay()
+    expect(replay?.steps.some((s) => s.kind === 'mcp-query')).toBe(true)
+
+    await fs.rm(dir, { recursive: true, force: true })
   })
 })

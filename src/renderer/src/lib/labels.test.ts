@@ -51,6 +51,7 @@ describe('uiLabels', () => {
     )
     expect(labels.flowWaitingCaption).toContain('aktywna ścieżka')
     expect(labels.guideFlowReplay).toBe('Odtwórz demo')
+    expect(labels.guideFlowReplayLast).toBe('Odtwórz ostatnią aktywność')
   })
 
   it('exposes guide and status strip labels in Polish', () => {

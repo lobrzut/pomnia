@@ -238,6 +238,9 @@ export interface UiLabels {
   guideDiagramToggle: string
   guideDiagramHide: string
   guideFlowReplay: string
+  guideFlowReplayLast: string
+  guideFlowReplayLastNone: string
+  guideFlowReplayLastBusy: string
   guideFlowMainLegend: string
   guideFlowDocsLegend: string
   guideFlowOptionalLegend: string
@@ -471,7 +474,10 @@ const PL_LABELS: UiLabels = {
   guideDiagramToggle: 'Pokaż diagram',
   guideDiagramHide: 'Ukryj diagram',
   guideFlowReplay: 'Odtwórz demo',
-  guideFlowReplayHint: 'Przycisk odtwarza demo kroków — na żywo: destylacja, import i zapytania MCP',
+  guideFlowReplayLast: 'Odtwórz ostatnią aktywność',
+  guideFlowReplayLastNone: 'Brak zapisanej aktywności — uruchom destylację, import lub zapytanie MCP.',
+  guideFlowReplayLastBusy: 'Poczekaj — trwa operacja na żywo.',
+  guideFlowReplayHint: 'Demo kroków albo odtworzenie ostatniej realnej operacji (destylacja, import, MCP)',
   guideFlowMainLegend: 'Ścieżka czatów',
   guideFlowDocsLegend: 'Ścieżka dokumentów',
   guideFlowOptionalLegend: 'Opcjonalnie',
