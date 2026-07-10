@@ -8,9 +8,11 @@ import {
   particleDuration,
   planFlowVisual
 } from '../lib/flowActivity'
+import { replayTimeline } from '../lib/activityReplay'
 import { uiLabels } from '../lib/labels'
 import type { UiLabels } from '../lib/labels'
 import { useStore, type Route } from '../store/useStore'
+import type { ActivityState, LastActivityReplay } from '../lib/types'
 
 const SLAVIC_GREEN = '#1a5c3a'
 const DOCS_ORANGE = '#fb923c'
@@ -35,6 +37,9 @@ export interface FlowDiagramProps {
   variant?: 'full' | 'mini' | 'pip'
   /** Increment to replay onboarding demo tour (manual only). */
   animKey?: number
+  /** Increment to replay last recorded real activity (manual only). */
+  replayKey?: number
+  replaySnapshot?: LastActivityReplay | null
   onNavigate?: (route: Route) => void
   className?: string
 }
@@ -456,7 +461,14 @@ function FlowParticle({
 }
 
 
-export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, className }: FlowDiagramProps) {
+export function FlowDiagram({
+  variant = 'full',
+  animKey = 0,
+  replayKey = 0,
+  replaySnapshot = null,
+  onNavigate,
+  className,
+}: FlowDiagramProps) {
   const labels = uiLabels()
   const pip = variant === 'pip'
   const mini = variant === 'mini' || pip
@@ -476,6 +488,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   const brainRunning = useStore((s) => s.brainRunning)
   const isBusy = globalActivity.kind !== 'idle'
   const [demoStep, setDemoStep] = useState(-1)
+  const [replayActivity, setReplayActivity] = useState<ActivityState | null>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [embeddedRunning, setEmbeddedRunning] = useState(false)
   const [lastMcpVisible, setLastMcpVisible] = useState(false)
@@ -483,27 +496,33 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   const [finaleKey, setFinaleKey] = useState(0)
   const svgRef = useRef<SVGSVGElement>(null)
   const prevAnimKey = useRef(animKey)
+  const prevReplayKey = useRef(replayKey)
   const lastMcpTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const replayActive = replayActivity !== null
+  const displayActivity = replayActive ? replayActivity : globalActivity
   const demoActive = demoStep >= 0
   const visual = useMemo(
     () =>
-      planFlowVisual(globalActivity, {
+      planFlowVisual(displayActivity, {
         demoActive,
         embeddedRunning,
         brainPipelineRunning: brainRunning
       }),
-    [globalActivity, demoActive, embeddedRunning, brainRunning]
+    [displayActivity, demoActive, embeddedRunning, brainRunning]
   )
 
-  const flowLive = isBusy || demoActive
-  const isFinale = globalActivity.kind === 'finale'
-  const isMcpQuery = globalActivity.kind === 'mcp-query'
+  const flowLive = isBusy || demoActive || replayActive
+  const isFinale = displayActivity.kind === 'finale'
+  const isMcpQuery = displayActivity.kind === 'mcp-query'
   const particleDur =
-    isFinale ? (mini ? 0.68 : 0.52) : particleDuration(globalActivity, mini, demoActive)
+    isFinale ? (mini ? 0.68 : 0.52) : particleDuration(displayActivity, mini, demoActive)
   const agentPasses = visual.agentParticlePasses
   const agentOneShot = visual.agentParticlesOneShot
-  const progressStep = isBusy && globalActivity.kind === 'distill' ? distillProgressStep(globalActivity) : undefined
+  const progressStep =
+    (isBusy || replayActive) && displayActivity.kind === 'distill'
+      ? distillProgressStep(displayActivity)
+      : undefined
 
   useEffect(() => {
     const svg = svgRef.current
@@ -513,8 +532,12 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
   }, [flowLive])
 
   useEffect(() => {
-    if (globalActivity.kind === 'finale') setFinaleKey((k) => k + 1)
-  }, [globalActivity.kind])
+    if (displayActivity.kind === 'finale') setFinaleKey((k) => k + 1)
+  }, [displayActivity.kind])
+
+  useEffect(() => {
+    if (isBusy && replayActive) setReplayActivity(null)
+  }, [isBusy, replayActive])
 
   useEffect(() => {
     if (globalActivity.kind !== 'mcp-query') return
@@ -551,6 +574,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
     prevAnimKey.current = animKey
     if (animKey === 0) return
 
+    setReplayActivity(null)
     setDemoStep(0)
     const timers: ReturnType<typeof setTimeout>[] = []
     for (let i = 1; i <= 5; i++) {
@@ -560,6 +584,30 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
     return () => timers.forEach(clearTimeout)
   }, [animKey])
 
+  useEffect(() => {
+    if (replayKey === prevReplayKey.current) return
+    prevReplayKey.current = replayKey
+    if (replayKey === 0 || !replaySnapshot?.steps?.length) return
+
+    setDemoStep(-1)
+    const timeline = replayTimeline(replaySnapshot)
+    if (timeline.length === 0) return
+
+    setReplayActivity(timeline[0].state)
+    const timers: ReturnType<typeof setTimeout>[] = []
+    let offset = timeline[0].durationMs
+    for (let i = 1; i < timeline.length; i++) {
+      const step = timeline[i]
+      timers.push(setTimeout(() => setReplayActivity(step.state), offset))
+      offset += step.durationMs
+    }
+    timers.push(setTimeout(() => setReplayActivity(null), offset))
+    return () => {
+      timers.forEach(clearTimeout)
+      setReplayActivity(null)
+    }
+  }, [replayKey, replaySnapshot])
+
   const hint =
     hoverId != null
       ? (nodes.find((n) => n.id === hoverId)?.hint ?? labels.guideLead)
@@ -567,8 +615,10 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
         ? labels.flowFinaleCaption
         : demoActive
           ? (nodes.find((n) => n.step === demoStep)?.hint ?? labels.guideLead)
-          : isBusy && globalActivity.kind !== 'finale' && globalActivity.detail
-            ? globalActivity.detail
+          : (isBusy || replayActive) &&
+              displayActivity.kind !== 'finale' &&
+              displayActivity.detail
+            ? displayActivity.detail
             : labels.guideLead
 
   const focusMode = visual.focusMode && !demoActive
@@ -580,7 +630,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
     if (!focusMode) return true
     if (visual.activeNodeIds.has(nodeId)) return true
     if (mini) {
-      const kind = globalActivity.kind
+      const kind = displayActivity.kind
       if (kind === 'mcp-query' || kind === 'finale') return nodeId === 'library' || nodeId === 'mcp'
       if (kind === 'doc-import') return nodeId === 'vault' || nodeId === 'library'
       if (kind === 'distill' || kind === 'indexing' || kind === 'embed' || kind === 'brain-start') {
@@ -595,18 +645,18 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
     if (visual.activeEdgeIds.has(edgeId)) return true
     if (mini) {
       if (edgeId === 'e-compact-vault-library') {
-        return globalActivity.kind === 'distill' ||
-          globalActivity.kind === 'doc-import' ||
-          globalActivity.kind === 'indexing' ||
-          globalActivity.kind === 'embed' ||
-          globalActivity.kind === 'brain-start'
+        return displayActivity.kind === 'distill' ||
+          displayActivity.kind === 'doc-import' ||
+          displayActivity.kind === 'indexing' ||
+          displayActivity.kind === 'embed' ||
+          displayActivity.kind === 'brain-start'
       }
       if (edgeId === 'e-compact-library-mcp') {
-        return globalActivity.kind === 'mcp-query' ||
-          globalActivity.kind === 'finale' ||
-          globalActivity.kind === 'indexing' ||
-          globalActivity.kind === 'embed' ||
-          (globalActivity.kind === 'distill' && globalActivity.phase === 'reindex')
+        return displayActivity.kind === 'mcp-query' ||
+          displayActivity.kind === 'finale' ||
+          displayActivity.kind === 'indexing' ||
+          displayActivity.kind === 'embed' ||
+          (displayActivity.kind === 'distill' && displayActivity.phase === 'reindex')
       }
     }
     return false
@@ -616,16 +666,19 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
     <div
       className={clsx(
         'flow-diagram relative overflow-hidden border border-white/8',
-        pip ? 'rounded-none bg-[#06070d]' : 'rounded-2xl',
+        pip
+          ? 'flow-diagram--pip rounded-none border-0 bg-transparent'
+          : 'rounded-2xl',
         mini && !pip ? 'bg-black/25' : !pip ? 'bg-gradient-to-b from-[#06070d] to-[#0a1210]' : '',
         flowLive && 'flow-diagram--live',
         isBusy && 'flow-diagram--busy',
+        replayActive && !isBusy && 'flow-diagram--replay',
         focusMode && 'flow-diagram--focus',
         isMcpQuery && 'flow-diagram--mcp-query',
         isFinale && 'flow-diagram--finale',
         !flowLive && visual.embeddedGlow && 'flow-diagram--embedded-idle',
         !flowLive && !visual.embeddedGlow && 'flow-diagram--idle',
-        pip && 'flex min-h-0 flex-1 flex-col border-0',
+        pip && 'flex min-h-0 flex-1 flex-col',
         className
       )}
     >
@@ -661,7 +714,7 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
               mini && 'text-[9px]',
             )}
           >
-            {labels.flowFocusBanner(globalActivity)}
+            {labels.flowFocusBanner(displayActivity)}
           </span>
         </div>
       )}
@@ -669,13 +722,20 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
       <div
         className={clsx(
           'relative w-full',
-          pip ? 'min-h-[168px] flex-1' : mini ? 'h-[140px]' : 'h-[360px]',
+          pip ? 'min-h-[148px] flex-1' : mini ? 'h-[140px]' : 'h-[360px]',
         )}
       >
-        {!mini && (
+        {(pip || !mini) && (
           <div
-            className="pointer-events-none absolute inset-0 opacity-40"
-            style={{ background: `radial-gradient(ellipse 80% 60% at 50% 35%, ${SLAVIC_GREEN}44, transparent 70%)` }}
+            className={clsx(
+              'pointer-events-none absolute inset-0',
+              pip ? 'opacity-55' : 'opacity-40',
+            )}
+            style={{
+              background: pip
+                ? `radial-gradient(ellipse 90% 70% at 50% 42%, ${SLAVIC_GREEN}55, transparent 72%)`
+                : `radial-gradient(ellipse 80% 60% at 50% 35%, ${SLAVIC_GREEN}44, transparent 70%)`,
+            }}
           />
         )}
 
@@ -799,6 +859,17 @@ export function FlowDiagram({ variant = 'full', animKey = 0, onNavigate, classNa
 
       {mini && !pip && (
         <p className="border-t border-white/6 bg-black/25 px-3 py-1.5 text-center text-[10px] text-ink-dim">
+          {labels.flowMiniStatus(globalActivity)}
+        </p>
+      )}
+
+      {pip && (
+        <p
+          className={clsx(
+            'shrink-0 border-t border-white/6 px-3 py-1.5 text-center text-[9px] leading-snug',
+            isBusy ? 'bg-mint/8 text-mint' : 'bg-black/20 text-ink-dim',
+          )}
+        >
           {labels.flowMiniStatus(globalActivity)}
         </p>
       )}

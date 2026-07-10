@@ -1,4 +1,5 @@
-import { X } from 'lucide-react'
+import clsx from 'clsx'
+import { GripHorizontal, X } from 'lucide-react'
 import { useEffect } from 'react'
 import { FlowDiagram } from '../components/FlowDiagram'
 import { api } from '../lib/api'
@@ -22,18 +23,27 @@ export default function FloatingMonitor() {
     if (!onboarded) void api.floatingMonitorHide()
   }, [onboarded])
 
-  const badge =
-    globalActivity.kind === 'idle'
-      ? labels.floatingMonitorIdleBadge
-      : formatFlowLiveBadge(globalActivity)
+  const isIdle = globalActivity.kind === 'idle'
+  const badge = isIdle ? labels.floatingMonitorIdleBadge : formatFlowLiveBadge(globalActivity)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="drag flex h-7 shrink-0 items-center justify-between gap-2 border-b border-white/8 px-2">
-        <span className="min-w-0 truncate text-[10px] font-medium text-emerald/90">{badge}</span>
+    <div className="floating-pip-shell flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
+      <div className="drag flex h-8 shrink-0 items-center justify-between gap-2 border-b border-white/8 px-2.5">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <GripHorizontal className="h-3 w-3 shrink-0 text-ink-faint/70" aria-hidden />
+          {!isIdle && <span className="flow-live-dot h-1.5 w-1.5 shrink-0" aria-hidden />}
+          <span
+            className={clsx(
+              'min-w-0 truncate text-[10px] font-medium tracking-wide',
+              isIdle ? 'text-ink-dim' : 'text-mint',
+            )}
+          >
+            {badge}
+          </span>
+        </div>
         <button
           type="button"
-          className="no-drag rounded p-0.5 text-ink-faint transition-colors hover:bg-white/10 hover:text-ink"
+          className="no-drag rounded-md p-0.5 text-ink-faint transition-colors hover:bg-white/10 hover:text-ink"
           onClick={() => void api.floatingMonitorHide()}
           aria-label={labels.floatingMonitorClose}
           title={labels.floatingMonitorClose}
@@ -45,7 +55,7 @@ export default function FloatingMonitor() {
       <div
         role="button"
         tabIndex={0}
-        className="no-drag flex min-h-0 flex-1 cursor-pointer flex-col outline-none"
+        className="no-drag flex min-h-0 flex-1 cursor-pointer flex-col outline-none transition-opacity hover:opacity-[0.98]"
         onClick={() => void api.floatingMonitorOpenMain()}
         onDoubleClick={() => void api.floatingMonitorHide()}
         onKeyDown={(e) => {
@@ -56,7 +66,7 @@ export default function FloatingMonitor() {
         }}
         title={labels.floatingMonitorOpenHint}
       >
-        <FlowDiagram variant="pip" className="min-h-0 flex-1 rounded-none border-0" />
+        <FlowDiagram variant="pip" className="min-h-0 flex-1 border-0 bg-transparent" />
       </div>
     </div>
   )

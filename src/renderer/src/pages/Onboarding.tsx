@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeft,
   ArrowRight,
-  Boxes,
   Check,
   Copy,
   Cpu,
@@ -19,6 +18,7 @@ import {
   Zap
 } from 'lucide-react'
 import clsx from 'clsx'
+import { AppLogo } from '../components/AppLogo'
 import { Button, Field, Input, Spinner } from '../components/ui'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { GuideOverlay } from '../components/GuideMap'
@@ -108,9 +108,7 @@ export default function Onboarding() {
       <div className="hidden w-[230px] shrink-0 flex-col justify-between border-r border-white/6 p-7 sm:flex">
         <div>
           <div className="mb-10 flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl accent-grad ring-glow">
-              <Boxes className="h-5 w-5 text-white" />
-            </div>
+            <AppLogo size="sm" />
             <div>
               <div className="text-sm font-bold tracking-tight text-grad">POMNIA</div>
               <div className="text-[9px] font-medium uppercase tracking-[0.22em] text-ink-faint">first run</div>
@@ -228,13 +226,11 @@ function WelcomeStep({ simpleMode, onNext }: { simpleMode: boolean; onNext: () =
       <div className="glass rounded-3xl p-9 text-center">
       <div className="relative mx-auto mb-6 h-20 w-20">
         <motion.div
-          className="absolute inset-0 rounded-3xl accent-grad opacity-30 blur-xl"
+          className="absolute inset-0 rounded-full bg-amber/25 opacity-50 blur-xl"
           animate={{ scale: [1, 1.25, 1] }}
           transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
         />
-        <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl accent-grad ring-glow">
-          <Boxes className="h-10 w-10 text-white" />
-        </div>
+        <AppLogo size="xl" glow className="relative" />
       </div>
 
       <h1 className="text-[28px] font-bold leading-tight tracking-tight text-grad">

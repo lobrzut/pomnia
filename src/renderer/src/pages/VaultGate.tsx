@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Boxes, FolderOpen, KeyRound, ShieldCheck, Sparkles } from 'lucide-react'
+import { FolderOpen, KeyRound, ShieldCheck, Sparkles } from 'lucide-react'
+import { AppLogo } from '../components/AppLogo'
 import { Button, Field, Input } from '../components/ui'
 import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
@@ -55,9 +56,7 @@ export default function VaultGate() {
         className="glass w-[440px] rounded-3xl p-7"
       >
         <div className="mb-5 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl accent-grad ring-glow">
-            <Boxes className="h-6 w-6 text-white" />
-          </div>
+          <AppLogo size="lg" glow />
           <div>
             <h1 className="text-lg font-bold text-grad">Pomnia Vault</h1>
             <p className="text-xs text-ink-dim">Your AI memory — encrypted, portable, yours.</p>

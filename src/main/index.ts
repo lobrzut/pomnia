@@ -61,6 +61,11 @@ import {
   toggleFloatingMonitor,
 } from './floatingMonitor.js'
 import { activity, type ActivityUpdate } from './activity.js'
+import {
+  getLastActivityReplay,
+  initActivityReplayStore,
+  loadLastActivityReplay,
+} from './activityReplayStore.js'
 import { isCursorDbTooLarge } from '@core/adapters/cursor.js'
 import { migrateBrainIndexFile, migrateLegacyAppData } from './migrateLegacy.js'
 import { ensureBrainForIndexing } from './ensureBrain.js'
@@ -302,6 +307,7 @@ function registerIpc(): void {
     () => refreshTrayMenu(win, requestQuit),
   )
   ipcMain.handle('activity:get', () => activity.get())
+  ipcMain.handle('activity:lastReplay', () => getLastActivityReplay())
   ipcMain.handle('mcpActivity:watch', (_e, active: boolean) => {
     if (active) startMcpActivityPoll(emitMcpQueryActivity)
     else stopMcpActivityPoll()
@@ -890,6 +896,8 @@ app.whenReady().then(async () => {
   await fs.mkdir(brainDir(), { recursive: true })
   await migrateBrainIndexFile(brainDir())
   await loadAppSettings()
+  initActivityReplayStore(app.getPath('userData'))
+  await loadLastActivityReplay()
   registerIpc()
   createWindow()
   if (win) void initTray(win, requestQuit)

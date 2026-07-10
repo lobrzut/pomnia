@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
-import { Boxes, BrainCircuit, Import as ImportIcon, LayoutDashboard, Lock, Map, MessagesSquare, Minus, Plug, Settings as Cog, Square, X } from 'lucide-react'
+import { BrainCircuit, Import as ImportIcon, LayoutDashboard, Lock, Map, MessagesSquare, Minus, Plug, Settings as Cog, Square, X } from 'lucide-react'
 import clsx from 'clsx'
+import { AppLogo } from './AppLogo'
 import { Spinner } from './ui'
 import { api, isMock } from '../lib/api'
 import { uiLabels } from '../lib/labels'
@@ -38,9 +39,7 @@ export function TitleBar() {
     // the window, so they can't be obscured while the vault is locked.
     <div className="drag relative z-50 flex h-12 items-center justify-between px-4">
       <div className="flex items-center gap-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg accent-grad ring-glow">
-          <Boxes className="h-4 w-4 text-white" />
-        </div>
+        <AppLogo size="xs" />
         <div className="flex items-baseline gap-2">
           <span className="text-[15px] font-bold tracking-tight text-grad">POMNIA</span>
           <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">vault</span>

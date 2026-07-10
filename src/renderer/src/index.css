@@ -113,6 +113,23 @@
     z-index: 1;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
+  .floating-pip-root {
+    background: transparent !important;
+  }
+  body:has(.floating-pip-root),
+  body:has(.floating-pip-root) #root {
+    background: transparent !important;
+  }
+  .floating-pip-shell {
+    background: linear-gradient(165deg, #101a14f2 0%, #0a100cf0 42%, #070a0df5 100%);
+    border: 1px solid #ffffff1a;
+    backdrop-filter: blur(22px) saturate(140%);
+    box-shadow:
+      0 0 0 1px #1a5c3a28 inset,
+      0 1px 0 0 #ffffff14 inset,
+      0 12px 40px -10px #000000a0,
+      0 0 56px -16px #1a5c3a44;
+  }
 }
 
 /* ── Aurora blobs ──────────────────────────────────────────────────────── */
@@ -223,6 +240,19 @@
 .flow-diagram--embedded-idle .flow-path-main,
 .flow-diagram--embedded-idle .flow-path-agent {
   opacity: 0.7;
+}
+.flow-diagram--pip.flow-diagram--idle .flow-path-main {
+  opacity: 0.78;
+}
+.flow-diagram--pip.flow-diagram--embedded-idle .flow-path-main,
+.flow-diagram--pip.flow-diagram--embedded-idle .flow-path-agent {
+  opacity: 0.82;
+}
+.flow-diagram--pip.flow-diagram--focus .flow-path--focused.flow-path-main {
+  opacity: 1;
+}
+.flow-diagram--pip .flow-node > span {
+  background: #0a100ce6;
 }
 .flow-path-main {
   stroke: #1a5c3a;

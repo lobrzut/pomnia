@@ -27,7 +27,7 @@ function isFloatingMonitorRoute(): boolean {
 export default function App() {
   if (isFloatingMonitorRoute()) {
     return (
-      <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#06070d]">
+      <div className="floating-pip-root flex h-screen w-screen flex-col overflow-hidden bg-transparent p-2">
         <FloatingMonitor />
       </div>
     )

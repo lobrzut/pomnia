@@ -89,6 +89,27 @@
       margin-bottom: 4rem;
     }
 
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .brand-mark {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .brand-mark img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
     .logo {
       font-size: 1.25rem;
       font-weight: 700;
@@ -324,7 +345,10 @@
 
   <div class="wrap">
     <header>
-      <div class="logo">Pomnia</div>
+      <div class="brand">
+        <div class="brand-mark"><img src="../resources/icon.png" alt="" width="32" height="32" /></div>
+        <div class="logo">Pomnia</div>
+      </div>
       <div class="lang-toggle" role="group" aria-label="Language">
         <button type="button" id="btn-pl" class="active" aria-pressed="true">PL</button>
         <button type="button" id="btn-en" aria-pressed="false">EN</button>

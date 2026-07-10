@@ -136,6 +136,20 @@ export interface ActivityState {
   detail?: string
 }
 
+export interface ActivityReplayStep {
+  kind: Exclude<ActivityKind, 'idle'>
+  phase?: string
+  done?: number
+  total?: number
+  detail?: string
+  durationMs: number
+}
+
+export interface LastActivityReplay {
+  completedAt: string
+  steps: ActivityReplayStep[]
+}
+
 export interface ConversationMeta {
   id: string
   source: SourceId

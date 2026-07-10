@@ -2,6 +2,11 @@
  * Global background-operation state — shared by IPC, tray tooltip, and renderer banners.
  */
 
+import {
+  buildReplayFromSession,
+  saveLastActivityReplay,
+} from './activityReplayStore.js'
+
 export type ActivityKind =
   | 'idle'
   | 'distill'
@@ -64,12 +69,18 @@ type BroadcastFn = (channel: 'activity:update' | 'activity:idle', payload?: Acti
 export const PIPELINE_FINALE_MS = 2600
 
 const PIPELINE_KINDS: ActivityKind[] = ['distill', 'embed', 'indexing']
+const SESSION_STEP_CAP = 32
+
+function sessionStepKey(state: ActivityState): string {
+  return `${state.kind}|${state.phase ?? ''}|${state.done ?? ''}|${state.total ?? ''}|${state.detail ?? ''}`
+}
 
 class ActivityManager {
   private state: ActivityState = { kind: 'idle' }
   private broadcast: BroadcastFn | null = null
   private onChange: (() => void) | null = null
   private finaleTimer: ReturnType<typeof setTimeout> | null = null
+  private sessionSamples: Array<{ state: ActivityState; at: number }> = []
 
   wire(broadcast: BroadcastFn, onChange?: () => void): void {
     this.broadcast = broadcast
@@ -78,6 +89,27 @@ class ActivityManager {
 
   get(): ActivityState {
     return { ...this.state }
+  }
+
+  private recordSessionSample(): void {
+    const snapshot = this.get()
+    if (snapshot.kind === 'idle') return
+    const last = this.sessionSamples[this.sessionSamples.length - 1]
+    if (last && sessionStepKey(last.state) === sessionStepKey(snapshot)) return
+    this.sessionSamples.push({ state: snapshot, at: Date.now() })
+    if (this.sessionSamples.length > SESSION_STEP_CAP) this.sessionSamples.shift()
+  }
+
+  private resetSession(): void {
+    this.sessionSamples = []
+  }
+
+  private persistSession(): void {
+    if (this.sessionSamples.length === 0) return
+    const replay = buildReplayFromSession(this.sessionSamples, Date.now())
+    this.resetSession()
+    if (!replay) return
+    void saveLastActivityReplay(replay).catch(() => {})
   }
 
   private clearFinaleTimer(): void {
@@ -90,6 +122,7 @@ class ActivityManager {
   update(patch: ActivityUpdate): void {
     this.clearFinaleTimer()
     this.state = { ...patch }
+    this.recordSessionSample()
     this.broadcast?.('activity:update', this.get())
     this.onChange?.()
   }
@@ -99,6 +132,7 @@ class ActivityManager {
     const kinds = expected == null ? undefined : Array.isArray(expected) ? expected : [expected]
     if (kinds && !kinds.includes(this.state.kind)) return
     if (this.state.kind === 'idle') return
+    this.persistSession()
     this.state = { kind: 'idle' }
     this.broadcast?.('activity:idle')
     this.onChange?.()
@@ -116,11 +150,13 @@ class ActivityManager {
     if (this.state.kind === 'mcp-query') return
     this.clearFinaleTimer()
     this.state = { kind: 'finale' }
+    this.recordSessionSample()
     this.broadcast?.('activity:update', this.get())
     this.onChange?.()
     this.finaleTimer = setTimeout(() => {
       this.finaleTimer = null
       if (this.state.kind === 'finale') {
+        this.persistSession()
         this.state = { kind: 'idle' }
         this.broadcast?.('activity:idle')
         this.onChange?.()
@@ -138,3 +174,4 @@ class ActivityManager {
 }
 
 export const activity = new ActivityManager()
+export type { LastActivityReplay } from './activityReplayStore.js'

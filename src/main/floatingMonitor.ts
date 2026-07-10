@@ -6,8 +6,8 @@ import { join } from 'node:path'
 import { BrowserWindow, screen, type WebContents } from 'electron'
 import { getAppSettings, setAppSettings } from './appSettings.js'
 
-const WIDTH = 400
-const HEIGHT = 240
+const WIDTH = 432
+const HEIGHT = 272
 const SNAP_THRESHOLD = 96
 
 let floatingWin: BrowserWindow | null = null
@@ -102,11 +102,13 @@ export async function showFloatingMonitor(opts?: { force?: boolean }): Promise<v
     x: pos.x,
     y: pos.y,
     frame: false,
+    transparent: true,
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
     show: false,
-    backgroundColor: '#06070d',
+    hasShadow: false,
+    backgroundColor: '#00000000',
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
