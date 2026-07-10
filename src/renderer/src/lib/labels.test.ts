@@ -54,6 +54,14 @@ describe('uiLabels', () => {
     expect(labels.guideFlowReplayLast).toBe('Odtwórz ostatnią aktywność')
   })
 
+  it('exposes Connect first-time MCP labels in Polish', () => {
+    const labels = uiLabels()
+    expect(labels.connectCopyForCursor).toBe('Kopiuj mcp.json dla Cursora')
+    expect(labels.connectPartialTitle).toContain('vault/library')
+    expect(labels.connectChecklistTitle).toContain('4 kroki')
+    expect(labels.connectMacNoAppHint).toContain('cursor-mcp.html')
+  })
+
   it('exposes guide and status strip labels in Polish', () => {
     const labels = uiLabels()
     expect(labels.navGuide).toBe('Jak to działa')

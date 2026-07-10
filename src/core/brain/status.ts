@@ -180,6 +180,10 @@ export async function checkClient(spec: ClientSpec): Promise<ClientStatus> {
   const issues: string[] = []
   for (const s of servers) {
     if (s.present && !s.url) issues.push(`${s.key}: no URL detected (config shape unknown)`)
+    if (!embeddedLocal && !s.present) issues.push(`${s.key}: missing`)
+  }
+  if (!embeddedLocal && present > 0 && present < BRAIN_KEYS.length) {
+    issues.unshift('incomplete: need brain-rag + brain-vault + brain-library (remote)')
   }
 
   return { id: spec.id, label: spec.label, configPath, configExists: true, state, servers, issues }

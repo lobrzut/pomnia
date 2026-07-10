@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pomnia — Podłącz Cursor (MCP)</title>
+  <meta name="description" content="Wygeneruj pełny ~/.cursor/mcp.json dla Brain: brain-rag, brain-vault, brain-library + Bearer token. Działa bez aplikacji Pomnia (Mac / nowa maszyna)." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --void: #06070d;
+      --panel: #11141f;
+      --line: #232838;
+      --ink: #e9ecf5;
+      --ink-dim: #9aa3bd;
+      --ink-faint: #5b6178;
+      --violet: #8b5cf6;
+      --iris: #6366f1;
+      --cyan: #22d3ee;
+      --mint: #34d399;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --radius-xl: 1.25rem;
+      --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--void);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+    .aurora {
+      position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+    }
+    .blob {
+      position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.4;
+      mix-blend-mode: screen; animation: drift 24s ease-in-out infinite;
+    }
+    .blob-1 { width: 50vw; height: 50vw; top: -15%; left: -10%; background: var(--violet); }
+    .blob-2 { width: 40vw; height: 40vw; top: 40%; right: -12%; background: var(--iris); animation-delay: -8s; }
+    @keyframes drift {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(3vw, -2vh) scale(1.08); }
+    }
+    .wrap {
+      position: relative; z-index: 2;
+      max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem 4rem;
+    }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 2rem; gap: 1rem; flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: center; gap: 0.65rem; text-decoration: none; color: inherit; }
+    .brand-mark {
+      width: 2rem; height: 2rem; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+      background: linear-gradient(120deg, var(--violet), var(--iris));
+    }
+    .brand-mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .logo {
+      font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em;
+      background: linear-gradient(100deg, var(--ink), #c7b8ff 55%, var(--cyan));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .nav-link {
+      font-size: 0.8rem; font-weight: 600; color: var(--ink-dim); text-decoration: none;
+    }
+    .nav-link:hover { color: var(--cyan); }
+    h1 {
+      font-size: clamp(1.6rem, 4vw, 2.1rem); font-weight: 700;
+      letter-spacing: -0.03em; line-height: 1.15; margin-bottom: 0.5rem;
+    }
+    .lead { color: var(--ink-dim); font-size: 0.95rem; margin-bottom: 1.5rem; max-width: 36rem; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      font-size: 0.7rem; font-weight: 600; padding: 0.25rem 0.6rem;
+      border-radius: 999px; background: #fbbf241f; color: var(--amber);
+      border: 1px solid #fbbf2433; margin-bottom: 1rem;
+    }
+    .card {
+      background: linear-gradient(160deg, #ffffff0e, #ffffff05);
+      border: 1px solid #ffffff14; border-radius: var(--radius-xl);
+      padding: 1.25rem 1.35rem; margin-bottom: 1rem;
+      backdrop-filter: blur(18px) saturate(140%);
+      box-shadow: 0 1px 0 0 #ffffff1a inset, 0 20px 60px -28px #000000cc;
+    }
+    .card h2 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .steps { list-style: none; display: grid; gap: 0.65rem; }
+    .steps li {
+      display: flex; gap: 0.75rem; align-items: flex-start;
+      font-size: 0.875rem; color: var(--ink-dim);
+    }
+    .n {
+      flex-shrink: 0; width: 1.4rem; height: 1.4rem; border-radius: 999px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; background: #6366f126; color: var(--iris);
+    }
+    label {
+      display: block; font-size: 0.75rem; font-weight: 600;
+      color: var(--ink-faint); margin-bottom: 0.35rem;
+    }
+    .field { margin-bottom: 0.9rem; }
+    input[type="url"], input[type="password"], input[type="text"] {
+      width: 100%; font: inherit; font-size: 0.875rem;
+      padding: 0.65rem 0.85rem; border-radius: 0.75rem;
+      border: 1px solid var(--line); background: #00000066; color: var(--ink);
+      outline: none;
+    }
+    input:focus { border-color: #6366f166; box-shadow: 0 0 0 3px #6366f122; }
+    .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .hint { font-size: 0.75rem; color: var(--ink-faint); margin-top: 0.35rem; }
+    .hint a { color: var(--iris); }
+    .warn {
+      font-size: 0.8rem; color: var(--amber); background: #fbbf2414;
+      border: 1px solid #fbbf2433; border-radius: 0.75rem;
+      padding: 0.65rem 0.85rem; margin-bottom: 0.9rem;
+    }
+    .ok-note {
+      font-size: 0.8rem; color: var(--mint); background: #34d39914;
+      border: 1px solid #34d39933; border-radius: 0.75rem;
+      padding: 0.65rem 0.85rem; margin-bottom: 0.9rem;
+    }
+    .btn {
+      font: inherit; font-size: 0.85rem; font-weight: 600;
+      padding: 0.65rem 1.1rem; border: none; border-radius: 0.75rem;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;
+      background: linear-gradient(120deg, var(--violet), var(--iris));
+      color: white; transition: opacity 0.15s, transform 0.15s;
+    }
+    .btn:hover { opacity: 0.92; }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-soft {
+      background: #ffffff12; color: var(--ink);
+      border: 1px solid #ffffff18;
+    }
+    pre {
+      max-height: 22rem; overflow: auto;
+      background: #00000099; border: 1px solid #ffffff12;
+      border-radius: 0.85rem; padding: 0.9rem 1rem;
+      font-size: 0.72rem; line-height: 1.5; color: var(--cyan);
+      white-space: pre-wrap; word-break: break-all;
+    }
+    .path {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.75rem; color: var(--ink-dim);
+      background: #00000055; border: 1px solid #ffffff12;
+      border-radius: 0.5rem; padding: 0.35rem 0.55rem;
+    }
+    footer {
+      margin-top: 2rem; text-align: center;
+      font-size: 0.75rem; color: var(--ink-faint);
+    }
+    footer a { color: var(--iris); }
+    .servers {
+      display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0 0;
+    }
+    .chip {
+      font-size: 0.7rem; font-weight: 600; padding: 0.2rem 0.55rem;
+      border-radius: 999px; background: #22d3ee18; color: var(--cyan);
+      border: 1px solid #22d3ee33;
+    }
+  </style>
+</head>
+<body>
+  <div class="aurora" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+  </div>
+
+  <div class="wrap">
+    <header>
+      <a class="brand" href="index.html">
+        <span class="brand-mark"><img src="icon.png" alt="" width="32" height="32" onerror="this.remove()" /></span>
+        <span class="logo">Pomnia</span>
+      </a>
+      <a class="nav-link" href="index.html">← Strona główna</a>
+    </header>
+
+    <span class="badge">Bez aplikacji · Mac / nowa maszyna</span>
+    <h1>Podłącz Cursor do Brain</h1>
+    <p class="lead">
+      Wklej URL Brain i token — skopiuj gotowy <code>~/.cursor/mcp.json</code>
+      z <strong>trzema</strong> serwerami. Nie potrzebujesz DMG Pomni.
+    </p>
+
+    <div class="card">
+      <h2>4 kroki</h2>
+      <ol class="steps">
+        <li><span class="n">1</span><span>URL Brain MCP — port <strong>:7862</strong> (np. <code>http://brain.example.local:7862</code>)</span></li>
+        <li><span class="n">2</span><span>Token Bearer — dashboard Brain na <strong>:7860</strong> → Settings / API tokens → utwórz</span></li>
+        <li><span class="n">3</span><span>Skopiuj JSON poniżej → zapisz jako <span class="path">~/.cursor/mcp.json</span></span></li>
+        <li><span class="n">4</span><span>Cursor: <kbd>Cmd+Shift+P</kbd> → „Developer: Reload Window”</span></li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>Generator mcp.json</h2>
+
+      <div id="incomplete-warn" class="warn" hidden>
+        Uwaga: sam <code>brain-rag</code> to za mało — potrzebujesz też <code>brain-vault</code> i <code>brain-library</code>. Ten generator zawsze daje wszystkie trzy.
+      </div>
+
+      <div class="field">
+        <label for="brain-url">URL Brain (MCP :7862)</label>
+        <input id="brain-url" type="url" placeholder="http://brain.example.local:7862" autocomplete="off" spellcheck="false" />
+        <p class="hint">Bez ścieżki <code>/sse</code> — tylko baza. Dashboard tokenów: ten sam host, port <strong>7860</strong>.</p>
+      </div>
+
+      <div class="field">
+        <label for="token">Bearer token</label>
+        <input id="token" type="password" placeholder="btk_…" autocomplete="off" spellcheck="false" />
+        <p class="hint">
+          Token z dashboardu Brain (<span id="dash-hint">host:7860</span>).
+          <a id="dash-link" href="#" target="_blank" rel="noopener">Otwórz dashboard</a>
+          (gdy jesteś w tej samej sieci).
+        </p>
+      </div>
+
+      <div id="ready-note" class="ok-note" hidden>
+        Gotowe — trzy serwery + Authorization. Plik trzymaj prywatnie (<code>chmod 600 ~/.cursor/mcp.json</code>).
+      </div>
+      <div id="token-warn" class="warn" hidden>
+        Bez tokena remote MCP zwykle nie zadziała. Wklej token z dashboardu :7860, potem skopiuj ponownie.
+      </div>
+
+      <div class="row" style="margin-bottom: 0.85rem">
+        <button type="button" class="btn" id="btn-copy" disabled>Kopiuj mcp.json dla Cursora</button>
+        <button type="button" class="btn btn-soft" id="btn-copy-path">Kopiuj ścieżkę pliku</button>
+      </div>
+
+      <p class="hint" style="margin-bottom: 0.5rem">
+        Plik: <span class="path">~/.cursor/mcp.json</span>
+        · jeśli plik już istnieje z innymi MCP — użyj trybu merge (tylko obiekt serwerów poniżej w docs).
+      </p>
+
+      <div class="servers" aria-label="Serwery w snippecie">
+        <span class="chip">brain-rag</span>
+        <span class="chip">brain-vault</span>
+        <span class="chip">brain-library</span>
+      </div>
+
+      <pre id="preview" style="margin-top: 0.85rem" aria-live="polite">{
+  "mcpServers": {
+    "brain-rag": { "url": "…" },
+    "brain-vault": { "url": "…" },
+    "brain-library": { "url": "…" }
+  }
+}</pre>
+    </div>
+
+    <div class="card">
+      <h2>Weryfikacja</h2>
+      <ol class="steps">
+        <li><span class="n">✓</span><span>Cursor → Settings → MCP — trzy serwery zielone / Connected</span></li>
+        <li><span class="n">✓</span><span>W czacie: agent powinien wołać <code>get_user_profile</code> / <code>search_library</code></span></li>
+        <li><span class="n">!</span><span>Jeśli widzisz tylko <code>brain-rag</code> — config niepełny; wklej ponownie z tej strony</span></li>
+      </ol>
+      <p class="hint" style="margin-top: 0.75rem">
+        Pełna dokumentacja: <a href="../docs/CURSOR-MCP.md">docs/CURSOR-MCP.md</a>
+        · na Windowsie z instalatorem: zakładka <strong>Connect</strong> w aplikacji Pomnia.
+      </p>
+    </div>
+
+    <footer>
+      <p>© 2026 Pomnia · <a href="index.html">pomnia.ai</a> · token nigdy nie jest wysyłany nigdzie — generacja tylko w przeglądarce</p>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      const urlEl = document.getElementById('brain-url')
+      const tokenEl = document.getElementById('token')
+      const preview = document.getElementById('preview')
+      const btnCopy = document.getElementById('btn-copy')
+      const btnPath = document.getElementById('btn-copy-path')
+      const dashHint = document.getElementById('dash-hint')
+      const dashLink = document.getElementById('dash-link')
+      const readyNote = document.getElementById('ready-note')
+      const tokenWarn = document.getElementById('token-warn')
+      const incompleteWarn = document.getElementById('incomplete-warn')
+
+      const params = new URLSearchParams(location.search)
+      if (params.get('url')) urlEl.value = params.get('url')
+      if (params.get('warn') === 'partial') incompleteWarn.hidden = false
+
+      function trimBase(u) {
+        return String(u || '').trim().replace(/\/+$/, '')
+      }
+
+      function dashboardUrl(brainUrl) {
+        const base = trimBase(brainUrl)
+        if (!base) return ''
+        try {
+          const u = new URL(base)
+          u.port = '7860'
+          u.pathname = '/'
+          u.search = ''
+          u.hash = ''
+          return u.toString().replace(/\/$/, '')
+        } catch {
+          return base.replace(/:\d+$/, ':7860')
+        }
+      }
+
+      function buildMcpJson(brainUrl, token) {
+        const base = trimBase(brainUrl)
+        if (!base) return null
+        const headers = token
+          ? { Authorization: 'Bearer ' + token }
+          : undefined
+        const server = (path) => {
+          const o = { url: base + path }
+          if (headers) o.headers = headers
+          return o
+        }
+        return {
+          mcpServers: {
+            'brain-rag': server('/sse'),
+            'brain-vault': server('/servers/brain-vault/sse'),
+            'brain-library': server('/servers/brain-library/sse'),
+          },
+        }
+      }
+
+      function refresh() {
+        const url = trimBase(urlEl.value)
+        const token = tokenEl.value.trim()
+        const dash = dashboardUrl(url)
+        dashHint.textContent = dash || 'host:7860'
+        if (dash) {
+          dashLink.href = dash
+          dashLink.style.pointerEvents = ''
+          dashLink.style.opacity = ''
+        } else {
+          dashLink.href = '#'
+          dashLink.style.pointerEvents = 'none'
+          dashLink.style.opacity = '0.4'
+        }
+
+        const obj = buildMcpJson(url, token)
+        if (!obj) {
+          preview.textContent = '{\n  "mcpServers": { … }\n}'
+          btnCopy.disabled = true
+          readyNote.hidden = true
+          tokenWarn.hidden = true
+          return
+        }
+        const json = JSON.stringify(obj, null, 2) + '\n'
+        preview.textContent = json
+        btnCopy.disabled = false
+        readyNote.hidden = !token
+        tokenWarn.hidden = !!token
+        btnCopy.dataset.json = json
+      }
+
+      async function copyText(text, btn, okLabel) {
+        try {
+          await navigator.clipboard.writeText(text)
+          const prev = btn.textContent
+          btn.textContent = okLabel
+          setTimeout(() => { btn.textContent = prev }, 1600)
+        } catch {
+          const ta = document.createElement('textarea')
+          ta.value = text
+          document.body.appendChild(ta)
+          ta.select()
+          document.execCommand('copy')
+          ta.remove()
+          const prev = btn.textContent
+          btn.textContent = okLabel
+          setTimeout(() => { btn.textContent = prev }, 1600)
+        }
+      }
+
+      urlEl.addEventListener('input', refresh)
+      tokenEl.addEventListener('input', refresh)
+      btnCopy.addEventListener('click', () => {
+        const json = btnCopy.dataset.json
+        if (json) void copyText(json, btnCopy, 'Skopiowano ✓')
+      })
+      btnPath.addEventListener('click', () => {
+        void copyText('~/.cursor/mcp.json', btnPath, 'Skopiowano ✓')
+      })
+
+      refresh()
+    })()
+  </script>
+</body>
+</html>

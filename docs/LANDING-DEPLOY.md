@@ -1,6 +1,11 @@
 # Deploy landing to pomnia.ai
 
-Static site lives in `landing/` — one HTML file, no build step.
+Static site lives in `landing/` — HTML files, no build step.
+
+Pages:
+
+- `index.html` — marketing + waitlist
+- `cursor-mcp.html` — **Podłącz Cursor** generator (URL + token → full 3-server `mcp.json`; works without Pomnia desktop / Mac DMG)
 
 ## Prerequisites
 

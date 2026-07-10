@@ -446,11 +446,11 @@ function mockBridge(): PomniaBridge {
         label: clientId,
         filePath: '~/.example/mcp.json',
         mcpKey: 'mcpServers',
-        fullFileJson: `{\n  "mcpServers": {\n    "brain-rag": { "type": "http", "url": "${brainUrl}/sse" }\n  }\n}\n`,
-        mergeJson: `{\n  "brain-rag": { "type": "http", "url": "${brainUrl}/sse" }\n}\n`,
-        instructions: `▶ ${clientId}\n\n1. Open or create the config file.\n2. Paste the snippet.\n3. Restart the client.`,
+        fullFileJson: `{\n  "mcpServers": {\n    "brain-rag": { "url": "${brainUrl}/sse", "headers": { "Authorization": "Bearer …" } },\n    "brain-vault": { "url": "${brainUrl}/servers/brain-vault/sse", "headers": { "Authorization": "Bearer …" } },\n    "brain-library": { "url": "${brainUrl}/servers/brain-library/sse", "headers": { "Authorization": "Bearer …" } }\n  }\n}\n`,
+        mergeJson: `{\n  "brain-rag": { "url": "${brainUrl}/sse" },\n  "brain-vault": { "url": "${brainUrl}/servers/brain-vault/sse" },\n  "brain-library": { "url": "${brainUrl}/servers/brain-library/sse" }\n}\n`,
+        instructions: `▶ ${clientId}\n\n1. Open or create the config file.\n2. Paste the FULL 3-server snippet.\n3. Restart the client.`,
         restartHint: 'Restart the client to pick up the new config.',
-        notes: 'Mock snippet (browser preview). Run inside Pomnia for the real per-client config.'
+        notes: 'Mock snippet (browser preview). Remote always includes brain-rag + brain-vault + brain-library.'
       }
     },
     async connectSkillsList() {
