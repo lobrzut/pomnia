@@ -1,0 +1,98 @@
+CURSOR + Brain MCP na Macu — prosta instrukcja
+================================================
+Cel: Cursor na Macu widzi Brain (pamięć / vault / library).
+Bez aplikacji Pomnia. Max kilka minut.
+
+WAŻNE O TOKENIE (czytaj to pierwsze)
+------------------------------------
+Dashboard Brain (:7860) NIE MA przycisku „MCP tokens” /
+„API tokens” w OPTIONS. Instrukcje typu „Settings → API
+tokens” są nieaktualne — UI nie istnieje, jest tylko API.
+
+Token bierzesz stąd (wybierz JEDNĄ drogę):
+
+  A) Najłatwiej — skopiuj z Windowsa
+     Na PC otwórz:  C:\Users\Alice\.cursor\mcp.json
+     Skopiuj wartość po „Bearer ” (zaczyna się od btk_).
+     Ten sam token działa na Macu (ten sam serwer Brain).
+
+  B) Nowy token z Windowsa (Pomnia)
+     Pomnia → Connect → tryb „Na serwerze” → wklej URL
+     :7862 + istniejący token → przycisk „Nowy token”
+     → skopiuj wygenerowany btk_… na Maca.
+
+  C) curl (gdy masz już jakiś działający Bearer)
+     curl -s -X POST http://brain.example.local:7860/api/mcp/tokens \
+       -H "Authorization: Bearer btk_STARY" \
+       -H "Content-Type: application/json" \
+       -d "{\"name\":\"macbook\"}"
+     W odpowiedzi pole „token” — zapisz od razu (widać raz).
+
+  D) Awaria — SSH na serwer Brain
+     Plik: data/mcp-tokens.json (pełne tokeny w plain text).
+     Albo napraw UI w brain hub (OPTIONS brakuje panelu).
+
+
+KROKI NA MACU
+-------------
+1) Połącz się z tą samą siecią LAN co Brain
+   (host zwykle: brain.example.local).
+
+2) Sklonuj / zaktualizuj repo Pomnia:
+   git clone https://github.com/lobrzut/reliqua.git pomnia
+   cd pomnia
+   # albo jeśli już masz:
+   git pull
+
+3) Weź token (A/B/C powyżej). Nie wklejaj go do gita.
+
+4) Utwórz plik ~/.cursor/mcp.json z SZABLONEM poniżej
+   (podstaw HOST i TOKEN). Albo otwórz w przeglądarce:
+     open landing/cursor-mcp.html
+   wklej URL http://HOST:7862 + token → Kopiuj mcp.json.
+
+5) Szablon (3 serwery — nie tylko brain-rag):
+
+{
+  "mcpServers": {
+    "brain-rag": {
+      "url": "http://brain.example.local:7862/sse",
+      "headers": { "Authorization": "Bearer btk_WSTAW_TOKEN" }
+    },
+    "brain-vault": {
+      "url": "http://brain.example.local:7862/servers/brain-vault/sse",
+      "headers": { "Authorization": "Bearer btk_WSTAW_TOKEN" }
+    },
+    "brain-library": {
+      "url": "http://brain.example.local:7862/servers/brain-library/sse",
+      "headers": { "Authorization": "Bearer btk_WSTAW_TOKEN" }
+    }
+  }
+}
+
+6) Uprawnienia:
+   chmod 600 ~/.cursor/mcp.json
+
+7) Cursor: Cmd+Shift+P → „Developer: Reload Window”.
+
+8) Sprawdź: Settings → MCP — trzy serwery Connected.
+   Agent powinien wołać get_user_profile / search_library.
+
+
+PORTY (żeby się nie pomylić)
+----------------------------
+  :7862  = MCP (to idzie do mcp.json)
+  :7860  = dashboard WWW (login, reindex) — NIE ma UI tokenów
+
+
+OPCJONALNIE — DMG Pomnia
+------------------------
+Gdy będzie instalator Mac: Connect w aplikacji zrobi
+snippet + „Nowy token” za Ciebie. Do tego czasu wystarczy
+mcp.json + ten plik.
+
+
+Szybki test sieci
+-----------------
+  curl -s -o /dev/null -w "%{http_code}\n" http://brain.example.local:7862/
+  (401/unauthorized bez tokena = proxy żyje — to OK)
