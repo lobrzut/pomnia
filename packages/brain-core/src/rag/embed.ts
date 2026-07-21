@@ -38,9 +38,16 @@ export class EmbedClient {
    * Embed a batch of texts. Returns one vector per input, in order.
    * Throws with the Ollama status body on error.
    */
-  async embedBatch(texts: string[]): Promise<number[][]> {
+  async embedBatch(texts: string[], signal?: AbortSignal): Promise<number[][]> {
     if (texts.length === 0) return []
+    if (signal?.aborted) {
+      const err = new Error('embed aborted')
+      err.name = 'AbortError'
+      throw err
+    }
     const ctl = new AbortController()
+    const onAbort = (): void => ctl.abort()
+    signal?.addEventListener('abort', onAbort, { once: true })
     const t = setTimeout(() => ctl.abort(), this.timeoutMs)
     try {
       const r = await fetch(`${this.url}/api/embed`, {
@@ -59,6 +66,7 @@ export class EmbedClient {
       throw new Error('ollama embed returned no vectors')
     } finally {
       clearTimeout(t)
+      signal?.removeEventListener('abort', onAbort)
     }
   }
 

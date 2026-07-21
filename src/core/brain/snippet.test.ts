@@ -44,3 +44,31 @@ describe('brain/snippet — Cursor remote mcp.json', () => {
     expect(full.mcpServers['brain-rag'].headers).toBeUndefined()
   })
 })
+
+describe('brain/snippet — Antigravity remote mcp_config.json', () => {
+  it('uses serverUrl + streamable-http (not Cursor url shape)', () => {
+    const s = buildSnippet(
+      'antigravity',
+      'http://brain.example.local:7862',
+      'win32',
+      'C:\\Users\\Admin',
+      'btk_test_token',
+      'remote'
+    )
+    expect(s.client).toBe('antigravity')
+    expect(s.label).toBe('Antigravity (Google IDE)')
+    expect(s.filePath.replace(/\\/g, '/')).toMatch(/\.gemini\/antigravity-ide\/mcp_config\.json$/)
+
+    const full = JSON.parse(s.fullFileJson) as {
+      mcpServers: Record<
+        string,
+        { type?: string; serverUrl?: string; url?: string; headers?: { Authorization: string } }
+      >
+    }
+    const rag = full.mcpServers['brain-rag']
+    expect(rag.type).toBe('streamable-http')
+    expect(rag.serverUrl).toBe('http://brain.example.local:7862/mcp')
+    expect(rag.url).toBeUndefined()
+    expect(rag.headers?.Authorization).toBe('Bearer btk_test_token')
+  })
+})

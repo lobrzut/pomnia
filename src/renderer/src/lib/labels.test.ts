@@ -56,7 +56,10 @@ describe('uiLabels', () => {
 
   it('exposes Connect first-time MCP labels in Polish', () => {
     const labels = uiLabels()
-    expect(labels.connectCopyForCursor).toBe('Kopiuj mcp.json dla Cursora')
+    expect(labels.connectCopyForClient('Cursor')).toBe('Kopiuj mcp.json dla Cursora')
+    expect(labels.connectCopyForClient('Antigravity (Google IDE)')).toBe(
+      'Kopiuj mcp.json dla Antigravity (Google IDE)'
+    )
     expect(labels.connectPartialTitle).toContain('vault/library')
     expect(labels.connectChecklistTitle).toContain('4 kroki')
     expect(labels.connectMacNoAppHint).toContain('cursor-mcp.html')
@@ -72,11 +75,22 @@ describe('uiLabels', () => {
     expect(labels.helpDontKnowStart).toBe('Nie wiem od czego zacząć →')
     expect(labels.dashboardTitle).toBe('Centrum dowodzenia')
     expect(labels.lockVaultBtn).toBe('Zablokuj vault')
+    expect(labels.dashboardBackupAndBrain).toBe('Backup i do Brain')
+    expect(labels.dashboardBackupOnly).toBe('Tylko backup')
+    expect(labels.dashboardSourcesSelected(5)).toBe('5 źródeł zaznaczonych')
   })
 
   it('returns the same object reference for any argument', () => {
     expect(uiLabels(true)).toBe(uiLabels(false))
     expect(uiLabels()).toBe(uiLabels(true))
+  })
+
+  it('exposes handshake ritual labels in Polish', () => {
+    const labels = uiLabels()
+    expect(labels.handshake).toBe('Handshake')
+    expect(labels.handshakeReady).toBe('Gotowy')
+    expect(labels.handshakeArmedBadge).toBe('Go')
+    expect(labels.handshakeToastReady).toBe('Gotowy')
   })
 })
 

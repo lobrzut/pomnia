@@ -80,7 +80,7 @@ export async function indexPendingLibraryDocuments(
       return { indexed: 0, chunks: 0, errors: ['Wyszukiwarka niedostępna'] }
     }
   } else {
-    const ensured = await ensureBrainForIndexing(opts?.ollamaUrl, opts?.onProgress)
+    const ensured = await ensureBrainForIndexing(opts?.ollamaUrl, opts?.onProgress, vaultDir)
     if (!ensured.running) {
       return {
         indexed: 0,

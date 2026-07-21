@@ -9,11 +9,12 @@
  * revisit the rest when there's actual demand.
  *
  * Priority order for later ports (rough):
- *   - list_skills / list_cli_skills / get_skill  — Pomnia already syncs
- *     skills locally, agents can read them without brain
  *   - run_skill — depends on Ollama-backed workflow runner (later)
  *   - search_code / code_status — separate index (pipeline/codeindex.py in
  *     Python), niche
+ *
+ * list_skills / list_cli_skills / get_skill are implemented in skills.ts
+ * (reads `<skillsRoot>/brain` + `cli`).
  */
 
 export const stubSchemas = {

@@ -20,6 +20,8 @@ const AMBER = '#fbbf24'
 /** SVG viewBox height — keep in sync with node y% (y% = y / VIEWBOX_H * 100). */
 const VIEWBOX_H = 360
 const FLOW_MAIN_Y = 92
+/** PiP: vertical center of node+label mass (labels hang below icons). */
+const PIP_MAIN_Y = 188
 const FLOW_RETURN_Y = 134
 /** Horizontal corridor for docs/optional connectors — below main subtitles, above docs icons. */
 const FLOW_ROUTE_Y = 218
@@ -227,17 +229,38 @@ function buildEdges(memoryReturnLabel: string): FlowEdge[] {
 /** PiP monitor: Vault → Pamięć → Agent (3 nodes). */
 const MINI_NODE_IDS = ['vault', 'library', 'mcp'] as const
 
-function buildMiniLayout(nodes: FlowNodeDef[], pip = false): FlowNodeDef[] {
+function buildMiniLayout(
+  nodes: FlowNodeDef[],
+  pip = false,
+  L?: ReturnType<typeof uiLabels>,
+): FlowNodeDef[] {
   const xs = [22, 50, 78]
-  const y = pip ? Math.round((FLOW_MAIN_Y / VIEWBOX_H) * 100) : 36
+  const y = pip ? Math.round((PIP_MAIN_Y / VIEWBOX_H) * 100) : 36
+  const pipLabel =
+    pip && L
+      ? ({
+          vault: L.flowNodeVaultLabelPip,
+          library: L.flowNodeLibraryLabelPip,
+          mcp: L.flowNodeMcpLabelPip,
+        } as const)
+      : null
   return MINI_NODE_IDS.map((id, i) => {
     const base = nodes.find((n) => n.id === id)!
-    return { ...base, x: xs[i], y }
+    return {
+      ...base,
+      x: xs[i],
+      y,
+      ...(pipLabel ? { label: pipLabel[id] } : {}),
+    }
   })
 }
 
-function buildCompactEdges(ids: readonly string[], branch: FlowEdge['branch'] = 'main'): FlowEdge[] {
-  const my = FLOW_MAIN_Y
+function buildCompactEdges(
+  ids: readonly string[],
+  branch: FlowEdge['branch'] = 'main',
+  pip = false,
+): FlowEdge[] {
+  const my = pip ? PIP_MAIN_Y : FLOW_MAIN_Y
   const edges: FlowEdge[] = []
   for (let i = 0; i < ids.length - 1; i++) {
     const from = ids[i]
@@ -301,6 +324,7 @@ function FlowNode({
   mcpFinaleGlow,
   dimmed,
   mini,
+  pip,
   onNavigate,
   labels,
 }: {
@@ -311,6 +335,7 @@ function FlowNode({
   mcpFinaleGlow?: boolean
   dimmed?: boolean
   mini: boolean
+  pip?: boolean
   onNavigate?: (route: Route) => void
   labels?: UiLabels
 }) {
@@ -336,7 +361,7 @@ function FlowNode({
         isMcp && 'flow-node--mcp',
         node.branch === 'optional' && 'flow-node--optional',
         node.branch === 'docs' && 'flow-node--docs',
-        mini ? 'w-[68px]' : isMcp ? 'w-[124px]' : 'w-[108px]',
+        pip ? 'w-[78px]' : mini ? 'w-[68px]' : isMcp ? 'w-[124px]' : 'w-[108px]',
       )}
       style={{ left: `${node.x}%`, top: `${node.y}%`, transform: 'translate(-50%, -50%)' }}
     >
@@ -348,11 +373,11 @@ function FlowNode({
             !active && 'border-iris/35',
           )}
           style={{
-            background: 'linear-gradient(180deg, #818cf818 0%, #06070dcc 100%)',
+            background: 'linear-gradient(180deg, #2dd4bf18 0%, #0a120ecc 100%)',
           }}
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-iris/25 bg-black/30">
-            <Icon className="h-4 w-4" style={{ color: '#a5b4fc' }} />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-mint/25 bg-black/30">
+            <Icon className="h-4 w-4" style={{ color: '#5eead4' }} />
           </div>
           <span className="w-full text-[11px] font-semibold leading-tight text-ink">{node.label}</span>
           <span className="w-full font-mono text-[8px] leading-tight text-iris/80">
@@ -369,16 +394,23 @@ function FlowNode({
           <div
             className={clsx(
               'relative z-10 flex flex-col items-center rounded-xl border',
-              mini ? 'h-7 w-7 items-center justify-center' : 'h-11 w-11 items-center justify-center',
+              pip
+                ? 'h-9 w-9 items-center justify-center'
+                : mini
+                  ? 'h-7 w-7 items-center justify-center'
+                  : 'h-11 w-11 items-center justify-center',
               active && 'border-amber/60',
               !active && node.branch === 'main' && 'border-[#1a5c3a66]',
               !active && node.branch === 'docs' && 'border-[#fb923c44]',
               !active && node.branch === 'optional' && 'border-dashed border-amber/30',
+              pip && !active && 'border-[#34d39955]',
             )}
             style={{
               background:
                 node.branch === 'main'
-                  ? `${SLAVIC_GREEN}33`
+                  ? pip
+                    ? `${SLAVIC_GREEN}55`
+                    : `${SLAVIC_GREEN}33`
                   : node.branch === 'docs'
                     ? `${DOCS_ORANGE}22`
                     : `${AMBER}15`,
@@ -386,19 +418,31 @@ function FlowNode({
           >
             <div className={clsx('flex items-center justify-center', !mini && 'h-full w-full')}>
               <Icon
-                className={mini ? 'h-3 w-3' : 'h-4 w-4'}
+                className={pip ? 'h-4 w-4' : mini ? 'h-3 w-3' : 'h-4 w-4'}
+                strokeWidth={pip ? 2.25 : 2}
                 style={{
                   color:
-                    node.branch === 'main' ? '#34d399' : node.branch === 'docs' ? DOCS_ORANGE : AMBER,
+                    node.branch === 'main'
+                      ? pip
+                        ? '#6ee7b7'
+                        : '#34d399'
+                      : node.branch === 'docs'
+                        ? DOCS_ORANGE
+                        : AMBER,
                 }}
               />
             </div>
           </div>
           <span
             className={clsx(
-              'relative z-20 mt-2 rounded-md bg-[#06070d]/90 px-1.5 py-0.5 font-semibold leading-tight text-ink backdrop-blur-sm',
-              mini ? 'text-[8px]' : 'text-[11px]',
+              'relative z-20 rounded-md bg-[#06070d]/90 px-1.5 py-0.5 font-semibold leading-tight text-ink backdrop-blur-sm',
+              pip
+                ? 'mt-1.5 max-w-full truncate whitespace-nowrap text-[10px] tracking-wide text-[#f0f3fa]'
+                : mini
+                  ? 'mt-2 text-[8px]'
+                  : 'mt-2 text-[11px]',
             )}
+            title={pip ? node.hint : undefined}
           >
             {node.label}
           </span>
@@ -418,6 +462,7 @@ function FlowParticle({
   reverse,
   dur,
   mini,
+  pip,
   passIndex = 0,
   oneShot = false,
 }: {
@@ -425,6 +470,7 @@ function FlowParticle({
   reverse?: boolean
   dur: number
   mini: boolean
+  pip?: boolean
   passIndex?: number
   oneShot?: boolean
 }) {
@@ -438,13 +484,14 @@ function FlowParticle({
           : 'flow-particle-main'
 
   const stagger = oneShot ? passIndex * 0.38 : passIndex * (dur / 3.2)
+  const glowId = pip ? 'flow-glow-pip' : 'flow-glow'
 
   return (
     <circle
-      r={mini ? 2 : edge.branch === 'agent' ? 3.5 : 3}
+      r={pip ? 4 : mini ? 2 : edge.branch === 'agent' ? 3.5 : 3}
       className={particleClass}
-      filter={mini ? undefined : 'url(#flow-glow)'}
-      opacity={mini ? 0.55 : edge.branch === 'agent' ? 1 : 1}
+      filter={pip || !mini ? `url(#${glowId})` : undefined}
+      opacity={pip ? 1 : mini ? 0.55 : 1}
     >
       <animateMotion
         dur={`${dur}s`}
@@ -476,13 +523,13 @@ export function FlowDiagram({
   const fullEdges = useMemo(() => buildEdges(labels.flowEdgeMemoryReturn), [labels.flowEdgeMemoryReturn])
   const agentEdges = useMemo(() => buildAgentEdges(), [])
   const nodes = useMemo(() => {
-    if (mini) return buildMiniLayout(allNodes, pip)
+    if (mini) return buildMiniLayout(allNodes, pip, labels)
     return allNodes
-  }, [allNodes, mini, pip])
+  }, [allNodes, labels, mini, pip])
   const edges = useMemo(() => {
-    if (mini) return buildCompactEdges(MINI_NODE_IDS)
+    if (mini) return buildCompactEdges(MINI_NODE_IDS, 'main', pip)
     return fullEdges
-  }, [fullEdges, mini])
+  }, [fullEdges, mini, pip])
   const displayAgentEdges = mini ? [] : agentEdges
   const globalActivity = useStore((s) => s.globalActivity)
   const brainRunning = useStore((s) => s.brainRunning)
@@ -516,7 +563,13 @@ export function FlowDiagram({
   const isFinale = displayActivity.kind === 'finale'
   const isMcpQuery = displayActivity.kind === 'mcp-query'
   const particleDur =
-    isFinale ? (mini ? 0.68 : 0.52) : particleDuration(displayActivity, mini, demoActive)
+    isFinale
+      ? pip
+        ? 0.55
+        : mini
+          ? 0.68
+          : 0.52
+      : particleDuration(displayActivity, mini, demoActive) * (pip ? 0.72 : 1)
   const agentPasses = visual.agentParticlePasses
   const agentOneShot = visual.agentParticlesOneShot
   const progressStep =
@@ -722,20 +775,31 @@ export function FlowDiagram({
       <div
         className={clsx(
           'relative w-full',
-          pip ? 'min-h-[148px] flex-1' : mini ? 'h-[140px]' : 'h-[360px]',
+          pip ? 'min-h-0 flex-1' : mini ? 'h-[140px]' : 'h-[360px]',
         )}
       >
         {(pip || !mini) && (
           <div
             className={clsx(
               'pointer-events-none absolute inset-0',
-              pip ? 'opacity-55' : 'opacity-40',
+              pip ? (flowLive ? 'opacity-100' : 'opacity-90') : 'opacity-40',
             )}
             style={{
               background: pip
-                ? `radial-gradient(ellipse 90% 70% at 50% 42%, ${SLAVIC_GREEN}55, transparent 72%)`
+                ? flowLive
+                  ? `radial-gradient(ellipse 130% 110% at 50% 52%, ${SLAVIC_GREEN}99, #fbbf2435 38%, #2dd4bf28 55%, transparent 72%)`
+                  : `radial-gradient(ellipse 120% 100% at 50% 52%, ${SLAVIC_GREEN}77, #2dd4bf30 45%, transparent 72%)`
                 : `radial-gradient(ellipse 80% 60% at 50% 35%, ${SLAVIC_GREEN}44, transparent 70%)`,
             }}
+          />
+        )}
+        {pip && (
+          <div
+            className={clsx(
+              'pointer-events-none absolute inset-0',
+              flowLive ? 'pip-aurora-live' : 'pip-aurora-idle',
+            )}
+            aria-hidden
           />
         )}
 
@@ -754,11 +818,19 @@ export function FlowDiagram({
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
+            <filter id="flow-glow-pip" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur stdDeviation="4.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
             <marker id="flow-arrow-return" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
               <path d="M0,0 L6,3 L0,6 Z" fill="#34d399" opacity="0.45" />
             </marker>
             <marker id="flow-arrow-agent" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-              <path d="M0,0 L6,3 L0,6 Z" fill="#818cf8" opacity="0.55" />
+              <path d="M0,0 L6,3 L0,6 Z" fill="#2dd4bf" opacity="0.55" />
             </marker>
           </defs>
           {edges.map((edge) => {
@@ -778,7 +850,9 @@ export function FlowDiagram({
                   fill="none"
                   markerEnd={edge.branch === 'return' ? 'url(#flow-arrow-return)' : undefined}
                 />
-                {showForward && edgeActive && <FlowParticle edge={edge} dur={particleDur} mini={mini} />}
+                {showForward && edgeActive && (
+                  <FlowParticle edge={edge} dur={particleDur} mini={mini} pip={pip} />
+                )}
               </g>
             )
           })}
@@ -803,6 +877,7 @@ export function FlowDiagram({
                       reverse
                       dur={particleDur * (agentOneShot ? 1 : 1.1)}
                       mini={mini}
+                      pip={pip}
                       passIndex={i}
                       oneShot={agentOneShot}
                     />
@@ -844,6 +919,7 @@ export function FlowDiagram({
               <FlowNode
                 node={node}
                 mini={mini}
+                pip={pip}
                 labels={labels}
                 onNavigate={onNavigate}
                 active={demoHighlight || progressHighlight}
@@ -863,16 +939,7 @@ export function FlowDiagram({
         </p>
       )}
 
-      {pip && (
-        <p
-          className={clsx(
-            'shrink-0 border-t border-white/6 px-3 py-1.5 text-center text-[9px] leading-snug',
-            isBusy ? 'bg-mint/8 text-mint' : 'bg-black/20 text-ink-dim',
-          )}
-        >
-          {labels.flowMiniStatus(globalActivity)}
-        </p>
-      )}
+      {/* PiP: status only in FloatingMonitor header — no duplicate footer */}
 
       {!mini && (
         <div className="border-t border-white/6 bg-black/30 px-4 py-2.5">

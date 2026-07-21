@@ -1,10 +1,24 @@
 import { create } from 'zustand'
+import { VRAM_PROFILES } from '@core/brain/profiles'
 import { api } from '../lib/api'
 import { loadBool, loadStr, migrateLegacyStorage, saveBool, saveStr } from '../lib/persist'
 import type { ClientId, DetectedSource, Snapshot, SourceId, VaultStatus, BrainRunResult, BrainStateInfo, ActivityState } from '../lib/types'
 import { formatBrainProgressLabel, uiLabels } from '../lib/labels'
 
 migrateLegacyStorage()
+
+/** Same distillable set as Brain tab — live assistant sources with JSONL/DB chats. */
+const DISTILLABLE_SOURCES = new Set<SourceId>(['claude-code', 'cursor', 'claude-desktop'])
+const BRAIN_PROFILE_KEY = 'pomnia.brain.profile'
+
+function loadDistillChatModel(): string {
+  try {
+    const id = localStorage.getItem(BRAIN_PROFILE_KEY) ?? 'standard'
+    return (VRAM_PROFILES.find((p) => p.id === id) ?? VRAM_PROFILES[1]).chatModel
+  } catch {
+    return VRAM_PROFILES[1].chatModel
+  }
+}
 
 export type Route = 'dashboard' | 'browse' | 'import' | 'brain' | 'connect' | 'settings' | 'guide'
 
@@ -160,6 +174,9 @@ export interface Toast {
   kind: 'info' | 'success' | 'warn' | 'error'
   title: string
   detail?: string
+  /** Optional CTA (e.g. Start Brain after backup). */
+  actionLabel?: string
+  onAction?: () => void
 }
 
 interface State {
@@ -185,7 +202,10 @@ interface State {
   selected: Set<SourceId>
   toggleSelected: (id: SourceId) => void
   selectAll: (ids: SourceId[]) => void
-  backup: (note?: string) => Promise<void>
+  /** Returns false if vault closed, nothing selected, or backup failed. */
+  backup: (note?: string, opts?: { silent?: boolean }) => Promise<boolean>
+  /** Backup selected → distill (same pipeline as Brain tab). */
+  backupAndDistill: (note?: string) => Promise<void>
 
   connectClientOverride: Partial<Record<ClientId, boolean>>
   setConnectClientVisible: (id: ClientId, visible: boolean) => void
@@ -199,7 +219,8 @@ interface State {
   ollamaUrl: string
   setOllamaUrl: (url: string) => void
 
-  /** Remote Brain (KVM) — auto-push distilled notes after pipeline. */
+  /** Remote Brain (KVM) — auto-push distilled notes after pipeline.
+   *  Embedded always writes to brain-core-data/vault/distilled in main. */
   brainAutoDeploy: boolean
   setBrainAutoDeploy: (on: boolean) => void
   brainDeployUrl: string
@@ -279,11 +300,9 @@ export const useStore = create<State>((set, get) => ({
     try {
       const sources = await api.scan()
       set({ sources })
-      // Default-select installed sources; skip Cursor when chat parse is disabled (oversized state.vscdb).
-      const tooLarge = (s: DetectedSource) =>
-        s.id === 'cursor' && s.notes?.some((n) => n.includes('parse skipped'))
+      // All installed sources — same default. Oversized Cursor still backups; chat count may be 0 (note on tile).
       set({
-        selected: new Set(sources.filter((s) => s.installed && !tooLarge(s)).map((s) => s.id))
+        selected: new Set(sources.filter((s) => s.installed).map((s) => s.id))
       })
     } finally {
       set({ scanning: false })
@@ -338,39 +357,108 @@ export const useStore = create<State>((set, get) => ({
       return { selected: next }
     }),
   selectAll: (ids) => set({ selected: new Set(ids) }),
-  async backup(note) {
+  async backup(note, opts) {
+    const labels = uiLabels()
     const { selected, vault } = get()
     if (!vault.open) {
-      get().toast({ kind: 'warn', title: 'No vault open', detail: 'Create or unlock a vault first.' })
-      return
+      get().toast({ kind: 'warn', title: labels.dashboardNoVaultTitle, detail: labels.dashboardNoVaultDetail })
+      return false
     }
     if (selected.size === 0) {
-      get().toast({ kind: 'warn', title: 'Nothing selected' })
-      return
+      get().toast({ kind: 'warn', title: labels.dashboardNothingSelected })
+      return false
     }
-    set({ backingUp: true, backupPhase: 'starting…' })
+    set({ backingUp: true, backupPhase: labels.dashboardBackupStarting })
     const off = api.onBackupProgress((e) =>
       set({ backupPhase: `${e.source} · ${e.phase}${e.detail ? ' · ' + e.detail : ''}` })
     )
     try {
       const made = await api.backup([...selected], note)
       await get().refreshVault()
-      const skipped = made.reduce((n, m) => n + (m.stats.skipped || 0), 0)
-      get().toast({
-        kind: skipped ? 'warn' : 'success',
-        title: skipped
-          ? `Backup done — ${skipped} locked file(s) skipped`
-          : `Backed up ${made.length} source(s)`,
-        detail: skipped
-          ? `${made.map((m) => m.source.label).join(', ')} · close running apps & backup again for full capture`
-          : made.map((m) => m.source.label).join(', ')
-      })
+      if (!opts?.silent) {
+        const skipped = made.reduce((n, m) => n + (m.stats.skipped || 0), 0)
+        get().toast({
+          kind: skipped ? 'warn' : 'success',
+          title: skipped
+            ? labels.dashboardBackupDoneSkipped(skipped)
+            : labels.dashboardBackupDone(made.length),
+          detail: skipped
+            ? `${made.map((m) => m.source.label).join(', ')} · ${labels.dashboardBackupSkippedHint}`
+            : made.map((m) => m.source.label).join(', ')
+        })
+      }
+      return true
     } catch (e) {
-      get().toast({ kind: 'error', title: 'Backup failed', detail: (e as Error).message })
+      get().toast({ kind: 'error', title: labels.dashboardBackupFailed, detail: (e as Error).message })
+      return false
     } finally {
       off()
       set({ backingUp: false, backupPhase: '' })
     }
+  },
+
+  async backupAndDistill(note) {
+    const labels = uiLabels()
+    const ok = await get().backup(note, { silent: true })
+    if (!ok) return
+
+    const distillable = [...get().selected].filter((id) => DISTILLABLE_SOURCES.has(id))
+    if (distillable.length === 0) {
+      get().toast({
+        kind: 'info',
+        title: labels.dashboardNoDistillSourcesTitle,
+        detail: labels.dashboardNoDistillSourcesDetail
+      })
+      return
+    }
+
+    // Embedded: MCP reindex after distill needs brain-core. Offer Start; backup already done.
+    if (get().brainTarget === 'embedded') {
+      let running = false
+      try {
+        running = !!(await api.brainCoreStatus()).running
+      } catch {
+        running = false
+      }
+      if (!running) {
+        get().toast({
+          kind: 'warn',
+          title: labels.dashboardBrainOffTitle,
+          detail: labels.dashboardBrainOffDetail,
+          actionLabel: labels.embeddedBrainStart,
+          onAction: () => {
+            void (async () => {
+              try {
+                await api.brainCoreStart(get().ollamaUrl || undefined)
+                get().toast({ kind: 'success', title: labels.dashboardBrainStarted })
+                // Same as Brain "Przygotuj pamięć (N nowych)": only ledger-pending chats.
+                await get().runBrainPipeline({
+                  sources: distillable,
+                  model: loadDistillChatModel(),
+                  ollamaUrl: get().ollamaUrl,
+                  pendingOnly: true
+                })
+              } catch (e) {
+                get().toast({
+                  kind: 'error',
+                  title: labels.dashboardBrainStartFailed,
+                  detail: (e as Error).message
+                })
+              }
+            })()
+          }
+        })
+        return
+      }
+    }
+
+    // Incremental: skip already-ledgered sessions (isWorthDistilling still skips trivia).
+    await get().runBrainPipeline({
+      sources: distillable,
+      model: loadDistillChatModel(),
+      ollamaUrl: get().ollamaUrl,
+      pendingOnly: true
+    })
   },
 
   connectClientOverride: loadClientOverride(),
@@ -603,6 +691,7 @@ export const useStore = create<State>((set, get) => ({
     })
     try {
       const s = get()
+      // Remote: optional push to KVM. Embedded vault sync is unconditional in main.
       const autoDeploy = s.brainTarget === 'remote' && s.brainAutoDeploy
       const r = await api.brainRun({
         sources: opts.sources,
@@ -627,8 +716,17 @@ export const useStore = create<State>((set, get) => ({
         return
       }
       const fail = r.failed ?? 0
-      const deploy = r.deployed ? ` · ${r.deployed} deployed to Brain` : ''
-      const reidx = r.reindexed ? ' · reindexed' : r.deployMethod && r.deployMethod !== 'none' && !r.reindexed ? ' · reindex failed' : ''
+      const deploy =
+        r.deployed > 0
+          ? s.brainTarget === 'embedded'
+            ? ` · ${r.deployed} → vault/distilled`
+            : ` · ${r.deployed} deployed to Brain`
+          : ''
+      const reidx = r.reindexed
+        ? ' · reindexed'
+        : autoDeploy && r.deployMethod !== 'none' && !r.reindexed
+          ? ' · reindex failed'
+          : ''
       get().toast({
         kind: fail || (autoDeploy && r.deployMethod === 'none') ? 'warn' : 'success',
         title: fail ? `Distill done — ${fail} chat(s) timed out` : 'Distill complete',
@@ -657,7 +755,8 @@ export const useStore = create<State>((set, get) => ({
   toast: (t) => {
     const id = crypto.randomUUID()
     set((s) => ({ toasts: [...s.toasts, { ...t, id }] }))
-    setTimeout(() => get().dismiss(id), 5200)
+    // Longer linger when there's a CTA (e.g. Start Brain after backup).
+    setTimeout(() => get().dismiss(id), t.actionLabel ? 12_000 : 5200)
   },
   dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
 }))

@@ -30,6 +30,8 @@ export interface AppSettings {
   onboarded?: boolean
   /** Show PiP flow monitor when the main window is minimized or hidden to tray. */
   floatingMonitorOnMinimize?: boolean
+  /** Keep floating monitor always on top (pin). Default true for PiP. */
+  floatingMonitorAlwaysOnTop?: boolean
   /** Last floating monitor window position (multi-monitor). */
   floatingMonitorPosition?: { x: number; y: number }
 }
@@ -39,6 +41,7 @@ const DEFAULTS: AppSettings = {
   closeToTray: true,
   embeddedBrainAutoStart: false,
   floatingMonitorOnMinimize: true,
+  floatingMonitorAlwaysOnTop: true,
 }
 
 let cached: AppSettings = { ...DEFAULTS }
@@ -64,6 +67,7 @@ export async function loadAppSettings(): Promise<AppSettings> {
       embeddedBrainAutoStart: parsed.embeddedBrainAutoStart ?? DEFAULTS.embeddedBrainAutoStart,
       onboarded: parsed.onboarded,
       floatingMonitorOnMinimize: parsed.floatingMonitorOnMinimize ?? DEFAULTS.floatingMonitorOnMinimize,
+      floatingMonitorAlwaysOnTop: parsed.floatingMonitorAlwaysOnTop ?? DEFAULTS.floatingMonitorAlwaysOnTop,
       floatingMonitorPosition: parsed.floatingMonitorPosition,
     }
   } catch {

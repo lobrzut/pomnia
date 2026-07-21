@@ -32,28 +32,37 @@ function navItems(): { id: Route; label: string; icon: typeof LayoutDashboard }[
 
 export function TitleBar() {
   const vault = useStore((s) => s.vault)
+  const onboarded = useStore((s) => s.onboarded)
   const labels = uiLabels()
+  // Onboarding / VaultGate paint their own brand at z-40. TitleBar stays at z-50
+  // so window chrome remains usable — but showing logo + "POMNIA vault" here
+  // stacks on top of the gate brand (double mark + overlapping labels).
+  const gateOpen = !onboarded || !vault.open
   return (
     // z-50: must stay above VaultGate's lock overlay (z-40) — on a frameless
     // window these minimize/maximize/close buttons are the only way to control
     // the window, so they can't be obscured while the vault is locked.
     <div className="drag relative z-50 flex h-12 items-center justify-between px-4">
-      <div className="flex items-center gap-3">
-        <AppLogo size="xs" />
-        <div className="flex items-baseline gap-2">
-          <span className="text-[15px] font-bold tracking-tight text-grad">POMNIA</span>
-          <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">vault</span>
-        </div>
-        <div className="ml-2 flex items-center gap-2">
-          <span
-            className={clsx('h-1.5 w-1.5 rounded-full', vault.open ? 'bg-mint' : 'bg-ink-faint')}
-            style={vault.open ? { boxShadow: '0 0 10px #34d399' } : undefined}
-          />
-          <span className="text-xs text-ink-dim">{vault.open ? vault.name : labels.vaultLocked}</span>
-        </div>
+      <div className="flex min-w-0 items-center gap-3">
+        {!gateOpen && (
+          <>
+            <AppLogo size="xs" />
+            <div className="flex items-baseline gap-2 leading-none">
+              <span className="text-[15px] font-bold tracking-tight text-grad">POMNIA</span>
+              <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">vault</span>
+            </div>
+            <div className="ml-2 flex items-center gap-2">
+              <span
+                className={clsx('h-1.5 w-1.5 rounded-full', vault.open ? 'bg-mint' : 'bg-ink-faint')}
+                style={vault.open ? { boxShadow: '0 0 10px #34d399' } : undefined}
+              />
+              <span className="truncate text-xs text-ink-dim">{vault.open ? vault.name : labels.vaultLocked}</span>
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="no-drag flex items-center gap-1">
+      <div className="no-drag flex shrink-0 items-center gap-1">
         {isMock && (
           <span className="mr-2 rounded-full border border-amber/30 bg-amber/10 px-2 py-0.5 text-[10px] font-medium text-amber">
             preview
@@ -114,12 +123,22 @@ export function Sidebar() {
             {active && (
               <motion.div
                 layoutId="nav-active"
-                className="absolute inset-0 rounded-xl border border-white/10 bg-white/8"
+                className="absolute inset-0 rounded-xl border border-mint/20 bg-mint/8"
                 transition={{ type: 'spring', stiffness: 380, damping: 32 }}
               />
             )}
-            <Icon className={clsx('relative h-[18px] w-[18px]', active ? 'text-iris' : 'text-ink-faint')} />
-            <span className={clsx('relative flex min-w-0 flex-1 flex-col text-left', active ? 'text-ink' : 'text-ink-dim')}>
+            <Icon
+              className={clsx(
+                'relative h-[18px] w-[18px]',
+                active ? 'text-mint' : n.id === 'brain' ? 'text-mint/70' : 'text-ink-faint'
+              )}
+            />
+            <span
+              className={clsx(
+                'relative flex min-w-0 flex-1 flex-col text-left',
+                active ? 'text-ink' : n.id === 'brain' ? 'text-mint/80' : 'text-ink-dim'
+              )}
+            >
               <span className="flex items-center gap-1.5">
                 {n.label}
                 {n.id === 'brain' && pendingLibrary > 0 && (
@@ -127,7 +146,7 @@ export function Sidebar() {
                     {pendingLibrary} indeksów czeka
                   </span>
                 )}
-                {n.id === 'brain' && busy && <Spinner className="h-3 w-3 shrink-0 text-iris" />}
+                {n.id === 'brain' && busy && <Spinner className="h-3 w-3 shrink-0 text-mint" />}
               </span>
               {n.id === 'brain' && busyLabel && (
                 <span className="truncate text-[10px] font-normal text-ink-faint">{busyLabel}</span>

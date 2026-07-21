@@ -124,12 +124,14 @@ function HealthCheck() {
         })
       }
 
-      next.push({
-        id: 'deploy',
-        label: labels.healthDeployPath,
-        ok: null,
-        detail: brainDeployTarget?.trim() || 'Nie skonfigurowano (opcjonalnie)'
-      })
+      if (effectiveTarget === 'remote') {
+        next.push({
+          id: 'deploy',
+          label: labels.healthDeployPath,
+          ok: null,
+          detail: brainDeployTarget?.trim() || 'Nie skonfigurowano (opcjonalnie)'
+        })
+      }
     } finally {
       setRows(next)
       setChecking(false)
@@ -229,6 +231,14 @@ export default function Settings() {
   const [exportSnap, setExportSnap] = useState(snapshots[0]?.id ?? '')
   const [clients, setClients] = useState<ClientStatus[]>([])
   const [verifying, setVerifying] = useState(false)
+  const [appVersion, setAppVersion] = useState('')
+
+  useEffect(() => {
+    void api
+      .appVersion()
+      .then((r) => setAppVersion(r.version))
+      .catch(() => {})
+  }, [])
 
   async function verifyIntegrity() {
     setVerifying(true)
@@ -292,7 +302,7 @@ export default function Settings() {
 
       <GlassCard className="mb-4 p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
-          <Minimize2 className="h-4 w-4 text-iris" /> {labels.systemTray}
+          <Minimize2 className="h-4 w-4 text-mint" /> {labels.systemTray}
         </div>
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
@@ -327,7 +337,7 @@ export default function Settings() {
 
       <GlassCard className="mb-4 p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
-          <Vault className="h-4 w-4 text-iris" /> {labels.vault}
+          <Vault className="h-4 w-4 text-mint" /> {labels.vault}
         </div>
         {vault.open ? (
           <div className="flex items-center justify-between">
@@ -346,7 +356,7 @@ export default function Settings() {
 
       <GlassCard className="mb-4 p-5">
         <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
-          <Brain className="h-4 w-4 text-violet" /> {labels.brainBridge}
+          <Brain className="h-4 w-4 text-mint" /> {labels.brainBridge}
         </div>
         <p className="mb-4 text-xs text-ink-dim">{labels.brainBridgeLead}</p>
         <div className="grid grid-cols-[1fr_auto] gap-3">
@@ -427,7 +437,7 @@ export default function Settings() {
       <GlassCard className="mb-4 p-5">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <FileArchive className="h-4 w-4 text-violet" /> {labels.snapshots}
+            <FileArchive className="h-4 w-4 text-mint" /> {labels.snapshots}
           </div>
           {snapshots.length > 0 && vault.open && (
             <Button variant="soft" onClick={verifyIntegrity} disabled={verifying}>
@@ -486,7 +496,9 @@ export default function Settings() {
           <li>• scrypt (N=2¹⁷) — pochodna klucza z hasła.</li>
           <li>• Content-addressed blob store — identyczne pliki trzymane raz.</li>
           <li>• Pełna przenośność: skopiuj folder .pomnia na dowolny OS i odblokuj.</li>
-          <li className="text-ink-faint">Pomnia v0.1.0 · silnik działa też headless przez CLI.</li>
+          {appVersion && (
+            <li className="text-ink-faint">{labels.securityAboutCli(appVersion)}</li>
+          )}
         </ul>
         {isMock && (
           <p className="mt-3 rounded-lg border border-amber/20 bg-amber/10 p-2 text-[11px] text-amber">

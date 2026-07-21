@@ -62,7 +62,7 @@ export function Button({
       disabled={disabled}
       className={clsx(
         'no-drag relative inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
-        variant === 'primary' && 'accent-grad text-white shadow-[0_10px_30px_-10px_#6366f1cc]',
+        variant === 'primary' && 'accent-grad text-white shadow-[0_10px_30px_-10px_#34d399cc]',
         variant === 'soft' && 'bg-white/8 text-ink hover:bg-white/14 border border-white/10',
         variant === 'ghost' && 'text-ink-dim hover:text-ink hover:bg-white/6',
         variant === 'danger' && 'bg-rose/15 text-rose border border-rose/30 hover:bg-rose/25',
@@ -111,7 +111,7 @@ export function Toggle({
       className={clsx(
         'no-drag relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40',
         checked
-          ? 'bg-iris shadow-[inset_0_1px_2px_#0003,0_0_14px_-3px_#6366f1b3]'
+          ? 'bg-mint shadow-[inset_0_1px_2px_#0003,0_0_14px_-3px_#34d399b3]'
           : 'bg-white/10 shadow-[inset_0_1px_3px_#0006] ring-1 ring-inset ring-white/10'
       )}
     >
@@ -202,6 +202,19 @@ export function Toasts() {
             <div className="min-w-0 flex-1">
               <div className="text-sm font-semibold text-ink">{t.title}</div>
               {t.detail && <div className="mt-0.5 break-words text-xs text-ink-dim">{t.detail}</div>}
+              {t.actionLabel && t.onAction && (
+                <button
+                  type="button"
+                  className="no-drag mt-2 rounded-lg bg-mint/20 px-2.5 py-1 text-[11px] font-semibold text-mint hover:bg-mint/30"
+                  onClick={() => {
+                    const run = t.onAction
+                    dismiss(t.id)
+                    run?.()
+                  }}
+                >
+                  {t.actionLabel}
+                </button>
+              )}
             </div>
             <button onClick={() => dismiss(t.id)} className="no-drag text-ink-faint hover:text-ink">
               <X className="h-4 w-4" />

@@ -1,7 +1,7 @@
 import { basename, join } from 'node:path'
-import { promises as fs } from 'node:fs'
+import { existsSync, promises as fs } from 'node:fs'
 import crypto from 'node:crypto'
-import { BrowserWindow, app, dialog, ipcMain, shell, type WebContents } from 'electron'
+import { BrowserWindow, app, dialog, globalShortcut, ipcMain, shell, type WebContents } from 'electron'
 import {
   Ollama,
   Vault,
@@ -53,13 +53,24 @@ import {
   getFloatingWebContents,
   hideFloatingMonitor,
   hideFloatingWhenMainShown,
+  isFloatingAlwaysOnTop,
   isFloatingMonitorVisible,
   maybeShowFloatingOnHide,
   openMainOnGuide,
+  setFloatingAlwaysOnTop,
   setFloatingMainWindow,
   showFloatingMonitor,
   toggleFloatingMonitor,
 } from './floatingMonitor.js'
+import {
+  destroyHandshake,
+  hideHandshake,
+  isGoArmed,
+  setGoArmed,
+  setHandshakeMainWindow,
+  showHandshake,
+  tryArmHandshake,
+} from './handshake.js'
 import { activity, type ActivityUpdate } from './activity.js'
 import {
   getLastActivityReplay,
@@ -69,16 +80,39 @@ import {
 import { isCursorDbTooLarge } from '@core/adapters/cursor.js'
 import { migrateBrainIndexFile, migrateLegacyAppData } from './migrateLegacy.js'
 import { ensureBrainForIndexing } from './ensureBrain.js'
-import { brainCoreDataDir } from './brainPaths.js'
+import { brainCoreDataDir, brainVaultDistilledDir, brainVaultRoot, brainSkillsDir } from './brainPaths.js'
+import { ensurePortableSkills } from './ensurePortableSkills.js'
 import { brainProcessFailedMessage, ollamaUnreachableMessage, probeOllama, resolveOllamaUrl } from './ollamaSettings.js'
 
 let win: BrowserWindow | null = null
 let forceQuit = false
+/** True while awaiting brainCore.stop() during quit — prevents before-quit re-entry. */
+let quittingCleanup = false
 
 function requestQuit(): void {
   forceQuit = true
   app.quit()
 }
+
+/** `?.` on BrowserWindow does not protect against a destroyed window / webContents. */
+function canSendToWindow(w: BrowserWindow | null | undefined): w is BrowserWindow {
+  return !!w && !w.isDestroyed() && !w.webContents.isDestroyed()
+}
+
+function safeSend(wc: WebContents | null | undefined, channel: string, ...args: unknown[]): void {
+  if (!wc || wc.isDestroyed()) return
+  try {
+    wc.send(channel, ...args)
+  } catch {
+    // Destroyed mid-send during quit — ignore.
+  }
+}
+
+function safeSendMain(channel: string, ...args: unknown[]): void {
+  if (!canSendToWindow(win)) return
+  safeSend(win.webContents, channel, ...args)
+}
+
 let vault: Vault | null = null
 let vaultPath: string | null = null
 let brainRunAbort: AbortController | null = null
@@ -115,12 +149,12 @@ function emitBrainProgress(p: { phase: string; done?: number; total?: number; de
     total: p.total ?? 0,
     detail: p.detail,
   })
-  win?.webContents.send('brain:progress', payload)
+  safeSendMain('brain:progress', payload)
 }
 
 function emitBrainProgressClear(): void {
   activity.pipelineIdle()
-  win?.webContents.send('brain:progress', { phase: 'idle', done: 0, total: 0 })
+  safeSendMain('brain:progress', { phase: 'idle', done: 0, total: 0 })
 }
 
 function emitDocImportProgress(ev: { phase: string; done: number; total: number; detail?: string }): void {
@@ -133,7 +167,7 @@ function emitDocImportProgress(ev: { phase: string; done: number; total: number;
           ? 'doc-import'
           : 'doc-import'
   activity.update({ kind, phase: ev.phase, done: ev.done, total: ev.total, detail: ev.detail })
-  win?.webContents.send('doc:import-progress', localizePipelineProgress(ev))
+  safeSendMain('doc:import-progress', localizePipelineProgress(ev))
 }
 
 const brainDir = (): string => join(app.getPath('userData'), 'brain-notes')
@@ -174,7 +208,7 @@ function ollamaFor(url?: string, model?: string): Ollama {
 
 async function notifyLibraryIndexComplete(flush: PendingIndexResult): Promise<void> {
   if (flush.indexed <= 0 && flush.errors.length === 0) return
-  win?.webContents.send('library:index-complete', flush)
+  safeSendMain('library:index-complete', flush)
   if (flush.indexed > 0) {
     log.info(`library index flush: ${flush.indexed} doc(s), ${flush.chunks} chunk(s)`)
   }
@@ -208,7 +242,7 @@ async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
   }
   if (brainCore.status().starting) return
   if (!getAppSettings().embeddedBrainAutoStart) return
-  const ensured = await ensureBrainForIndexing(url)
+  const ensured = await ensureBrainForIndexing(url, undefined, vaultPath)
   if (!ensured.running || !vault || !vaultPath) return
   refreshTrayMenu(win, requestQuit)
   await flushPendingLibraryDocs(url)
@@ -227,6 +261,20 @@ async function collectLive(sources: SourceId[], limit?: number): Promise<Convers
   return limit && limit > 0 ? out.slice(0, limit) : out
 }
 
+
+/** Window / taskbar icon — same candidates as tray.ts */
+function resolveWindowIcon(): string | undefined {
+  const candidates = [
+    join(process.resourcesPath, 'icon.ico'),
+    join(__dirname, '../../resources/icon.ico'),
+    join(app.getAppPath(), 'resources', 'icon.ico'),
+  ]
+  for (const p of candidates) {
+    if (existsSync(p)) return p
+  }
+  return undefined
+}
+
 function createWindow(): void {
   win = new BrowserWindow({
     width: 1180,
@@ -236,7 +284,8 @@ function createWindow(): void {
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
-    backgroundColor: '#06070d',
+    icon: resolveWindowIcon(),
+    backgroundColor: '#060a08',
     trafficLightPosition: { x: 16, y: 16 },
     webPreferences: {
       // electron-vite emits the preload as ESM (index.mjs) — must match exactly,
@@ -284,12 +333,13 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  setLogSink((level, msg) => win?.webContents.send('log', { level, msg }))
+  setLogSink((level, msg) => safeSendMain('log', { level, msg }))
 
   if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else win.loadFile(join(__dirname, '../renderer/index.html'))
 
   setFloatingMainWindow(win)
+  setHandshakeMainWindow(win)
 }
 
 /* ── IPC ───────────────────────────────────────────────────────────────── */
@@ -297,12 +347,12 @@ function registerIpc(): void {
   activity.wire(
     (channel, payload) => {
       const send = (wc: WebContents) => {
-        if (channel === 'activity:update') wc.send('activity:update', payload)
-        else wc.send('activity:idle')
+        if (channel === 'activity:update') safeSend(wc, 'activity:update', payload)
+        else safeSend(wc, 'activity:idle')
       }
-      if (win?.webContents) send(win.webContents)
+      if (canSendToWindow(win)) send(win.webContents)
       const floating = getFloatingWebContents()
-      if (floating) send(floating)
+      if (floating && !floating.isDestroyed()) send(floating)
     },
     () => refreshTrayMenu(win, requestQuit),
   )
@@ -376,6 +426,8 @@ function registerIpc(): void {
   ipcMain.handle('vault:create', async (_e, path: string, name: string, pass: string) => {
     vault = await Vault.create(path, name, pass)
     vaultPath = path
+    const skillsRoot = await ensurePortableSkills(path)
+    brainCore.setSkillsRoot(skillsRoot)
     void maybeAutoStartEmbeddedBrain()
     return { open: true, path, name, snapshots: 0, pendingLibraryIndex: 0 }
   })
@@ -383,6 +435,8 @@ function registerIpc(): void {
   ipcMain.handle('vault:open', async (_e, path: string, pass: string) => {
     vault = await Vault.open(path, pass)
     vaultPath = path
+    const skillsRoot = await ensurePortableSkills(path)
+    brainCore.setSkillsRoot(skillsRoot)
     const m = vault.getManifest()
     const pendingLibraryIndex = vault.getPendingIndexDocuments().length
     void maybeAutoStartEmbeddedBrain()
@@ -398,7 +452,7 @@ function registerIpc(): void {
 
   ipcMain.handle('backup', async (_e, sources: SourceId[], note?: string) => {
     const opts: BackupOptions = { sources, note }
-    return runBackup(requireVault(), opts, (p) => win?.webContents.send('backup:progress', p))
+    return runBackup(requireVault(), opts, (p) => safeSendMain('backup:progress', p))
   })
 
   ipcMain.handle('verify', () => requireVault().verify())
@@ -518,10 +572,10 @@ function registerIpc(): void {
     try {
       await o.pull(
         model,
-        (p) => win?.webContents.send('ollama:pull:progress', { model, ...p }),
+        (p) => safeSendMain('ollama:pull:progress', { model, ...p }),
         pullAbort.signal
       )
-      win?.webContents.send('ollama:pull:progress', { model, status: 'success' })
+      safeSendMain('ollama:pull:progress', { model, status: 'success' })
       return { ok: true }
     } finally {
       pullAbort = null
@@ -593,7 +647,11 @@ function registerIpc(): void {
         )
         if (signal.aborted) throw new Error('Distill cancelled')
         const dir = brainDir()
+        // Staging copy for UI / legacy local index (userData/brain-notes).
         await deployFilesystem(notes, dir)
+        // Canonical vault for embedded MCP (brain-core-data/vault/distilled).
+        const vaultDistilled = brainVaultDistilledDir()
+        await deployFilesystem(notes, vaultDistilled)
         const okNotes = notes.filter((n) => n.quality === 'ok')
         const idx = await buildIndex(
           okNotes.map((n) => ({ source: n.source, notePath: n.sessionId, text: n.markdown })),
@@ -601,19 +659,30 @@ function registerIpc(): void {
           (done, total) => emitBrainProgress({ phase: 'index', done, total })
         )
         await saveIndex(idx, brainIndexFile())
-        const noteIds = new Set(notes.map((n) => n.sessionId))
+        // Only quality:ok locks the ledger. Stub/garbage stay pending so the
+        // next "distill backlog" retries them instead of stranding knowledge in _review/.
+        const okIds = new Set(notes.filter((n) => n.quality === 'ok').map((n) => n.sessionId))
         const processedIds = convs
-          .filter((c) => !isWorthDistilling(c) || noteIds.has(c.id))
+          .filter((c) => !isWorthDistilling(c) || okIds.has(c.id))
           .map((c) => c.id)
         await markProcessed(processedIds)
-        if (brainCore.status().running) {
+
+        // Local vault deploy is always done above; report it so embedded UX matches remote.
+        let deployed = okNotes.length
+        let deployMethod: 'filesystem' | 'http' | 'none' = okNotes.length > 0 ? 'filesystem' : 'none'
+        let reindexed = false
+
+        // Reindex vault root (distilled + sessions) — not brain-notes staging.
+        if (brainCore.status().running && opts.reindex !== false) {
           activity.update({ kind: 'indexing', phase: 'reindex', done: 0, total: 1, detail: 'po destylacji…' })
-          await brainCore.reindex(brainDir()).catch((e) => log.warn('embedded reindex failed:', (e as Error).message))
+          try {
+            await brainCore.reindex(brainVaultRoot())
+            reindexed = true
+          } catch (e) {
+            log.warn('embedded reindex failed:', (e as Error).message)
+          }
         }
 
-        let deployed = 0
-        let deployMethod: 'filesystem' | 'http' | 'none' = 'none'
-        let reindexed = false
         if (opts.autoDeploy && opts.deployUrl && okNotes.length > 0) {
           emitBrainProgress({
             phase: 'deploy',
@@ -628,9 +697,10 @@ function registerIpc(): void {
             reindex: opts.reindex !== false,
             token: opts.deployToken
           })
+          // Remote attempt owns the deploy stats (incl. method=none → UI warns).
           deployed = dep.copied
           deployMethod = dep.method
-          reindexed = dep.reindex
+          reindexed = dep.reindex || reindexed
           emitBrainProgress({
             phase: 'deploy',
             done: 1,
@@ -670,7 +740,7 @@ function registerIpc(): void {
 
   // ── Embedded brain-core (fork lifecycle) ──
   brainCore.onEvent = (e) => {
-    win?.webContents.send('brainCore:event', e)
+    safeSendMain('brainCore:event', e)
     if (e.type === 'reindex-progress' || e.type === 'index-progress') {
       activity.update({
         kind: 'indexing',
@@ -684,7 +754,7 @@ function registerIpc(): void {
       emitMcpQueryActivity({ tool: e.tool, detail: e.detail })
     }
     if (e.type === 'ready' || e.type === 'exited') {
-      activity.idle('brain-start')
+      activity.idle(['brain-start', 'indexing', 'doc-import'])
       refreshTrayMenu(win, requestQuit)
     }
   }
@@ -699,6 +769,7 @@ function registerIpc(): void {
       await brainCore.start({
         dataDir: brainCoreDataDir(),
         ollamaUrl: url,
+        skillsRoot: brainSkillsDir(vaultPath),
       })
       await setAppSettings({ embeddedBrainAutoStart: true, ollamaUrl: url })
       await flushPendingLibraryDocs(url)
@@ -711,6 +782,7 @@ function registerIpc(): void {
     }
   })
   ipcMain.handle('brainCore:stop', async () => {
+    activity.idle(['indexing', 'brain-start', 'doc-import'])
     const s = await brainCore.stop()
     await setAppSettings({ embeddedBrainAutoStart: false })
     refreshTrayMenu(win, requestQuit)
@@ -719,13 +791,14 @@ function registerIpc(): void {
   ipcMain.handle('brainCore:reindex', async () => {
     activity.update({ kind: 'indexing', phase: 'reindex' })
     try {
-      const stats = await brainCore.reindex(brainDir())
+      const stats = await brainCore.reindex(brainVaultRoot())
       return { stats }
     } finally {
       activity.idle('indexing')
     }
   })
   ipcMain.handle('app:settings', () => getAppSettings())
+  ipcMain.handle('app:version', () => ({ version: app.getVersion() }))
   ipcMain.handle('app:openLogs', async () => {
     const dir = join(app.getPath('userData'), 'logs')
     await fs.mkdir(dir, { recursive: true })
@@ -769,11 +842,51 @@ function registerIpc(): void {
     return { ok: true }
   })
   ipcMain.handle('floating-monitor:is-visible', () => ({ visible: isFloatingMonitorVisible() }))
+  ipcMain.handle('floating-monitor:get-always-on-top', () => ({
+    alwaysOnTop: isFloatingAlwaysOnTop(),
+  }))
+  ipcMain.handle('floating-monitor:set-always-on-top', async (_e, on: boolean) => {
+    const alwaysOnTop = await setFloatingAlwaysOnTop(!!on)
+    return { alwaysOnTop }
+  })
 
-  app.on('before-quit', () => {
+  ipcMain.handle('handshake:show', async () => {
+    await showHandshake()
+    refreshTrayMenu(win, requestQuit)
+    return { visible: true }
+  })
+  ipcMain.handle('handshake:hide', () => {
+    hideHandshake()
+    refreshTrayMenu(win, requestQuit)
+    return { visible: false }
+  })
+  ipcMain.handle('handshake:try', (_e, phrase: string) => {
+    const result = tryArmHandshake(String(phrase ?? ''))
+    if (result.ok) {
+      safeSendMain('handshake:toast-ready')
+      refreshTrayMenu(win, requestQuit)
+    }
+    return result
+  })
+  ipcMain.handle('handshake:get-armed', () => ({ armed: isGoArmed() }))
+  ipcMain.handle('handshake:disarm', () => ({ armed: setGoArmed(false) }))
+
+  app.on('before-quit', (e) => {
+    if (quittingCleanup) return
+    e.preventDefault()
+    quittingCleanup = true
+    forceQuit = true
+    // Detach before stop — child exit still fires onEvent with type 'exited'.
+    brainCore.onEvent = null
     destroyFloatingMonitor()
+    destroyHandshake()
     destroyTray()
-    void brainCore.stop()
+    void brainCore
+      .stop()
+      .catch((err) => log.warn('brainCore stop on quit:', (err as Error).message))
+      .finally(() => {
+        app.quit()
+      })
   })
 
   // Honest pipeline state: how many chats exist in the tools right now vs how
@@ -820,7 +933,19 @@ function registerIpc(): void {
         await fs.mkdir(opts.target, { recursive: true })
         const files = (await fs.readdir(brainDir())).filter((f) => f.endsWith('.md'))
         for (const f of files) await fs.copyFile(join(brainDir(), f), join(opts.target, f))
-        detail = `Copied ${files.length} notes → ${opts.target}`
+        // Keep embedded vault in sync when manually deploying.
+        const vaultDistilled = brainVaultDistilledDir()
+        await fs.mkdir(vaultDistilled, { recursive: true })
+        for (const f of files) await fs.copyFile(join(brainDir(), f), join(vaultDistilled, f))
+        detail = `Copied ${files.length} notes → ${opts.target} (+ vault/distilled)`
+        if (opts.reindex !== false && brainCore.status().running) {
+          try {
+            await brainCore.reindex(brainVaultRoot())
+            detail += ' · embedded reindex ok'
+          } catch (e) {
+            detail += ` · embedded reindex failed: ${(e as Error).message}`
+          }
+        }
       } else {
         const convs = await collectLive(opts.sources ?? [])
         const r = await deployDashboard(convs, opts.url || 'http://localhost:7860')
@@ -867,7 +992,7 @@ function registerIpc(): void {
   )
 
   ipcMain.handle('connect:skillsSync', (_e, brainUrl: string, token?: string) =>
-    syncSkills(brainUrl, join(app.getPath('userData'), 'brain-skills'), { token })
+    syncSkills(brainUrl, brainSkillsDir(vaultPath), { token })
   )
 
   ipcMain.handle(
@@ -901,6 +1026,14 @@ app.whenReady().then(async () => {
   registerIpc()
   createWindow()
   if (win) void initTray(win, requestQuit)
+  // Personal ritual window — Ctrl+Shift+H (optional, discoverable via tray / Brain).
+  const hk = globalShortcut.register('CommandOrControl+Shift+H', () => {
+    void showHandshake()
+  })
+  if (!hk) log.warn('handshake hotkey Ctrl+Shift+H not registered (conflict?)')
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll()
+  })
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
     else win?.show()
