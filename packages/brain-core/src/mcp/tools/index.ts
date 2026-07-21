@@ -4,11 +4,14 @@
  *     clients discover via `tools/list`,
  *   - dispatch to the right handler when a client calls `tools/call`.
  *
- * The four load-bearing tools are real; the other six are stubs (see stubs.ts).
+ * The load-bearing tools are real (search, save, profile, memory, library_status,
+ * list/get skills); remaining stubs live in stubs.ts.
  */
 
 import type Database from 'better-sqlite3'
+import { readFileSync } from 'node:fs'
 import type { EmbedClient } from '../../rag/embed.js'
+import { indexFiles } from '../../rag/indexer.js'
 
 import { runSearchLibrary, searchLibrarySchema } from './searchLibrary.js'
 import { runSaveConversation, saveConversationSchema } from './saveConversation.js'
@@ -19,6 +22,14 @@ import {
   memorySchema,
 } from './userProfile.js'
 import { runLibraryStatus, libraryStatusSchema } from './libraryStatus.js'
+import {
+  runListSkills,
+  runListCliSkills,
+  runGetSkill,
+  listSkillsSchema,
+  listCliSkillsSchema,
+  getSkillSchema,
+} from './skills.js'
 import { stubSchemas, runStub } from './stubs.js'
 
 export interface ToolDef {
@@ -32,6 +43,11 @@ export interface ToolContext {
   embedder: EmbedClient
   vaultRoot: string
   userMdPath: string
+  /**
+   * Skills filesystem root — prefer `<encryptedVault>/skills` (portable sidecar),
+   * else `<dataDir>/vault/skills` (legacy).
+   */
+  skillsRoot: string
 }
 
 /** MCP-standard tool catalog. Descriptions kept short-ish; the Python impl has
@@ -68,15 +84,23 @@ export function listTools(): ToolDef[] {
       description: 'Report counts from the brain index — number of files, chunks, and a sample of file names.',
       inputSchema: libraryStatusSchema,
     },
-    // Stubs — schemas present so `tools/list` reflects the full API surface,
-    // but handlers return a "not implemented in MVP" text response.
-    { name: 'list_skills', description: 'STUB — coming later.', inputSchema: stubSchemas.list_skills },
+    {
+      name: 'list_skills',
+      description:
+        'List brain workflow skills (skills/brain/*.md). Prefer portable vault sidecar <vault>/skills when open.',
+      inputSchema: listSkillsSchema,
+    },
     {
       name: 'list_cli_skills',
-      description: 'STUB — coming later.',
-      inputSchema: stubSchemas.list_cli_skills,
+      description: 'List CLI expertise skills (skills/cli/*/SKILL.md) from the active skills root.',
+      inputSchema: listCliSkillsSchema,
     },
-    { name: 'get_skill', description: 'STUB — coming later.', inputSchema: stubSchemas.get_skill },
+    {
+      name: 'get_skill',
+      description: 'Load a skill by name (brain .md or cli SKILL.md). Returns full markdown content.',
+      inputSchema: getSkillSchema,
+    },
+    // Remaining stubs — schemas present so tools/list stays complete.
     { name: 'run_skill', description: 'STUB — coming later.', inputSchema: stubSchemas.run_skill },
     { name: 'search_code', description: 'STUB — coming later.', inputSchema: stubSchemas.search_code },
     {
@@ -99,8 +123,19 @@ export async function callTool(
   switch (name) {
     case 'search_library':
       return runSearchLibrary(args, { db: ctx.db, embedder: ctx.embedder })
-    case 'save_conversation':
-      return runSaveConversation(args, { vaultRoot: ctx.vaultRoot })
+    case 'save_conversation': {
+      const saved = await runSaveConversation(args, { vaultRoot: ctx.vaultRoot })
+      // Fire-and-forget: index the new session file without blocking the MCP reply.
+      void indexFiles(ctx.db, ctx.embedder, [
+        { path: saved.path, text: readFileSync(saved.path, 'utf8') },
+      ]).catch((err) => {
+        console.error(
+          '[brain-core] session index after save_conversation failed:',
+          err instanceof Error ? err.message : err,
+        )
+      })
+      return saved.text
+    }
     case 'get_user_profile':
       return runGetUserProfile(args, { userMdPath: ctx.userMdPath })
     case 'memory':
@@ -109,8 +144,12 @@ export async function callTool(
       return runLibraryStatus(args, { db: ctx.db })
 
     case 'list_skills':
+      return runListSkills(args, { skillsRoot: ctx.skillsRoot })
     case 'list_cli_skills':
+      return runListCliSkills(args, { skillsRoot: ctx.skillsRoot })
     case 'get_skill':
+      return runGetSkill(args, { skillsRoot: ctx.skillsRoot })
+
     case 'run_skill':
     case 'search_code':
     case 'code_status':

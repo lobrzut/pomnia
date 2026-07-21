@@ -26,6 +26,13 @@ const BATCH = 32
 /** File extensions the embedded indexer ingests as plain text. */
 const TEXT_EXTS = new Set(['.md', '.txt', '.markdown'])
 
+function throwIfAborted(signal?: AbortSignal, message = 'aborted'): void {
+  if (!signal?.aborted) return
+  const err = new Error(message)
+  err.name = 'AbortError'
+  throw err
+}
+
 export interface IndexStats {
   files: number
   chunks: number
@@ -66,6 +73,7 @@ export async function indexFiles(
   embedder: EmbedClient,
   files: IndexFileInput[],
   onProgress?: (p: IndexProgressEvent) => void,
+  signal?: AbortSignal,
 ): Promise<IndexStats> {
   const delVec = db.prepare('DELETE FROM chunks_vec WHERE rowid = ?')
   const selIds = db.prepare('SELECT id FROM chunks WHERE pdf_path = ?')
@@ -79,6 +87,7 @@ export async function indexFiles(
   let done = 0
 
   for (const f of files) {
+    if (signal?.aborted) throwIfAborted(signal, 'reindex aborted')
     const name = f.name ?? basename(f.path)
 
     // Drop previous rows for this path (vec rows first — they key off chunk ids).
@@ -102,12 +111,13 @@ export async function indexFiles(
     }
 
     for (let i = 0; i < chunks.length; i += BATCH) {
+      if (signal?.aborted) throwIfAborted(signal, 'reindex aborted')
       const batch = chunks.slice(i, i + BATCH)
       // Embedding happens OUTSIDE the write transaction — Ollama can take
       // seconds per batch and holding a write lock that long is rude to
       // any concurrent search. No nomic prefixes here: Ollama's model
       // template adds them itself (see embed.ts header, verified Phase 0).
-      const vecs = await embedder.embedBatch(batch)
+      const vecs = await embedder.embedBatch(batch, signal)
       if (vecs.length !== batch.length) {
         throw new Error(`embed count mismatch: got ${vecs.length} for ${batch.length} chunks (${name})`)
       }
@@ -138,6 +148,7 @@ export async function indexDocument(
   embedder: EmbedClient,
   doc: IndexDocumentInput,
   onProgress?: (p: IndexProgressEvent) => void,
+  signal?: AbortSignal,
 ): Promise<IndexStats> {
   const delVec = db.prepare('DELETE FROM chunks_vec WHERE rowid = ?')
   const selIds = db.prepare('SELECT id FROM chunks WHERE pdf_path = ?')
@@ -149,6 +160,8 @@ export async function indexDocument(
 
   const name = doc.name ?? basename(doc.path)
   const stats: IndexStats = { files: 0, chunks: 0, empty: 0, prunedFiles: 0 }
+
+  if (signal?.aborted) throwIfAborted(signal, 'index aborted')
 
   const oldIds = (selIds.all(doc.path) as { id: number }[]).map((r) => r.id)
   if (oldIds.length > 0) {
@@ -177,9 +190,10 @@ export async function indexDocument(
   }
 
   for (let i = 0; i < pending.length; i += BATCH) {
+    if (signal?.aborted) throwIfAborted(signal, 'index aborted')
     const batch = pending.slice(i, i + BATCH)
     const texts = batch.map((b) => b.text)
-    const vecs = await embedder.embedBatch(texts)
+    const vecs = await embedder.embedBatch(texts, signal)
     if (vecs.length !== texts.length) {
       throw new Error(`embed count mismatch: got ${vecs.length} for ${texts.length} chunks (${name})`)
     }
@@ -207,35 +221,82 @@ export async function indexDocument(
   return stats
 }
 
-/** Recursively list indexable text files under a root. */
+/**
+ * Directories never walked into library.db.
+ * - `_review` / `_quarantine_stubs`: low-quality / quarantine distill stubs
+ * - `skills`: skill repos (list_skills / get_skill) — not RAG content
+ * - `blobs` / `snapshots`: encrypted vault sidecar (not markdown knowledge)
+ * - `node_modules` / `.git`: deps / VCS (`.git` also caught by dot-prefix skip)
+ */
+const SKIP_DIRS = new Set([
+  '_review',
+  '_quarantine_stubs',
+  'skills',
+  'blobs',
+  'snapshots',
+  'node_modules',
+  '.git',
+])
+
+/**
+ * When present as immediate children of the vault root, only these trees are
+ * walked (plus any loose `.md`/`.txt` at the root, e.g. USER.md).
+ * Skills live next to distilled/ but must never enter RAG.
+ */
+const INDEX_SUBDIRS = new Set(['distilled', 'sessions', 'library'])
+
+/** Basenames never indexed even if they appear outside skills/ (belt-and-suspenders). */
+const SKIP_BASENAMES = new Set(['example_usage.md'])
+
+/** Recursively list indexable text files under a vault/notes root. */
 function listTextFiles(root: string): string[] {
   const out: string[] = []
-  const walk = (dir: string): void => {
+  const rootEntries = readdirSync(root).filter((e) => !e.startsWith('.'))
+  const restrictToAllow =
+    rootEntries.some((e) => {
+      try {
+        return INDEX_SUBDIRS.has(e) && statSync(join(root, e)).isDirectory()
+      } catch {
+        return false
+      }
+    })
+
+  const walk = (dir: string, depth: number): void => {
     for (const entry of readdirSync(dir)) {
       if (entry.startsWith('.')) continue
+      if (SKIP_DIRS.has(entry)) continue
       const p = join(dir, entry)
       const st = statSync(p)
-      if (st.isDirectory()) walk(p)
-      else if (TEXT_EXTS.has(entry.slice(entry.lastIndexOf('.')).toLowerCase())) out.push(p)
+      if (st.isDirectory()) {
+        if (depth === 0 && restrictToAllow && !INDEX_SUBDIRS.has(entry)) continue
+        walk(p, depth + 1)
+      } else if (
+        TEXT_EXTS.has(entry.slice(entry.lastIndexOf('.')).toLowerCase()) &&
+        !SKIP_BASENAMES.has(entry.toLowerCase())
+      ) {
+        out.push(p)
+      }
     }
   }
-  walk(root)
+  walk(root, 0)
   return out
 }
 
 /**
- * Index every .md/.txt under `rootDir` and prune DB rows whose files are
- * gone. This is the "reindex" the embedded brain runs after each distill.
+ * Index every .md/.txt under `rootDir` (distilled / sessions / library only when
+ * those dirs exist; never skills/) and prune DB rows whose files are gone.
+ * This is the "reindex" the embedded brain runs after each distill.
  */
 export async function indexDir(
   db: Database.Database,
   embedder: EmbedClient,
   rootDir: string,
   onProgress?: (p: IndexProgressEvent) => void,
+  signal?: AbortSignal,
 ): Promise<IndexStats> {
   const paths = listTextFiles(rootDir)
   const files: IndexFileInput[] = paths.map((p) => ({ path: p, text: readFileSync(p, 'utf8') }))
-  const stats = await indexFiles(db, embedder, files, onProgress)
+  const stats = await indexFiles(db, embedder, files, onProgress, signal)
 
   // Prune: any indexed path under rootDir that no longer exists on disk.
   const present = new Set(paths)
@@ -246,6 +307,7 @@ export async function indexDir(
   const selIds = db.prepare('SELECT id FROM chunks WHERE pdf_path = ?')
   const delChunks = db.prepare('DELETE FROM chunks WHERE pdf_path = ?')
   for (const { p } of known) {
+    if (signal?.aborted) throwIfAborted(signal, 'reindex aborted')
     if (present.has(p)) continue
     const ids = (selIds.all(p) as { id: number }[]).map((r) => r.id)
     const wipe = db.transaction(() => {

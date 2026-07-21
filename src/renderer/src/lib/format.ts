@@ -35,11 +35,11 @@ export interface SourceMeta {
 export const SOURCE_META: Record<string, SourceMeta> = {
   'claude-code': { label: 'Claude Code', color: '#d97757', glyph: 'CC' },
   'claude-desktop': { label: 'Claude Desktop', color: '#d97757', glyph: 'C' },
-  cursor: { label: 'Cursor', color: '#e2e8f0', glyph: 'Cu' },
+  cursor: { label: 'Cursor', color: '#22d3ee', glyph: 'Cu' },
   antigravity: { label: 'Antigravity', color: '#4285f4', glyph: 'Ag' },
   vscode: { label: 'VS Code', color: '#3b9eff', glyph: 'VS' },
   windsurf: { label: 'Windsurf', color: '#22d3ee', glyph: 'Wf' },
-  continue: { label: 'Continue', color: '#6e56cf', glyph: 'Co' },
+  continue: { label: 'Continue', color: '#34d399', glyph: 'Co' },
   'claude-ai': { label: 'Claude.ai', color: '#d97757', glyph: 'Cl' },
   chatgpt: { label: 'ChatGPT', color: '#10a37f', glyph: 'GPT' },
   grok: { label: 'Grok', color: '#e2e8f0', glyph: 'Gr' },

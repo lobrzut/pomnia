@@ -46,9 +46,19 @@ export async function deployFilesystem(notes: DistilledNote[], targetDir: string
       await fs.mkdir(reviewDir, { recursive: true })
       reviewMade = true
     }
-    const file = path.join(lowQuality ? reviewDir : targetDir, noteFilename(n))
+    const name = noteFilename(n)
+    const file = path.join(lowQuality ? reviewDir : targetDir, name)
     await fs.writeFile(file, n.markdown, 'utf8')
     written.push(file)
+    // Successful re-distill: drop any prior stub/garbage twin so _review doesn't
+    // keep a ghost next to the canonical vault note.
+    if (!lowQuality) {
+      try {
+        await fs.unlink(path.join(reviewDir, name))
+      } catch {
+        /* no prior stub */
+      }
+    }
   }
   const reviewed = written.length - notes.filter((n) => n.quality === 'ok').length
   log.info('deployed', notes.filter((n) => n.quality === 'ok').length, 'notes →', targetDir,

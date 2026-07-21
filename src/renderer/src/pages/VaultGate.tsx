@@ -57,9 +57,11 @@ export default function VaultGate() {
       >
         <div className="mb-5 flex items-center gap-3">
           <AppLogo size="lg" glow />
-          <div>
-            <h1 className="text-lg font-bold text-grad">Pomnia Vault</h1>
-            <p className="text-xs text-ink-dim">Your AI memory — encrypted, portable, yours.</p>
+          <div className="min-w-0 leading-none">
+            <h1 className="text-lg font-bold leading-tight tracking-tight text-grad">Pomnia Vault</h1>
+            <p className="mt-1.5 text-xs leading-snug text-ink-dim">
+              Your AI memory — encrypted, portable, yours.
+            </p>
           </div>
         </div>
 

@@ -30,12 +30,12 @@ export function ActivityBanner({ className = '' }: { className?: string }) {
 
   return (
     <div
-      className={`flex flex-col gap-2 rounded-2xl border border-iris/35 bg-iris/10 px-4 py-3 ${className}`}
+      className={`flex flex-col gap-2 rounded-2xl border border-mint/35 bg-mint/10 px-4 py-3 ${className}`}
       role="status"
       aria-live="polite"
     >
       <div className="flex min-w-0 items-center gap-2.5">
-        <Icon className="h-4 w-4 shrink-0 text-iris" />
+        <Icon className="h-4 w-4 shrink-0 text-mint" />
         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
           {labels.activityBanner(globalActivity)}
         </span>

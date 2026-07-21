@@ -19,6 +19,13 @@ export interface BrainConfig {
   /** Root data dir. Vault, DB, logs live under here. */
   dataDir: string
 
+  /**
+   * Skills filesystem root. When set (Pomnia with open encrypted vault), points at
+   * `<encryptedVaultPath>/skills` — plaintext sidecar that travels with the vault folder.
+   * Default: `<dataDir>/vault/skills` (legacy / standalone).
+   */
+  skillsRoot?: string
+
   /** Ollama base URL — reachable http endpoint. */
   ollamaUrl: string
   /** Embedding model name known to Ollama (nomic-embed-text-v1.5 → dim 768). */

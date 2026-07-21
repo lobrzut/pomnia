@@ -1,18 +1,19 @@
 @import 'tailwindcss';
 
-/* ── Reliqua design tokens ───────────────────────────────────────────── */
+/* ── Pomnia design tokens — mint-dark (matches floating „Na żywo” pip) ─ */
 @theme {
-  --color-void: #06070d;
-  --color-abyss: #0a0c16;
-  --color-panel: #11141f;
-  --color-panel-2: #161a28;
-  --color-line: #232838;
-  --color-ink: #e9ecf5;
-  --color-ink-dim: #9aa3bd;
-  --color-ink-faint: #5b6178;
-  --color-violet: #8b5cf6;
-  --color-iris: #6366f1;
-  --color-cyan: #22d3ee;
+  --color-void: #060a08;
+  --color-abyss: #0a120e;
+  --color-panel: #101a14;
+  --color-panel-2: #15201a;
+  --color-line: #24352c;
+  --color-ink: #e8f0eb;
+  --color-ink-dim: #8fa89a;
+  --color-ink-faint: #5a6e64;
+  /* Legacy names kept for class compatibility; hex remapped away from purple. */
+  --color-violet: #10b981;
+  --color-iris: #2dd4bf;
+  --color-cyan: #5eead4;
   --color-mint: #34d399;
   --color-amber: #fbbf24;
   --color-rose: #fb7185;
@@ -27,10 +28,10 @@
   * {
     box-sizing: border-box;
   }
-  /* Replace the UA focus ring (orange on Windows) with a house-style iris ring.
+  /* Replace the UA focus ring (orange on Windows) with mint/teal.
      Keyboard-only (:focus-visible) — mouse clicks stay ring-free. */
   :focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--color-iris) 70%, transparent);
+    outline: 2px solid color-mix(in srgb, var(--color-mint) 75%, transparent);
     outline-offset: 2px;
     border-radius: 6px;
   }
@@ -73,11 +74,12 @@
     -webkit-app-region: no-drag;
   }
   .glass {
-    background: linear-gradient(160deg, #ffffff0e, #ffffff05);
-    border: 1px solid #ffffff14;
-    backdrop-filter: blur(18px) saturate(140%);
+    background: linear-gradient(160deg, #1a5c3a14, #ffffff06 45%, #0a120e88);
+    border: 1px solid #ffffff12;
+    backdrop-filter: blur(18px) saturate(130%);
     box-shadow:
-      0 1px 0 0 #ffffff1a inset,
+      0 1px 0 0 #ffffff14 inset,
+      0 0 0 1px #1a5c3a18 inset,
       0 20px 60px -28px #000000cc;
   }
   .glass-hover {
@@ -87,22 +89,22 @@
       box-shadow 0.35s;
   }
   .glass-hover:hover {
-    border-color: #ffffff2e;
+    border-color: #34d39944;
     box-shadow:
-      0 1px 0 0 #ffffff24 inset,
-      0 28px 80px -30px #6366f188;
+      0 1px 0 0 #ffffff1e inset,
+      0 28px 80px -30px #34d39966;
   }
   .text-grad {
-    background: linear-gradient(100deg, var(--color-ink), #c7b8ff 55%, var(--color-cyan));
+    background: linear-gradient(100deg, var(--color-ink), #a8c4b0 50%, var(--color-mint));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
   .accent-grad {
-    background: linear-gradient(120deg, var(--color-violet), var(--color-iris) 50%, var(--color-cyan));
+    background: linear-gradient(120deg, #1a5c3a, var(--color-mint) 48%, var(--color-iris));
   }
   .ring-glow {
-    box-shadow: 0 0 0 1px #ffffff1f, 0 0 40px -8px var(--color-iris);
+    box-shadow: 0 0 0 1px #ffffff1f, 0 0 40px -8px #34d39999;
   }
   .grain::before {
     content: '';
@@ -121,14 +123,104 @@
     background: transparent !important;
   }
   .floating-pip-shell {
-    background: linear-gradient(165deg, #101a14f2 0%, #0a100cf0 42%, #070a0df5 100%);
-    border: 1px solid #ffffff1a;
-    backdrop-filter: blur(22px) saturate(140%);
+    background: linear-gradient(165deg, #122018cc 0%, #0c1410b8 40%, #080c0acc 100%);
+    border: 1px solid #ffffff28;
+    backdrop-filter: blur(32px) saturate(165%);
+    -webkit-backdrop-filter: blur(32px) saturate(165%);
     box-shadow:
-      0 0 0 1px #1a5c3a28 inset,
-      0 1px 0 0 #ffffff14 inset,
-      0 12px 40px -10px #000000a0,
-      0 0 56px -16px #1a5c3a44;
+      0 0 0 1px #1a5c3a44 inset,
+      0 1px 0 0 #ffffff22 inset,
+      0 16px 48px -12px #000000aa,
+      0 0 64px -14px #1a5c3a66;
+    transition:
+      border-color 0.35s,
+      box-shadow 0.45s;
+  }
+  .floating-pip-shell--idle {
+    animation: pip-shell-breathe 4.5s ease-in-out infinite;
+  }
+  .floating-pip-shell--live {
+    border-color: #34d39977;
+    background: linear-gradient(165deg, #14261acc 0%, #0e1a14c0 42%, #0a100ecc 100%);
+    box-shadow:
+      0 0 0 1px #34d39955 inset,
+      0 1px 0 0 #ffffff24 inset,
+      0 14px 44px -10px #000000aa,
+      0 0 52px -4px #34d39999,
+      0 0 28px -2px #fbbf2466;
+    animation: none;
+  }
+  .handshake-flash {
+    animation: handshake-mint-flash 0.9s ease-out;
+  }
+  @keyframes handshake-mint-flash {
+    0% {
+      box-shadow:
+        0 0 0 1px #34d399aa inset,
+        0 0 0 0 #34d39900,
+        0 14px 44px -10px #000000aa;
+      border-color: #34d399;
+    }
+    40% {
+      box-shadow:
+        0 0 0 2px #34d399ee inset,
+        0 0 48px 8px #34d39966,
+        0 14px 44px -10px #000000aa;
+      border-color: #6ee7b7;
+    }
+    100% {
+      box-shadow:
+        0 0 0 1px #34d39955 inset,
+        0 0 52px -4px #34d39999,
+        0 14px 44px -10px #000000aa;
+    }
+  }
+  @keyframes pip-shell-breathe {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 1px #1a5c3a40 inset,
+        0 1px 0 0 #ffffff1c inset,
+        0 16px 48px -12px #000000aa,
+        0 0 48px -18px #1a5c3a55;
+    }
+    50% {
+      box-shadow:
+        0 0 0 1px #34d39944 inset,
+        0 1px 0 0 #ffffff28 inset,
+        0 16px 48px -12px #000000aa,
+        0 0 72px -10px #34d39966;
+    }
+  }
+}
+
+/* PiP aurora layers — fill the void under/around nodes */
+.pip-aurora-idle,
+.pip-aurora-live {
+  background:
+    radial-gradient(ellipse 75% 60% at 22% 55%, #1a5c3a55, transparent 62%),
+    radial-gradient(ellipse 80% 65% at 78% 52%, #2dd4bf40, transparent 64%),
+    radial-gradient(ellipse 90% 70% at 50% 88%, #0a1f1644, transparent 55%);
+  opacity: 0.85;
+}
+.pip-aurora-live {
+  background:
+    radial-gradient(ellipse 80% 65% at 55% 48%, #34d39955, transparent 58%),
+    radial-gradient(ellipse 70% 55% at 78% 50%, #fbbf2438, transparent 60%),
+    radial-gradient(ellipse 75% 60% at 22% 58%, #1a5c3a66, transparent 62%),
+    radial-gradient(ellipse 100% 50% at 50% 100%, #0a181255, transparent 50%);
+  opacity: 1;
+  animation: pip-aurora-pulse 2.8s ease-in-out infinite;
+}
+@keyframes pip-aurora-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(1.12);
   }
 }
 
@@ -144,7 +236,7 @@
   position: absolute;
   border-radius: 50%;
   filter: blur(90px);
-  opacity: 0.55;
+  opacity: 0.42;
   mix-blend-mode: screen;
   animation: drift 24s ease-in-out infinite;
 }
@@ -208,6 +300,25 @@
 .flow-diagram--idle .flow-path-agent {
   opacity: 0.55;
 }
+/* PiP idle still feels alive — slow dash + soft node breath */
+.flow-diagram--pip.flow-diagram--idle .flow-path-main {
+  opacity: 0.85;
+  animation: flow-dash 2.6s linear infinite;
+}
+.flow-diagram--pip.flow-diagram--idle .flow-node > div:first-child {
+  animation: pip-node-breathe 3.4s ease-in-out infinite;
+}
+@keyframes pip-node-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 8px #34d39933, inset 0 0 6px #1a5c3a22;
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 18px #34d39966, 0 0 6px #2dd4bf44, inset 0 0 10px #1a5c3a33;
+    transform: scale(1.04);
+  }
+}
 .flow-diagram--focus .flow-path--dimmed {
   opacity: 0.3 !important;
   animation: none;
@@ -242,17 +353,102 @@
   opacity: 0.7;
 }
 .flow-diagram--pip.flow-diagram--idle .flow-path-main {
-  opacity: 0.78;
+  opacity: 0.88;
+  stroke: #227a4a;
+  stroke-width: 2.6;
 }
 .flow-diagram--pip.flow-diagram--embedded-idle .flow-path-main,
 .flow-diagram--pip.flow-diagram--embedded-idle .flow-path-agent {
-  opacity: 0.82;
+  opacity: 0.9;
+  stroke-width: 2.8;
+}
+.flow-diagram--pip .flow-path-main {
+  stroke: #1f6f45;
+  stroke-width: 2.6;
+  opacity: 0.9;
+}
+.flow-diagram--pip.flow-diagram--live .flow-path--dash-live.flow-path-main,
+.flow-diagram--pip.flow-diagram--busy .flow-path--dash-live.flow-path-main {
+  stroke: #6ee7b7;
+  stroke-width: 3.4;
+  opacity: 1;
+  stroke-dasharray: 11 5;
+  filter: drop-shadow(0 0 6px #34d399cc);
+  animation-duration: 0.48s;
 }
 .flow-diagram--pip.flow-diagram--focus .flow-path--focused.flow-path-main {
   opacity: 1;
+  stroke: #6ee7b7;
+  stroke-width: 3.6;
+  filter: drop-shadow(0 0 8px #34d399dd);
+}
+.flow-diagram--pip.flow-diagram--mcp-query .flow-path--dash-live.flow-path-main,
+.flow-diagram--pip.flow-diagram--finale .flow-path--dash-live.flow-path-main,
+.flow-diagram--pip.flow-diagram--finale .flow-path--focused.flow-path-main {
+  stroke: #fbbf24;
+  stroke-width: 3.5;
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 7px #fbbf24aa);
+  animation: flow-dash 0.42s linear infinite;
+}
+.flow-diagram--pip .flow-particle-main {
+  fill: #6ee7b7;
+}
+.flow-diagram--pip.flow-diagram--mcp-query .flow-particle-main,
+.flow-diagram--pip.flow-diagram--finale .flow-particle-main {
+  fill: #fde68a;
 }
 .flow-diagram--pip .flow-node > span {
-  background: #0a100ce6;
+  background: #0a120ed9;
+  color: #f0f3fa;
+  text-shadow: 0 1px 8px #000000aa;
+  box-shadow:
+    0 0 0 1px #ffffff18,
+    0 2px 10px #00000066;
+}
+.flow-diagram--pip .flow-node--pulse > span,
+.flow-diagram--pip .flow-node--active > span {
+  color: #fde68a;
+  text-shadow: 0 0 12px #fbbf2488;
+  box-shadow:
+    0 0 0 1px #fbbf2433,
+    0 2px 12px #00000088;
+}
+.flow-diagram--pip .flow-node--pulse > div:first-child {
+  animation: flow-node-pulse-loop-pip 1.15s ease-in-out infinite;
+  border-color: #fbbf24cc !important;
+}
+.flow-diagram--pip .flow-node--active > div:first-child {
+  border-color: #fbbf24aa !important;
+  box-shadow:
+    0 0 22px #fbbf2499,
+    0 0 10px #34d39966,
+    inset 0 0 12px #34d39933;
+}
+.flow-diagram--pip .flow-node--embedded > div:first-child {
+  box-shadow:
+    0 0 18px #34d39966,
+    0 0 8px #2dd4bf44,
+    inset 0 0 10px #34d39928;
+  border-color: #34d39988 !important;
+}
+@keyframes flow-node-pulse-loop-pip {
+  0%,
+  100% {
+    box-shadow:
+      0 0 12px #fbbf2477,
+      0 0 4px #34d39955,
+      inset 0 0 8px #1a5c3a33;
+    transform: scale(1);
+  }
+  50% {
+    box-shadow:
+      0 0 32px #fbbf24cc,
+      0 0 16px #34d399aa,
+      0 0 6px #6ee7b788,
+      inset 0 0 14px #34d39944;
+    transform: scale(1.1);
+  }
 }
 .flow-path-main {
   stroke: #1a5c3a;
@@ -274,34 +470,34 @@
   animation: none;
 }
 .flow-path-agent {
-  stroke: #818cf8;
+  stroke: #2dd4bf;
   stroke-dasharray: 4 6;
   opacity: 0.5;
   animation: none;
 }
 .flow-diagram--busy .flow-path-agent {
   opacity: 0.95;
-  stroke: #a5b4fc;
+  stroke: #5eead4;
 }
 .flow-diagram--mcp-query .flow-path-agent {
   opacity: 1;
-  stroke: #c7d2fe;
+  stroke: #99f6e4;
   stroke-width: 2.5;
-  filter: drop-shadow(0 0 6px #818cf888);
+  filter: drop-shadow(0 0 6px #2dd4bf88);
 }
 .flow-diagram--mcp-query .flow-path--dash-live.flow-path-agent {
   animation-duration: 0.55s;
 }
 .flow-diagram--mcp-query .flow-particle-agent {
-  fill: #c7d2fe;
-  filter: drop-shadow(0 0 8px #818cf8cc);
+  fill: #99f6e4;
+  filter: drop-shadow(0 0 8px #2dd4bfcc);
 }
 .flow-diagram--mcp-query .flow-node--mcp.flow-node--pulse > div:first-child {
   box-shadow:
-    0 0 28px #818cf888,
+    0 0 28px #2dd4bf88,
     0 0 12px #34d39955,
-    inset 0 0 12px #818cf822;
-  border-color: #a5b4fc !important;
+    inset 0 0 12px #2dd4bf22;
+  border-color: #5eead4 !important;
 }
 .flow-diagram--finale .flow-path-agent {
   opacity: 1;
@@ -324,21 +520,21 @@
   0% {
     box-shadow:
       0 0 0 0 #34d39900,
-      0 0 0 0 #818cf800;
+      0 0 0 0 #2dd4bf00;
   }
   35% {
     box-shadow:
       0 -10px 22px #34d39955,
       0 10px 22px #34d39955,
-      -10px 0 22px #818cf855,
-      10px 0 22px #818cf855,
+      -10px 0 22px #2dd4bf55,
+      10px 0 22px #2dd4bf55,
       0 0 28px #6ee7b766,
-      inset 0 0 14px #818cf822;
+      inset 0 0 14px #2dd4bf22;
   }
   100% {
     box-shadow:
       0 0 12px #34d39933,
-      inset 0 0 8px #818cf815;
+      inset 0 0 8px #2dd4bf15;
   }
 }
 .flow-diagram--busy .flow-path--dash-live.flow-path-agent {
@@ -354,7 +550,7 @@
   fill: #fbbf24;
 }
 .flow-particle-agent {
-  fill: #a5b4fc;
+  fill: #5eead4;
 }
 .flow-live-dot {
   display: inline-block;
@@ -382,8 +578,8 @@
 }
 .flow-node--embedded > div:first-child,
 .flow-node--mcp.flow-node--pulse > div:first-child {
-  box-shadow: 0 0 14px #818cf844, inset 0 0 8px #34d39922;
-  border-color: #818cf866 !important;
+  box-shadow: 0 0 14px #2dd4bf44, inset 0 0 8px #34d39922;
+  border-color: #2dd4bf66 !important;
 }
 .flow-node--mcp > div:first-child {
   transition: box-shadow 0.35s, border-color 0.35s;

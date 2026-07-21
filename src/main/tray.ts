@@ -8,6 +8,7 @@ import { app, Menu, Tray, nativeImage, type BrowserWindow, type NativeImage } fr
 import { activity } from './activity.js'
 import { brainCore } from './brainCore.js'
 import { isFloatingMonitorVisible, toggleFloatingMonitor } from './floatingMonitor.js'
+import { isGoArmed, showHandshake } from './handshake.js'
 
 let tray: Tray | null = null
 
@@ -52,6 +53,12 @@ function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
         void toggleFloatingMonitor().then(() => tray?.setContextMenu(buildMenu(win, onQuit)))
       },
     },
+    {
+      label: isGoArmed() ? 'Handshake · Go' : 'Handshake',
+      click: () => {
+        void showHandshake().then(() => tray?.setContextMenu(buildMenu(win, onQuit)))
+      },
+    },
     { type: 'separator' },
     ...(busyLine
       ? [
@@ -68,7 +75,9 @@ function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
     ...(embedded.running
       ? [
           {
-            label: 'Zatrzymaj lokalną wyszukiwarkę',
+            label: embedded.indexing
+              ? 'Zatrzymaj lokalną wyszukiwarkę (anuluj indeks)'
+              : 'Zatrzymaj lokalną wyszukiwarkę',
             click: () => {
               void brainCore.stop().then(() => tray?.setContextMenu(buildMenu(win, onQuit)))
             },

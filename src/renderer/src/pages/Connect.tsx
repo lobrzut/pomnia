@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
-  BookOpenText,
   Check,
   CheckCircle2,
   Circle,
@@ -19,7 +18,10 @@ import {
 } from 'lucide-react'
 import { Badge, Button, GlassCard, Input, Spinner } from '../components/ui'
 import { ClientIcon, CLIENT_BRAND } from '../components/ClientIcon'
-import { EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from '@core/brain/snippet'
+import {
+  EMBEDDED_BRAIN_DEFAULT_URL,
+  REMOTE_BRAIN_URL_PLACEHOLDER,
+} from '@core/brain/snippet'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore, dashboardUrlFromBrainUrl } from '../store/useStore'
@@ -224,7 +226,7 @@ export default function Connect() {
   const checklistDone = {
     url: effectiveTarget === 'embedded' || !!remoteBrainUrl.trim(),
     token: effectiveTarget === 'embedded' || !!connectToken.trim(),
-    copy: copied === 'code' || copied === 'cursor-full',
+    copy: copied === 'code' || copied === 'mcp-full',
     reload: connectedCount > 0,
   }
 
@@ -477,16 +479,20 @@ export default function Connect() {
                 </div>
                 <Button
                   onClick={() =>
-                    void copy(snippet.fullFileJson, 'cursor-full', labels.connectCopyForCursor)
+                    void copy(
+                      snippet.fullFileJson,
+                      'mcp-full',
+                      labels.connectCopyForClient(snippet.label)
+                    )
                   }
                   className="shrink-0"
                 >
-                  {copied === 'cursor-full' ? (
+                  {copied === 'mcp-full' ? (
                     <Check className="h-3.5 w-3.5 text-mint" />
                   ) : (
                     <Copy className="h-3.5 w-3.5" />
                   )}
-                  {labels.connectCopyForCursor}
+                  {labels.connectCopyForClient(snippet.label)}
                 </Button>
                 <button
                   onClick={() => setPicked(null)}
@@ -588,70 +594,13 @@ export default function Connect() {
                       : labels.connectTokenRequired}
                 </p>
               </div>
-
-              {/* Optional: agent brief — makes the agent auto-call brain tools */}
-              {snippet.brief && (
-                <div className="mt-5 rounded-2xl border border-amber/25 bg-amber/5 p-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <BookOpenText className="h-4 w-4 text-amber" />
-                    <span className="text-sm font-semibold text-ink">Brief agenta (opcjonalnie)</span>
-                    <Badge color="#fbbf24">zalecane</Badge>
-                  </div>
-                  <p className="mb-3 text-[11px] leading-relaxed text-ink-dim">
-                    Instrukcje, które agent czyta przy starcie sesji. Bez nich wie, że narzędzia istnieją,
-                    ale sam decyduje kiedy ich użyć — z briefem woła <code>get_user_profile</code>,
-                    <code> search_library</code> przed odpowiedziami technicznymi i <code>save_conversation</code> gdy
-                    powiesz &laquo;zapisz do brain&raquo;. Copy-paste — nie ruszamy pliku.
-                  </p>
-                  <ol className="mb-3 space-y-2.5">
-                    <Step n={1}>
-                      {snippet.brief.mode === 'append-to-existing'
-                        ? 'Append the block below to (create if missing):'
-                        : 'Create this file with the block below as its content:'}
-                      <button
-                        onClick={() => snippet.brief && void copy(snippet.brief.filePath, 'brief-path', 'brief path')}
-                        className="no-drag group ml-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-white/10 bg-black/30 px-2 py-1 align-middle text-[11px] text-ink-dim transition-colors hover:border-amber/40 hover:text-ink"
-                      >
-                        <span className="truncate">{snippet.brief.filePath}</span>
-                        {copied === 'brief-path' ? (
-                          <Check className="h-3 w-3 shrink-0 text-mint" />
-                        ) : (
-                          <Copy className="h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100" />
-                        )}
-                      </button>
-                    </Step>
-                  </ol>
-                  <div className="relative mb-3">
-                    <button
-                      onClick={() => snippet.brief && void copy(snippet.brief.content, 'brief', 'brief content')}
-                      className="no-drag absolute right-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-lg border border-amber/25 bg-amber/10 px-2.5 py-1 text-[11px] font-semibold text-amber transition-colors hover:bg-amber/20"
-                    >
-                      {copied === 'brief' ? (
-                        <>
-                          <Check className="h-3.5 w-3.5" /> Copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3.5 w-3.5" /> Copy brief
-                        </>
-                      )}
-                    </button>
-                    <pre className="max-h-56 overflow-auto rounded-xl border border-white/8 bg-black/40 p-3.5 pt-9 text-[11px] leading-relaxed text-ink-dim">
-                      {snippet.brief.content}
-                    </pre>
-                  </div>
-                  <div className="flex items-start gap-2 rounded-xl border border-amber/20 bg-amber/8 px-3 py-2 text-[11px] leading-relaxed text-ink-dim">
-                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber" />
-                    <span>{snippet.brief.restartHint}</span>
-                  </div>
-                </div>
-              )}
             </>
           )}
         </GlassCard>
       )}
 
-      {/* Skills sync */}
+      {/* Skills sync — remote Brain dashboard (:7860) only */}
+      {effectiveTarget === 'remote' && (
       <GlassCard className="p-5">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
@@ -668,6 +617,7 @@ export default function Connect() {
           Sync skills
         </Button>
       </GlassCard>
+      )}
     </div>
   )
 }

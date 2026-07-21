@@ -2,12 +2,14 @@
  * Picture-in-Picture style floating flow monitor — always-on-top mini window.
  */
 
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { BrowserWindow, screen, type WebContents } from 'electron'
 import { getAppSettings, setAppSettings } from './appSettings.js'
 
-const WIDTH = 432
-const HEIGHT = 272
+/** Compact PiP: 3 nodes (Vault → library → MCP) + padding; matches FlowDiagram pip layout. */
+const WIDTH = 300
+const HEIGHT = 196
 const SNAP_THRESHOLD = 96
 
 let floatingWin: BrowserWindow | null = null
@@ -96,6 +98,13 @@ export async function showFloatingMonitor(opts?: { force?: boolean }): Promise<v
   }
 
   const pos = s.floatingMonitorPosition ?? defaultPosition()
+  const pinned = s.floatingMonitorAlwaysOnTop !== false
+  const iconCandidates = [
+    join(process.resourcesPath, 'icon.ico'),
+    join(__dirname, '../../resources/icon.ico'),
+  ]
+  const iconPath = iconCandidates.find((p) => existsSync(p))
+
   floatingWin = new BrowserWindow({
     width: WIDTH,
     height: HEIGHT,
@@ -103,11 +112,12 @@ export async function showFloatingMonitor(opts?: { force?: boolean }): Promise<v
     y: pos.y,
     frame: false,
     transparent: true,
-    alwaysOnTop: true,
+    alwaysOnTop: pinned,
     skipTaskbar: true,
     resizable: false,
     show: false,
     hasShadow: false,
+    ...(iconPath ? { icon: iconPath } : {}),
     backgroundColor: '#00000000',
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
@@ -116,7 +126,7 @@ export async function showFloatingMonitor(opts?: { force?: boolean }): Promise<v
     },
   })
 
-  floatingWin.setAlwaysOnTop(true, 'floating')
+  if (pinned) floatingWin.setAlwaysOnTop(true, 'floating')
   attachMoveSnap(floatingWin)
   loadFloatingUrl(floatingWin)
 
@@ -124,6 +134,19 @@ export async function showFloatingMonitor(opts?: { force?: boolean }): Promise<v
   floatingWin.on('closed', () => {
     floatingWin = null
   })
+}
+
+export function isFloatingAlwaysOnTop(): boolean {
+  return getAppSettings().floatingMonitorAlwaysOnTop !== false
+}
+
+export async function setFloatingAlwaysOnTop(on: boolean): Promise<boolean> {
+  await setAppSettings({ floatingMonitorAlwaysOnTop: on })
+  if (floatingWin && !floatingWin.isDestroyed()) {
+    if (on) floatingWin.setAlwaysOnTop(true, 'floating')
+    else floatingWin.setAlwaysOnTop(false)
+  }
+  return on
 }
 
 export function hideFloatingMonitor(): void {

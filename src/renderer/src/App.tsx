@@ -6,6 +6,7 @@ import { Toasts } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useStore } from './store/useStore'
 import { api } from './lib/api'
+import { uiLabels } from './lib/labels'
 import Dashboard from './pages/Dashboard'
 import Browse from './pages/Browse'
 import ImportPage from './pages/Import'
@@ -16,6 +17,7 @@ import VaultGate from './pages/VaultGate'
 import Onboarding from './pages/Onboarding'
 import HowItWorks from './pages/HowItWorks'
 import FloatingMonitor from './pages/FloatingMonitor'
+import Handshake from './pages/Handshake'
 
 const PAGES = { dashboard: Dashboard, browse: Browse, import: ImportPage, brain: Brain, connect: Connect, settings: Settings, guide: HowItWorks } as const
 
@@ -24,11 +26,24 @@ function isFloatingMonitorRoute(): boolean {
   return hash === '/floating-monitor' || hash === 'floating-monitor'
 }
 
+function isHandshakeRoute(): boolean {
+  const hash = window.location.hash.replace(/^#/, '')
+  return hash === '/handshake' || hash === 'handshake'
+}
+
 export default function App() {
   if (isFloatingMonitorRoute()) {
     return (
       <div className="floating-pip-root flex h-screen w-screen flex-col overflow-hidden bg-transparent p-2">
         <FloatingMonitor />
+      </div>
+    )
+  }
+
+  if (isHandshakeRoute()) {
+    return (
+      <div className="floating-pip-root flex h-screen w-screen flex-col overflow-hidden bg-transparent p-2">
+        <Handshake />
       </div>
     )
   }
@@ -55,6 +70,9 @@ export default function App() {
         setRoute(r)
       }
     })
+    const offHandshakeToast = api.onHandshakeToastReady(() => {
+      toast({ kind: 'success', title: uiLabels().handshakeToastReady })
+    })
     // Surface otherwise-silent async failures as toasts (diagnostics).
     const onErr = (e: ErrorEvent) => toast({ kind: 'error', title: 'Unexpected error', detail: e.message })
     const onRej = (e: PromiseRejectionEvent) =>
@@ -66,6 +84,7 @@ export default function App() {
       window.removeEventListener('unhandledrejection', onRej)
       offActivity()
       offNavigate()
+      offHandshakeToast()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

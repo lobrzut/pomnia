@@ -118,67 +118,14 @@ function embeddedServers(spec: ClientSpec, brainUrl: string): Record<string, Rec
 }
 
 /* ---------------------------------------------------------------------- */
-/* Agent brief — one markdown, all clients                                */
+/* Legacy brief exports — unused by Connect (MCP alone is enough).         */
 /* ---------------------------------------------------------------------- */
 
-/**
- * The behavior contract we want every MCP-capable agent to follow when it
- * has brain-rag/brain-vault/brain-library wired. Same text for every client
- * because the tool surface is identical — only the destination file changes.
- *
- * Written in Polish because that is the user's operating language; the tool
- * names + payload keys stay English because that is how MCP catalog reports
- * them.
- */
-export const BRAIN_BRIEF_EMBEDDED_MD = `## Brain integration (MCP) — lokalny embedded
+/** @deprecated Not shown in UI. */
+export const BRAIN_BRIEF_EMBEDDED_MD = ''
 
-Masz **jeden** MCP server \`brain-rag\` na \`127.0.0.1:7862\` — wszystkie narzędzia są na nim
-(\`search_library\`, \`save_conversation\`, \`get_user_profile\`, \`memory\`, \`library_status\`).
-Bez tokena — localhost only.
-
-### Na starcie każdej nietrywialnej sesji
-1. Wywołaj \`brain-rag.get_user_profile\` — przeczytaj mój profil (USER.md).
-2. Gdy pytanie brzmi technicznie — \`brain-rag.search_library\` PRZED odpowiedzią.
-
-### W trakcie rozmowy
-3. "zapisz do brain" → \`brain-rag.save_conversation\` z pełnym payloadem.
-4. Korekty / trwałe fakty → \`brain-rag.memory\` add/replace/remove.
-
-Uruchom embedded brain w Pomnia (Brain tab → Start) jeśli MCP nie odpowiada.
-`
-
-export const BRAIN_BRIEF_MD = `## Brain integration (MCP)
-
-Masz dostęp do trzech MCP serverów: \`brain-rag\`, \`brain-vault\`, \`brain-library\`.
-Traktuj je jak przedłużenie mojej pamięci — nie moją wiedzę pretrenowaną.
-
-### Na starcie każdej nietrywialnej sesji
-1. Wywołaj \`brain-rag.get_user_profile\` — przeczytaj mój profil (USER.md).
-   Bez tego nie wiesz kim jestem, jak rozmawiam, jakich narzędzi używam.
-2. Jeśli pytanie brzmi technicznie / dotyczy tego projektu — wywołaj
-   \`brain-rag.search_library\` z tematem pytania PRZED odpowiedzią.
-   Cytuj źródła (path, score) gdy pomogły.
-
-### W trakcie rozmowy
-3. Gdy powiem "zapisz do brain", "zapisz rozmowę", "zapisz" lub podobnie —
-   natychmiast wywołaj \`brain-rag.save_conversation\` z PEŁNYM payloadem:
-   \`decisions\`, \`solutions\`, \`root_causes\`, \`files_touched\`,
-   \`commands_run\`, \`errors_seen\`, \`attempts_failed\`, \`facts\`,
-   \`open_questions\`, \`endpoints_urls_ips\`.
-   Preferuj konkret (ścieżki z numerami linii, dokładne komendy, kody błędów)
-   nad ogólnymi zdaniami — te notatki czytam za miesiące.
-4. Gdy Cię koryguję ("nie używaj X", "wolę Y", "przestań robić Z") lub gdy
-   powiem coś trwałego o sobie — wywołaj \`brain-rag.memory\` z akcją
-   \`add\` i odpowiednią kategorią (\`user\` / \`tech\` / \`comm\` / \`income\`).
-
-### Preferencje
-- Preferuj \`brain-rag.search_library\` nad własną pretrenowaną wiedzą gdy
-  pytanie brzmi jak coś specyficznego dla tego projektu / usera.
-- Bez wywołania brain = zgadujesz. Z brain = masz kontekst tej konkretnej
-  osoby i tego konkretnego repo.
-- Nie pytaj mnie o pozwolenie na wywołanie tych narzędzi — są bezpieczne
-  (read + append do vault). Rób.
-`
+/** @deprecated Not shown in UI. */
+export const BRAIN_BRIEF_MD = ''
 
 
 /* ---------------------------------------------------------------------- */
@@ -449,17 +396,6 @@ export function buildSnippet(
     .filter(Boolean)
     .join('\n')
 
-  const briefContent = target === 'embedded' ? BRAIN_BRIEF_EMBEDDED_MD : BRAIN_BRIEF_MD
-
-  const brief: SnippetBrief | undefined = spec.brief
-    ? {
-        filePath: spec.brief.briefPath(os, home),
-        content: briefContent,
-        mode: spec.brief.mode,
-        restartHint: spec.brief.hint,
-      }
-    : undefined
-
   return {
     client: clientId,
     label: spec.label,
@@ -470,6 +406,7 @@ export function buildSnippet(
     instructions,
     restartHint: spec.restartHint,
     notes: spec.notes,
-    brief,
+    // MCP tools are enough after connect — no rules-file brief to paste.
+    brief: undefined,
   }
 }

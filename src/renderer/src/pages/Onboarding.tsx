@@ -104,14 +104,16 @@ export default function Onboarding() {
       exit={{ opacity: 0 }}
       className="absolute inset-0 z-40 flex items-stretch bg-void/80 backdrop-blur-md"
     >
-      {/* Step rail */}
-      <div className="hidden w-[230px] shrink-0 flex-col justify-between border-r border-white/6 p-7 sm:flex">
+      {/* Step rail — pt clears TitleBar (h-12) so brand isn't under window chrome */}
+      <div className="hidden w-[230px] shrink-0 flex-col justify-between border-r border-white/6 px-7 pb-7 pt-14 sm:flex">
         <div>
           <div className="mb-10 flex items-center gap-2.5">
             <AppLogo size="sm" />
-            <div>
+            <div className="min-w-0 leading-none">
               <div className="text-sm font-bold tracking-tight text-grad">POMNIA</div>
-              <div className="text-[9px] font-medium uppercase tracking-[0.22em] text-ink-faint">first run</div>
+              <div className="mt-1.5 text-[9px] font-medium uppercase tracking-[0.22em] text-ink-faint">
+                first run
+              </div>
             </div>
           </div>
 
@@ -133,7 +135,7 @@ export default function Onboarding() {
                     className={clsx(
                       'z-10 flex h-[27px] w-[27px] shrink-0 items-center justify-center rounded-full border text-[11px] font-bold transition-colors duration-300',
                       state === 'done' && 'border-transparent accent-grad text-white',
-                      state === 'active' && 'border-iris/60 bg-iris/15 text-ink shadow-[0_0_16px_-4px_#6366f1]',
+                      state === 'active' && 'border-mint/60 bg-mint/15 text-ink shadow-[0_0_16px_-4px_#34d399]',
                       state === 'todo' && 'border-white/12 bg-black/40 text-ink-faint'
                     )}
                   >

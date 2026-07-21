@@ -86,6 +86,7 @@ const bridge = {
   connectMcpTokenCreate: (brainUrl: string, name: string, adminToken?: string) =>
     ipcRenderer.invoke('connect:mcpTokenCreate', brainUrl, name, adminToken),
   appSettings: () => ipcRenderer.invoke('app:settings'),
+  appVersion: () => ipcRenderer.invoke('app:version') as Promise<{ version: string }>,
   appSettingsSet: (patch: {
     minimizeToTray?: boolean
     closeToTray?: boolean
@@ -104,6 +105,26 @@ const bridge = {
   floatingMonitorToggle: () => ipcRenderer.invoke('floating-monitor:toggle') as Promise<{ visible: boolean }>,
   floatingMonitorOpenMain: () => ipcRenderer.invoke('floating-monitor:open-main') as Promise<{ ok: boolean }>,
   floatingMonitorIsVisible: () => ipcRenderer.invoke('floating-monitor:is-visible') as Promise<{ visible: boolean }>,
+  floatingMonitorGetAlwaysOnTop: () =>
+    ipcRenderer.invoke('floating-monitor:get-always-on-top') as Promise<{ alwaysOnTop: boolean }>,
+  floatingMonitorSetAlwaysOnTop: (on: boolean) =>
+    ipcRenderer.invoke('floating-monitor:set-always-on-top', on) as Promise<{ alwaysOnTop: boolean }>,
+  handshakeShow: () => ipcRenderer.invoke('handshake:show') as Promise<{ visible: boolean }>,
+  handshakeHide: () => ipcRenderer.invoke('handshake:hide') as Promise<{ visible: boolean }>,
+  handshakeTry: (phrase: string) =>
+    ipcRenderer.invoke('handshake:try', phrase) as Promise<{ ok: boolean; armed: boolean }>,
+  handshakeGetArmed: () => ipcRenderer.invoke('handshake:get-armed') as Promise<{ armed: boolean }>,
+  handshakeDisarm: () => ipcRenderer.invoke('handshake:disarm') as Promise<{ armed: boolean }>,
+  onHandshakeArmed: (cb: (e: { armed: boolean }) => void) => {
+    const l = (_: IpcRendererEvent, e: { armed: boolean }) => cb(e)
+    ipcRenderer.on('handshake:armed', l)
+    return () => ipcRenderer.removeListener('handshake:armed', l)
+  },
+  onHandshakeToastReady: (cb: () => void) => {
+    const l = () => cb()
+    ipcRenderer.on('handshake:toast-ready', l)
+    return () => ipcRenderer.removeListener('handshake:toast-ready', l)
+  },
   onAppNavigate: (cb: (route: string) => void) => {
     const l = (_: IpcRendererEvent, route: string) => cb(route)
     ipcRenderer.on('app:navigate', l)

@@ -85,7 +85,7 @@ export function GuideMap({ onOpenTab, compact }: { onOpenTab?: (tab: Route) => v
     {
       id: 'collect',
       icon: HardDriveDownload,
-      accent: '#6366f1',
+      accent: '#2dd4bf',
       title: labels.guideStep1Title,
       body: labels.guideStep1Body,
       where: labels.guideStep1Where,
@@ -103,7 +103,7 @@ export function GuideMap({ onOpenTab, compact }: { onOpenTab?: (tab: Route) => v
     {
       id: 'distill',
       icon: Sparkles,
-      accent: '#a78bfa',
+      accent: '#34d399',
       title: labels.guideStep3Title,
       body: labels.guideStep3Body,
       where: labels.guideStep3Where,
@@ -121,7 +121,7 @@ export function GuideMap({ onOpenTab, compact }: { onOpenTab?: (tab: Route) => v
     {
       id: 'cursor',
       icon: Plug,
-      accent: '#f472b6',
+      accent: '#2dd4bf',
       title: labels.guideStep5Title,
       body: labels.guideStep5Body,
       where: labels.guideStep5Where,

@@ -88,7 +88,7 @@ export async function importDocument(
   let indexError: string | undefined
 
   if (!brainRunning) {
-    const ensured = await ensureBrainForIndexing(ollamaUrl, onProgress)
+    const ensured = await ensureBrainForIndexing(ollamaUrl, onProgress, vaultDir)
     brainRunning = ensured.running
     brainAutoStarted = ensured.autoStarted
     if (!brainRunning) indexError = ensured.error

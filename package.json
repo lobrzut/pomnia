@@ -1,6 +1,6 @@
 {
   "name": "pomnia",
-  "version": "0.1.2",
+  "version": "0.1.12",
   "description": "Pomnia — local-first AI memory for developers: encrypted vault, distill pipeline, embedded Brain MCP.",
   "homepage": "https://pomnia.ai",
   "author": "alice",
@@ -23,9 +23,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",
     "build:brain-core": "npm run build -w @pomnia/brain-core",
+    "build:doc-parser": "npm run build -w @pomnia/doc-parser",
     "stage:brain-core": "node scripts/stage-brain-core.mjs",
-    "pack:win": "npm run build:brain-core && npm run stage:brain-core && electron-vite build && electron-builder --win",
-    "pack:mac": "npm run build:brain-core && npm run stage:brain-core && electron-vite build && electron-builder --mac"
+    "pack:win": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && electron-vite build && electron-builder --win",
+    "pack:mac": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && electron-vite build && electron-builder --mac"
   },
   "dependencies": {
     "@pomnia/brain-core": "*",

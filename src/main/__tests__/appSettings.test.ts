@@ -47,6 +47,13 @@ describe('appSettings tray logic', () => {
     expect(mod.getAppSettings().floatingMonitorOnMinimize).toBe(false)
   })
 
+  it('floatingMonitorAlwaysOnTop defaults on', async () => {
+    const mod = await import('../appSettings.js')
+    expect(mod.getAppSettings().floatingMonitorAlwaysOnTop).toBe(true)
+    await mod.setAppSettings({ floatingMonitorAlwaysOnTop: false })
+    expect(mod.getAppSettings().floatingMonitorAlwaysOnTop).toBe(false)
+  })
+
   it('persists per-user brain settings', async () => {
     const mod = await import('../appSettings.js')
     await mod.setAppSettings({

@@ -48,6 +48,8 @@ export interface StartOptions {
   dataDir: string
   ollamaUrl?: string
   port?: number
+  /** Portable skills sidecar — typically `<encryptedVault>/skills`. */
+  skillsRoot?: string
 }
 
 function resolveNodeBin(): string | undefined {
@@ -77,6 +79,8 @@ export class BrainCoreManager {
   private indexing = false
   private lastError: string | null = null
   private dataDir = ''
+  /** Reject in-flight reindex / index-document when the child is stopped. */
+  private pendingOpReject: ((err: Error) => void) | null = null
   /** Broadcast hook — main wires this to webContents.send. */
   onEvent: ((e: ChildMsg) => void) | null = null
 
@@ -89,6 +93,13 @@ export class BrainCoreManager {
       dataDir: this.dataDir,
       lastError: this.lastError,
     }
+  }
+
+  private failPendingOp(reason: string): void {
+    const reject = this.pendingOpReject
+    this.pendingOpReject = null
+    this.indexing = false
+    reject?.(new Error(reason))
   }
 
   async start(opts: StartOptions): Promise<EmbeddedBrainStatus> {
@@ -117,7 +128,7 @@ export class BrainCoreManager {
         if (this.child === child) {
           this.child = null
           this.url = null
-          this.indexing = false
+          this.failPendingOp('embedded brain stopped')
           if (code && code !== 0) this.lastError = `brain-core exited with code ${code}`
           this.onEvent?.({ type: 'exited', message: String(code ?? 0) })
         }
@@ -150,6 +161,7 @@ export class BrainCoreManager {
             ollamaUrl: opts.ollamaUrl,
             port: opts.port ?? 7862,
             host: '127.0.0.1',
+            ...(opts.skillsRoot ? { skillsRoot: opts.skillsRoot } : {}),
           },
         })
       })
@@ -168,7 +180,12 @@ export class BrainCoreManager {
 
   async stop(): Promise<EmbeddedBrainStatus> {
     const child = this.child
-    if (!child) return this.status()
+    if (!child) {
+      this.failPendingOp('embedded brain stopped')
+      return this.status()
+    }
+    // Unblock IPC callers waiting on reindex / index-document before the child exits.
+    this.failPendingOp('embedded brain stopped')
     await new Promise<void>((resolve) => {
       const t = setTimeout(() => {
         child.kill()
@@ -178,10 +195,17 @@ export class BrainCoreManager {
         clearTimeout(t)
         resolve()
       })
-      child.send({ type: 'stop' })
+      try {
+        child.send({ type: 'stop' })
+      } catch {
+        child.kill()
+        clearTimeout(t)
+        resolve()
+      }
     })
     this.child = null
     this.url = null
+    this.indexing = false
     return this.status()
   }
 
@@ -192,14 +216,24 @@ export class BrainCoreManager {
     this.indexing = true
     try {
       return await new Promise((resolve, reject) => {
-        const t = setTimeout(() => reject(new Error('reindex timeout (10 min)')), 600_000)
+        const t = setTimeout(() => {
+          this.pendingOpReject = null
+          reject(new Error('reindex timeout (10 min)'))
+        }, 600_000)
+        this.pendingOpReject = (err) => {
+          clearTimeout(t)
+          child.off('message', h)
+          reject(err)
+        }
         const h = (m: ChildMsg): void => {
           if (m.type === 'reindexed') {
             clearTimeout(t)
+            this.pendingOpReject = null
             child.off('message', h)
             resolve(m.stats)
           } else if (m.type === 'error') {
             clearTimeout(t)
+            this.pendingOpReject = null
             child.off('message', h)
             reject(new Error(m.message ?? 'reindex failed'))
           }
@@ -219,14 +253,24 @@ export class BrainCoreManager {
     this.indexing = true
     try {
       return await new Promise((resolve, reject) => {
-        const t = setTimeout(() => reject(new Error('index-document timeout (10 min)')), 600_000)
+        const t = setTimeout(() => {
+          this.pendingOpReject = null
+          reject(new Error('index-document timeout (10 min)'))
+        }, 600_000)
+        this.pendingOpReject = (err) => {
+          clearTimeout(t)
+          child.off('message', h)
+          reject(err)
+        }
         const h = (m: ChildMsg): void => {
           if (m.type === 'indexed-document') {
             clearTimeout(t)
+            this.pendingOpReject = null
             child.off('message', h)
             resolve(m.stats)
           } else if (m.type === 'error') {
             clearTimeout(t)
+            this.pendingOpReject = null
             child.off('message', h)
             reject(new Error(m.message ?? 'index-document failed'))
           }
@@ -237,6 +281,13 @@ export class BrainCoreManager {
     } finally {
       this.indexing = false
     }
+  }
+
+  /** Point MCP list_skills / get_skill at a new root (portable vault sidecar). */
+  setSkillsRoot(path: string): void {
+    const child = this.child
+    if (!child || !this.url) return
+    child.send({ type: 'set-skills-root', path })
   }
 }
 

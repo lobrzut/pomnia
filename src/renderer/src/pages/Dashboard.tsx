@@ -1,6 +1,15 @@
 import { useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Check, Database, HardDriveDownload, MessageSquare, RefreshCw, Server, Layers } from 'lucide-react'
+import {
+  Check,
+  Database,
+  HardDriveDownload,
+  MessageSquare,
+  RefreshCw,
+  Server,
+  Layers,
+  Sparkles
+} from 'lucide-react'
 import { Badge, Button, GlassCard, Input, ProgressBar, SourceTile, Spinner } from '../components/ui'
 import { ActivityBanner } from '../components/ActivityBanner'
 import { StatusStrip } from '../components/StatusStrip'
@@ -43,6 +52,7 @@ export default function Dashboard() {
     toggleSelected,
     selectAll,
     backup,
+    backupAndDistill,
     backingUp,
     backupPhase,
     vault,
@@ -50,9 +60,12 @@ export default function Dashboard() {
     setBackupNote,
     setRoute,
     brainState,
+    brainRunning,
+    brainProgress,
     globalActivity
   } = useStore()
   const labels = uiLabels()
+  const busy = backingUp || brainRunning
 
   const installed = useMemo(() => sources.filter((s) => s.installed), [sources])
   const totals = useMemo(
@@ -69,6 +82,12 @@ export default function Dashboard() {
       : brainState?.lastRun
         ? labels.dashboardActivityLast(relativeTime(brainState.lastRun))
         : labels.dashboardActivityNone
+
+  const barPhase = backingUp
+    ? backupPhase || labels.dashboardWorking
+    : brainRunning
+      ? brainProgress?.label || labels.dashboardDistilling
+      : null
 
   useEffect(() => {
     void api.mcpActivityWatch(true)
@@ -160,7 +179,8 @@ export default function Dashboard() {
                     className="pointer-events-none absolute inset-0 rounded-[var(--radius-xl)] transition-opacity"
                     style={{
                       opacity: on ? 1 : 0,
-                      boxShadow: `inset 0 0 0 1.5px ${meta.color}aa, inset 0 0 60px -30px ${meta.color}`
+                      // Same mint ring for every selected source — no “Claude on / Cursor off” look.
+                      boxShadow: 'inset 0 0 0 1.5px #34d399aa, inset 0 0 60px -30px #34d399'
                     }}
                   />
                   <div className="relative flex items-start gap-3.5">
@@ -178,8 +198,7 @@ export default function Dashboard() {
                     </div>
                     <motion.div
                       animate={{ scale: on ? 1 : 0.6, opacity: on ? 1 : 0 }}
-                      className="flex h-6 w-6 items-center justify-center rounded-full"
-                      style={{ background: meta.color }}
+                      className="flex h-6 w-6 items-center justify-center rounded-full bg-mint"
                     >
                       <Check className="h-3.5 w-3.5 text-black" strokeWidth={3} />
                     </motion.div>
@@ -190,36 +209,57 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Backup launch bar */}
+      {/* Backup + Distill launch bar */}
       <motion.div layout className="sticky bottom-0 mt-7">
         <GlassCard className="flex items-center gap-4 p-4">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl accent-grad ring-glow">
             <Database className="h-5 w-5 text-white" />
           </div>
           <div className="min-w-0 flex-1">
-            {backingUp ? (
+            {busy ? (
               <>
-                <div className="mb-1.5 text-sm font-medium text-ink">{backupPhase || 'Working…'}</div>
+                <div className="mb-1.5 text-sm font-medium text-ink">{barPhase}</div>
                 <ProgressBar indeterminate />
               </>
             ) : (
               <>
                 <div className="text-sm font-semibold text-ink">
-                  {selected.size} source{selected.size === 1 ? '' : 's'} selected
+                  {labels.dashboardSourcesSelected(selected.size)}
                 </div>
                 <div className="text-xs text-ink-dim">
-                  {vault.open ? `Ready — backup to “${vault.name}”` : 'Open a vault to enable backup'}
+                  {vault.open
+                    ? labels.dashboardReadyVault(vault.name ?? 'vault')
+                    : labels.dashboardOpenVaultHint}
                 </div>
               </>
             )}
           </div>
           <div className="hidden w-56 shrink-0 md:block">
-            <Input value={backupNote} onChange={(e) => setBackupNote(e.target.value)} placeholder="optional note…" />
+            <Input
+              value={backupNote}
+              onChange={(e) => setBackupNote(e.target.value)}
+              placeholder={labels.dashboardBackupNotePlaceholder}
+              disabled={busy}
+            />
           </div>
-          <Button onClick={() => backup(backupNote)} disabled={backingUp || !vault.open || selected.size === 0}>
-            {backingUp ? <Spinner className="h-4 w-4" /> : <HardDriveDownload className="h-4 w-4" />}
-            Backup now
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => void backup(backupNote)}
+              disabled={busy || !vault.open || selected.size === 0}
+              className="!px-3 !text-xs text-ink-dim"
+            >
+              {backingUp && !brainRunning ? <Spinner className="h-3.5 w-3.5" /> : null}
+              {labels.dashboardBackupOnly}
+            </Button>
+            <Button
+              onClick={() => void backupAndDistill(backupNote)}
+              disabled={busy || !vault.open || selected.size === 0}
+            >
+              {busy ? <Spinner className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+              {labels.dashboardBackupAndBrain}
+            </Button>
+          </div>
         </GlassCard>
       </motion.div>
     </div>

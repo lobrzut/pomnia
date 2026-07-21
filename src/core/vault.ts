@@ -1,12 +1,15 @@
 /**
  * Pomnia vault — an encrypted, content-addressed, portable store.
  *
- * On-disk layout of `MyVault.pomnia/`:
+ * On-disk layout of `MyVault.pomnia/` (or any vault folder e.g. `C:\Vault`):
  *   header.json              plaintext: format, vault id, KDF salt+params, check token
  *   manifest.cvb             encrypted VaultManifest (list of snapshots + stats)
  *   library.cvb              encrypted LibraryManifest (imported PDF/DOCX docs)
  *   snapshots/<id>.cvb       encrypted SnapshotPayload (conversations + file index)
  *   blobs/<sha256>.cvb       encrypted file contents, deduplicated across snapshots
+ *   skills/                  plaintext sidecar (brain/*.md, cli/<skill>/SKILL.md) — NOT encrypted;
+ *                            travels with the vault folder; ignored by crypto open/create
+ *   distilled/               optional plaintext notes (host-side); also ignored by crypto
  *
  * The header holds NO secrets — only the salt and an encrypted check token used to
  * validate the passphrase at unlock. The folder is fully portable: copy it to any

@@ -1,4 +1,4 @@
-import clsx from 'clsx'
+﻿import clsx from 'clsx'
 import appIcon from '@brand/icon.png'
 
 const SIZES = {
@@ -23,13 +23,20 @@ export function AppLogo({ size = 'sm', className, glow }: AppLogoProps) {
   return (
     <div
       className={clsx(
-        'relative shrink-0 overflow-hidden rounded-full',
+        // Soft radial mask kills any residual square-edge fringe beyond the stone rim
+        'relative shrink-0 overflow-hidden rounded-full [mask-image:radial-gradient(circle,black_88%,transparent_100%)] [-webkit-mask-image:radial-gradient(circle,black_88%,transparent_100%)]',
         SIZES[size],
         glow && 'ring-glow',
         className
       )}
     >
-      <img src={appIcon} alt="" aria-hidden className="h-full w-full object-cover" draggable={false} />
+      <img
+        src={appIcon}
+        alt=""
+        aria-hidden
+        className="h-full w-full rounded-full object-cover"
+        draggable={false}
+      />
     </div>
   )
 }

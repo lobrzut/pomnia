@@ -4,8 +4,9 @@
  *
  *   parent → child
  *     { type: 'start', config: Partial<BrainConfig> }
- *     { type: 'reindex', dir: string }        // index every .md/.txt under dir
+ *     { type: 'reindex', dir: string }        // distilled/sessions/library only (never skills/)
  *     { type: 'index-document', doc: IndexDocumentInput }
+ *     { type: 'set-skills-root', path: string } // portable vault sidecar skills/
  *     { type: 'stop' }
  *
  *   child → parent
@@ -32,15 +33,22 @@ type ParentMsg =
   | { type: 'start'; config?: Partial<BrainConfig> }
   | { type: 'reindex'; dir: string }
   | { type: 'index-document'; doc: IndexDocumentInput }
+  | { type: 'set-skills-root'; path: string }
   | { type: 'stop' }
 
 function send(msg: unknown): void {
   process.send?.(msg)
 }
 
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError'
+}
+
 let server: BrainServer | null = null
 let config: BrainConfig | null = null
 let busy = false
+/** Cancels in-flight reindex / index-document when parent sends stop. */
+let opAbort: AbortController | null = null
 
 async function handleStart(partial?: Partial<BrainConfig>): Promise<void> {
   if (server) {
@@ -52,7 +60,7 @@ async function handleStart(partial?: Partial<BrainConfig>): Promise<void> {
     onMcpQuery: (ev) => send({ type: 'mcp-query', tool: ev.tool, detail: ev.detail }),
   })
   await server.start()
-  send({ type: 'ready', url: server.url })
+  send({ type: 'ready', url: server.url, adopted: server.adopted })
 }
 
 async function handleReindex(dir: string): Promise<void> {
@@ -65,6 +73,8 @@ async function handleReindex(dir: string): Promise<void> {
     return
   }
   busy = true
+  const ac = new AbortController()
+  opAbort = ac
   try {
     // Separate writable handle — the server's own handle stays untouched.
     // SQLite WAL would be nicer but the Python schema doesn't use it; short
@@ -72,15 +82,20 @@ async function handleReindex(dir: string): Promise<void> {
     const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
     try {
       const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
-      const stats = await indexDir(db, embedder, dir, (p) => send({ type: 'reindex-progress', ...p }))
+      const stats = await indexDir(db, embedder, dir, (p) => send({ type: 'reindex-progress', ...p }), ac.signal)
       send({ type: 'reindexed', stats })
     } finally {
       db.close()
     }
   } catch (err) {
-    send({ type: 'error', message: err instanceof Error ? err.message : String(err) })
+    if (isAbortError(err)) {
+      send({ type: 'error', message: 'reindex aborted' })
+    } else {
+      send({ type: 'error', message: err instanceof Error ? err.message : String(err) })
+    }
   } finally {
     busy = false
+    if (opAbort === ac) opAbort = null
   }
 }
 
@@ -94,23 +109,31 @@ async function handleIndexDocument(doc: IndexDocumentInput): Promise<void> {
     return
   }
   busy = true
+  const ac = new AbortController()
+  opAbort = ac
   try {
     const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
     try {
       const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
-      const stats = await indexDocument(db, embedder, doc, (p) => send({ type: 'index-progress', ...p }))
+      const stats = await indexDocument(db, embedder, doc, (p) => send({ type: 'index-progress', ...p }), ac.signal)
       send({ type: 'indexed-document', stats })
     } finally {
       db.close()
     }
   } catch (err) {
-    send({ type: 'error', message: err instanceof Error ? err.message : String(err) })
+    if (isAbortError(err)) {
+      send({ type: 'error', message: 'index aborted' })
+    } else {
+      send({ type: 'error', message: err instanceof Error ? err.message : String(err) })
+    }
   } finally {
     busy = false
+    if (opAbort === ac) opAbort = null
   }
 }
 
 async function handleStop(): Promise<void> {
+  opAbort?.abort()
   try {
     await server?.stop()
   } finally {
@@ -131,6 +154,10 @@ process.on('message', (msg: ParentMsg) => {
       break
     case 'index-document':
       void handleIndexDocument(msg.doc)
+      break
+    case 'set-skills-root':
+      if (config) config.skillsRoot = msg.path
+      server?.setSkillsRoot(msg.path)
       break
     case 'stop':
       void handleStop()

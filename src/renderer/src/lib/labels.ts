@@ -78,6 +78,7 @@ export interface UiLabels {
   distillBacklog: (n: number) => string
   runPipeline: string
   deployToBrain: string
+  remoteDeployLead: string
   embedded: string
   remote: string
   reindex: string
@@ -85,6 +86,9 @@ export interface UiLabels {
   brainPageTitle: string
   brainPageLead: string
   embeddedBrain: string
+  embeddedBrainStart: string
+  embeddedBrainStop: string
+  embeddedBrainStoppedToast: string
   brainServer: string
   searchKnowledge: string
   advanced: string
@@ -100,14 +104,26 @@ export interface UiLabels {
   floatingMonitorOnMinimizeHint: string
   floatingMonitorIdleBadge: string
   floatingMonitorClose: string
+  floatingMonitorPin: string
+  floatingMonitorUnpin: string
   floatingMonitorOpenHint: string
+  handshake: string
+  handshakeHint: string
+  handshakePlaceholder: string
+  handshakeSubmit: string
+  handshakeWrong: string
+  handshakeReady: string
+  handshakeClose: string
+  handshakeArmedBadge: string
+  handshakeToastReady: string
   connectPageLead: string
   connectChecklistTitle: string
   connectStepUrl: string
   connectStepToken: string
   connectStepCopy: string
   connectStepReload: string
-  connectCopyForCursor: string
+  /** Copy-button label; `name` = selected MCP client (Cursor, Antigravity, …). */
+  connectCopyForClient: (name: string) => string
   connectTokenPlaceholder: string
   connectTokenRequired: string
   connectOpenDashboard: string
@@ -140,6 +156,8 @@ export interface UiLabels {
   unlockVaultForSnapshots: string
   moreSnapshots: (n: number) => string
   securityAbout: string
+  /** Footer under Settings → Bezpieczeństwo; `version` from app.getVersion(). */
+  securityAboutCli: (version: string) => string
   previewMode: string
   importTitle: string
   importLead: string
@@ -269,6 +287,8 @@ export interface UiLabels {
   flowNodeAiHint: string
   flowNodeAiDisk: string
   flowNodeVaultLabel: string
+  /** Short label for floating PiP (~300px) — no wrap. */
+  flowNodeVaultLabelPip: string
   flowNodeVaultHint: string
   flowNodeVaultDisk: string
   flowNodeDistillLabel: string
@@ -278,9 +298,11 @@ export interface UiLabels {
   flowNodeNotesHint: string
   flowNodeNotesDisk: string
   flowNodeLibraryLabel: string
+  flowNodeLibraryLabelPip: string
   flowNodeLibraryHint: string
   flowNodeLibraryDisk: string
   flowNodeMcpLabel: string
+  flowNodeMcpLabelPip: string
   flowNodeMcpHint: string
   flowNodeMcpDisk: string
   flowNodeImportLabel: string
@@ -309,6 +331,28 @@ export interface UiLabels {
   statusPendingDocsNone: string
   dashboardTitle: string
   dashboardLead: string
+  dashboardSourcesSelected: (n: number) => string
+  dashboardReadyVault: (name: string) => string
+  dashboardOpenVaultHint: string
+  dashboardBackupNotePlaceholder: string
+  dashboardBackupAndBrain: string
+  dashboardBackupOnly: string
+  dashboardWorking: string
+  dashboardDistilling: string
+  dashboardBackupStarting: string
+  dashboardNoVaultTitle: string
+  dashboardNoVaultDetail: string
+  dashboardNothingSelected: string
+  dashboardBackupDone: (n: number) => string
+  dashboardBackupDoneSkipped: (n: number) => string
+  dashboardBackupSkippedHint: string
+  dashboardBackupFailed: string
+  dashboardNoDistillSourcesTitle: string
+  dashboardNoDistillSourcesDetail: string
+  dashboardBrainOffTitle: string
+  dashboardBrainOffDetail: string
+  dashboardBrainStarted: string
+  dashboardBrainStartFailed: string
 }
 
 const PL_LABELS: UiLabels = {
@@ -316,6 +360,7 @@ const PL_LABELS: UiLabels = {
   distillBacklog: (n) => `Przygotuj pamięć (${n} nowych)`,
   runPipeline: 'Przygotuj pamięć',
   deployToBrain: 'Wyślij do wyszukiwarki',
+  remoteDeployLead: 'To jest dla Brain na serwerze / KVM — lokalnie nie wypełniaj.',
   embedded: 'Lokalnie',
   remote: 'Na serwerze',
   reindex: 'Odśwież indeks',
@@ -324,6 +369,9 @@ const PL_LABELS: UiLabels = {
   brainPageLead:
     'Przygotuj rozmowy do wyszukiwania i uruchom lokalną wyszukiwarkę — bez serwera w chmurze.',
   embeddedBrain: 'Lokalna wyszukiwarka',
+  embeddedBrainStart: 'Start',
+  embeddedBrainStop: 'Stop',
+  embeddedBrainStoppedToast: 'Lokalna wyszukiwarka zatrzymana',
   brainServer: 'Serwer Brain',
   searchKnowledge: 'Szukaj w swojej pamięci',
   advanced: 'Zaawansowane',
@@ -340,9 +388,20 @@ const PL_LABELS: UiLabels = {
   floatingMonitorOnMinimize: 'Pokaż przy minimalizacji',
   floatingMonitorOnMinimizeHint:
     'Gdy chowasz okno do traya lub minimalizujesz — mały diagram na pulpicie pokazuje na żywo destylację, indeksowanie i zapytania MCP (jak PiP na YouTube).',
-  floatingMonitorIdleBadge: 'Na żywo: bezczynnie',
+  floatingMonitorIdleBadge: 'Na żywo',
   floatingMonitorClose: 'Zamknij pływający diagram',
+  floatingMonitorPin: 'Przypnij — zawsze na wierzchu',
+  floatingMonitorUnpin: 'Odepnij — nie trzymaj na wierzchu',
   floatingMonitorOpenHint: 'Kliknij, aby otworzyć Pomnię na „Jak to działa”. Podwójne kliknięcie — zamknij.',
+  handshake: 'Handshake',
+  handshakeHint: 'Twój rytuał — wpisz frazę i ruszamy.',
+  handshakePlaceholder: 'OK to Go Go Go',
+  handshakeSubmit: 'OK',
+  handshakeWrong: 'Nie ta fraza — spróbuj jeszcze raz.',
+  handshakeReady: 'Gotowy',
+  handshakeClose: 'Zamknij Handshake',
+  handshakeArmedBadge: 'Go',
+  handshakeToastReady: 'Gotowy',
   connectPageLead:
     'Skopiuj konfigurację MCP i wklej w Cursorze — Pomnia nigdy nie dotyka Twoich plików.',
   connectChecklistTitle: 'Pierwsze podłączenie (4 kroki)',
@@ -350,7 +409,8 @@ const PL_LABELS: UiLabels = {
   connectStepToken: 'Token Bearer z dashboardu (:7860)',
   connectStepCopy: 'Kopiuj pełny mcp.json (3 serwery)',
   connectStepReload: 'Reload Window w Cursorze',
-  connectCopyForCursor: 'Kopiuj mcp.json dla Cursora',
+  connectCopyForClient: (name) =>
+    name === 'Cursor' ? 'Kopiuj mcp.json dla Cursora' : `Kopiuj mcp.json dla ${name}`,
   connectTokenPlaceholder: 'Bearer token (wymagany dla remote)',
   connectTokenRequired: 'Bez tokena remote MCP zwykle nie zadziała — wklej lub utwórz poniżej.',
   connectOpenDashboard: 'Otwórz dashboard tokenów',
@@ -389,6 +449,8 @@ const PL_LABELS: UiLabels = {
   unlockVaultForSnapshots: 'Odblokuj vault, żeby zobaczyć snapshoty.',
   moreSnapshots: (n) => `+ ${n} więcej…`,
   securityAbout: 'Bezpieczeństwo i informacje',
+  securityAboutCli: (version) =>
+    `Pomnia v${version} · ten sam silnik działa też w trybie CLI (bez okna).`,
   previewMode: 'Tryb podglądu (bez backendu Electron) — dane są przykładowe.',
   importTitle: 'Importuj',
   importLead: 'Wgraj eksport z Claude.ai, ChatGPT, Gemini albo Grok — trafi do vaultu.',
@@ -517,6 +579,7 @@ const PL_LABELS: UiLabels = {
   flowNodeAiHint: 'Cursor, Claude Code, Antigravity — surowe logi sesji na dysku lokalnym.',
   flowNodeAiDisk: 'Cursor · Claude · Antigravity',
   flowNodeVaultLabel: 'Vault .pomnia',
+  flowNodeVaultLabelPip: 'Vault',
   flowNodeVaultHint: 'Zaszyfrowane archiwum snapshotów backupów i dokumentów library.cvb.',
   flowNodeVaultDisk: 'folder *.pomnia',
   flowNodeDistillLabel: 'Destylacja',
@@ -526,9 +589,11 @@ const PL_LABELS: UiLabels = {
   flowNodeNotesHint: 'Zdestylowane skróty sesji gotowe do indeksowania.',
   flowNodeNotesDisk: 'notes/distilled',
   flowNodeLibraryLabel: 'library.db',
+  flowNodeLibraryLabelPip: 'library.db',
   flowNodeLibraryHint: 'Embedded brain: chunki tekstu + wektory embeddingów lokalnie na tym PC.',
   flowNodeLibraryDisk: 'core-data/library.db',
   flowNodeMcpLabel: 'Agent przez MCP',
+  flowNodeMcpLabelPip: 'Agent MCP',
   flowNodeMcpHint: 'Agent (Cursor i inni) łączy się przez MCP — most do lokalnej wyszukiwarki Brain.',
   flowNodeMcpDisk: 'Connect · mcp.json',
   flowAgentLayerSkills: 'skills',
@@ -569,6 +634,31 @@ const PL_LABELS: UiLabels = {
   dashboardTitle: 'Centrum dowodzenia',
   dashboardLead:
     'Zbierz rozmowy ze wszystkich asystentów do jednego zaszyfrowanego vaultu — backup to tylko mechanizm.',
+  dashboardSourcesSelected: (n) =>
+    n === 1 ? '1 źródło zaznaczone' : `${n} źródeł zaznaczonych`,
+  dashboardReadyVault: (name) => `Gotowe — backup do „${name}”`,
+  dashboardOpenVaultHint: 'Otwórz vault, żeby włączyć backup',
+  dashboardBackupNotePlaceholder: 'opcjonalna notatka…',
+  dashboardBackupAndBrain: 'Backup i do Brain',
+  dashboardBackupOnly: 'Tylko backup',
+  dashboardWorking: 'Pracuję…',
+  dashboardDistilling: 'Destylacja do Brain…',
+  dashboardBackupStarting: 'startuję…',
+  dashboardNoVaultTitle: 'Brak otwartego vaultu',
+  dashboardNoVaultDetail: 'Najpierw utwórz lub odblokuj vault.',
+  dashboardNothingSelected: 'Nic nie zaznaczono',
+  dashboardBackupDone: (n) => `Zrobiono backup ${n} źródeł`,
+  dashboardBackupDoneSkipped: (n) => `Backup gotowy — pominięto ${n} zablokowanych plików`,
+  dashboardBackupSkippedHint: 'zamknij działające aplikacje i zrób backup ponownie',
+  dashboardBackupFailed: 'Backup nieudany',
+  dashboardNoDistillSourcesTitle: 'Backup gotowy — brak źródeł do destylacji',
+  dashboardNoDistillSourcesDetail:
+    'Destylacja działa dla Claude Code, Cursor i Claude Desktop. Zaznacz jedno z nich albo użyj zakładki Brain.',
+  dashboardBrainOffTitle: 'Backup gotowy — Brain wyłączony',
+  dashboardBrainOffDetail:
+    'Destylacja wymaga lokalnej wyszukiwarki. Uruchom Brain, a potem kontynuuj destylację.',
+  dashboardBrainStarted: 'Brain uruchomiony — destyluję…',
+  dashboardBrainStartFailed: 'Nie udało się uruchomić Brain',
 }
 
 /** @param _simple ignored — kept for call-site compatibility; language does not depend on simple mode */

@@ -144,11 +144,21 @@ export interface PomniaBridge {
     floatingMonitorOnMinimize?: boolean
   }>
   openLogs(): Promise<string>
+  appVersion(): Promise<{ version: string }>
   floatingMonitorShow(): Promise<{ visible: boolean }>
   floatingMonitorHide(): Promise<{ visible: boolean }>
   floatingMonitorToggle(): Promise<{ visible: boolean }>
   floatingMonitorOpenMain(): Promise<{ ok: boolean }>
   floatingMonitorIsVisible(): Promise<{ visible: boolean }>
+  floatingMonitorGetAlwaysOnTop(): Promise<{ alwaysOnTop: boolean }>
+  floatingMonitorSetAlwaysOnTop(on: boolean): Promise<{ alwaysOnTop: boolean }>
+  handshakeShow(): Promise<{ visible: boolean }>
+  handshakeHide(): Promise<{ visible: boolean }>
+  handshakeTry(phrase: string): Promise<{ ok: boolean; armed: boolean }>
+  handshakeGetArmed(): Promise<{ armed: boolean }>
+  handshakeDisarm(): Promise<{ armed: boolean }>
+  onHandshakeArmed(cb: (e: { armed: boolean }) => void): () => void
+  onHandshakeToastReady(cb: () => void): () => void
   onAppNavigate(cb: (route: string) => void): () => void
   minimize(): void
   toggleMaximize(): void
@@ -348,7 +358,7 @@ function mockBridge(): PomniaBridge {
       return { ...mockEmbedded }
     },
     async brainCoreStop() {
-      Object.assign(mockEmbedded, { running: false, url: null })
+      Object.assign(mockEmbedded, { running: false, indexing: false, url: null })
       return { ...mockEmbedded }
     },
     async brainCoreReindex() {
@@ -485,6 +495,9 @@ function mockBridge(): PomniaBridge {
     async openLogs() {
       return '/mock/logs'
     },
+    async appVersion() {
+      return { version: '0.1.8' }
+    },
     async floatingMonitorShow() {
       return { visible: true }
     },
@@ -499,6 +512,34 @@ function mockBridge(): PomniaBridge {
     },
     async floatingMonitorIsVisible() {
       return { visible: false }
+    },
+    async floatingMonitorGetAlwaysOnTop() {
+      return { alwaysOnTop: true }
+    },
+    async floatingMonitorSetAlwaysOnTop(on) {
+      return { alwaysOnTop: on }
+    },
+    async handshakeShow() {
+      return { visible: true }
+    },
+    async handshakeHide() {
+      return { visible: false }
+    },
+    async handshakeTry(phrase) {
+      const ok = /^ok\s+to\s+go\s+go\s+go$/i.test(phrase.trim().replace(/\s+/g, ' '))
+      return { ok, armed: ok }
+    },
+    async handshakeGetArmed() {
+      return { armed: false }
+    },
+    async handshakeDisarm() {
+      return { armed: false }
+    },
+    onHandshakeArmed() {
+      return () => {}
+    },
+    onHandshakeToastReady() {
+      return () => {}
     },
     onAppNavigate() {
       return () => {}

@@ -8,7 +8,8 @@
  *   - "cli"    → expertise injections (~/.claude/skills/<n>/SKILL.md), listed by
  *                /api/cli-skills/list, fetched by /api/cli-skills/get?name=<n>
  *
- * Local layout (under <vaultRoot>/skills/):
+ * Local layout (under skills root — prefer `<encryptedVault>/skills`, else
+ * `<brain-core-data>/vault/skills`):
  *   brain/<name>.md            ← workflow skills
  *   cli/<name>/SKILL.md        ← CLI expertise skills
  *   index.json                 ← {kind, name, description, mtime, syncedAt}[]

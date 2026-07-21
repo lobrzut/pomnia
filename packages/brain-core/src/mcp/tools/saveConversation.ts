@@ -86,10 +86,16 @@ function nowParts(): { date: string; time: string } {
   }
 }
 
+export interface SaveConversationResult {
+  text: string
+  /** Absolute path of the written session note. */
+  path: string
+}
+
 export async function runSaveConversation(
   args: unknown,
   deps: SaveConversationDeps,
-): Promise<string> {
+): Promise<SaveConversationResult> {
   const a = argsSchema.parse(args)
   const src = a.source.trim().toLowerCase() || 'unknown'
   const topic = a.topic.trim() || 'untitled'
@@ -131,9 +137,11 @@ export async function runSaveConversation(
   writeFileSync(tmp, content, 'utf-8')
   renameSync(tmp, outPath)
 
-  return (
-    `✓ Saved to vault/sessions/${filename}\n` +
-    `Will appear on knowledge graph within 30s.\n` +
-    `Searchable via search_library after next reindex.`
-  )
+  return {
+    path: outPath,
+    text:
+      `✓ Saved to vault/sessions/${filename}\n` +
+      `Indexing for search_library in the background.\n` +
+      `Will appear on knowledge graph within 30s.`,
+  }
 }
