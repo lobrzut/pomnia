@@ -1,9 +1,16 @@
 import { create } from 'zustand'
 import { VRAM_PROFILES } from '@core/brain/profiles'
+import {
+  DEFAULT_HANDSHAKE_PHRASE,
+  displayHandshakePhrase,
+  isValidHandshakePhraseSetting,
+} from '@core/handshakePhrase'
 import { api } from '../lib/api'
 import { loadBool, loadStr, migrateLegacyStorage, saveBool, saveStr } from '../lib/persist'
+import { applyColorScheme, isColorScheme, type ColorScheme } from '../lib/theme'
 import type { ClientId, DetectedSource, Snapshot, SourceId, VaultStatus, BrainRunResult, BrainStateInfo, ActivityState } from '../lib/types'
-import { formatBrainProgressLabel, uiLabels } from '../lib/labels'
+import { formatBrainProgressLabel, invalidateUiLabelsCache, uiLabels } from '../lib/labels'
+import { isUiLocale, setUiLocaleCache, type UiLocale } from '../lib/uiLocale'
 
 migrateLegacyStorage()
 
@@ -93,6 +100,7 @@ const VAULT_PATH_KEY = 'pomnia.vault.lastPath'
 const BACKUP_NOTE_KEY = 'pomnia.backup.note'
 const SETTINGS_EXPORT_DIR_KEY = 'pomnia.settings.exportDir'
 const SIMPLE_MODE_KEY = 'pomnia.settings.simpleMode'
+const AGENT_BRAIN_MODE_KEY = 'pomnia.settings.agentBrainMode'
 
 function loadBrainAutoDeploy(): boolean {
   try {
@@ -246,15 +254,30 @@ interface State {
   simpleMode: boolean
   setSimpleMode: (on: boolean) => void
 
+  /**
+   * Connect Brain Mode — include agent rule snippet + instruct MCP loop.
+   * Not Desktop auto-capture of chats.
+   */
+  agentBrainMode: boolean
+  setAgentBrainMode: (on: boolean) => void
+
   /** Tray — main-process settings mirrored here for the Settings UI. */
   minimizeToTray: boolean
   closeToTray: boolean
   floatingMonitorOnMinimize: boolean
   openAtLogin: boolean
+  colorScheme: ColorScheme
+  uiLocale: UiLocale
+  handshakePhrase: string
+  handshakeEnabled: boolean
   setMinimizeToTray: (on: boolean) => void
   setCloseToTray: (on: boolean) => void
   setFloatingMonitorOnMinimize: (on: boolean) => void
   setOpenAtLogin: (on: boolean) => void
+  setColorScheme: (scheme: ColorScheme) => void
+  setUiLocale: (locale: UiLocale) => void
+  setHandshakePhrase: (phrase: string) => Promise<{ ok: boolean; phrase: string }>
+  setHandshakeEnabled: (on: boolean) => void
   loadAppSettings: () => Promise<void>
 
   /** Distill pipeline — lives in the store so progress survives tab switches. */
@@ -324,6 +347,8 @@ export const useStore = create<State>((set, get) => ({
       const vault = await api.createVault(path, name, pass)
       saveStr(VAULT_PATH_KEY, path)
       set({ vault, snapshots: [], vaultLastPath: path })
+      // Refresh so skillsCount / distilledNotes match vault:status (open may omit older fields).
+      await get().refreshVault()
       get().toast({ kind: 'success', title: 'Vault created', detail: name })
       return true
     } catch (e) {
@@ -336,6 +361,7 @@ export const useStore = create<State>((set, get) => ({
       const vault = await api.openVault(path, pass)
       saveStr(VAULT_PATH_KEY, path)
       set({ vault, snapshots: await api.listSnapshots(), vaultLastPath: path })
+      await get().refreshVault()
       get().toast({ kind: 'success', title: 'Vault unlocked', detail: vault.name })
       return true
     } catch (e) {
@@ -565,10 +591,20 @@ export const useStore = create<State>((set, get) => ({
     set({ simpleMode })
   },
 
+  agentBrainMode: loadBool(AGENT_BRAIN_MODE_KEY, false),
+  setAgentBrainMode: (agentBrainMode) => {
+    saveBool(AGENT_BRAIN_MODE_KEY, agentBrainMode)
+    set({ agentBrainMode })
+  },
+
   minimizeToTray: false,
   closeToTray: true,
   floatingMonitorOnMinimize: true,
   openAtLogin: false,
+  colorScheme: 'mint',
+  uiLocale: 'pl',
+  handshakePhrase: DEFAULT_HANDSHAKE_PHRASE,
+  handshakeEnabled: true,
   async loadAppSettings() {
     try {
       const s = await api.appSettings()
@@ -607,12 +643,26 @@ export const useStore = create<State>((set, get) => ({
       const brainDeployUrl = state.brainDeployUrl || s.brainDeployUrl || loadBrainDeployUrl()
       const connectToken = state.connectToken || s.connectToken || loadStr(CONNECT_TOKEN_KEY)
       const ollamaUrl = state.ollamaUrl || s.ollamaUrl || ''
+      const colorScheme = isColorScheme(s.colorScheme) ? s.colorScheme : 'mint'
+      applyColorScheme(colorScheme)
+      const uiLocale = isUiLocale(s.uiLocale) ? s.uiLocale : 'pl'
+      setUiLocaleCache(uiLocale)
+      invalidateUiLabelsCache()
+      const handshakePhrase =
+        typeof s.handshakePhrase === 'string' && s.handshakePhrase.trim()
+          ? displayHandshakePhrase(s.handshakePhrase)
+          : DEFAULT_HANDSHAKE_PHRASE
+      const handshakeEnabled = s.handshakeEnabled !== false
 
       set({
         minimizeToTray: s.minimizeToTray,
         closeToTray: s.closeToTray,
         floatingMonitorOnMinimize: s.floatingMonitorOnMinimize !== false,
         openAtLogin: !!s.openAtLogin,
+        colorScheme,
+        uiLocale,
+        handshakePhrase,
+        handshakeEnabled,
         ollamaUrl,
         remoteBrainUrl,
         brainTarget,
@@ -636,6 +686,46 @@ export const useStore = create<State>((set, get) => ({
   },
   setOpenAtLogin: (openAtLogin) => {
     void api.appSettingsSet({ openAtLogin }).then((s) => set({ openAtLogin: !!s.openAtLogin }))
+  },
+  setColorScheme: (scheme) => {
+    const colorScheme = isColorScheme(scheme) ? scheme : 'mint'
+    applyColorScheme(colorScheme)
+    set({ colorScheme })
+    void api.appSettingsSet({ colorScheme }).then((s) => {
+      const next = isColorScheme(s.colorScheme) ? s.colorScheme : colorScheme
+      applyColorScheme(next)
+      set({ colorScheme: next })
+    })
+  },
+  setUiLocale: (locale) => {
+    const uiLocale = isUiLocale(locale) ? locale : 'pl'
+    setUiLocaleCache(uiLocale)
+    invalidateUiLabelsCache()
+    set({ uiLocale })
+    void api.appSettingsSet({ uiLocale }).then((s) => {
+      const next = isUiLocale(s.uiLocale) ? s.uiLocale : uiLocale
+      setUiLocaleCache(next)
+      invalidateUiLabelsCache()
+      set({ uiLocale: next })
+    })
+  },
+  async setHandshakePhrase(phrase) {
+    const trimmed = phrase.trim()
+    if (!trimmed || !isValidHandshakePhraseSetting(trimmed)) {
+      return { ok: false, phrase: get().handshakePhrase }
+    }
+    const s = await api.appSettingsSet({ handshakePhrase: trimmed })
+    const next =
+      typeof s.handshakePhrase === 'string' && s.handshakePhrase.trim()
+        ? displayHandshakePhrase(s.handshakePhrase)
+        : displayHandshakePhrase(trimmed)
+    set({ handshakePhrase: next })
+    return { ok: true, phrase: next }
+  },
+  setHandshakeEnabled: (handshakeEnabled) => {
+    void api.appSettingsSet({ handshakeEnabled }).then((s) =>
+      set({ handshakeEnabled: s.handshakeEnabled !== false }),
+    )
   },
 
   brainRunning: false,
@@ -752,6 +842,7 @@ export const useStore = create<State>((set, get) => ({
       off()
       set({ brainRunning: false, brainProgress: null })
       void get().loadBrainState()
+      void get().refreshVault()
     }
   },
   cancelBrainPipeline() {

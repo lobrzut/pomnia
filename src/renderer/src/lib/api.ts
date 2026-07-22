@@ -1,4 +1,4 @@
-import { isHandshakePhrase } from '@core/handshakePhrase'
+import { DEFAULT_HANDSHAKE_PHRASE } from '@core/handshakePhrase'
 import type {
   ActivityState,
   LastActivityReplay,
@@ -26,8 +26,19 @@ import type {
   VaultStatus
 } from './types'
 
-/** Browser / no-preload mock session flag (mirrors main goArmed). */
-let mockGoArmed = false
+export type ProfilePreviewStatus = 'ok' | 'vault_locked' | 'brain_down' | 'no_knowledge'
+
+export interface ProfilePreviewResult {
+  status: ProfilePreviewStatus
+  summary?: string
+  source?: 'ollama' | 'fallback'
+  /** Raw vault USER.md for editing when vault is open. */
+  userMd?: string
+}
+
+export type ProfilePreviewSaveResult =
+  | { ok: true; path: string; chars: number }
+  | { ok: false; error: 'vault_locked' | 'too_long' | 'write_failed'; detail?: string; maxChars?: number }
 
 /** The bridge exposed by preload as window.pomnia. */
 export interface PomniaBridge {
@@ -104,6 +115,7 @@ export interface PomniaBridge {
     brainUrl: string,
     token?: string,
     target?: 'embedded' | 'remote',
+    brainMode?: boolean,
   ): Promise<Snippet>
   connectSkillsList(brainUrl: string, token?: string): Promise<SkillListEntry[]>
   connectSkillsSync(brainUrl: string, token?: string): Promise<SkillSyncResult>
@@ -124,6 +136,10 @@ export interface PomniaBridge {
     onboarded?: boolean
     floatingMonitorOnMinimize?: boolean
     openAtLogin?: boolean
+    colorScheme?: 'mint' | 'iris' | 'glass'
+    uiLocale?: 'pl' | 'en'
+    handshakePhrase?: string
+    handshakeEnabled?: boolean
   }>
   appSettingsSet(patch: {
     minimizeToTray?: boolean
@@ -137,6 +153,10 @@ export interface PomniaBridge {
     onboarded?: boolean
     floatingMonitorOnMinimize?: boolean
     openAtLogin?: boolean
+    colorScheme?: 'mint' | 'iris' | 'glass'
+    uiLocale?: 'pl' | 'en'
+    handshakePhrase?: string
+    handshakeEnabled?: boolean
   }): Promise<{
     minimizeToTray: boolean
     closeToTray: boolean
@@ -149,7 +169,13 @@ export interface PomniaBridge {
     onboarded?: boolean
     floatingMonitorOnMinimize?: boolean
     openAtLogin?: boolean
+    colorScheme?: 'mint' | 'iris' | 'glass'
+    uiLocale?: 'pl' | 'en'
+    handshakePhrase?: string
+    handshakeEnabled?: boolean
   }>
+  onColorScheme(cb: (scheme: 'mint' | 'iris' | 'glass') => void): () => void
+  onUiLocale(cb: (locale: 'pl' | 'en') => void): () => void
   openLogs(): Promise<string>
   appVersion(): Promise<{ version: string }>
   floatingMonitorShow(): Promise<{ visible: boolean }>
@@ -159,13 +185,15 @@ export interface PomniaBridge {
   floatingMonitorIsVisible(): Promise<{ visible: boolean }>
   floatingMonitorGetAlwaysOnTop(): Promise<{ alwaysOnTop: boolean }>
   floatingMonitorSetAlwaysOnTop(on: boolean): Promise<{ alwaysOnTop: boolean }>
-  handshakeShow(): Promise<{ visible: boolean }>
-  handshakeHide(): Promise<{ visible: boolean }>
-  handshakeTry(phrase: string): Promise<{ ok: boolean; armed: boolean }>
-  handshakeGetArmed(): Promise<{ armed: boolean }>
-  handshakeDisarm(): Promise<{ armed: boolean }>
-  onHandshakeArmed(cb: (e: { armed: boolean }) => void): () => void
-  onHandshakeToastReady(cb: () => void): () => void
+  handshakeGetPhrase(): Promise<{ phrase: string; enabled?: boolean }>
+  onHandshakePhrase(cb: (e: { phrase: string; enabled?: boolean }) => void): () => void
+  profilePreviewShow(): Promise<{ visible: boolean }>
+  profilePreviewHide(): Promise<{ visible: boolean }>
+  profilePreviewLoad(): Promise<ProfilePreviewResult>
+  onProfilePreviewProgress(
+    cb: (e: { phase: 'user_md' | 'notes' | 'search' | 'summarize' | 'done'; pct: number }) => void,
+  ): () => void
+  profilePreviewSave(content: string): Promise<ProfilePreviewSaveResult>
   onAppToast(cb: (t: { kind: 'info' | 'success' | 'warn' | 'error'; title: string; detail?: string }) => void): () => void
   onAppNavigate(cb: (route: string) => void): () => void
   minimize(): void
@@ -176,6 +204,8 @@ export interface PomniaBridge {
 /* ── Mock bridge for browser preview (no Electron) ──────────────────────── */
 const mockPullListeners = new Set<(e: OllamaPullEvent) => void>()
 let mockPullCancelled = false
+let mockHandshakePhrase = DEFAULT_HANDSHAKE_PHRASE
+let mockHandshakeEnabled = true
 const mockEmbedded: EmbeddedBrainStatus = {
   running: false,
   starting: false,
@@ -204,7 +234,12 @@ function mockBridge(): PomniaBridge {
     { id: 'antigravity', label: 'Antigravity', strategy: 'hybrid', installed: true, root: '~/AppData/Roaming/Antigravity', os: 'win32', sizeBytes: 7.6e3, conversations: 7, notes: ['Chats in ~/.gemini/antigravity/brain/*/transcript.jsonl'] },
     { id: 'vscode', label: 'VS Code', strategy: 'snapshot', installed: true, root: '~/AppData/Roaming/Code/User', os: 'win32', sizeBytes: 3.4e5 }
   ]
-  let status: VaultStatus = { open: false, snapshots: 0 }
+  let status: VaultStatus = {
+    open: false,
+    snapshots: 0,
+    skillsCount: 0,
+    distilledNotes: 0,
+  }
   let snaps: Snapshot[] = []
   const mkSnap = (id: SourceId, label: string, n: number): Snapshot => ({
     id: crypto.randomUUID(),
@@ -236,16 +271,32 @@ function mockBridge(): PomniaBridge {
       return 'C:/Users/Alice/Downloads/report.pdf'
     },
     async createVault(path, name) {
-      status = { open: true, path, name, snapshots: 0 }
+      status = {
+        open: true,
+        path,
+        name,
+        snapshots: 0,
+        skillsCount: 3,
+        distilledNotes: 12,
+        knowledgePath: path,
+      }
       return status
     },
     async openVault(path, _pass) {
       snaps = [mkSnap('claude-code', 'Claude Code', 38), mkSnap('cursor', 'Cursor', 21)]
-      status = { open: true, path, name: 'Demo Vault', snapshots: snaps.length }
+      status = {
+        open: true,
+        path,
+        name: 'Demo Vault',
+        snapshots: snaps.length,
+        skillsCount: 5,
+        distilledNotes: 24,
+        knowledgePath: path,
+      }
       return status
     },
     async lockVault() {
-      status = { open: false, snapshots: 0 }
+      status = { open: false, snapshots: 0, skillsCount: 0, distilledNotes: 0 }
       snaps = []
     },
     async listSnapshots() {
@@ -458,7 +509,7 @@ function mockBridge(): PomniaBridge {
         ]
       } as { clients: ClientStatus[]; brain: BrainPing }
     },
-    async connectSnippet(clientId, brainUrl) {
+    async connectSnippet(clientId, brainUrl, _token?, _target?, brainMode?) {
       return {
         client: clientId,
         label: clientId,
@@ -468,7 +519,10 @@ function mockBridge(): PomniaBridge {
         mergeJson: `{\n  "brain-rag": { "url": "${brainUrl}/sse" },\n  "brain-vault": { "url": "${brainUrl}/servers/brain-vault/sse" },\n  "brain-library": { "url": "${brainUrl}/servers/brain-library/sse" }\n}\n`,
         instructions: `▶ ${clientId}\n\n1. Open or create the config file.\n2. Paste the FULL 3-server snippet.\n3. Restart the client.`,
         restartHint: 'Restart the client to pick up the new config.',
-        notes: 'Mock snippet (browser preview). Remote always includes brain-rag + brain-vault + brain-library.'
+        notes: 'Mock snippet (browser preview). Remote always includes brain-rag + brain-vault + brain-library.',
+        agentRuleMarkdown: brainMode
+          ? '<!-- pomnia-brain-start -->\n# Pomnia Brain (preview)\n<!-- pomnia-brain-end -->\n'
+          : undefined,
       }
     },
     async connectSkillsList() {
@@ -495,16 +549,36 @@ function mockBridge(): PomniaBridge {
         closeToTray: true,
         floatingMonitorOnMinimize: true,
         openAtLogin: false,
+        colorScheme: 'mint' as const,
+        uiLocale: 'pl' as const,
+        handshakePhrase: mockHandshakePhrase,
+        handshakeEnabled: mockHandshakeEnabled,
       }
     },
     async appSettingsSet(patch) {
+      if (typeof patch.handshakePhrase === 'string' && patch.handshakePhrase.trim()) {
+        mockHandshakePhrase = patch.handshakePhrase.trim()
+      }
+      if (typeof patch.handshakeEnabled === 'boolean') {
+        mockHandshakeEnabled = patch.handshakeEnabled
+      }
       return {
         minimizeToTray: patch.minimizeToTray ?? false,
         closeToTray: patch.closeToTray ?? true,
         floatingMonitorOnMinimize: patch.floatingMonitorOnMinimize ?? true,
         openAtLogin: patch.openAtLogin ?? false,
+        colorScheme: patch.colorScheme ?? 'mint',
+        uiLocale: patch.uiLocale ?? 'pl',
         onboarded: patch.onboarded,
+        handshakePhrase: mockHandshakePhrase,
+        handshakeEnabled: mockHandshakeEnabled,
       }
+    },
+    onColorScheme(_cb) {
+      return () => {}
+    },
+    onUiLocale(_cb) {
+      return () => {}
     },
     async openLogs() {
       return '/mock/logs'
@@ -533,29 +607,32 @@ function mockBridge(): PomniaBridge {
     async floatingMonitorSetAlwaysOnTop(on) {
       return { alwaysOnTop: on }
     },
-    async handshakeShow() {
+    async handshakeGetPhrase() {
+      return { phrase: mockHandshakePhrase, enabled: mockHandshakeEnabled }
+    },
+    onHandshakePhrase() {
+      return () => {}
+    },
+    async profilePreviewShow() {
       return { visible: true }
     },
-    async handshakeHide() {
+    async profilePreviewHide() {
       return { visible: false }
     },
-    async handshakeTry(phrase) {
-      const ok = isHandshakePhrase(phrase)
-      if (ok) mockGoArmed = true
-      return { ok, armed: mockGoArmed }
+    async profilePreviewLoad() {
+      return {
+        status: 'ok' as const,
+        summary:
+          'To jest przykładowy podgląd profilu (tryb przeglądarki). Nic nie zostało zapisane.',
+        source: 'fallback' as const,
+        userMd: '§ PROFIL\nPrzykładowy profil (browser mock).\n',
+      }
     },
-    async handshakeGetArmed() {
-      return { armed: mockGoArmed }
-    },
-    async handshakeDisarm() {
-      mockGoArmed = false
-      return { armed: false }
-    },
-    onHandshakeArmed() {
+    onProfilePreviewProgress() {
       return () => {}
     },
-    onHandshakeToastReady() {
-      return () => {}
+    async profilePreviewSave(_content: string) {
+      return { ok: true as const, path: 'mock/USER.md', chars: _content.length }
     },
     onAppToast() {
       return () => {}

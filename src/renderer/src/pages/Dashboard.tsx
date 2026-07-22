@@ -3,17 +3,18 @@ import { motion } from 'framer-motion'
 import {
   Check,
   Database,
-  HardDriveDownload,
   MessageSquare,
   RefreshCw,
   Server,
   Layers,
-  Sparkles
+  Sparkles,
+  BookOpen,
+  Wand2
 } from 'lucide-react'
 import { Badge, Button, GlassCard, Input, ProgressBar, SourceTile, Spinner } from '../components/ui'
 import { ActivityBanner } from '../components/ActivityBanner'
 import { StatusStrip } from '../components/StatusStrip'
-import { humanBytes, relativeTime, sourceMeta } from '../lib/format'
+import { humanBytes, relativeTime, shortPath, sourceMeta } from '../lib/format'
 import { uiLabels } from '../lib/labels'
 import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
@@ -32,13 +33,13 @@ function Stat({
   delay: number
 }) {
   return (
-    <GlassCard delay={delay} className="p-5">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-wider text-ink-faint">{label}</span>
-        <Icon className="h-4 w-4 text-iris" />
+    <GlassCard delay={delay} className="p-2.5">
+      <div className="flex items-center justify-between gap-1">
+        <span className="truncate text-[10px] font-medium uppercase tracking-wider text-ink-faint">{label}</span>
+        <Icon className="h-3.5 w-3.5 shrink-0 text-iris" />
       </div>
-      <div className="mt-3 text-3xl font-bold tracking-tight text-ink">{value}</div>
-      {sub && <div className="mt-1 text-xs text-ink-dim">{sub}</div>}
+      <div className="mt-1 text-xl font-bold tracking-tight text-ink">{value}</div>
+      {sub && <div className="mt-0.5 truncate text-[10px] text-ink-dim">{sub}</div>}
     </GlassCard>
   )
 }
@@ -62,7 +63,9 @@ export default function Dashboard() {
     brainState,
     brainRunning,
     brainProgress,
-    globalActivity
+    globalActivity,
+    refreshVault,
+    loadBrainState
   } = useStore()
   const labels = uiLabels()
   const busy = backingUp || brainRunning
@@ -89,20 +92,28 @@ export default function Dashboard() {
       ? brainProgress?.label || labels.dashboardDistilling
       : null
 
+  const skillsCount = vault.skillsCount ?? 0
+  const distilledNotes = vault.distilledNotes ?? brainState?.distilled ?? 0
+  const knowledgeSub = vault.open
+    ? shortPath(vault.knowledgePath ?? vault.path ?? vault.name ?? '', 22)
+    : labels.dashboardStatKnowledgeClosed
+
   useEffect(() => {
     void api.mcpActivityWatch(true)
+    void loadBrainState()
+    void refreshVault()
     return () => {
       void api.mcpActivityWatch(false)
     }
-  }, [])
+  }, [loadBrainState, refreshVault])
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <ActivityBanner className="mb-5" />
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col overflow-hidden">
+      <ActivityBanner className="mb-2 shrink-0" />
       <StatusStrip />
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1 text-xs text-ink-dim">
-        <span>{activityLine}</span>
+      <div className="mb-1.5 flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-0.5 px-1 text-[11px] text-ink-dim">
+        <span className="min-w-0 truncate">{activityLine}</span>
         <button
           type="button"
           onClick={() => setRoute('guide')}
@@ -112,113 +123,157 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <div className="mb-6 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.dashboardTitle}</h1>
-          <p className="mt-1 text-sm text-ink-dim">{labels.dashboardLead}</p>
+      <div className="mb-2 flex shrink-0 items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold tracking-tight text-grad">{labels.dashboardTitle}</h1>
+          <p className="mt-0.5 line-clamp-1 text-xs text-ink-dim">{labels.dashboardLead}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => setRoute('guide')}
-            className="no-drag mt-2 text-xs font-medium text-iris hover:text-cyan"
+            className="no-drag hidden text-[11px] font-medium text-iris hover:text-cyan sm:inline"
           >
             {labels.helpDontKnowStart}
           </button>
+          <Button variant="soft" onClick={() => scan()} disabled={scanning} className="!px-2.5 !py-1.5 !text-xs">
+            {scanning ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            Rescan
+          </Button>
         </div>
-        <Button variant="soft" onClick={() => scan()} disabled={scanning}>
-          {scanning ? <Spinner className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />}
-          Rescan
-        </Button>
       </div>
 
-      <div className="mb-7 grid grid-cols-4 gap-4">
-        <Stat icon={Server} label="Sources" value={installed.length} sub="installed" delay={0.02} />
-        <Stat icon={MessageSquare} label="Chats found" value={totals.chats || '—'} sub="extractable" delay={0.06} />
-        <Stat icon={Layers} label="Snapshots" value={vault.snapshots} sub={vault.open ? vault.name : 'no vault'} delay={0.1} />
-        <Stat icon={HardDriveDownload} label="Payload" value={humanBytes(totals.bytes)} sub="after cache trim" delay={0.14} />
+      <div className="mb-2 grid shrink-0 grid-cols-3 gap-2 sm:grid-cols-6">
+        <Stat
+          icon={Server}
+          label={labels.dashboardStatSources}
+          value={installed.length}
+          sub={labels.dashboardStatSourcesSub}
+          delay={0.02}
+        />
+        <Stat
+          icon={MessageSquare}
+          label={labels.dashboardStatChats}
+          value={totals.chats || '—'}
+          sub={labels.dashboardStatChatsSub}
+          delay={0.04}
+        />
+        <Stat
+          icon={Layers}
+          label={labels.dashboardStatSnapshots}
+          value={vault.snapshots}
+          sub={vault.open ? vault.name : labels.dashboardStatSnapshotsClosed}
+          delay={0.06}
+        />
+        <Stat
+          icon={Wand2}
+          label={labels.dashboardStatSkills}
+          value={skillsCount}
+          sub={labels.dashboardStatSkillsSub}
+          delay={0.08}
+        />
+        <Stat
+          icon={BookOpen}
+          label={labels.dashboardStatDistilled}
+          value={distilledNotes}
+          sub={labels.dashboardStatDistilledSub}
+          delay={0.1}
+        />
+        <Stat
+          icon={Database}
+          label={labels.dashboardStatKnowledge}
+          value={vault.open ? labels.dashboardStatKnowledgeOpen : labels.dashboardStatKnowledgeClosed}
+          sub={knowledgeSub}
+          delay={0.12}
+        />
       </div>
 
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-faint">Sources</h2>
+      <div className="mb-1.5 flex shrink-0 items-center justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-faint">
+          {labels.dashboardSourcesHeading}
+        </h2>
         <button
           onClick={() =>
             selectAll(allSelected ? [] : installed.map((s) => s.id))
           }
-          className="text-xs font-medium text-iris hover:text-cyan"
+          className="text-[11px] font-medium text-iris hover:text-cyan"
         >
-          {allSelected ? 'Deselect all' : 'Select all'}
+          {allSelected ? labels.dashboardDeselectAll : labels.dashboardSelectAll}
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        {scanning && installed.length === 0 ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="skeleton h-[104px] rounded-[var(--radius-xl)]" />
-          ))
-        ) : installed.length === 0 ? (
-          <div className="col-span-2 flex flex-col items-center gap-2 rounded-[var(--radius-xl)] border border-dashed border-white/10 px-6 py-10 text-center">
-            <Server className="h-6 w-6 text-ink-faint" />
-            <p className="text-sm text-ink-dim">No AI tools detected on this machine.</p>
-            <p className="max-w-sm text-[11px] leading-relaxed text-ink-faint">
-              Pomnia looks for Claude Code, Cursor, Claude Desktop, Antigravity and VS Code. Install one, chat a bit,
-              then hit Rescan — or bring exported chats in via the Import tab.
-            </p>
-          </div>
-        ) : (
-          installed.map((s, i) => {
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="grid grid-cols-2 gap-2 pb-1">
+          {scanning && installed.length === 0 ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="skeleton h-[72px] rounded-[var(--radius-xl)]" />
+            ))
+          ) : installed.length === 0 ? (
+            <div className="col-span-2 flex flex-col items-center gap-1.5 rounded-[var(--radius-xl)] border border-dashed border-white/10 px-4 py-6 text-center">
+              <Server className="h-5 w-5 text-ink-faint" />
+              <p className="text-sm text-ink-dim">{labels.dashboardNoSourcesTitle}</p>
+              <p className="max-w-sm text-[11px] leading-relaxed text-ink-faint">{labels.dashboardNoSourcesDetail}</p>
+            </div>
+          ) : (
+            installed.map((s, i) => {
               const meta = sourceMeta(s.id)
               const on = selected.has(s.id)
               return (
                 <GlassCard
                   key={s.id}
-                  delay={0.04 * i}
+                  delay={0.03 * i}
                   hover
                   onClick={() => toggleSelected(s.id)}
-                  className="relative overflow-hidden p-4"
+                  className="relative overflow-hidden p-2.5"
                 >
                   <div
                     className="pointer-events-none absolute inset-0 rounded-[var(--radius-xl)] transition-opacity"
                     style={{
                       opacity: on ? 1 : 0,
-                      // Same mint ring for every selected source — no “Claude on / Cursor off” look.
                       boxShadow: 'inset 0 0 0 1.5px #34d399aa, inset 0 0 60px -30px #34d399'
                     }}
                   />
-                  <div className="relative flex items-start gap-3.5">
+                  <div className="relative flex items-center gap-2.5">
                     <SourceTile glyph={meta.glyph} color={meta.color} />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate font-semibold text-ink">{s.label}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-sm font-semibold text-ink">{s.label}</span>
                         <Badge color={s.strategy === 'hybrid' ? '#34d399' : '#9aa3bd'}>{s.strategy}</Badge>
                       </div>
-                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-ink-dim">
+                      <div className="mt-0.5 flex flex-wrap gap-x-2.5 gap-y-0 text-[11px] text-ink-dim">
                         <span>{humanBytes(s.sizeBytes)}</span>
                         {s.conversations != null && <span>{s.conversations} chats</span>}
                       </div>
-                      {s.notes?.[0] && <div className="mt-1.5 truncate text-[11px] text-ink-faint">{s.notes[0]}</div>}
+                      {s.notes?.some((n) => /too large|skipped|agent-transcripts/i.test(n)) && (
+                        <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-ink-faint">
+                          {s.notes.find((n) => /agent-transcripts|too large|skipped/i.test(n))}
+                        </p>
+                      )}
                     </div>
                     <motion.div
                       animate={{ scale: on ? 1 : 0.6, opacity: on ? 1 : 0 }}
-                      className="flex h-6 w-6 items-center justify-center rounded-full bg-mint"
+                      className="flex h-5 w-5 items-center justify-center rounded-full bg-mint"
                     >
-                      <Check className="h-3.5 w-3.5 text-black" strokeWidth={3} />
+                      <Check className="h-3 w-3 text-black" strokeWidth={3} />
                     </motion.div>
                   </div>
                 </GlassCard>
               )
             })
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Backup + Distill launch bar */}
-      <motion.div layout className="sticky bottom-0 mt-7">
-        <GlassCard className="flex items-center gap-4 p-4">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl accent-grad ring-glow">
-            <Database className="h-5 w-5 text-white" />
+      {/* Backup + Distill — pinned to bottom of flex column (no sticky scroll-trap) */}
+      <motion.div layout className="mt-2 shrink-0">
+        <GlassCard className="flex items-center gap-3 p-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl accent-grad ring-glow">
+            <Database className="h-4 w-4 text-white" />
           </div>
           <div className="min-w-0 flex-1">
             {busy ? (
               <>
-                <div className="mb-1.5 text-sm font-medium text-ink">{barPhase}</div>
+                <div className="mb-1 text-sm font-medium text-ink">{barPhase}</div>
                 <ProgressBar indeterminate />
               </>
             ) : (
@@ -226,7 +281,7 @@ export default function Dashboard() {
                 <div className="text-sm font-semibold text-ink">
                   {labels.dashboardSourcesSelected(selected.size)}
                 </div>
-                <div className="text-xs text-ink-dim">
+                <div className="truncate text-[11px] text-ink-dim">
                   {vault.open
                     ? labels.dashboardReadyVault(vault.name ?? 'vault')
                     : labels.dashboardOpenVaultHint}
@@ -234,7 +289,7 @@ export default function Dashboard() {
               </>
             )}
           </div>
-          <div className="hidden w-56 shrink-0 md:block">
+          <div className="hidden w-44 shrink-0 md:block">
             <Input
               value={backupNote}
               onChange={(e) => setBackupNote(e.target.value)}
@@ -242,12 +297,12 @@ export default function Dashboard() {
               disabled={busy}
             />
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             <Button
               variant="ghost"
               onClick={() => void backup(backupNote)}
               disabled={busy || !vault.open || selected.size === 0}
-              className="!px-3 !text-xs text-ink-dim"
+              className="!px-2.5 !text-xs text-ink-dim"
             >
               {backingUp && !brainRunning ? <Spinner className="h-3.5 w-3.5" /> : null}
               {labels.dashboardBackupOnly}
@@ -255,6 +310,7 @@ export default function Dashboard() {
             <Button
               onClick={() => void backupAndDistill(backupNote)}
               disabled={busy || !vault.open || selected.size === 0}
+              className="!px-3 !text-xs"
             >
               {busy ? <Spinner className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
               {labels.dashboardBackupAndBrain}

@@ -10,6 +10,7 @@
  * queries ("tunel WireGuard MikroTik") get scattered embeddings. Literal
  * keyword matches in filename/path/content give a strong signal we must
  * use, otherwise we'd miss well-tagged notes.
+ * No user language switch — always hybrid PL+EN (app uiLocale is chrome-only).
  */
 
 import type Database from 'better-sqlite3'

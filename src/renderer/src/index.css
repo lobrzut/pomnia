@@ -24,6 +24,15 @@
   --radius-xl: 1.25rem;
 }
 
+/* Aurora + deep accent — overridden per data-theme */
+:root,
+html[data-theme='mint'] {
+  --aurora-1: #1a5c3a;
+  --aurora-2: #34d399;
+  --aurora-3: #2dd4bf55;
+  --accent-deep: #1a5c3a;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -49,6 +58,23 @@
     overflow: hidden;
     user-select: none;
   }
+  /* body { user-select: none } blocks caret/typing unless inputs opt back in.
+     Also mark controls no-drag so frameless -webkit-app-region never eats them. */
+  input,
+  textarea,
+  select,
+  [contenteditable='true'] {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  button,
+  a,
+  label {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -69,9 +95,11 @@
 @layer utilities {
   .drag {
     -webkit-app-region: drag;
+    app-region: drag;
   }
   .no-drag {
     -webkit-app-region: no-drag;
+    app-region: no-drag;
   }
   .glass {
     background: linear-gradient(160deg, #1a5c3a14, #ffffff06 45%, #0a120e88);
@@ -127,11 +155,10 @@
     border: 1px solid #ffffff28;
     backdrop-filter: blur(32px) saturate(165%);
     -webkit-backdrop-filter: blur(32px) saturate(165%);
+    /* Inset chrome only — no outer glow/halo (transparent Electron windows). */
     box-shadow:
       0 0 0 1px #1a5c3a44 inset,
-      0 1px 0 0 #ffffff22 inset,
-      0 16px 48px -12px #000000aa,
-      0 0 64px -14px #1a5c3a66;
+      0 1px 0 0 #ffffff22 inset;
     transition:
       border-color 0.35s,
       box-shadow 0.45s;
@@ -144,11 +171,18 @@
     background: linear-gradient(165deg, #14261acc 0%, #0e1a14c0 42%, #0a100ecc 100%);
     box-shadow:
       0 0 0 1px #34d39955 inset,
-      0 1px 0 0 #ffffff24 inset,
-      0 14px 44px -10px #000000aa,
-      0 0 52px -4px #34d39999,
-      0 0 28px -2px #fbbf2466;
+      0 1px 0 0 #ffffff24 inset;
     animation: none;
+  }
+  /* Handshake / Profile — fully opaque. No backdrop-filter: on Windows transparent
+     BrowserWindows it breaks hit-testing / keyboard focus into inputs. */
+  .floating-pip-shell--solid {
+    background: linear-gradient(165deg, #0e1814 0%, #0a100e 42%, #080c0a 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .floating-pip-shell--solid.floating-pip-shell--live {
+    background: linear-gradient(165deg, #122018 0%, #0e1612 42%, #0a100e 100%);
   }
   .handshake-flash {
     animation: handshake-mint-flash 0.9s ease-out;
@@ -157,22 +191,19 @@
     0% {
       box-shadow:
         0 0 0 1px #34d399aa inset,
-        0 0 0 0 #34d39900,
-        0 14px 44px -10px #000000aa;
+        0 1px 0 0 #ffffff22 inset;
       border-color: #34d399;
     }
     40% {
       box-shadow:
         0 0 0 2px #34d399ee inset,
-        0 0 48px 8px #34d39966,
-        0 14px 44px -10px #000000aa;
+        0 1px 0 0 #ffffff28 inset;
       border-color: #6ee7b7;
     }
     100% {
       box-shadow:
         0 0 0 1px #34d39955 inset,
-        0 0 52px -4px #34d39999,
-        0 14px 44px -10px #000000aa;
+        0 1px 0 0 #ffffff24 inset;
     }
   }
   @keyframes pip-shell-breathe {
@@ -180,34 +211,30 @@
     100% {
       box-shadow:
         0 0 0 1px #1a5c3a40 inset,
-        0 1px 0 0 #ffffff1c inset,
-        0 16px 48px -12px #000000aa,
-        0 0 48px -18px #1a5c3a55;
+        0 1px 0 0 #ffffff1c inset;
     }
     50% {
       box-shadow:
         0 0 0 1px #34d39944 inset,
-        0 1px 0 0 #ffffff28 inset,
-        0 16px 48px -12px #000000aa,
-        0 0 72px -10px #34d39966;
+        0 1px 0 0 #ffffff28 inset;
     }
   }
 }
 
-/* PiP aurora layers — fill the void under/around nodes */
+/* PiP aurora layers — soft wash behind the strip (keep height budget for nodes) */
 .pip-aurora-idle,
 .pip-aurora-live {
   background:
-    radial-gradient(ellipse 75% 60% at 22% 55%, #1a5c3a55, transparent 62%),
-    radial-gradient(ellipse 80% 65% at 78% 52%, #2dd4bf40, transparent 64%),
-    radial-gradient(ellipse 90% 70% at 50% 88%, #0a1f1644, transparent 55%);
+    radial-gradient(ellipse 70% 90% at 22% 48%, #1a5c3a55, transparent 68%),
+    radial-gradient(ellipse 75% 95% at 78% 50%, #2dd4bf40, transparent 70%),
+    radial-gradient(ellipse 95% 80% at 50% 100%, #0a1f1640, transparent 58%);
   opacity: 0.85;
 }
 .pip-aurora-live {
   background:
-    radial-gradient(ellipse 80% 65% at 55% 48%, #34d39955, transparent 58%),
-    radial-gradient(ellipse 70% 55% at 78% 50%, #fbbf2438, transparent 60%),
-    radial-gradient(ellipse 75% 60% at 22% 58%, #1a5c3a66, transparent 62%),
+    radial-gradient(ellipse 75% 95% at 55% 46%, #34d39955, transparent 62%),
+    radial-gradient(ellipse 70% 90% at 78% 50%, #fbbf2438, transparent 66%),
+    radial-gradient(ellipse 70% 90% at 22% 52%, #1a5c3a66, transparent 68%),
     radial-gradient(ellipse 100% 50% at 50% 100%, #0a181255, transparent 50%);
   opacity: 1;
   animation: pip-aurora-pulse 2.8s ease-in-out infinite;
@@ -603,3 +630,227 @@
   animation: flow-node-pulse 1.1s ease-in-out;
   border-color: #fbbf2488 !important;
 }
+
+/* ── Color schemes (html[data-theme]) ─────────────────────────────────── */
+/* mint = default tokens above. iris = legacy Reliqua purple. glass = frosted panels. */
+
+html[data-theme='iris'] {
+  --color-void: #06070d;
+  --color-abyss: #0a0c16;
+  --color-panel: #11141f;
+  --color-panel-2: #161a28;
+  --color-line: #232838;
+  --color-ink: #e9ecf5;
+  --color-ink-dim: #9aa3bd;
+  --color-ink-faint: #5b6178;
+  --color-violet: #8b5cf6;
+  --color-iris: #6366f1;
+  --color-cyan: #22d3ee;
+  /* UI remapped to text-mint — drive primary accent purple in iris mode */
+  --color-mint: #8b5cf6;
+  --aurora-1: #4c1d95;
+  --aurora-2: #8b5cf6;
+  --aurora-3: #6366f155;
+  --accent-deep: #4c1d95;
+}
+
+html[data-theme='iris'] .glass {
+  background: linear-gradient(160deg, #8b5cf614, #ffffff06 45%, #0a0c1688);
+  border: 1px solid #ffffff12;
+  box-shadow:
+    0 1px 0 0 #ffffff14 inset,
+    0 0 0 1px #8b5cf618 inset,
+    0 20px 60px -28px #000000cc;
+}
+html[data-theme='iris'] .glass-hover:hover {
+  border-color: #8b5cf644;
+  box-shadow:
+    0 1px 0 0 #ffffff1e inset,
+    0 28px 80px -30px #8b5cf666;
+}
+html[data-theme='iris'] .text-grad {
+  background: linear-gradient(100deg, var(--color-ink), #c4b5fd 50%, var(--color-violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+html[data-theme='iris'] .accent-grad {
+  background: linear-gradient(120deg, #4c1d95, var(--color-violet) 48%, var(--color-cyan));
+}
+html[data-theme='iris'] .ring-glow {
+  box-shadow: 0 0 0 1px #ffffff1f, 0 0 40px -8px #8b5cf699;
+}
+html[data-theme='iris'] .floating-pip-shell {
+  background: linear-gradient(165deg, #16122acc 0%, #0c0a16b8 40%, #08060fcc 100%);
+  box-shadow:
+    0 0 0 1px #8b5cf644 inset,
+    0 1px 0 0 #ffffff22 inset;
+}
+html[data-theme='iris'] .floating-pip-shell--live {
+  border-color: #a78bfa77;
+  background: linear-gradient(165deg, #1a1430cc 0%, #100e1cc0 42%, #0a0814cc 100%);
+  box-shadow:
+    0 0 0 1px #8b5cf655 inset,
+    0 1px 0 0 #ffffff24 inset;
+}
+html[data-theme='iris'] .floating-pip-shell--solid {
+  background: linear-gradient(165deg, #120e1cf8 0%, #0c0a16f6 42%, #08060ff8 100%);
+}
+html[data-theme='iris'] .floating-pip-shell--solid.floating-pip-shell--live {
+  background: linear-gradient(165deg, #181228f8 0%, #100e1cf6 42%, #0a0814f8 100%);
+}
+html[data-theme='iris'] .handshake-flash {
+  animation: handshake-iris-flash 0.9s ease-out;
+}
+@keyframes handshake-iris-flash {
+  0% {
+    box-shadow:
+      0 0 0 1px #8b5cf6aa inset,
+      0 1px 0 0 #ffffff22 inset;
+    border-color: #8b5cf6;
+  }
+  40% {
+    box-shadow:
+      0 0 0 2px #8b5cf6ee inset,
+      0 1px 0 0 #ffffff28 inset;
+    border-color: #c4b5fd;
+  }
+  100% {
+    box-shadow:
+      0 0 0 1px #8b5cf655 inset,
+      0 1px 0 0 #ffffff24 inset;
+  }
+}
+html[data-theme='iris'] .pip-aurora-idle,
+html[data-theme='iris'] .pip-aurora-live {
+  background:
+    radial-gradient(ellipse 75% 60% at 22% 55%, #4c1d9555, transparent 62%),
+    radial-gradient(ellipse 80% 65% at 78% 52%, #6366f140, transparent 64%),
+    radial-gradient(ellipse 90% 70% at 50% 88%, #0a081644, transparent 55%);
+}
+html[data-theme='iris'] .pip-aurora-live {
+  background:
+    radial-gradient(ellipse 80% 65% at 55% 48%, #8b5cf655, transparent 58%),
+    radial-gradient(ellipse 70% 55% at 78% 50%, #fbbf2438, transparent 60%),
+    radial-gradient(ellipse 75% 60% at 22% 58%, #4c1d9566, transparent 62%),
+    radial-gradient(ellipse 100% 50% at 50% 100%, #0a081655, transparent 50%);
+}
+
+/* Frosted glass — frosted panels, silver/sky accents, deep blur */
+html[data-theme='glass'] {
+  --color-void: #07080c;
+  --color-abyss: #0e1016;
+  --color-panel: #161922;
+  --color-panel-2: #1c202a;
+  --color-line: #ffffff18;
+  --color-ink: #f4f6fa;
+  --color-ink-dim: #a8b0c0;
+  --color-ink-faint: #6b7384;
+  --color-violet: #94a3b8;
+  --color-iris: #7dd3fc;
+  --color-cyan: #7dd3fc;
+  --color-mint: #94a3b8;
+  --aurora-1: #334155;
+  --aurora-2: #7dd3fc66;
+  --aurora-3: #94a3b855;
+  --accent-deep: #475569;
+}
+
+html[data-theme='glass'] body {
+  background:
+    radial-gradient(ellipse 90% 70% at 15% 10%, #7dd3fc12, transparent 55%),
+    radial-gradient(ellipse 80% 60% at 85% 20%, #ffffff08, transparent 50%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, #33415522, transparent 55%),
+    var(--color-void);
+}
+
+html[data-theme='glass'] .glass {
+  background: linear-gradient(155deg, #ffffff14 0%, #ffffff08 42%, #0e101699 100%);
+  border: 1px solid #ffffff22;
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  box-shadow:
+    0 1px 0 0 #ffffff33 inset,
+    0 -1px 0 0 #ffffff08 inset,
+    0 0 0 1px #ffffff0a inset,
+    0 24px 64px -28px #000000cc;
+}
+html[data-theme='glass'] .glass-hover:hover {
+  border-color: #ffffff38;
+  box-shadow:
+    0 1px 0 0 #ffffff44 inset,
+    0 28px 80px -30px #7dd3fc44;
+}
+html[data-theme='glass'] .text-grad {
+  background: linear-gradient(100deg, #ffffff, #cbd5e1 45%, #7dd3fc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+html[data-theme='glass'] .accent-grad {
+  background: linear-gradient(120deg, #475569, #94a3b8 48%, #7dd3fc);
+}
+html[data-theme='glass'] .ring-glow {
+  box-shadow: 0 0 0 1px #ffffff28, 0 0 40px -8px #7dd3fc66;
+}
+html[data-theme='glass'] .floating-pip-shell {
+  background: linear-gradient(165deg, #ffffff18 0%, #1c202a88 38%, #0e1016b0 100%);
+  border: 1px solid #ffffff28;
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  box-shadow:
+    0 0 0 1px #ffffff14 inset,
+    0 1px 0 0 #ffffff33 inset;
+}
+html[data-theme='glass'] .floating-pip-shell--live {
+  border-color: #7dd3fc66;
+  background: linear-gradient(165deg, #ffffff1e 0%, #1e2430a0 42%, #10141acc 100%);
+  box-shadow:
+    0 0 0 1px #7dd3fc33 inset,
+    0 1px 0 0 #ffffff38 inset;
+}
+html[data-theme='glass'] .floating-pip-shell--solid {
+  background: linear-gradient(165deg, #1a1e28f6 0%, #12151cf8 42%, #0c0e14fa 100%);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+html[data-theme='glass'] .floating-pip-shell--solid.floating-pip-shell--live {
+  background: linear-gradient(165deg, #1e2430f6 0%, #161a24f8 42%, #10141afa 100%);
+}
+html[data-theme='glass'] .handshake-flash {
+  animation: handshake-glass-flash 0.9s ease-out;
+}
+@keyframes handshake-glass-flash {
+  0% {
+    box-shadow:
+      0 0 0 1px #7dd3fcaa inset,
+      0 1px 0 0 #ffffff22 inset;
+    border-color: #7dd3fc;
+  }
+  40% {
+    box-shadow:
+      0 0 0 2px #ffffff88 inset,
+      0 1px 0 0 #ffffff38 inset;
+    border-color: #e2e8f0;
+  }
+  100% {
+    box-shadow:
+      0 0 0 1px #7dd3fc55 inset,
+      0 1px 0 0 #ffffff38 inset;
+  }
+}
+html[data-theme='glass'] .pip-aurora-idle,
+html[data-theme='glass'] .pip-aurora-live {
+  background:
+    radial-gradient(ellipse 75% 60% at 22% 55%, #64748b44, transparent 62%),
+    radial-gradient(ellipse 80% 65% at 78% 52%, #7dd3fc33, transparent 64%),
+    radial-gradient(ellipse 90% 70% at 50% 88%, #ffffff10, transparent 55%);
+}
+html[data-theme='glass'] .pip-aurora-live {
+  background:
+    radial-gradient(ellipse 80% 65% at 55% 48%, #7dd3fc44, transparent 58%),
+    radial-gradient(ellipse 70% 55% at 78% 50%, #fbbf2430, transparent 60%),
+    radial-gradient(ellipse 75% 60% at 22% 58%, #94a3b844, transparent 62%),
+    radial-gradient(ellipse 100% 50% at 50% 100%, #ffffff12, transparent 50%);
+}
+

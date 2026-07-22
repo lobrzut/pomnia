@@ -92,7 +92,7 @@ export function StatusStrip() {
     {
       id: 'docs',
       icon: FileText,
-      label: 'Dokumenty',
+      label: labels.statusDocuments,
       value: pendingDocs > 0 ? labels.statusPendingDocs(pendingDocs) : labels.statusPendingDocsNone,
       ok: pendingDocs === 0 ? true : null,
       tab: pendingDocs > 0 ? 'brain' : 'import'
@@ -100,14 +100,14 @@ export function StatusStrip() {
   ]
 
   return (
-    <GlassCard className="mb-5 p-3">
-      <div className="mb-2.5 flex items-center justify-between gap-2">
+    <GlassCard className="mb-2 shrink-0 p-2">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
           {labels.statusStripTitle}
         </span>
         {checking && <Spinner className="h-3 w-3 text-ink-faint" />}
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {items.map((item) => {
           const Icon = item.icon
           return (
@@ -115,11 +115,11 @@ export function StatusStrip() {
               key={item.id}
               type="button"
               onClick={() => setRoute(item.tab)}
-              className="no-drag flex min-w-[140px] flex-1 items-start gap-2 rounded-xl border border-white/6 bg-black/20 px-3 py-2 text-left transition-colors hover:border-white/12 hover:bg-white/6"
+              className="no-drag flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-white/6 bg-black/20 px-2.5 py-1.5 text-left transition-colors hover:border-white/12 hover:bg-white/6"
             >
               <span
                 className={clsx(
-                  'mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full',
+                  'h-1.5 w-1.5 shrink-0 rounded-full',
                   item.ok === true && 'bg-mint',
                   item.ok === false && 'bg-rose',
                   item.ok === null && 'bg-amber'
@@ -127,12 +127,18 @@ export function StatusStrip() {
                 style={item.ok === true ? { boxShadow: '0 0 8px #34d39988' } : undefined}
               />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   <Icon className="h-3 w-3 shrink-0 text-ink-faint" />
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-ink-faint">{item.label}</span>
+                  <span className="truncate text-[9px] font-medium uppercase tracking-wider text-ink-faint">
+                    {item.label}
+                  </span>
                 </div>
-                <div className="truncate text-xs font-semibold text-ink">{item.value}</div>
-                {item.detail && <div className="truncate text-[10px] text-ink-faint">{item.detail}</div>}
+                <div className="truncate text-[11px] font-semibold leading-tight text-ink">
+                  {item.value}
+                  {item.detail ? (
+                    <span className="ml-1 font-normal text-ink-faint">{item.detail}</span>
+                  ) : null}
+                </div>
               </div>
             </button>
           )

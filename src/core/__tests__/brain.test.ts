@@ -28,10 +28,10 @@ describe('brain/distill', () => {
     expect(stub.quality).toBe('stub')
     expect(stub.markdown).toContain('distilled_via: pomnia')
 
-    const ok = assembleNote(conv, { summary: 'did a thing', decisions: ['chose X'], solutions: [], facts: [], openQuestions: [] }, 'qwen2.5:14b')
-    expect(ok.quality).toBe('ok')
-    expect(ok.markdown).toContain('## Decisions')
-    expect(ok.markdown).toContain('- chose X')
+    // Bare "chose X" scrapes ~4.0 — must NOT pass the quality-first gate (≥5).
+    const weak = assembleNote(conv, { summary: 'did a thing', decisions: ['chose X'], solutions: [], facts: [], openQuestions: [] }, 'qwen2.5:14b')
+    expect(weak.quality).toBe('garbage')
+    expect(weak.score).toBeLessThan(5)
   })
 
   it('tags generic-filler bullets as garbage, not ok', () => {
@@ -48,7 +48,7 @@ describe('brain/distill', () => {
       'qwen2.5:3b'
     )
     expect(filler.quality).toBe('garbage')
-    expect(filler.score).toBeLessThan(4)
+    expect(filler.score).toBeLessThan(5)
     expect(filler.markdown).toContain('quality: garbage')
 
     // A real, specific note with file paths/commands/numbers should score well above it.
@@ -64,7 +64,10 @@ describe('brain/distill', () => {
       'qwen2.5:14b'
     )
     expect(specific.quality).toBe('ok')
+    expect(specific.score).toBeGreaterThanOrEqual(5)
     expect(specific.score).toBeGreaterThan(filler.score)
+    expect(specific.markdown).toContain('## Decisions')
+    expect(specific.markdown).toContain('src/core/crypto.ts')
   })
 
   it('pre-filters trivial conversations before they ever reach the LLM', () => {

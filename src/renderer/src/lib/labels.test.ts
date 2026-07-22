@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest'
-import { formatBrainProgressLabel, uiLabels } from './labels'
+import { afterEach, describe, expect, it } from 'vitest'
+import { formatBrainProgressLabel, invalidateUiLabelsCache, uiLabels } from './labels'
+import { setUiLocaleCache } from './uiLocale'
 
 describe('uiLabels', () => {
+  afterEach(() => {
+    setUiLocaleCache('pl')
+    invalidateUiLabelsCache()
+  })
+
   it('returns Polish labels regardless of simple mode flag', () => {
     const simple = uiLabels(true)
     const advanced = uiLabels(false)
@@ -30,6 +36,14 @@ describe('uiLabels', () => {
     expect(labels.brainStateLastDistill('2 dni temu')).toBe('Ostatnia destylacja 2 dni temu')
     expect(labels.brainStatePendingNew(7)).toBe('+7 nowych')
     expect(labels.distillEmptyBacklog).toBe('Brak nowych sesji do destylacji')
+    expect(labels.brainPipeCollect).toBe('Zbieraj')
+    expect(labels.brainPipeCollectNote).toBe('z asystentów')
+    expect(labels.brainPipeDistill).toBe('Destyluj')
+    expect(labels.brainPipeDistillNote).toBe('lokalny model')
+    expect(labels.brainPipeIndex).toBe('Indeksuj')
+    expect(labels.brainPipeIndexNote).toBe('embeddingi')
+    expect(labels.brainPipeDeploy).toBe('Wyślij')
+    expect(labels.brainPipeDeployNote).toBe('do Brain')
   })
 
   it('formats activity banner in Polish', () => {
@@ -80,17 +94,37 @@ describe('uiLabels', () => {
     expect(labels.dashboardSourcesSelected(5)).toBe('5 źródeł zaznaczonych')
   })
 
-  it('returns the same object reference for any argument', () => {
+  it('returns the same object reference for PL', () => {
     expect(uiLabels(true)).toBe(uiLabels(false))
     expect(uiLabels()).toBe(uiLabels(true))
   })
 
-  it('exposes handshake ritual labels in Polish', () => {
+  it('switches to English chrome when uiLocale is en', () => {
+    setUiLocaleCache('en')
+    invalidateUiLabelsCache()
+    const labels = uiLabels()
+    expect(labels.settingsTitle).toBe('Settings')
+    expect(labels.uiLocale).toBe('Interface language')
+    expect(labels.navSettings).toBe('Settings')
+    expect(labels.dashboardTitle).toBe('Command center')
+    expect(labels.dashboardBackupAndBrain).toBe('Backup & to Brain')
+    expect(labels.activityBanner({ kind: 'distill', done: 1, total: 2 })).toBe(
+      'In progress: distillation (1/2)',
+    )
+  })
+
+  it('exposes handshake proof-phrase labels in Polish', () => {
     const labels = uiLabels()
     expect(labels.handshake).toBe('Handshake')
-    expect(labels.handshakeReady).toBe('Gotowy')
-    expect(labels.handshakeArmedBadge).toBe('Go')
-    expect(labels.handshakeToastReady).toBe('Gotowy')
+    expect(labels.handshakePhrase).toBe('Fraza dowodu')
+    expect(labels.handshakePhraseSave).toBe('Zapisz frazę')
+    expect(labels.handshakePhraseSaved).toBe('Fraza Handshake zaktualizowana')
+    expect(labels.handshakePhrasePreview('OK to Go Go Go')).toContain('OK to Go Go Go')
+    expect(labels.handshakeEnabled).toBe('Handshake')
+    expect(labels.handshakeEnabledHint).toContain('pierwszą odpowiedź')
+    expect(labels.handshakePhraseHint).toContain('dowód')
+    expect(labels.profilePreviewCopy).toBe('Kopiuj')
+    expect(labels.profilePreviewCopied).toBe('Skopiowano USER.md')
   })
 })
 

@@ -14,7 +14,7 @@ Nic nie idzie do chmury, dopóki sam nie skonfigurujesz deployu na swój serwer.
 
 | Nazwa | Gdzie | Co trzyma |
 |-------|-------|-----------|
-| **Pomnia Vault** | Folder `*.pomnia` (wybierasz przy tworzeniu) | Zaszyfrowane czaty + dokumenty |
+| **Pomnia Vault** | Folder vaultu, który wybierasz (np. `C:\Vault` — nazwa dowolna, też `*.pomnia`) | Zaszyfrowane czaty + dokumenty (+ skills/, USER.md, distilled…) |
 | **Brain data** | `%AppData%/Pomnia/brain-core-data/` | Indeks RAG (`library.db`) + notatki distill — **nieszyfrowane** na dysku |
 
 Vault = archiwum i backup. Brain data = silnik wyszukiwania semantycznego.

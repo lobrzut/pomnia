@@ -79,8 +79,13 @@ const bridge = {
   brainDeploy: (opts: unknown) => ipcRenderer.invoke('brain:deploy', opts),
   connectStatus: (brainUrl?: string, token?: string, target?: string) =>
     ipcRenderer.invoke('connect:status', brainUrl, token, target),
-  connectSnippet: (clientId: string, brainUrl: string, token?: string, target?: string) =>
-    ipcRenderer.invoke('connect:snippet', clientId, brainUrl, token, target),
+  connectSnippet: (
+    clientId: string,
+    brainUrl: string,
+    token?: string,
+    target?: string,
+    brainMode?: boolean,
+  ) => ipcRenderer.invoke('connect:snippet', clientId, brainUrl, token, target, brainMode),
   connectSkillsList: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsList', brainUrl, token),
   connectSkillsSync: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsSync', brainUrl, token),
   connectMcpTokenCreate: (brainUrl: string, name: string, adminToken?: string) =>
@@ -99,7 +104,21 @@ const bridge = {
     onboarded?: boolean
     floatingMonitorOnMinimize?: boolean
     openAtLogin?: boolean
+    colorScheme?: 'mint' | 'iris' | 'glass'
+    uiLocale?: 'pl' | 'en'
+    handshakePhrase?: string
+    handshakeEnabled?: boolean
   }) => ipcRenderer.invoke('app:settings:set', patch),
+  onColorScheme: (cb: (scheme: 'mint' | 'iris' | 'glass') => void) => {
+    const l = (_: IpcRendererEvent, scheme: 'mint' | 'iris' | 'glass') => cb(scheme)
+    ipcRenderer.on('app:color-scheme', l)
+    return () => ipcRenderer.removeListener('app:color-scheme', l)
+  },
+  onUiLocale: (cb: (locale: 'pl' | 'en') => void) => {
+    const l = (_: IpcRendererEvent, locale: 'pl' | 'en') => cb(locale)
+    ipcRenderer.on('app:ui-locale', l)
+    return () => ipcRenderer.removeListener('app:ui-locale', l)
+  },
   openLogs: () => ipcRenderer.invoke('app:openLogs') as Promise<string>,
   floatingMonitorShow: () => ipcRenderer.invoke('floating-monitor:show') as Promise<{ visible: boolean }>,
   floatingMonitorHide: () => ipcRenderer.invoke('floating-monitor:hide') as Promise<{ visible: boolean }>,
@@ -110,22 +129,37 @@ const bridge = {
     ipcRenderer.invoke('floating-monitor:get-always-on-top') as Promise<{ alwaysOnTop: boolean }>,
   floatingMonitorSetAlwaysOnTop: (on: boolean) =>
     ipcRenderer.invoke('floating-monitor:set-always-on-top', on) as Promise<{ alwaysOnTop: boolean }>,
-  handshakeShow: () => ipcRenderer.invoke('handshake:show') as Promise<{ visible: boolean }>,
-  handshakeHide: () => ipcRenderer.invoke('handshake:hide') as Promise<{ visible: boolean }>,
-  handshakeTry: (phrase: string) =>
-    ipcRenderer.invoke('handshake:try', phrase) as Promise<{ ok: boolean; armed: boolean }>,
-  handshakeGetArmed: () => ipcRenderer.invoke('handshake:get-armed') as Promise<{ armed: boolean }>,
-  handshakeDisarm: () => ipcRenderer.invoke('handshake:disarm') as Promise<{ armed: boolean }>,
-  onHandshakeArmed: (cb: (e: { armed: boolean }) => void) => {
-    const l = (_: IpcRendererEvent, e: { armed: boolean }) => cb(e)
-    ipcRenderer.on('handshake:armed', l)
-    return () => ipcRenderer.removeListener('handshake:armed', l)
+  handshakeGetPhrase: () =>
+    ipcRenderer.invoke('handshake:get-phrase') as Promise<{ phrase: string; enabled?: boolean }>,
+  onHandshakePhrase: (cb: (e: { phrase: string; enabled?: boolean }) => void) => {
+    const l = (_: IpcRendererEvent, e: { phrase: string; enabled?: boolean }) => cb(e)
+    ipcRenderer.on('handshake:phrase', l)
+    return () => ipcRenderer.removeListener('handshake:phrase', l)
   },
-  onHandshakeToastReady: (cb: () => void) => {
-    const l = () => cb()
-    ipcRenderer.on('handshake:toast-ready', l)
-    return () => ipcRenderer.removeListener('handshake:toast-ready', l)
+  profilePreviewShow: () => ipcRenderer.invoke('profile-preview:show') as Promise<{ visible: boolean }>,
+  profilePreviewHide: () => ipcRenderer.invoke('profile-preview:hide') as Promise<{ visible: boolean }>,
+  profilePreviewLoad: () =>
+    ipcRenderer.invoke('profile-preview:load') as Promise<{
+      status: 'ok' | 'vault_locked' | 'brain_down' | 'no_knowledge'
+      summary?: string
+      source?: 'ollama' | 'fallback'
+      userMd?: string
+    }>,
+  onProfilePreviewProgress: (
+    cb: (e: { phase: 'user_md' | 'notes' | 'search' | 'summarize' | 'done'; pct: number }) => void,
+  ) => {
+    const l = (
+      _: IpcRendererEvent,
+      ev: { phase: 'user_md' | 'notes' | 'search' | 'summarize' | 'done'; pct: number },
+    ) => cb(ev)
+    ipcRenderer.on('profile-preview:progress', l)
+    return () => ipcRenderer.removeListener('profile-preview:progress', l)
   },
+  profilePreviewSave: (content: string) =>
+    ipcRenderer.invoke('profile-preview:save', content) as Promise<
+      | { ok: true; path: string; chars: number }
+      | { ok: false; error: 'vault_locked' | 'too_long' | 'write_failed'; detail?: string; maxChars?: number }
+    >,
   onAppToast: (
     cb: (t: { kind: 'info' | 'success' | 'warn' | 'error'; title: string; detail?: string }) => void,
   ) => {

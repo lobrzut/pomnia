@@ -242,7 +242,7 @@ function WelcomeStep({ simpleMode, onNext }: { simpleMode: boolean; onNext: () =
       </h1>
       <p className="mx-auto mt-2.5 max-w-[380px] text-sm leading-relaxed text-ink-dim">
         {simpleMode
-          ? 'Vault → backup rozmów → lokalna wyszukiwarka → podłączenie Cursora. Bez żargonu, bez serwera w chmurze.'
+          ? 'Vault → backup rozmów → lokalna wyszukiwarka → agent. Bez żargonu, bez serwera w chmurze.'
           : 'Pomnia zamienia rozproszone rozmowy z asystentami w jedną zaszyfrowaną, przeszukiwalną pamięć — i oddaje ją każdemu AI, z którym pracujesz.'}
       </p>
 
@@ -309,8 +309,8 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
   return (
     <StepCard
       icon={ShieldCheck}
-      title="Create your vault"
-      lead="One encrypted folder holds everything Pomnia captures. Pick where it lives and choose a passphrase you won't lose."
+      title="Utwórz vault"
+      lead="Jeden folder vaultu trzyma wszystko (np. C:\Vault — nazwa dowolna, też *.pomnia). Wybierz lokalizację i hasło, którego nie zgubisz. Przenośność = skopiuj cały ten folder → Otwórz vault → hasło."
     >
       <div className="mb-4 flex rounded-xl border border-white/10 bg-black/20 p-1">
         {(['create', 'unlock'] as const).map((m) => (
@@ -325,16 +325,16 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
             {mode === m && <motion.div layoutId="ob-vault-tab" className="absolute inset-0 rounded-lg accent-grad opacity-90" />}
             <span className="relative flex items-center justify-center gap-1.5">
               {m === 'create' ? <Sparkles className="h-3.5 w-3.5" /> : <KeyRound className="h-3.5 w-3.5" />}
-              {m === 'create' ? 'New vault' : 'I have one'}
+              {m === 'create' ? 'Nowy vault' : 'Mam już folder'}
             </span>
           </button>
         ))}
       </div>
 
       <div className="space-y-3.5">
-        <Field label={mode === 'create' ? 'New vault folder' : 'Vault folder'}>
+        <Field label={mode === 'create' ? 'Nowy folder vaultu' : 'Folder vaultu'}>
           <div className="flex gap-2">
-            <Input value={path} onChange={(e) => setPath(e.target.value)} placeholder="…/MyVault.pomnia" />
+            <Input value={path} onChange={(e) => setPath(e.target.value)} placeholder="C:\Vault" />
             <Button variant="soft" onClick={pick}>
               <FolderOpen className="h-4 w-4" />
             </Button>
@@ -699,7 +699,7 @@ function SimpleBrainStep({
     <StepCard
       icon={Cpu}
       title="Start local search"
-      lead="Runs a small search engine on this machine — Cursor can query your memory without any remote server."
+      lead="Runs a small search engine on this machine — an agent can query your memory without any remote server."
     >
       {embedded === null ? (
         <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-5">
@@ -796,9 +796,9 @@ function ConnectStep({
     setTimeout(() => setCopied(false), 1800)
   }
 
-  const title = 'Podłącz Cursora'
+  const title = 'Podłącz agenta'
   const lead = simpleMode
-    ? 'Skopiuj konfigurację MCP i wklej w Cursorze — Pomnia nigdy nie dotyka Twoich plików.'
+    ? 'Skopiuj konfigurację MCP i wklej u klienta — Pomnia nigdy nie dotyka Twoich plików.'
     : `Snippety wskazują na ${brainTarget === 'embedded' ? 'lokalną wyszukiwarkę' : 'zdalny serwer Brain'} (${brainUrl}). Wybierz klienta — wklej config, nigdy nie dotykamy ich plików.`
 
   return (
@@ -881,7 +881,7 @@ function ReadyStep({
         { label: 'Zaszyfrowany vault', state: outcomes.vault ?? 'skipped' },
         { label: 'Pierwszy backup', state: outcomes.backup ?? 'skipped' },
         { label: 'Lokalna wyszukiwarka', state: outcomes.engine ?? 'skipped' },
-        { label: 'Konfiguracja MCP Cursora', state: outcomes.connect ?? 'skipped' }
+        { label: 'Konfiguracja MCP agenta', state: outcomes.connect ?? 'skipped' }
       ]
     : [
         { label: 'Zaszyfrowany vault', state: outcomes.vault ?? 'skipped' },
@@ -905,7 +905,7 @@ function ReadyStep({
       <h1 className="text-[26px] font-bold tracking-tight text-grad">Gotowe</h1>
       <p className="mx-auto mt-2 max-w-[360px] text-sm text-ink-dim">
         {simpleMode
-          ? 'Vault, backup i wyszukiwarka są gotowe. Cursor może teraz przeszukiwać Twoją pamięć.'
+          ? 'Vault, backup i wyszukiwarka są gotowe. Agent może teraz przeszukiwać Twoją pamięć.'
           : 'Uruchom pierwszy backup z Dashboardu — reszta jest podłączona.'}
       </p>
 

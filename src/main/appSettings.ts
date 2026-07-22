@@ -6,8 +6,18 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
+import {
+  canonicalizeHandshakePhraseSetting,
+  DEFAULT_HANDSHAKE_PHRASE,
+} from '@core/handshakePhrase.js'
 
 export type BrainTargetSetting = 'embedded' | 'remote'
+
+/** UI color scheme — mint (current), iris (legacy purple), glass (frosted panels). */
+export type ColorSchemeSetting = 'mint' | 'iris' | 'glass'
+
+/** App chrome language only — Brain search/distill stay auto bilingual (no knowledgeLang). */
+export type UiLocaleSetting = 'pl' | 'en'
 
 export interface AppSettings {
   /** Minimize button hides to tray instead of the taskbar. */
@@ -36,6 +46,20 @@ export interface AppSettings {
   floatingMonitorPosition?: { x: number; y: number }
   /** Launch Pomnia when the user logs into Windows (OS login item). Default off. */
   openAtLogin?: boolean
+  /** Desktop + floating windows color scheme (CSS data-theme). Default mint. */
+  colorScheme?: ColorSchemeSetting
+  /** UI chrome PL | EN. Default pl. Does not affect Brain knowledge language. */
+  uiLocale?: UiLocaleSetting
+  /**
+   * Proof phrase agents should say on their first reply when Pomnia Brain MCP is connected.
+   * Configured only in Settings — not a Desktop unlock ritual.
+   */
+  handshakePhrase?: string
+  /**
+   * When false, omit Handshake greeting from Connect rules / MCP hints.
+   * Default true.
+   */
+  handshakeEnabled?: boolean
   /**
    * Last vault root successfully reindexed into library.db.
    * Used to detect portable-vault switches and prune AppData orphans once.
@@ -50,6 +74,24 @@ const DEFAULTS: AppSettings = {
   floatingMonitorOnMinimize: true,
   floatingMonitorAlwaysOnTop: true,
   openAtLogin: false,
+  colorScheme: 'mint',
+  uiLocale: 'pl',
+  handshakePhrase: DEFAULT_HANDSHAKE_PHRASE,
+  handshakeEnabled: true,
+}
+
+function normalizeColorScheme(v: unknown): ColorSchemeSetting {
+  return v === 'iris' || v === 'glass' || v === 'mint' ? v : DEFAULTS.colorScheme!
+}
+
+function normalizeUiLocale(v: unknown): UiLocaleSetting {
+  return v === 'en' || v === 'pl' ? v : DEFAULTS.uiLocale!
+}
+
+/** Trim + min-length guard; empty/too-short falls back. Default-equivalent drops misleading "!". */
+function normalizeHandshakePhraseSetting(v: unknown, fallback = DEFAULT_HANDSHAKE_PHRASE): string {
+  if (typeof v !== 'string') return fallback
+  return canonicalizeHandshakePhraseSetting(v, fallback)
 }
 
 let cached: AppSettings = { ...DEFAULTS }
@@ -78,7 +120,26 @@ export async function loadAppSettings(): Promise<AppSettings> {
       floatingMonitorAlwaysOnTop: parsed.floatingMonitorAlwaysOnTop ?? DEFAULTS.floatingMonitorAlwaysOnTop,
       floatingMonitorPosition: parsed.floatingMonitorPosition,
       openAtLogin: parsed.openAtLogin ?? DEFAULTS.openAtLogin,
+      colorScheme: normalizeColorScheme(parsed.colorScheme),
+      uiLocale: normalizeUiLocale(parsed.uiLocale),
+      handshakePhrase: normalizeHandshakePhraseSetting(
+        parsed.handshakePhrase,
+        DEFAULTS.handshakePhrase,
+      ),
+      handshakeEnabled: parsed.handshakeEnabled ?? DEFAULTS.handshakeEnabled,
       lastIndexedVaultRoot: parsed.lastIndexedVaultRoot,
+    }
+    // Persist display canonicalization (e.g. "OK to Go Go Go!" → "OK to Go Go Go").
+    if (
+      typeof parsed.handshakePhrase === 'string' &&
+      parsed.handshakePhrase.trim() !== (cached.handshakePhrase ?? '')
+    ) {
+      try {
+        await fs.mkdir(app.getPath('userData'), { recursive: true })
+        await fs.writeFile(filePath(), JSON.stringify(cached, null, 2), 'utf8')
+      } catch {
+        /* ignore */
+      }
     }
   } catch {
     cached = { ...DEFAULTS }
@@ -91,7 +152,24 @@ export function getAppSettings(): AppSettings {
 }
 
 export async function setAppSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
-  cached = { ...cached, ...patch }
+  const next = { ...cached, ...patch }
+  if (Object.prototype.hasOwnProperty.call(patch, 'colorScheme')) {
+    next.colorScheme = normalizeColorScheme(patch.colorScheme)
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'uiLocale')) {
+    next.uiLocale = normalizeUiLocale(patch.uiLocale)
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'handshakePhrase')) {
+    // Empty / too short: keep previous (or default) — never persist invalid phrase.
+    next.handshakePhrase = normalizeHandshakePhraseSetting(
+      patch.handshakePhrase,
+      cached.handshakePhrase ?? DEFAULTS.handshakePhrase!,
+    )
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'handshakeEnabled')) {
+    next.handshakeEnabled = !!patch.handshakeEnabled
+  }
+  cached = next
   await fs.mkdir(app.getPath('userData'), { recursive: true })
   await fs.writeFile(filePath(), JSON.stringify(cached, null, 2), 'utf8')
   if (Object.prototype.hasOwnProperty.call(patch, 'openAtLogin')) {

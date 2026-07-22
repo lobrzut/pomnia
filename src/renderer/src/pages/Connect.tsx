@@ -16,7 +16,7 @@ import {
   Sparkles,
   X
 } from 'lucide-react'
-import { Badge, Button, GlassCard, Input, Spinner } from '../components/ui'
+import { Badge, Button, GlassCard, Input, Spinner, Toggle } from '../components/ui'
 import { ClientIcon, CLIENT_BRAND } from '../components/ClientIcon'
 import {
   EMBEDDED_BRAIN_DEFAULT_URL,
@@ -64,6 +64,8 @@ export default function Connect() {
   const connectToken = useStore((s) => s.connectToken)
   const setConnectToken = useStore((s) => s.setConnectToken)
   const simpleMode = useStore((s) => s.simpleMode)
+  const agentBrainMode = useStore((s) => s.agentBrainMode)
+  const setAgentBrainMode = useStore((s) => s.setAgentBrainMode)
   const labels = uiLabels()
   const effectiveTarget: BrainTarget = simpleMode ? 'embedded' : brainTarget
   const brainUrl = effectiveTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
@@ -103,7 +105,7 @@ export default function Connect() {
         setSnippetLoading(true)
         try {
           setSnippet(
-            await api.connectSnippet(picked, brainUrl, r.token, effectiveTarget)
+            await api.connectSnippet(picked, brainUrl, r.token, effectiveTarget, agentBrainMode)
           )
         } catch {
           /* ignore — user can re-pick */
@@ -170,7 +172,7 @@ export default function Connect() {
     setSnippet(null)
     setSnippetLoading(true)
     try {
-      setSnippet(await api.connectSnippet(id, brainUrl, effectiveTarget === 'remote' ? connectToken || undefined : undefined, effectiveTarget))
+      setSnippet(await api.connectSnippet(id, brainUrl, effectiveTarget === 'remote' ? connectToken || undefined : undefined, effectiveTarget, agentBrainMode))
     } catch (e) {
       toast({ kind: 'error', title: 'Nie udało się zbudować snippeta', detail: (e as Error).message })
     } finally {
@@ -183,6 +185,11 @@ export default function Connect() {
     if (!picked) return
     void pick(picked)
   }
+
+  useEffect(() => {
+    if (picked) void pick(picked)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentBrainMode])
 
   async function copy(text: string, key: string, label: string) {
     await navigator.clipboard.writeText(text)
@@ -390,6 +397,20 @@ export default function Connect() {
         </div>
       </GlassCard>
 
+      <GlassCard className="mb-5 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold text-ink">{labels.agentBrainMode}</div>
+            <p className="mt-1 text-xs leading-relaxed text-ink-dim">{labels.agentBrainModeHint}</p>
+          </div>
+          <Toggle
+            checked={agentBrainMode}
+            onChange={setAgentBrainMode}
+            aria-label={labels.agentBrainMode}
+          />
+        </div>
+      </GlassCard>
+
       {/* Clients status grid */}
       <GlassCard className="mb-5 p-5">
         <div className="mb-3 flex items-center justify-between">
@@ -583,6 +604,49 @@ export default function Connect() {
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan" />
                 <p className="text-[11px] leading-relaxed text-ink-dim">{snippet.notes}</p>
               </div>
+
+              {agentBrainMode && (snippet.brief || snippet.agentRuleMarkdown) && (
+                <div className="mt-4 rounded-xl border border-mint/25 bg-mint/5 p-3.5">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-ink">{labels.agentBrainModeBriefTitle}</div>
+                    <Button
+                      variant="soft"
+                      onClick={() =>
+                        void copy(
+                          snippet.brief?.content ?? snippet.agentRuleMarkdown ?? '',
+                          'brain-rule',
+                          labels.agentBrainModeBriefTitle,
+                        )
+                      }
+                    >
+                      {copied === 'brain-rule' ? (
+                        <Check className="h-3.5 w-3.5 text-mint" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                      {snippet.brief ? labels.agentBrainModeBriefCopy : labels.agentBrainModeRuleCopy}
+                    </Button>
+                  </div>
+                  {snippet.brief ? (
+                    <p className="mb-2 text-[11px] text-ink-dim">
+                      {snippet.brief.mode === 'append-to-existing' ? 'Dopisz na końcu: ' : 'Utwórz / nadpisz: '}
+                      <button
+                        type="button"
+                        onClick={() => void copy(snippet.brief!.filePath, 'brief-path', 'ścieżka reguły')}
+                        className="no-drag font-mono text-cyan hover:underline"
+                      >
+                        {snippet.brief.filePath}
+                      </button>
+                      <span className="text-ink-faint"> — {snippet.brief.restartHint}</span>
+                    </p>
+                  ) : (
+                    <p className="mb-2 text-[11px] text-ink-dim">{labels.agentBrainModeNoPath}</p>
+                  )}
+                  <pre className="max-h-40 overflow-auto rounded-lg border border-white/8 bg-black/40 p-3 text-[11px] leading-relaxed text-ink-dim">
+                    {snippet.brief?.content ?? snippet.agentRuleMarkdown}
+                  </pre>
+                </div>
+              )}
 
               <div className="mt-2 flex items-start gap-2 px-1">
                 <KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-faint" />

@@ -14,7 +14,6 @@ export default function FloatingMonitor() {
   const initGlobalActivity = useStore((s) => s.initGlobalActivity)
   const loadAppSettings = useStore((s) => s.loadAppSettings)
   const [pinned, setPinned] = useState(true)
-  const [goArmed, setGoArmed] = useState(false)
 
   useEffect(() => {
     void loadAppSettings()
@@ -24,8 +23,6 @@ export default function FloatingMonitor() {
 
   useEffect(() => {
     void api.floatingMonitorGetAlwaysOnTop().then((r) => setPinned(r.alwaysOnTop))
-    void api.handshakeGetArmed().then((r) => setGoArmed(r.armed))
-    return api.onHandshakeArmed((e) => setGoArmed(e.armed))
   }, [])
 
   useEffect(() => {
@@ -60,11 +57,6 @@ export default function FloatingMonitor() {
               </span>
             </>
           )}
-          {goArmed ? (
-            <span className="shrink-0 rounded bg-mint/25 px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider text-mint">
-              {labels.handshakeArmedBadge}
-            </span>
-          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
           <button
@@ -99,18 +91,21 @@ export default function FloatingMonitor() {
       <div
         role="button"
         tabIndex={0}
-        className="no-drag flex min-h-0 flex-1 cursor-pointer flex-col outline-none"
+        className="no-drag flex min-h-0 flex-1 cursor-pointer flex-col px-1.5 pb-1.5 pt-1"
+        title={labels.floatingMonitorOpenHint}
         onClick={() => void api.floatingMonitorOpenMain()}
-        onDoubleClick={() => void api.floatingMonitorHide()}
+        onDoubleClick={(e) => {
+          e.preventDefault()
+          void api.floatingMonitorHide()
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
             void api.floatingMonitorOpenMain()
           }
         }}
-        title={labels.floatingMonitorOpenHint}
       >
-        <FlowDiagram variant="pip" className="min-h-0 flex-1 border-0 bg-transparent" />
+        <FlowDiagram compact />
       </div>
     </div>
   )

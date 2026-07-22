@@ -72,14 +72,9 @@ export function brainSkillsDir(encryptedVaultPath?: string | null): string {
   return brainSkillsLegacyDir()
 }
 
-/** True when portable sidecar already has skills content. */
+/** True when portable sidecar already has countable skills (not empty dirs). */
 export function portableSkillsPresent(encryptedVaultPath: string): boolean {
-  const root = brainSkillsDir(encryptedVaultPath)
-  return (
-    existsSync(join(root, 'brain')) ||
-    existsSync(join(root, 'cli')) ||
-    existsSync(join(root, 'index.json'))
-  )
+  return countLocalSkills(encryptedVaultPath) > 0
 }
 
 function dirHasEntries(dir: string): boolean {
@@ -102,4 +97,58 @@ export function portableKnowledgePresent(encryptedVaultPath: string): boolean {
     dirHasEntries(join(encryptedVaultPath, 'distilled')) ||
     dirHasEntries(join(encryptedVaultPath, 'sessions'))
   )
+}
+
+/**
+ * Count brain/*.md + cli/.../SKILL.md under the active skills root.
+ * Uses name checks (not Dirent.isFile) so Windows/network FS quirks cannot zero the Dashboard tile.
+ */
+export function countLocalSkills(encryptedVaultPath?: string | null): number {
+  const root = brainSkillsDir(encryptedVaultPath)
+  let n = 0
+  const brain = join(root, 'brain')
+  if (existsSync(brain)) {
+    try {
+      for (const name of readdirSync(brain)) {
+        if (!name.endsWith('.md') || name.includes('.bak')) continue
+        n++
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  const cli = join(root, 'cli')
+  if (existsSync(cli)) {
+    try {
+      for (const name of readdirSync(cli)) {
+        if (existsSync(join(cli, name, 'SKILL.md'))) n++
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return n
+}
+
+/** Count .md notes under distilled/ (skips `_review`). */
+export function countDistilledNotes(encryptedVaultPath?: string | null): number {
+  const root = brainVaultDistilledDir(encryptedVaultPath)
+  if (!existsSync(root)) return 0
+  let n = 0
+  const walk = (dir: string): void => {
+    let ents
+    try {
+      ents = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const ent of ents) {
+      if (ent.name === '_review' || ent.name.startsWith('.')) continue
+      const full = join(dir, ent.name)
+      if (ent.isDirectory()) walk(full)
+      else if (ent.isFile() && ent.name.endsWith('.md')) n++
+    }
+  }
+  walk(root)
+  return n
 }

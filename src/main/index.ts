@@ -53,6 +53,7 @@ import {
   setAppSettings,
   shouldHideOnClose,
   shouldHideOnMinimize,
+  type ColorSchemeSetting,
 } from './appSettings.js'
 import { destroyTray, initTray, refreshTrayMenu } from './tray.js'
 import {
@@ -69,15 +70,14 @@ import {
   showFloatingMonitor,
   toggleFloatingMonitor,
 } from './floatingMonitor.js'
+import { getHandshakePhrase, isHandshakeEnabled } from './handshake.js'
 import {
-  destroyHandshake,
-  hideHandshake,
-  isGoArmed,
-  setGoArmed,
-  setHandshakeMainWindow,
-  showHandshake,
-  tryArmHandshake,
-} from './handshake.js'
+  destroyProfilePreview,
+  hideProfilePreview,
+  setProfilePreviewMainWindow,
+  showProfilePreview,
+} from './profilePreview.js'
+import { buildProfilePreview, saveProfileUserMd } from './profilePreviewContent.js'
 import { activity, type ActivityUpdate } from './activity.js'
 import {
   getLastActivityReplay,
@@ -94,6 +94,8 @@ import {
   brainVaultLegacyRoot,
   brainSkillsDir,
   brainSkillsLegacyDir,
+  countDistilledNotes,
+  countLocalSkills,
   setOpenEncryptedVaultPath,
 } from './brainPaths.js'
 import { ensurePortableSkills } from './ensurePortableSkills.js'
@@ -421,7 +423,7 @@ function createWindow(): void {
   else win.loadFile(join(__dirname, '../renderer/index.html'))
 
   setFloatingMainWindow(win)
-  setHandshakeMainWindow(win)
+  setProfilePreviewMainWindow(win)
 }
 
 /* ── IPC ───────────────────────────────────────────────────────────────── */
@@ -454,6 +456,10 @@ function registerIpc(): void {
     name: vault?.getManifest().name,
     snapshots: vault?.getManifest().snapshots.length ?? 0,
     pendingLibraryIndex: vault?.getPendingIndexDocuments().length ?? 0,
+    // Only count portable sidecar when vault is open (label: "w vault/skills").
+    skillsCount: vault ? countLocalSkills(vaultPath) : 0,
+    distilledNotes: vault ? countDistilledNotes(vaultPath) : 0,
+    knowledgePath: vault ? brainVaultRoot(vaultPath) : undefined,
   }))
 
   ipcMain.handle('vault:pickDir', async () => {
@@ -516,7 +522,16 @@ function registerIpc(): void {
     void maybeAutoStartEmbeddedBrain()
     // When autostart is off, still prompt for one-shot index hygiene.
     if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
-    return { open: true, path, name, snapshots: 0, pendingLibraryIndex: 0, knowledgeRoot }
+    return {
+      open: true,
+      path,
+      name,
+      snapshots: 0,
+      pendingLibraryIndex: 0,
+      skillsCount: countLocalSkills(path),
+      distilledNotes: countDistilledNotes(path),
+      knowledgePath: knowledgeRoot,
+    }
   })
 
   ipcMain.handle('vault:open', async (_e, path: string, pass: string) => {
@@ -537,7 +552,9 @@ function registerIpc(): void {
       name: m.name,
       snapshots: m.snapshots.length,
       pendingLibraryIndex,
-      knowledgeRoot,
+      skillsCount: countLocalSkills(path),
+      distilledNotes: countDistilledNotes(path),
+      knowledgePath: knowledgeRoot,
     }
   })
 
@@ -877,6 +894,8 @@ function registerIpc(): void {
         ollamaUrl: url,
         skillsRoot: brainSkillsDir(vaultPath),
         vaultRoot: brainVaultRoot(vaultPath),
+        handshakePhrase: getHandshakePhrase(),
+        handshakeEnabled: isHandshakeEnabled(),
       })
       await setAppSettings({ embeddedBrainAutoStart: true, ollamaUrl: url })
       await flushPendingLibraryDocs(url)
@@ -931,8 +950,35 @@ function registerIpc(): void {
         onboarded?: boolean
         floatingMonitorOnMinimize?: boolean
         openAtLogin?: boolean
+        colorScheme?: ColorSchemeSetting
+        uiLocale?: 'pl' | 'en'
+        handshakePhrase?: string
+        handshakeEnabled?: boolean
       },
-    ) => setAppSettings(patch),
+    ) => {
+      const next = await setAppSettings(patch)
+      if (Object.prototype.hasOwnProperty.call(patch, 'colorScheme')) {
+        const scheme = next.colorScheme ?? 'mint'
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (canSendToWindow(w)) w.webContents.send('app:color-scheme', scheme)
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(patch, 'uiLocale')) {
+        const locale = next.uiLocale ?? 'pl'
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (canSendToWindow(w)) w.webContents.send('app:ui-locale', locale)
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(patch, 'handshakePhrase') || Object.prototype.hasOwnProperty.call(patch, 'handshakeEnabled')) {
+        const phrase = getHandshakePhrase()
+        const enabled = isHandshakeEnabled()
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (canSendToWindow(w)) w.webContents.send('handshake:phrase', { phrase, enabled })
+        }
+        brainCore.setHandshake({ phrase, enabled })
+      }
+      return next
+    },
   )
 
   ipcMain.handle('floating-monitor:show', async () => {
@@ -961,29 +1007,67 @@ function registerIpc(): void {
     return { alwaysOnTop }
   })
 
-  ipcMain.handle('handshake:show', async () => {
-    await showHandshake()
+  ipcMain.handle('handshake:get-phrase', () => ({
+    phrase: getHandshakePhrase(),
+    enabled: isHandshakeEnabled(),
+  }))
+
+  ipcMain.handle('profile-preview:show', async () => {
+    await showProfilePreview()
     refreshTrayMenu(win, requestQuit)
     return { visible: true }
   })
-  ipcMain.handle('handshake:hide', () => {
-    hideHandshake()
+  ipcMain.handle('profile-preview:hide', () => {
+    hideProfilePreview()
     refreshTrayMenu(win, requestQuit)
     return { visible: false }
   })
-  ipcMain.handle('handshake:try', (_e, phrase: string) => {
-    const result = tryArmHandshake(String(phrase ?? ''))
+  ipcMain.handle('profile-preview:load', async (e) => {
+    return buildProfilePreview({
+      brainIndexFile: brainIndexFile(),
+      onProgress: (phase, pct) => {
+        try {
+          if (!e.sender.isDestroyed()) {
+            e.sender.send('profile-preview:progress', { phase, pct })
+          }
+        } catch {
+          /* ignore */
+        }
+      },
+    })
+  })
+  ipcMain.handle('profile-preview:save', async (_e, content: unknown) => {
+    const text = typeof content === 'string' ? content : ''
+    const result = await saveProfileUserMd(text)
+    const en = getAppSettings().uiLocale === 'en'
     if (result.ok) {
-      safeSendMain('handshake:toast-ready')
-      refreshTrayMenu(win, requestQuit)
+      sendAppToast({
+        kind: 'success',
+        title: en ? 'Profile saved' : 'Profil zapisany',
+        detail: en ? `USER.md · ${result.chars} chars` : `USER.md · ${result.chars} znaków`,
+      })
+    } else if (result.error === 'vault_locked') {
+      sendAppToast({
+        kind: 'error',
+        title: en ? 'Could not save profile' : 'Nie zapisano profilu',
+        detail: en ? 'Vault locked — unlock first.' : 'Sejf zablokowany — odblokuj vault.',
+      })
+    } else if (result.error === 'too_long') {
+      sendAppToast({
+        kind: 'error',
+        title: en ? 'Profile too long' : 'Profil za długi',
+        detail: en
+          ? `Max ${result.maxChars ?? 2200} characters (now ${result.detail}).`
+          : `Maks. ${result.maxChars ?? 2200} znaków (teraz ${result.detail}).`,
+      })
+    } else {
+      sendAppToast({
+        kind: 'error',
+        title: en ? 'Could not save profile' : 'Nie zapisano profilu',
+        detail: result.detail || (en ? 'USER.md write failed' : 'Błąd zapisu USER.md'),
+      })
     }
     return result
-  })
-  ipcMain.handle('handshake:get-armed', () => ({ armed: isGoArmed() }))
-  ipcMain.handle('handshake:disarm', () => {
-    const armed = setGoArmed(false)
-    refreshTrayMenu(win, requestQuit)
-    return { armed }
   })
 
   app.on('before-quit', (e) => {
@@ -994,7 +1078,7 @@ function registerIpc(): void {
     // Detach before stop — child exit still fires onEvent with type 'exited'.
     brainCore.onEvent = null
     destroyFloatingMonitor()
-    destroyHandshake()
+    destroyProfilePreview()
     destroyTray()
     void brainCore
       .stop()
@@ -1100,8 +1184,19 @@ function registerIpc(): void {
 
   ipcMain.handle(
     'connect:snippet',
-    (_e, clientId: ClientId, brainUrl: string, token?: string, target?: 'embedded' | 'remote') =>
-      buildSnippet(clientId, brainUrl, currentOS(), homeDir(), token, target ?? 'remote'),
+    (
+      _e,
+      clientId: ClientId,
+      brainUrl: string,
+      token?: string,
+      target?: 'embedded' | 'remote',
+      brainMode?: boolean,
+    ) =>
+      buildSnippet(clientId, brainUrl, currentOS(), homeDir(), token, target ?? 'remote', {
+        brainMode: !!brainMode,
+        handshakePhrase: getHandshakePhrase(),
+        handshakeEnabled: isHandshakeEnabled(),
+      }),
   )
 
   ipcMain.handle('connect:skillsList', (_e, brainUrl: string, token?: string) =>
@@ -1144,13 +1239,13 @@ app.whenReady().then(async () => {
   registerIpc()
   createWindow()
   if (win) void initTray(win, requestQuit)
-  // Personal ritual window — Ctrl+Shift+H (optional, discoverable via tray / Brain).
-  const hk = globalShortcut.register('CommandOrControl+Shift+H', () => {
-    void showHandshake().then(() => {
+  // Ephemeral profile preview — Ctrl+Shift+U (avoid P clash with print / other apps).
+  const hkProfile = globalShortcut.register('CommandOrControl+Shift+U', () => {
+    void showProfilePreview().then(() => {
       if (win) refreshTrayMenu(win, requestQuit)
     })
   })
-  if (!hk) log.warn('handshake hotkey Ctrl+Shift+H not registered (conflict?)')
+  if (!hkProfile) log.warn('profile preview hotkey Ctrl+Shift+U not registered (conflict?)')
   app.on('will-quit', () => {
     globalShortcut.unregisterAll()
   })

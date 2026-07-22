@@ -16,6 +16,12 @@ export interface VaultStatus {
   snapshots: number
   /** Library docs waiting for embedded brain indexing. */
   pendingLibraryIndex?: number
+  /** brain/*.md + cli/.../SKILL.md under vault/skills (or legacy). */
+  skillsCount?: number
+  /** .md files under vault/distilled (excludes `_review`). */
+  distilledNotes?: number
+  /** Plaintext knowledge root (USER.md, distilled/) when vault is open. */
+  knowledgePath?: string
 }
 
 export interface BackupProgressEvent {

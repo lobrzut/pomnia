@@ -27,6 +27,7 @@ const SYSTEM = `You are a knowledge distiller for a personal RAG "brain".
 Given a raw AI-assistant conversation transcript, extract ONLY durable, reusable knowledge.
 Rules:
 - Keep the user's language (Polish or English) — do not translate.
+- Mixed PL+EN vaults are normal: preserve each note/session in its original language; never force a single language across the vault.
 - Be concrete: real commands, file paths, numbers, config, decisions made. No chit-chat, no pleasantries.
 - Prefer terse bullet phrases over sentences.
 - If the conversation contains nothing durable, return empty arrays and an empty summary.
@@ -121,7 +122,11 @@ export function scoreFields(fields: DistilledNote['fields']): number {
   return Math.round(score * 100) / 100
 }
 
-const GARBAGE_THRESHOLD = 4.0 // below note_quality.py's "ok" bar
+// Quality-first: scoreFields floors near-empty notes around ~4.0 (base offset).
+// Gate at 5.0 so "chose X" / generic-ok scrapes do not enter RAG — they go to
+// _review/ and retry. Aligns closer to note_quality.py's solid>=6 band without
+// requiring solid for every note.
+const GARBAGE_THRESHOLD = 5.0
 
 /** Render a conversation to a transcript, budgeting characters (head + tail on overflow). */
 export function transcript(conv: Conversation, maxChars = 14000): { text: string; truncated: boolean } {

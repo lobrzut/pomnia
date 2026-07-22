@@ -13,8 +13,8 @@ Pomnia Desktop (Windows / macOS) zbiera czaty ze asystentów (Claude Code, Curso
 Każdy asystent trzyma rozmowy gdzie indziej. Zmiana maszyny = utrata kontekstu. Pomnia:
 
 - **wyciąga** rozmowy do jednego modelu (`Conversation`/`Message`),
-- **zabezpiecza** czaty + configi w content-addressed, szyfrowanym sejfie (`*.pomnia`),
-- **przenosi** sejf — skopiuj folder, otwórz tą samą frazą gdziekolwiek,
+- **zabezpiecza** czaty + configi w content-addressed, szyfrowanym **folderze vaultu** (np. `C:\Vault` — nazwa dowolna, też `*.pomnia`),
+- **przenosi** sejf — skopiuj cały folder vaultu na inny komputer → Otwórz vault → hasło,
 - **karmi Brain** — distill → notatki + indeks, potem MCP dla Cursora / innych agentów.
 
 ## Prosty flow (Desktop)

@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Activity, Brain, Clock, FileArchive, FolderOpen, Lock, Minimize2, Plug, RefreshCw, RotateCcw, ShieldCheck, Vault } from 'lucide-react'
+import { Activity, Brain, Clock, FileArchive, FolderOpen, Handshake, Languages, Lock, Minimize2, Palette, Plug, RefreshCw, RotateCcw, ShieldCheck, Vault } from 'lucide-react'
+import {
+  isValidHandshakePhraseSetting,
+} from '@core/handshakePhrase'
 import { Button, Field, GlassCard, Input, Spinner, Toggle } from '../components/ui'
 import { ClientIcon } from '../components/ClientIcon'
 import { api, isMock } from '../lib/api'
 import { humanBytes, relativeTime } from '../lib/format'
 import { uiLabels } from '../lib/labels'
+import { COLOR_SCHEMES, type ColorScheme } from '../lib/theme'
+import { UI_LOCALES, type UiLocale } from '../lib/uiLocale'
 import { useStore } from '../store/useStore'
 import type { ClientId, ClientStatus } from '../lib/types'
 
@@ -225,15 +230,39 @@ export default function Settings() {
     setFloatingMonitorOnMinimize,
     openAtLogin,
     setOpenAtLogin,
+    colorScheme,
+    setColorScheme,
+    uiLocale,
+    setUiLocale,
+    handshakePhrase,
+    setHandshakePhrase,
+    handshakeEnabled,
+    setHandshakeEnabled,
     brainTarget,
     remoteBrainUrl,
     connectToken
   } = useStore()
   const labels = uiLabels()
+  const schemeLabels: Record<ColorScheme, string> = {
+    mint: labels.colorSchemeMint,
+    iris: labels.colorSchemeIris,
+    glass: labels.colorSchemeGlass,
+  }
+  const localeLabels: Record<UiLocale, string> = {
+    pl: labels.uiLocalePl,
+    en: labels.uiLocaleEn,
+  }
   const [exportSnap, setExportSnap] = useState(snapshots[0]?.id ?? '')
   const [clients, setClients] = useState<ClientStatus[]>([])
   const [verifying, setVerifying] = useState(false)
   const [appVersion, setAppVersion] = useState('')
+  const [phraseDraft, setPhraseDraft] = useState(handshakePhrase)
+  const [phraseError, setPhraseError] = useState<string | null>(null)
+  const [phraseSaving, setPhraseSaving] = useState(false)
+
+  useEffect(() => {
+    setPhraseDraft(handshakePhrase)
+  }, [handshakePhrase])
 
   useEffect(() => {
     void api
@@ -241,6 +270,31 @@ export default function Settings() {
       .then((r) => setAppVersion(r.version))
       .catch(() => {})
   }, [])
+
+  async function saveHandshakePhrase() {
+    const trimmed = phraseDraft.trim()
+    if (!trimmed) {
+      setPhraseError(labels.handshakePhraseEmpty)
+      return
+    }
+    if (!isValidHandshakePhraseSetting(trimmed)) {
+      setPhraseError(labels.handshakePhraseTooShort)
+      return
+    }
+    setPhraseSaving(true)
+    setPhraseError(null)
+    try {
+      const r = await setHandshakePhrase(trimmed)
+      if (!r.ok) {
+        setPhraseError(labels.handshakePhraseTooShort)
+        return
+      }
+      setPhraseDraft(r.phrase)
+      toast({ kind: 'success', title: labels.handshakePhraseSaved })
+    } finally {
+      setPhraseSaving(false)
+    }
+  }
 
   async function verifyIntegrity() {
     setVerifying(true)
@@ -304,6 +358,70 @@ export default function Settings() {
 
       <GlassCard className="mb-4 p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+          <Languages className="h-4 w-4 text-mint" /> {labels.uiLocale}
+        </div>
+        <p className="mb-3 text-xs text-ink-dim">{labels.uiLocaleHint}</p>
+        <div
+          className="flex flex-wrap gap-1 rounded-xl border border-line bg-abyss/60 p-1"
+          role="radiogroup"
+          aria-label={labels.uiLocale}
+        >
+          {UI_LOCALES.map((id) => {
+            const active = uiLocale === id
+            return (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setUiLocale(id)}
+                className={
+                  active
+                    ? 'flex-1 rounded-lg border border-mint/35 bg-mint/15 px-3 py-2 text-sm font-medium text-ink shadow-[0_0_16px_-6px_var(--color-mint)]'
+                    : 'flex-1 rounded-lg border border-transparent px-3 py-2 text-sm font-medium text-ink-dim hover:bg-white/5 hover:text-ink'
+                }
+              >
+                {localeLabels[id]}
+              </button>
+            )
+          })}
+        </div>
+      </GlassCard>
+
+      <GlassCard className="mb-4 p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+          <Palette className="h-4 w-4 text-mint" /> {labels.colorScheme}
+        </div>
+        <p className="mb-3 text-xs text-ink-dim">{labels.colorSchemeHint}</p>
+        <div
+          className="flex flex-wrap gap-1 rounded-xl border border-line bg-abyss/60 p-1"
+          role="radiogroup"
+          aria-label={labels.colorScheme}
+        >
+          {COLOR_SCHEMES.map((id) => {
+            const active = colorScheme === id
+            return (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setColorScheme(id)}
+                className={
+                  active
+                    ? 'flex-1 rounded-lg border border-mint/35 bg-mint/15 px-3 py-2 text-sm font-medium text-ink shadow-[0_0_16px_-6px_var(--color-mint)]'
+                    : 'flex-1 rounded-lg border border-transparent px-3 py-2 text-sm font-medium text-ink-dim hover:bg-white/5 hover:text-ink'
+                }
+              >
+                {schemeLabels[id]}
+              </button>
+            )
+          })}
+        </div>
+      </GlassCard>
+
+      <GlassCard className="mb-4 p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
           <Minimize2 className="h-4 w-4 text-mint" /> {labels.systemTray}
         </div>
         <div className="space-y-4">
@@ -340,6 +458,56 @@ export default function Settings() {
             />
           </div>
         </div>
+      </GlassCard>
+
+      <GlassCard className="mb-4 p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+          <Handshake className="h-4 w-4 text-mint" /> {labels.handshake}
+        </div>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-medium text-ink">{labels.handshakeEnabled}</div>
+            <p className="mt-1 text-xs text-ink-dim">{labels.handshakeEnabledHint}</p>
+          </div>
+          <Toggle
+            checked={handshakeEnabled}
+            onChange={setHandshakeEnabled}
+            aria-label={labels.handshakeEnabled}
+          />
+        </div>
+        <div className="mb-1 text-sm font-medium text-ink">{labels.handshakePhrase}</div>
+        <p className="mb-3 text-xs text-ink-dim">{labels.handshakePhraseHint}</p>
+        <div className="flex flex-wrap items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <Input
+              value={phraseDraft}
+              onChange={(e) => {
+                setPhraseDraft(e.target.value)
+                if (phraseError) setPhraseError(null)
+              }}
+              placeholder={handshakePhrase || labels.handshakePlaceholder}
+              aria-label={labels.handshakePhrase}
+              autoComplete="off"
+              spellCheck={false}
+              disabled={!handshakeEnabled}
+              className={!handshakeEnabled ? 'opacity-50' : undefined}
+            />
+            {handshakeEnabled && phraseDraft.trim() ? (
+              <p className="mt-1.5 text-[11px] text-ink-faint">
+                {labels.handshakePhrasePreview(phraseDraft.trim())}
+              </p>
+            ) : null}
+          </div>
+          <Button
+            type="button"
+            onClick={() => void saveHandshakePhrase()}
+            disabled={!handshakeEnabled || phraseSaving || phraseDraft.trim() === handshakePhrase}
+          >
+            {phraseSaving ? <Spinner className="h-4 w-4" /> : null}
+            {labels.handshakePhraseSave}
+          </Button>
+        </div>
+        {phraseError ? <p className="mt-2 text-xs text-rose-300/90">{phraseError}</p> : null}
       </GlassCard>
 
       <HealthCheck />
@@ -507,7 +675,7 @@ export default function Settings() {
           <li>• AES-256-GCM — szyfrowanie uwierzytelnione, losowy IV na blob.</li>
           <li>• scrypt (N=2¹⁷) — pochodna klucza z hasła.</li>
           <li>• Content-addressed blob store — identyczne pliki trzymane raz.</li>
-          <li>• Pełna przenośność: skopiuj folder .pomnia na dowolny OS i odblokuj.</li>
+          <li>• {labels.securityPortability}</li>
           {appVersion && (
             <li className="text-ink-faint">{labels.securityAboutCli(appVersion)}</li>
           )}

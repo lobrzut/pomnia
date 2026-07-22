@@ -19,11 +19,12 @@ export function GlassCard({
 }) {
   return (
     <motion.div
-      // Avoid opacity:0 on mount — nested inside App's route transition it can stick invisible.
-      initial={{ y: 14, scale: 0.99 }}
-      animate={{ y: 0, scale: 1 }}
-      transition={{ duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] }}
-      whileHover={hover ? { y: -4 } : undefined}
+      // No opacity here — nested under App route crossfade, opacity:0 can stick invisible in Electron.
+      // Keep enter motion soft so it doesn't fight the page fade (y 6 / ~240ms).
+      initial={{ y: 6 }}
+      animate={{ y: 0 }}
+      transition={{ duration: 0.28, delay, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={hover ? { y: -2 } : undefined}
       whileTap={onClick ? { scale: 0.985 } : undefined}
       onClick={onClick}
       className={clsx(

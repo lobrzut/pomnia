@@ -1,12 +1,17 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import type { BackupOptions, Conversation, DetectedSource, Message, OS } from '../model.js'
 import { descriptorFor } from '../locations.js'
-import { pathExists } from '../fsutil.js'
+import { pathExists, walk } from '../fsutil.js'
+import { homeDir } from '../platform.js'
 import { log } from '../log.js'
 import { baseDetect, collectFilesFromDescriptor } from './base.js'
-import type { Adapter } from './types.js'
+import type { Adapter, CollectedFile } from './types.js'
+import { DEFAULT_MAX_FILE } from './types.js'
 
+const execFileAsync = promisify(execFile)
 const ID = 'cursor' as const
 
 /** sql.js loads the whole DB into RAM; large files also stall the Electron main process on readFile. */
@@ -20,6 +25,11 @@ function fmtBytes(n: number): string {
 
 export function cursorDbPath(root: string): string {
   return path.join(root, 'globalStorage', 'state.vscdb')
+}
+
+/** Cursor Agent mode transcripts live outside AppData (per project). */
+export function cursorProjectsRoot(home = homeDir()): string {
+  return path.join(home, '.cursor', 'projects')
 }
 
 export async function cursorDbStat(root: string): Promise<{ size: number; path: string } | null> {
@@ -65,13 +75,155 @@ function bubbleRole(type: unknown): Message['role'] {
   return type === 1 || type === '1' ? 'user' : 'assistant'
 }
 
+function agentContentText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  const parts: string[] = []
+  for (const block of content) {
+    if (!block || typeof block !== 'object') continue
+    const b = block as { type?: string; text?: string }
+    if (b.type === 'text' && typeof b.text === 'string' && b.text.trim()) parts.push(b.text)
+  }
+  return parts.join('\n').trim()
+}
+
+/**
+ * Count composerData keys without loading the whole DB into JS heap (sql.js).
+ * Tries node:sqlite (Node 22+), then system `sqlite3` CLI.
+ */
+export async function countCursorComposersLight(dbPath: string): Promise<number | null> {
+  const sql =
+    "SELECT COUNT(*) FROM cursorDiskKV WHERE key LIKE 'composerData:%'"
+
+  try {
+    const mod: any = await import('node:sqlite')
+    const DatabaseSync = mod.DatabaseSync
+    if (DatabaseSync) {
+      const db = new DatabaseSync(dbPath, { readOnly: true })
+      try {
+        const row = db.prepare(sql).get() as Record<string, number> | undefined
+        const n = row ? Number(Object.values(row)[0] ?? 0) : 0
+        return Number.isFinite(n) ? n : null
+      } finally {
+        try {
+          db.close()
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  } catch {
+    /* node:sqlite unavailable — try CLI */
+  }
+
+  try {
+    const { stdout } = await execFileAsync('sqlite3', [dbPath, sql], {
+      timeout: 60_000,
+      maxBuffer: 1024 * 1024,
+      windowsHide: true
+    })
+    const n = parseInt(String(stdout).trim(), 10)
+    return Number.isFinite(n) ? n : null
+  } catch {
+    return null
+  }
+}
+
+/** Parent agent sessions only — skip subagents/<uuid>.jsonl. */
+export async function listCursorAgentTranscriptFiles(
+  home = homeDir()
+): Promise<Array<{ id: string; project: string; file: string }>> {
+  const projectsRoot = cursorProjectsRoot(home)
+  if (!(await pathExists(projectsRoot))) return []
+
+  const out: Array<{ id: string; project: string; file: string }> = []
+  let projects: import('node:fs').Dirent[]
+  try {
+    projects = await fs.readdir(projectsRoot, { withFileTypes: true })
+  } catch {
+    return []
+  }
+
+  for (const proj of projects) {
+    if (!proj.isDirectory()) continue
+    const atRoot = path.join(projectsRoot, proj.name, 'agent-transcripts')
+    if (!(await pathExists(atRoot))) continue
+    let sessions: import('node:fs').Dirent[]
+    try {
+      sessions = await fs.readdir(atRoot, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const sess of sessions) {
+      if (!sess.isDirectory()) continue
+      const id = sess.name
+      const file = path.join(atRoot, id, `${id}.jsonl`)
+      if (await pathExists(file)) out.push({ id, project: proj.name, file })
+    }
+  }
+  return out
+}
+
+/** Parse Cursor agent-transcripts JSONL (role + message.content[]). */
+export async function readCursorAgentTranscripts(home = homeDir()): Promise<Conversation[]> {
+  const files = await listCursorAgentTranscriptFiles(home)
+  const byId = new Map<string, Conversation>()
+
+  for (const { id, project, file } of files) {
+    let raw: string
+    try {
+      raw = await fs.readFile(file, 'utf8')
+    } catch {
+      continue
+    }
+
+    const messages: Message[] = []
+    let title: string | undefined
+    for (const line of raw.split(/\r?\n/)) {
+      const t = line.trim()
+      if (!t) continue
+      let obj: { role?: string; message?: { content?: unknown } }
+      try {
+        obj = JSON.parse(t)
+      } catch {
+        continue
+      }
+      const roleRaw = String(obj.role ?? '')
+      const role: Message['role'] | null =
+        roleRaw === 'user' || roleRaw === 'assistant' || roleRaw === 'system' || roleRaw === 'tool'
+          ? roleRaw
+          : null
+      const text = agentContentText(obj.message?.content)
+      if (!role || !text) continue
+      messages.push({ role, text })
+      if (role === 'user' && !title) title = text.replace(/\s+/g, ' ').trim().slice(0, 80)
+    }
+
+    if (!messages.length) continue
+    const existing = byId.get(id)
+    // Same session id can appear under multiple project folders — keep richer copy.
+    if (!existing || messages.length > existing.messages.length) {
+      byId.set(id, {
+        id,
+        source: ID,
+        title: title || id.slice(0, 8),
+        project,
+        messages,
+        meta: { origin: 'agent-transcripts' }
+      })
+    }
+  }
+
+  return [...byId.values()]
+}
+
 /** Best-effort extraction of composers/chats from Cursor's state.vscdb. */
-export async function readCursorConversations(root: string): Promise<Conversation[]> {
+export async function readCursorVscdbConversations(root: string): Promise<Conversation[]> {
   const st = await cursorDbStat(root)
   if (!st) return []
   if (st.size > MAX_CURSOR_DB_BYTES) {
     log.warn(
-      `Cursor DB too large (${fmtBytes(st.size)} > ${fmtBytes(MAX_CURSOR_DB_BYTES)}) — skip chat extraction to avoid freezing the app`
+      `Cursor DB too large (${fmtBytes(st.size)} > ${fmtBytes(MAX_CURSOR_DB_BYTES)}) — skip sql.js parse; using agent-transcripts if present`
     )
     return []
   }
@@ -166,7 +318,45 @@ export async function readCursorConversations(root: string): Promise<Conversatio
     /* ignore */
   }
 
-  return [...convs.values()].filter((c) => c.messages.length > 0)
+  return [...convs.values()]
+    .filter((c) => c.messages.length > 0)
+    .map((c) => ({ ...c, meta: { ...c.meta, origin: 'state.vscdb' } }))
+}
+
+function mergeConversations(a: Conversation[], b: Conversation[]): Conversation[] {
+  const map = new Map<string, Conversation>()
+  for (const c of [...a, ...b]) {
+    const prev = map.get(c.id)
+    if (!prev || c.messages.length > prev.messages.length) map.set(c.id, c)
+  }
+  return [...map.values()]
+}
+
+/** Full Cursor conversation set: state.vscdb (when parseable) ∪ ~/.cursor/.../agent-transcripts. */
+export async function readCursorConversations(root: string, home = homeDir()): Promise<Conversation[]> {
+  const [fromDb, fromAgents] = await Promise.all([
+    readCursorVscdbConversations(root),
+    readCursorAgentTranscripts(home)
+  ])
+  return mergeConversations(fromDb, fromAgents)
+}
+
+async function collectAgentTranscriptFiles(home: string, opts: BackupOptions): Promise<CollectedFile[]> {
+  const root = cursorProjectsRoot(home)
+  if (!(await pathExists(root))) return []
+  const maxFileBytes = opts.maxFileBytes ?? DEFAULT_MAX_FILE
+  const files: CollectedFile[] = []
+  for await (const f of walk(root, { maxFileBytes })) {
+    // Keep parent transcripts + skip obvious junk; include subagents for fidelity.
+    if (!f.relPath.includes('agent-transcripts/')) continue
+    if (!f.relPath.endsWith('.jsonl')) continue
+    files.push({
+      ...f,
+      relPath: path.posix.join('cursor-agent-transcripts', f.relPath.replace(/\\/g, '/')),
+      pathSensitive: false
+    })
+  }
+  return files
 }
 
 export const cursorAdapter: Adapter = {
@@ -176,21 +366,44 @@ export const cursorAdapter: Adapter = {
 
   async detect(): Promise<DetectedSource> {
     const d = await baseDetect(ID)
-    if (d.installed) {
-      const st = await cursorDbStat(d.root)
-      if (st && st.size > MAX_CURSOR_DB_BYTES) {
-        d.conversations = 0
-        d.notes = [
-          ...(d.notes ?? []),
-          `state.vscdb is ${fmtBytes(st.size)} — in-app chat parse skipped (too large). Close Cursor before backup; or use Import for exports.`
-        ]
-      } else {
-        try {
-          d.conversations = (await readCursorConversations(d.root)).length
-        } catch {
-          d.conversations = undefined
-        }
+    if (!d.installed) return d
+
+    const st = await cursorDbStat(d.root)
+    // dirSize skips files > DEFAULT_MAX_FILE — fold oversized state.vscdb back in.
+    if (st && st.size > DEFAULT_MAX_FILE) d.sizeBytes += st.size
+
+    const agents = await readCursorAgentTranscripts(homeDir()).catch(() => [] as Conversation[])
+    const agentCount = agents.length
+    const tooLarge = !!(st && st.size > MAX_CURSOR_DB_BYTES)
+
+    if (tooLarge) {
+      const light = st ? await countCursorComposersLight(st.path) : null
+      // Prefer parseable agent-transcripts (messages). Light COUNT is keys only — may include empty shells.
+      if (agentCount > 0) d.conversations = agentCount
+      else if (light != null) d.conversations = light
+      else d.conversations = undefined
+      const bits = [
+        `state.vscdb is ${fmtBytes(st!.size)} — full in-app SQLite parse skipped (sql.js would freeze).`
+      ]
+      if (agentCount > 0) bits.push(`${agentCount} chats from ~/.cursor/projects/*/agent-transcripts.`)
+      if (light != null) bits.push(`${light} composerData keys (light SQLite probe; not fully parsed).`)
+      if (agentCount === 0 && light == null) {
+        bits.push('Chat count unknown — no agent-transcripts and no sqlite probe; DB too large for sql.js.')
       }
+      d.notes = [...(d.notes ?? []), ...bits]
+      return d
+    }
+
+    try {
+      d.conversations = (await readCursorConversations(d.root)).length
+    } catch {
+      d.conversations = agentCount > 0 ? agentCount : undefined
+    }
+    if (agentCount > 0) {
+      d.notes = [
+        ...(d.notes ?? []),
+        `Includes ${agentCount} agent-transcript session(s) under ~/.cursor/projects`
+      ]
     }
     return d
   },
@@ -199,7 +412,9 @@ export const cursorAdapter: Adapter = {
     return readCursorConversations(root)
   },
 
-  collectFiles(root: string, opts: BackupOptions) {
-    return collectFilesFromDescriptor(ID, root, opts)
+  async collectFiles(root: string, opts: BackupOptions) {
+    const appFiles = await collectFilesFromDescriptor(ID, root, opts)
+    const agentFiles = await collectAgentTranscriptFiles(homeDir(), opts)
+    return [...appFiles, ...agentFiles]
   }
 }

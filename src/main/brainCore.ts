@@ -55,6 +55,10 @@ export interface StartOptions {
    * (`USER.md`, `distilled/`, `sessions/` next to header.json).
    */
   vaultRoot?: string
+  /** Agent proof greeting phrase (from Pomnia Settings). */
+  handshakePhrase?: string
+  /** When false, MCP tools omit Handshake greeting hints. */
+  handshakeEnabled?: boolean
 }
 
 function resolveNodeBin(): string | undefined {
@@ -168,6 +172,8 @@ export class BrainCoreManager {
             host: '127.0.0.1',
             ...(opts.skillsRoot ? { skillsRoot: opts.skillsRoot } : {}),
             ...(opts.vaultRoot ? { vaultRoot: opts.vaultRoot } : {}),
+            ...(opts.handshakePhrase ? { handshakePhrase: opts.handshakePhrase } : {}),
+            handshakeEnabled: opts.handshakeEnabled !== false,
           },
         })
       })
@@ -301,6 +307,17 @@ export class BrainCoreManager {
     const child = this.child
     if (!child || !this.url) return
     child.send({ type: 'set-vault-root', path })
+  }
+
+  /** Update Handshake proof phrase for MCP tool descriptions / profile preamble. */
+  setHandshake(opts: { phrase: string; enabled: boolean }): void {
+    const child = this.child
+    if (!child || !this.url) return
+    child.send({
+      type: 'set-handshake',
+      phrase: opts.phrase,
+      enabled: opts.enabled,
+    })
   }
 }
 

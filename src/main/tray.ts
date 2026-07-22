@@ -8,7 +8,7 @@ import { app, Menu, Tray, nativeImage, type BrowserWindow, type NativeImage } fr
 import { activity } from './activity.js'
 import { brainCore } from './brainCore.js'
 import { isFloatingMonitorVisible, toggleFloatingMonitor } from './floatingMonitor.js'
-import { isGoArmed, showHandshake } from './handshake.js'
+import { showProfilePreview } from './profilePreview.js'
 
 let tray: Tray | null = null
 
@@ -54,9 +54,9 @@ function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
       },
     },
     {
-      label: isGoArmed() ? 'Handshake · Go' : 'Handshake',
+      label: 'Profil',
       click: () => {
-        void showHandshake().then(() => tray?.setContextMenu(buildMenu(win, onQuit)))
+        void showProfilePreview().then(() => tray?.setContextMenu(buildMenu(win, onQuit)))
       },
     },
     { type: 'separator' },

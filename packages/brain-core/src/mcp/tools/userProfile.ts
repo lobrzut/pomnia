@@ -35,11 +35,13 @@ export const memorySchema = {
       type: 'string',
       enum: ['user', 'tech', 'comm', 'income'],
       default: 'user',
-      description: "Section header: 'user'→PROFIL, 'tech'→TECH, 'comm'→KOMUNIKACJA, 'income'→ZAROBEK",
+      description:
+        "Section: 'user'→PROFIL (person), 'tech'→TECH (durable product/stack identity — not release notes), 'comm'→KOMUNIKACJA, 'income'→ZAROBEK",
     },
     content: {
       type: 'string',
-      description: 'For add: the new fact. For replace/remove: substring to find in current profile.',
+      description:
+        'For add: one durable fact (not a changelog). For replace/remove: substring to find. Never add installer paths, version notes, or one-off build fixes to USER.md.',
     },
     new_content: {
       type: 'string',
