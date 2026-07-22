@@ -87,4 +87,37 @@ describe('portable vault knowledge', () => {
     expect(portableKnowledgePresent(vaultDir)).toBe(true)
     expect(existsSync(join(vaultDir, '.portable-knowledge'))).toBe(true)
   })
+
+  it('countLocalSkills counts brain/*.md + cli/*/SKILL.md and skips .bak', async () => {
+    const { countLocalSkills, portableSkillsPresent } = await import('../brainPaths.js')
+    mkdirSync(join(vaultDir, 'skills', 'brain'), { recursive: true })
+    mkdirSync(join(vaultDir, 'skills', 'cli', 'mentor-suntzu'), { recursive: true })
+    mkdirSync(join(vaultDir, 'skills', 'cli', 'empty-pack'), { recursive: true })
+    writeFileSync(join(vaultDir, 'skills', 'brain', 'inbox-process.md'), '# skill')
+    writeFileSync(join(vaultDir, 'skills', 'brain', 'inbox-process.md.bak-1'), '# bak')
+    writeFileSync(join(vaultDir, 'skills', 'cli', 'mentor-suntzu', 'SKILL.md'), '# cli')
+    writeFileSync(join(vaultDir, 'skills', 'cli', 'empty-pack', 'README.md'), 'no skill')
+
+    expect(countLocalSkills(vaultDir)).toBe(2)
+    expect(portableSkillsPresent(vaultDir)).toBe(true)
+    expect(countLocalSkills(join(tmpdir(), 'pomnia-no-skills-xyz'))).toBe(0)
+  })
+
+  it('migrates skills from AppData when portable sidecar has only empty dirs', async () => {
+    const legacy = join(userData, 'brain-core-data', 'vault', 'skills')
+    mkdirSync(join(legacy, 'brain'), { recursive: true })
+    mkdirSync(join(legacy, 'cli', 'cisco-ios-patterns'), { recursive: true })
+    writeFileSync(join(legacy, 'brain', 'scope-analyzer.md'), '# brain')
+    writeFileSync(join(legacy, 'cli', 'cisco-ios-patterns', 'SKILL.md'), '# cli')
+
+    // Empty portable dirs used to block migrate (portableSkillsPresent was true on mkdir alone)
+    mkdirSync(join(vaultDir, 'skills', 'brain'), { recursive: true })
+    mkdirSync(join(vaultDir, 'skills', 'cli'), { recursive: true })
+
+    const { ensurePortableSkills } = await import('../ensurePortableSkills.js')
+    const { countLocalSkills } = await import('../brainPaths.js')
+    await ensurePortableSkills(vaultDir)
+    expect(countLocalSkills(vaultDir)).toBe(2)
+    expect(readFileSync(join(vaultDir, 'skills', 'brain', 'scope-analyzer.md'), 'utf8')).toContain('brain')
+  })
 })

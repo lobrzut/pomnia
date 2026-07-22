@@ -60,7 +60,7 @@ export default function VaultGate() {
           <div className="min-w-0 leading-none">
             <h1 className="text-lg font-bold leading-tight tracking-tight text-grad">Pomnia Vault</h1>
             <p className="mt-1.5 text-xs leading-snug text-ink-dim">
-              Your AI memory — encrypted, portable, yours.
+              Pamięć AI w folderze vaultu — zaszyfrowana, przenośna, Twoja.
             </p>
           </div>
         </div>
@@ -86,7 +86,7 @@ export default function VaultGate() {
         </div>
 
         <div className="space-y-4">
-          <Field label={mode === 'create' ? 'New vault folder' : 'Vault folder'}>
+          <Field label={mode === 'create' ? 'Nowy folder vaultu' : 'Folder vaultu'}>
             <div className="flex gap-2">
               <Input
                 value={path}
@@ -95,7 +95,7 @@ export default function VaultGate() {
                   setVaultLastPath(e.target.value)
                 }}
                 onKeyDown={onEnter}
-                placeholder="…/MyVault.pomnia"
+                placeholder="C:\Vault"
               />
               <Button variant="soft" onClick={pick}>
                 <FolderOpen className="h-4 w-4" />

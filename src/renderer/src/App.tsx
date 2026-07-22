@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
+import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import Aurora from './components/Aurora'
 import { Sidebar, TitleBar } from './components/Shell'
@@ -6,7 +7,9 @@ import { Toasts } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useStore } from './store/useStore'
 import { api } from './lib/api'
-import { uiLabels } from './lib/labels'
+import { applyColorScheme, isColorScheme } from './lib/theme'
+import { invalidateUiLabelsCache } from './lib/labels'
+import { isUiLocale, setUiLocaleCache } from './lib/uiLocale'
 import Dashboard from './pages/Dashboard'
 import Browse from './pages/Browse'
 import ImportPage from './pages/Import'
@@ -17,7 +20,7 @@ import VaultGate from './pages/VaultGate'
 import Onboarding from './pages/Onboarding'
 import HowItWorks from './pages/HowItWorks'
 import FloatingMonitor from './pages/FloatingMonitor'
-import Handshake from './pages/Handshake'
+import ProfilePreview from './pages/ProfilePreview'
 
 const PAGES = { dashboard: Dashboard, browse: Browse, import: ImportPage, brain: Brain, connect: Connect, settings: Settings, guide: HowItWorks } as const
 
@@ -26,29 +29,67 @@ function isFloatingMonitorRoute(): boolean {
   return hash === '/floating-monitor' || hash === 'floating-monitor'
 }
 
-function isHandshakeRoute(): boolean {
+function isProfilePreviewRoute(): boolean {
   const hash = window.location.hash.replace(/^#/, '')
-  return hash === '/handshake' || hash === 'handshake'
+  return hash === '/profile-preview' || hash === 'profile-preview'
+}
+
+/** Load persisted theme + locale; live-sync across main / PiP windows. */
+function useThemeSync() {
+  const loadAppSettings = useStore((s) => s.loadAppSettings)
+  useEffect(() => {
+    void loadAppSettings()
+    const offScheme = api.onColorScheme((scheme) => {
+      const next = isColorScheme(scheme) ? scheme : 'mint'
+      applyColorScheme(next)
+      useStore.setState({ colorScheme: next })
+    })
+    const offLocale = api.onUiLocale((locale) => {
+      const next = isUiLocale(locale) ? locale : 'pl'
+      setUiLocaleCache(next)
+      invalidateUiLabelsCache()
+      useStore.setState({ uiLocale: next })
+    })
+    return () => {
+      offScheme()
+      offLocale()
+    }
+  }, [loadAppSettings])
+}
+
+function FloatingShell({ children, dense }: { children: ReactNode; dense?: boolean }) {
+  useThemeSync()
+  return (
+    <div
+      className={clsx(
+        'floating-pip-root flex h-screen w-screen flex-col overflow-hidden bg-transparent',
+        dense ? 'px-1.5 py-1' : 'p-2',
+      )}
+    >
+      {children}
+      <Toasts />
+    </div>
+  )
 }
 
 export default function App() {
   if (isFloatingMonitorRoute()) {
     return (
-      <div className="floating-pip-root flex h-screen w-screen flex-col overflow-hidden bg-transparent p-2">
+      <FloatingShell dense>
         <FloatingMonitor />
-      </div>
+      </FloatingShell>
     )
   }
 
-  if (isHandshakeRoute()) {
+  if (isProfilePreviewRoute()) {
     return (
-      <div className="floating-pip-root flex h-screen w-screen flex-col overflow-hidden bg-transparent p-2">
-        <Handshake />
-      </div>
+      <FloatingShell>
+        <ProfilePreview />
+      </FloatingShell>
     )
   }
 
-  const { route, setRoute, scan, refreshVault, vault, toast, onboarded, loadAppSettings, initGlobalActivity } = useStore()
+  const { route, setRoute, scan, refreshVault, vault, toast, onboarded, loadAppSettings, initGlobalActivity, uiLocale } = useStore()
 
   useEffect(() => {
     void scan()
@@ -64,14 +105,22 @@ export default function App() {
         ...(s.onboarded ? { onboarded: true } : {}),
       }).catch(() => {})
     })
+    const offScheme = api.onColorScheme((scheme) => {
+      const next = isColorScheme(scheme) ? scheme : 'mint'
+      applyColorScheme(next)
+      useStore.setState({ colorScheme: next })
+    })
+    const offLocale = api.onUiLocale((locale) => {
+      const next = isUiLocale(locale) ? locale : 'pl'
+      setUiLocaleCache(next)
+      invalidateUiLabelsCache()
+      useStore.setState({ uiLocale: next })
+    })
     const offActivity = initGlobalActivity()
     const offNavigate = api.onAppNavigate((r) => {
       if (r === 'guide' || r === 'dashboard' || r === 'browse' || r === 'import' || r === 'brain' || r === 'connect' || r === 'settings') {
         setRoute(r)
       }
-    })
-    const offHandshakeToast = api.onHandshakeToastReady(() => {
-      toast({ kind: 'success', title: uiLabels().handshakeToastReady })
     })
     const offAppToast = api.onAppToast((t) => {
       toast(t)
@@ -85,9 +134,10 @@ export default function App() {
     return () => {
       window.removeEventListener('error', onErr)
       window.removeEventListener('unhandledrejection', onRej)
+      offScheme()
+      offLocale()
       offActivity()
       offNavigate()
-      offHandshakeToast()
       offAppToast()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,19 +146,21 @@ export default function App() {
   const Page = PAGES[route]
 
   return (
-    <div className="grain relative flex h-full flex-col overflow-hidden">
+    <div className="grain relative flex h-full flex-col overflow-hidden" key={uiLocale}>
       <Aurora />
       <TitleBar />
       <div className="relative z-10 flex min-h-0 flex-1">
         <Sidebar />
-        <main className="min-h-0 flex-1 overflow-y-auto px-9 pb-12 pt-3">
+        <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-9 pb-3 pt-3">
+          {/* Absolute stack keeps main height stable while pages crossfade — avoids flex collapse / scroll thrash. */}
           <AnimatePresence initial={false}>
             <motion.div
               key={route}
-              initial={{ y: 12 }}
-              animate={{ y: 0 }}
-              exit={{ y: -8, pointerEvents: 'none' }}
-              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4, pointerEvents: 'none' }}
+              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+              className="absolute inset-0 flex min-h-0 flex-col overflow-y-auto"
             >
               <ErrorBoundary>
                 <Page />

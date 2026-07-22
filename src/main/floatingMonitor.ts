@@ -7,9 +7,9 @@ import { join } from 'node:path'
 import { BrowserWindow, screen, type WebContents } from 'electron'
 import { getAppSettings, setAppSettings } from './appSettings.js'
 
-/** Compact PiP: 3 nodes (Vault → library → MCP) + padding; matches FlowDiagram pip layout. */
+/** Compact PiP strip: header + Vault → library → MCP; matches FlowDiagram pip layout. */
 const WIDTH = 300
-const HEIGHT = 196
+const HEIGHT = 118
 const SNAP_THRESHOLD = 96
 
 let floatingWin: BrowserWindow | null = null
@@ -93,6 +93,7 @@ export async function showFloatingMonitor(opts?: { force?: boolean }): Promise<v
   if (!opts?.force && s.onboarded === false) return
 
   if (floatingWin && !floatingWin.isDestroyed()) {
+    floatingWin.setSize(WIDTH, HEIGHT)
     floatingWin.show()
     return
   }

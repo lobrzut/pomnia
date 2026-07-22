@@ -43,6 +43,51 @@ describe('brain/snippet — Cursor remote mcp.json', () => {
     expect(full.mcpServers['brain-rag'].url).toBe('http://127.0.0.1:7862/mcp')
     expect(full.mcpServers['brain-rag'].headers).toBeUndefined()
   })
+
+  it('Brain Mode OFF omits agent brief', () => {
+    const s = buildSnippet('cursor', 'http://127.0.0.1:7862', 'win32', 'C:\\Users\\x', undefined, 'embedded')
+    expect(s.brief).toBeUndefined()
+    expect(s.agentRuleMarkdown).toBeUndefined()
+  })
+
+  it('Brain Mode ON includes Cursor .mdc brief + shared rule markdown', () => {
+    const s = buildSnippet('cursor', 'http://127.0.0.1:7862', 'win32', 'C:\\Users\\x', undefined, 'embedded', {
+      brainMode: true,
+    })
+    expect(s.brief?.filePath.replace(/\\/g, '/')).toMatch(/\.cursor\/rules\/brain\.mdc$/)
+    expect(s.brief?.content).toContain('alwaysApply: true')
+    expect(s.brief?.content).toContain('pomnia-brain-start')
+    expect(s.brief?.content).toContain('OK to Go Go Go')
+    expect(s.agentRuleMarkdown).toContain('save_conversation')
+    expect(s.agentRuleMarkdown).toContain('Do not assume Pomnia auto-captures')
+    expect(s.agentRuleMarkdown).toContain('Handshake (proof Pomnia Brain is wired)')
+  })
+
+  it('Brain Mode ON wires custom handshake phrase into the rule', () => {
+    const s = buildSnippet('claude-code', 'http://127.0.0.1:7862', 'darwin', '/Users/x', undefined, 'embedded', {
+      brainMode: true,
+      handshakePhrase: 'Ruszamy',
+    })
+    expect(s.agentRuleMarkdown).toContain('`Ruszamy`')
+    expect(s.instructions).toContain('Ruszamy')
+  })
+
+  it('Brain Mode ON with handshakeEnabled false omits greeting rule', () => {
+    const s = buildSnippet('cursor', 'http://127.0.0.1:7862', 'win32', 'C:\\Users\\x', undefined, 'embedded', {
+      brainMode: true,
+      handshakeEnabled: false,
+    })
+    expect(s.agentRuleMarkdown).not.toContain('Handshake (proof')
+    expect(s.instructions).toContain('Handshake greeting is OFF')
+  })
+
+  it('Brain Mode ON for Hermes still gives copyable rule (no dedicated path)', () => {
+    const s = buildSnippet('hermes', 'http://127.0.0.1:7862', 'linux', '/home/x', undefined, 'embedded', {
+      brainMode: true,
+    })
+    expect(s.brief).toBeUndefined()
+    expect(s.agentRuleMarkdown).toContain('get_user_profile')
+  })
 })
 
 describe('brain/snippet — Antigravity remote mcp_config.json', () => {

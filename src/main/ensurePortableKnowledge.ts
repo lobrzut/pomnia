@@ -14,6 +14,25 @@ import {
   portableKnowledgePresent,
 } from './brainPaths.js'
 
+/** Optional starter — preferred language is auto from notes; do not force fill. */
+const USER_MD_STARTER = `# Preferred language: auto from your notes (PL and EN both OK) — optional; leave blank.
+# Brain works bilingual automatically; no manual language setting.
+# memory MCP: § PROFIL = osoba; § TECH = trwała tożsamość projektu — nie ship notes / changelogi.
+
+§ PROFIL
+· Imię / nick:
+· Czym się zajmujesz:
+· Stack (języki, narzędzia, OS):
+· Preferencje w pracy z agentem:
+
+§ TECH
+· Projekty (tożsamość, nie release notes):
+
+§ KOMUNIKACJA
+· Język:
+· Ton / styl:
+`
+
 async function copyDir(src: string, dest: string): Promise<void> {
   await fs.mkdir(dest, { recursive: true })
   const entries = await fs.readdir(src, { withFileTypes: true })
@@ -22,6 +41,16 @@ async function copyDir(src: string, dest: string): Promise<void> {
     const to = join(dest, ent.name)
     if (ent.isDirectory()) await copyDir(from, to)
     else if (ent.isFile()) await fs.copyFile(from, to)
+  }
+}
+
+async function ensureUserMdStarter(encryptedVaultPath: string): Promise<void> {
+  const userMd = join(encryptedVaultPath, 'USER.md')
+  if (existsSync(userMd)) return
+  try {
+    await fs.writeFile(userMd, USER_MD_STARTER, 'utf8')
+  } catch (err) {
+    console.warn('[pomnia] USER.md starter failed', err)
   }
 }
 
@@ -35,37 +64,37 @@ export async function ensurePortableKnowledge(encryptedVaultPath: string): Promi
   await fs.mkdir(distilled, { recursive: true })
   await fs.mkdir(sessions, { recursive: true })
 
-  if (portableKnowledgePresent(encryptedVaultPath)) {
-    return encryptedVaultPath
+  if (!portableKnowledgePresent(encryptedVaultPath)) {
+    const legacy = brainVaultLegacyRoot()
+    const legacyUser = join(legacy, 'USER.md')
+    const legacyDistilled = join(legacy, 'distilled')
+    const legacySessions = join(legacy, 'sessions')
+
+    try {
+      console.info('[pomnia] migrating knowledge → portable vault', encryptedVaultPath)
+      if (existsSync(legacyUser)) {
+        await fs.copyFile(legacyUser, join(encryptedVaultPath, 'USER.md'))
+      }
+      if (existsSync(legacyDistilled)) {
+        await copyDir(legacyDistilled, distilled)
+      }
+      if (existsSync(legacySessions)) {
+        await copyDir(legacySessions, sessions)
+      }
+    } catch (err) {
+      console.warn('[pomnia] knowledge migrate failed', err)
+    }
+
+    // Marker so we do not re-copy on every open when legacy was empty.
+    // Dotfile → skipped by brain-core indexer.
+    try {
+      await fs.writeFile(join(encryptedVaultPath, '.portable-knowledge'), '1\n', 'utf8')
+    } catch (err) {
+      console.warn('[pomnia] portable-knowledge marker failed', err)
+    }
   }
 
-  const legacy = brainVaultLegacyRoot()
-  const legacyUser = join(legacy, 'USER.md')
-  const legacyDistilled = join(legacy, 'distilled')
-  const legacySessions = join(legacy, 'sessions')
-
-  try {
-    console.info('[pomnia] migrating knowledge → portable vault', encryptedVaultPath)
-    if (existsSync(legacyUser)) {
-      await fs.copyFile(legacyUser, join(encryptedVaultPath, 'USER.md'))
-    }
-    if (existsSync(legacyDistilled)) {
-      await copyDir(legacyDistilled, distilled)
-    }
-    if (existsSync(legacySessions)) {
-      await copyDir(legacySessions, sessions)
-    }
-  } catch (err) {
-    console.warn('[pomnia] knowledge migrate failed', err)
-  }
-
-  // Marker so we do not re-copy on every open when legacy was empty.
-  // Dotfile → skipped by brain-core indexer.
-  try {
-    await fs.writeFile(join(encryptedVaultPath, '.portable-knowledge'), '1\n', 'utf8')
-  } catch (err) {
-    console.warn('[pomnia] portable-knowledge marker failed', err)
-  }
+  await ensureUserMdStarter(encryptedVaultPath)
 
   return encryptedVaultPath
 }

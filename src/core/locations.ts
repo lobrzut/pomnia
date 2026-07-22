@@ -103,7 +103,11 @@ export const SOURCES: SourceDescriptor[] = [
     exclude: [...CHROMIUM_JUNK, 'History'],
     keepTop: ['globalStorage', 'workspaceStorage', 'settings.json', 'keybindings.json', 'snippets'],
     pathSensitive: ['settings.json', 'globalStorage/storage.json'],
-    notes: ['Chats/composers live in globalStorage/state.vscdb (SQLite)', 'WAL present → checkpoint before copy']
+    notes: [
+      'Composers in globalStorage/state.vscdb (SQLite); huge DBs skip in-app parse',
+      'Agent chats also under ~/.cursor/projects/*/agent-transcripts',
+      'WAL present → checkpoint before copy'
+    ]
   },
   {
     id: 'antigravity',

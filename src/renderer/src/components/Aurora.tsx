@@ -1,4 +1,4 @@
-/** Animated aurora background — mint/forest blobs + film grain (matches floating pip). */
+/** Animated aurora background — blob colors follow data-theme CSS vars. */
 export default function Aurora() {
   return (
     <>
@@ -10,7 +10,7 @@ export default function Aurora() {
             height: 620,
             left: '-8%',
             top: '-12%',
-            background: 'radial-gradient(circle, #1a5c3a, transparent 60%)',
+            background: 'radial-gradient(circle, var(--aurora-1), transparent 60%)',
             animationDelay: '0s',
           }}
         />
@@ -21,7 +21,7 @@ export default function Aurora() {
             height: 540,
             right: '-6%',
             top: '6%',
-            background: 'radial-gradient(circle, #34d399, transparent 60%)',
+            background: 'radial-gradient(circle, var(--aurora-2), transparent 60%)',
             animationDelay: '-8s',
           }}
         />
@@ -32,7 +32,7 @@ export default function Aurora() {
             height: 680,
             left: '24%',
             bottom: '-22%',
-            background: 'radial-gradient(circle, #2dd4bf55, transparent 60%)',
+            background: 'radial-gradient(circle, var(--aurora-3), transparent 60%)',
             animationDelay: '-15s',
           }}
         />

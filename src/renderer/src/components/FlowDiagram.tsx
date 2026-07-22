@@ -20,8 +20,8 @@ const AMBER = '#fbbf24'
 /** SVG viewBox height — keep in sync with node y% (y% = y / VIEWBOX_H * 100). */
 const VIEWBOX_H = 360
 const FLOW_MAIN_Y = 92
-/** PiP: vertical center of node+label mass (labels hang below icons). */
-const PIP_MAIN_Y = 188
+/** PiP: vertical center of node+label mass in strip layout (labels hang below icons). */
+const PIP_MAIN_Y = 168
 const FLOW_RETURN_Y = 134
 /** Horizontal corridor for docs/optional connectors — below main subtitles, above docs icons. */
 const FLOW_ROUTE_Y = 218
@@ -437,7 +437,7 @@ function FlowNode({
             className={clsx(
               'relative z-20 rounded-md bg-[#06070d]/90 px-1.5 py-0.5 font-semibold leading-tight text-ink backdrop-blur-sm',
               pip
-                ? 'mt-1.5 max-w-full truncate whitespace-nowrap text-[10px] tracking-wide text-[#f0f3fa]'
+                ? 'mt-1 max-w-full truncate whitespace-nowrap text-[10px] tracking-wide text-[#f0f3fa]'
                 : mini
                   ? 'mt-2 text-[8px]'
                   : 'mt-2 text-[11px]',
@@ -787,8 +787,8 @@ export function FlowDiagram({
             style={{
               background: pip
                 ? flowLive
-                  ? `radial-gradient(ellipse 130% 110% at 50% 52%, ${SLAVIC_GREEN}99, #fbbf2435 38%, #2dd4bf28 55%, transparent 72%)`
-                  : `radial-gradient(ellipse 120% 100% at 50% 52%, ${SLAVIC_GREEN}77, #2dd4bf30 45%, transparent 72%)`
+                  ? `radial-gradient(ellipse 125% 140% at 50% 48%, ${SLAVIC_GREEN}99, #fbbf2435 38%, #2dd4bf28 55%, transparent 78%)`
+                  : `radial-gradient(ellipse 120% 130% at 50% 48%, ${SLAVIC_GREEN}77, #2dd4bf30 45%, transparent 78%)`
                 : `radial-gradient(ellipse 80% 60% at 50% 35%, ${SLAVIC_GREEN}44, transparent 70%)`,
             }}
           />

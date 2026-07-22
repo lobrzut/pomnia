@@ -15,7 +15,7 @@ import {
   Sparkles,
   Square,
   Upload,
-  Handshake,
+  User,
   X
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -35,12 +35,12 @@ function hasModel(models: string[], want: string): boolean {
   return models.some((m) => m === want || m === `${want}:latest` || m.replace(/:latest$/, '') === want)
 }
 
-const STAGES = [
-  { id: 'collect', label: 'Collect', icon: Database, note: 'from assistants' },
-  { id: 'distill', label: 'Distill', icon: Sparkles, note: 'local LLM' },
-  { id: 'index', label: 'Pre-index', icon: Layers, note: 'embeddings' },
-  { id: 'deploy', label: 'Deploy', icon: Rocket, note: 'to Brain' }
-] as const
+const STAGE_ICONS = {
+  collect: Database,
+  distill: Sparkles,
+  index: Layers,
+  deploy: Rocket
+} as const
 
 export default function Brain() {
   const {
@@ -76,7 +76,15 @@ export default function Brain() {
   const showAdvanced = !simpleMode || advancedOpen
   /** Simple mode is always embedded; remote-only UI only when advanced + remote target. */
   const isRemoteTarget = !simpleMode && brainTarget === 'remote'
-  const pipelineStages = isRemoteTarget ? STAGES : STAGES.filter((s) => s.id !== 'deploy')
+  const allPipelineStages = [
+    { id: 'collect' as const, label: labels.brainPipeCollect, note: labels.brainPipeCollectNote, icon: STAGE_ICONS.collect },
+    { id: 'distill' as const, label: labels.brainPipeDistill, note: labels.brainPipeDistillNote, icon: STAGE_ICONS.distill },
+    { id: 'index' as const, label: labels.brainPipeIndex, note: labels.brainPipeIndexNote, icon: STAGE_ICONS.index },
+    { id: 'deploy' as const, label: labels.brainPipeDeploy, note: labels.brainPipeDeployNote, icon: STAGE_ICONS.deploy }
+  ]
+  const pipelineStages = isRemoteTarget
+    ? allPipelineStages
+    : allPipelineStages.filter((s) => s.id !== 'deploy')
   const [status, setStatus] = useState<BrainStatus | null>(null)
   const [checking, setChecking] = useState(true)
 
@@ -428,8 +436,8 @@ export default function Brain() {
         )}
       </GlassCard>
 
-      {/* Pipeline stages — advanced only; Deploy step only for remote KVM */}
-      {showAdvanced && (
+      {/* Pipeline stages — full mode only (hidden in simpleMode; duplicates Backup i do Brain) */}
+      {!simpleMode && (
       <GlassCard className="mb-5 flex items-center justify-between p-5">
         {pipelineStages.map((s, i) => {
           const st = stageState(s.id)
@@ -643,11 +651,11 @@ export default function Brain() {
             <Button
               variant="soft"
               className="!px-2.5 !py-1.5 !text-[11px]"
-              onClick={() => void api.handshakeShow()}
-              title={labels.handshake}
+              onClick={() => void api.profilePreviewShow()}
+              title={labels.profilePreview}
             >
-              <Handshake className="h-3.5 w-3.5" />
-              {labels.handshake}
+              <User className="h-3.5 w-3.5" />
+              {labels.profilePreview}
             </Button>
             {embedded?.running && showAdvanced && (
               <Button

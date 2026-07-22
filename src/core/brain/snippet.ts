@@ -10,6 +10,7 @@
  * change = edit one entry. No deployer logic to debug.
  */
 import path from 'node:path'
+import { DEFAULT_HANDSHAKE_PHRASE } from '../handshakePhrase.js'
 import type { OS } from '../model.js'
 import { appDataRoot } from '../platform.js'
 
@@ -118,14 +119,72 @@ function embeddedServers(spec: ClientSpec, brainUrl: string): Record<string, Rec
 }
 
 /* ---------------------------------------------------------------------- */
-/* Legacy brief exports — unused by Connect (MCP alone is enough).         */
+/* Agent Brain Mode — rules snippet (NOT auto-capture of chats).           */
 /* ---------------------------------------------------------------------- */
 
-/** @deprecated Not shown in UI. */
-export const BRAIN_BRIEF_EMBEDDED_MD = ''
+export interface BrainBriefOptions {
+  /** Proof phrase agents must say on first reply. Default: OK to Go Go Go. */
+  handshakePhrase?: string
+  /** When false, omit the Handshake greeting rule. Default true. */
+  handshakeEnabled?: boolean
+}
 
-/** @deprecated Not shown in UI. */
-export const BRAIN_BRIEF_MD = ''
+/**
+ * Rule text pasted into Cursor rules / CLAUDE.md / AGENTS.md when Brain Mode is ON.
+ * Read proactively; write only on explicit user save / durable correction.
+ * Pomnia Desktop does NOT silently capture chats — the host agent must call MCP.
+ */
+export function buildBrainBriefMd(opts: BrainBriefOptions = {}): string {
+  const handshakeOn = opts.handshakeEnabled !== false
+  const phrase = (opts.handshakePhrase?.trim() || DEFAULT_HANDSHAKE_PHRASE).trim()
+  const handshakeSection = handshakeOn
+    ? `
+## Handshake (proof Pomnia Brain is wired)
+At the start of your **first assistant message in each conversation**, output exactly this phrase on its own first line, then continue normally:
+
+\`${phrase}\`
+
+Do not add quotes, markdown, or extra words on that first line. Skip on later turns in the same conversation (avoid noise). If Handshake is disabled in Pomnia Settings, this section is omitted from the rule — then do not invent a greeting.
+`
+    : ''
+
+  return `<!-- pomnia-brain-start -->
+# Pomnia Brain (MCP \`brain-rag\`)
+
+You are connected to a private memory layer. Use it in the tool loop — do not invent past decisions.
+${handshakeSection}
+## Auto-read (do this without being asked)
+1. Early in a non-trivial session: \`get_user_profile\`.
+2. Before technical answers that may already be decided in the vault: \`search_library\` (query in the user's language; vault is PL+EN).
+3. When a workflow/expertise skill may apply: \`list_skills\` / \`list_cli_skills\`, then \`get_skill\` for the match.
+
+## Write only on command (never dump whole chats)
+- \`save_conversation\` — only when the user says zapisz do brain / save to brain (or clear equivalent). Prefer concrete paths, commands, errors, decisions — not fluff.
+- \`memory\` — only durable identity facts the user confirmed. § PROFIL = person; § TECH = durable project/stack identity — never installer paths, version changelogs, or one-off build fixes (those go to save_conversation). Categories: user, tech, comm, income. Max ~2200 chars.
+
+## Not your job
+- Do not assume Pomnia auto-captures this chat. No MCP call = nothing is stored.
+- Do not spam search/memory every message; call when the topic needs memory.
+<!-- pomnia-brain-end -->
+`
+}
+
+/** Default brief (default phrase, Handshake on) — for older imports / tests. */
+export const BRAIN_BRIEF_MD = buildBrainBriefMd()
+
+/** Same policy; kept as alias for older imports. */
+export const BRAIN_BRIEF_EMBEDDED_MD = BRAIN_BRIEF_MD
+
+/** Cursor `.mdc` wrapper — alwaysApply so Agent Mode sees it. */
+export function brainBriefCursorMdc(opts: BrainBriefOptions = {}): string {
+  return `---
+description: Pomnia Brain — MCP memory for this user (read auto, write on command)
+alwaysApply: true
+---
+
+${buildBrainBriefMd(opts)}
+`
+}
 
 
 /* ---------------------------------------------------------------------- */
@@ -341,8 +400,13 @@ export interface Snippet {
   restartHint: string
   /** Human notes — quirks, multi-location warnings (also embedded in instructions). */
   notes: string
-  /** Optional agent brief — undefined if this client has no auto-loaded rules mechanism. */
+  /** Optional agent brief — set when Brain Mode is ON and the client has a rules path. */
   brief?: SnippetBrief
+  /**
+   * Same policy as brief.content (without Cursor .mdc frontmatter). Present when Brain Mode is ON
+   * so clients without a dedicated path (Windsurf, Hermes, …) can still paste into AGENTS.md.
+   */
+  agentRuleMarkdown?: string
 }
 
 /**
@@ -355,15 +419,34 @@ export interface Snippet {
  * @param token     optional Bearer token from /api/mcp/tokens (remote only)
  * @param target    embedded = single local /mcp, no auth; remote = three supergateway servers
  */
+export interface BuildSnippetOptions {
+  /**
+   * When true, include agent rule brief (Cursor rules / CLAUDE.md / copy block).
+   * Does NOT enable Desktop auto-capture — only instructs the host agent to use MCP.
+   */
+  brainMode?: boolean
+  /** Proof greeting phrase from Pomnia Settings (wired into Brain Mode rule). */
+  handshakePhrase?: string
+  /** When false, Brain Mode rule omits Handshake greeting. Default true. */
+  handshakeEnabled?: boolean
+}
+
 export function buildSnippet(
   clientId: ClientId,
   brainUrl: string,
   os: OS,
   home: string,
   token?: string,
-  target: BrainTarget = 'remote'
+  target: BrainTarget = 'remote',
+  opts: BuildSnippetOptions = {},
 ): Snippet {
   const spec = getClient(clientId)
+  const brainMode = !!opts.brainMode
+  const briefOpts: BrainBriefOptions = {
+    handshakePhrase: opts.handshakePhrase,
+    handshakeEnabled: opts.handshakeEnabled,
+  }
+  const ruleMd = brainMode ? buildBrainBriefMd(briefOpts) : undefined
   const servers =
     target === 'embedded' ? embeddedServers(spec, brainUrl) : spec.buildServers(trimBase(brainUrl), token)
   const filePath = spec.configPath(os, home)
@@ -377,6 +460,19 @@ export function buildSnippet(
       ? 'Embedded brain: one server (brain-rag) at /mcp — no Bearer token. Start it in Pomnia → Brain tab first.'
       : null
 
+  const brief =
+    brainMode && spec.brief
+      ? {
+          filePath: spec.brief.briefPath(os, home),
+          content: clientId === 'cursor' ? brainBriefCursorMdc(briefOpts) : (ruleMd as string),
+          mode: spec.brief.mode,
+          restartHint: spec.brief.hint,
+        }
+      : undefined
+
+  const handshakeOn = opts.handshakeEnabled !== false
+  const phrase = (opts.handshakePhrase?.trim() || DEFAULT_HANDSHAKE_PHRASE).trim()
+
   const instructions = [
     `▶ ${spec.label}`,
     ``,
@@ -384,9 +480,19 @@ export function buildSnippet(
     `2. If the file is empty / does not exist — paste the FULL snippet below as the entire file content.`,
     `   If the file already exists with other servers — merge into the "${spec.mcpKey}" object (under MERGE snippet).`,
     `3. ${spec.restartHint}`,
+    brainMode
+      ? brief
+        ? `4. Brain Mode ON — ${brief.mode === 'append-to-existing' ? 'append' : 'create'} agent rule at: ${brief.filePath}`
+        : `4. Brain Mode ON — paste the Agent rule block into this client's rules / AGENTS.md (no auto path for ${spec.label}).`
+      : null,
     ``,
     `Notes: ${spec.notes}`,
     embeddedNote,
+    brainMode
+      ? handshakeOn
+        ? `Brain Mode: first reply in a conversation should open with handshake phrase "${phrase}"; auto-read profile/skills/search; write only on "zapisz do brain". Pomnia does not silently capture chats.`
+        : 'Brain Mode: agent should auto-read profile/skills/search; write only on "zapisz do brain". Pomnia does not silently capture chats. Handshake greeting is OFF.'
+      : null,
     target === 'remote' && token
       ? `Token included in headers — keep this file private (chmod 600 if possible).`
       : target === 'remote'
@@ -406,7 +512,8 @@ export function buildSnippet(
     instructions,
     restartHint: spec.restartHint,
     notes: spec.notes,
-    // MCP tools are enough after connect — no rules-file brief to paste.
-    brief: undefined,
+    brief,
+    /** Always available when Brain Mode is ON — even if client has no dedicated rules path. */
+    agentRuleMarkdown: ruleMd,
   }
 }

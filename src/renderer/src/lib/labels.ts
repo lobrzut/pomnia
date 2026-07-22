@@ -1,9 +1,10 @@
-/** Polish UI labels — simple mode only hides advanced sections, not language. */
+/** Polish + English UI chrome labels. Brain knowledge stays auto bilingual (no knowledgeLang). */
 
 import { formatPipelineProgressLabel } from '@core/pipelineLabels.js'
 import type { ActivityState } from './types'
+import { getUiLocale } from './uiLocale'
 
-const ACTIVITY_KIND: Record<Exclude<ActivityState['kind'], 'idle'>, string> = {
+const ACTIVITY_KIND_PL: Record<Exclude<ActivityState['kind'], 'idle'>, string> = {
   distill: 'destylacja',
   'doc-import': 'import dokumentu',
   'brain-start': 'uruchamianie Brain',
@@ -11,6 +12,16 @@ const ACTIVITY_KIND: Record<Exclude<ActivityState['kind'], 'idle'>, string> = {
   embed: 'embeddingi',
   'mcp-query': 'zapytanie MCP',
   finale: 'indeks gotowy',
+}
+
+const ACTIVITY_KIND_EN: Record<Exclude<ActivityState['kind'], 'idle'>, string> = {
+  distill: 'distillation',
+  'doc-import': 'document import',
+  'brain-start': 'starting Brain',
+  indexing: 'indexing',
+  embed: 'embeddings',
+  'mcp-query': 'MCP query',
+  finale: 'index ready',
 }
 
 function truncateDetail(s: string, max = 48): string {
@@ -23,16 +34,30 @@ export const formatBrainProgressLabel = formatPipelineProgressLabel
 
 export function formatActivityBanner(state: ActivityState): string {
   if (state.kind === 'idle') return ''
-  const kind = ACTIVITY_KIND[state.kind]
+  const kind = ACTIVITY_KIND_PL[state.kind]
   const progress =
     state.done != null && state.total != null && state.total > 0 ? ` (${state.done}/${state.total})` : ''
   const detail = state.detail ? ` · ${truncateDetail(state.detail)}` : ''
   return `Trwa: ${kind}${progress}${detail}`
 }
 
+function formatActivityBannerEn(state: ActivityState): string {
+  if (state.kind === 'idle') return ''
+  const kind = ACTIVITY_KIND_EN[state.kind]
+  const progress =
+    state.done != null && state.total != null && state.total > 0 ? ` (${state.done}/${state.total})` : ''
+  const detail = state.detail ? ` · ${truncateDetail(state.detail)}` : ''
+  return `In progress: ${kind}${progress}${detail}`
+}
+
 export function formatFlowLastMcpBadge(tool: string): string {
   const t = tool.trim() || 'MCP'
   return `Ostatnie: ${t} · przed chwilą`
+}
+
+function formatFlowLastMcpBadgeEn(tool: string): string {
+  const t = tool.trim() || 'MCP'
+  return `Last: ${t} · just now`
 }
 
 export function formatFlowLiveBadge(state: ActivityState): string {
@@ -47,10 +72,28 @@ export function formatFlowLiveBadge(state: ActivityState): string {
     if (tool === 'get_skill' || tool === 'run_skill') return 'Na żywo: skill z Brain'
     return 'Na żywo: zapytanie MCP'
   }
-  const kind = ACTIVITY_KIND[state.kind]
+  const kind = ACTIVITY_KIND_PL[state.kind]
   const progress =
     state.done != null && state.total != null && state.total > 0 ? ` ${state.done}/${state.total}` : ''
   return `Na żywo: ${kind}${progress}`
+}
+
+function formatFlowLiveBadgeEn(state: ActivityState): string {
+  if (state.kind === 'idle') return ''
+  if (state.kind === 'finale') return 'Done: memory indexed'
+  if (state.kind === 'mcp-query') {
+    const tool = state.phase ?? ''
+    const toolNames = new Set(['search_library', 'get_skill', 'run_skill', 'list_skills', 'list_cli_skills'])
+    if (tool === 'search_library' || (state.detail && !toolNames.has(state.detail))) {
+      return 'Live: searching Brain'
+    }
+    if (tool === 'get_skill' || tool === 'run_skill') return 'Live: Brain skill'
+    return 'Live: MCP query'
+  }
+  const kind = ACTIVITY_KIND_EN[state.kind]
+  const progress =
+    state.done != null && state.total != null && state.total > 0 ? ` ${state.done}/${state.total}` : ''
+  return `Live: ${kind}${progress}`
 }
 
 /** Large on-diagram status banner during focus mode. */
@@ -66,11 +109,30 @@ export function formatFlowFocusBanner(state: ActivityState): string {
     if (tool === 'get_skill' || tool === 'run_skill') return 'Teraz: ładowanie skilla z Brain'
     return 'Teraz: zapytanie MCP'
   }
-  const kind = ACTIVITY_KIND[state.kind]
+  const kind = ACTIVITY_KIND_PL[state.kind]
   const progress =
     state.done != null && state.total != null && state.total > 0 ? ` ${state.done}/${state.total}` : ''
   const detail = state.detail ? ` · ${truncateDetail(state.detail, 40)}` : ''
   return `Teraz: ${kind}${progress}${detail}`
+}
+
+function formatFlowFocusBannerEn(state: ActivityState): string {
+  if (state.kind === 'idle') return ''
+  if (state.kind === 'finale') return 'Now: index ready — memory available to the agent'
+  if (state.kind === 'mcp-query') {
+    const tool = state.phase ?? ''
+    const toolNames = new Set(['search_library', 'get_skill', 'run_skill', 'list_skills', 'list_cli_skills'])
+    if (tool === 'search_library' || (state.detail && !toolNames.has(state.detail))) {
+      return 'Now: searching Brain'
+    }
+    if (tool === 'get_skill' || tool === 'run_skill') return 'Now: loading Brain skill'
+    return 'Now: MCP query'
+  }
+  const kind = ACTIVITY_KIND_EN[state.kind]
+  const progress =
+    state.done != null && state.total != null && state.total > 0 ? ` ${state.done}/${state.total}` : ''
+  const detail = state.detail ? ` · ${truncateDetail(state.detail, 40)}` : ''
+  return `Now: ${kind}${progress}${detail}`
 }
 
 export interface UiLabels {
@@ -101,6 +163,16 @@ export interface UiLabels {
   minimizeToTrayHint: string
   openAtLogin: string
   openAtLoginHint: string
+  colorScheme: string
+  colorSchemeHint: string
+  colorSchemeMint: string
+  colorSchemeIris: string
+  colorSchemeGlass: string
+  /** Settings → Język interfejsu (UI chrome only). */
+  uiLocale: string
+  uiLocaleHint: string
+  uiLocalePl: string
+  uiLocaleEn: string
   floatingMonitor: string
   floatingMonitorOnMinimize: string
   floatingMonitorOnMinimizeHint: string
@@ -110,14 +182,42 @@ export interface UiLabels {
   floatingMonitorUnpin: string
   floatingMonitorOpenHint: string
   handshake: string
-  handshakeHint: string
   handshakePlaceholder: string
-  handshakeSubmit: string
-  handshakeWrong: string
-  handshakeReady: string
-  handshakeClose: string
-  handshakeArmedBadge: string
-  handshakeToastReady: string
+  handshakePhrase: string
+  handshakePhraseHint: string
+  handshakePhraseSave: string
+  handshakePhraseSaved: string
+  /** Preview of the exact phrase agents will say. */
+  handshakePhrasePreview: (phrase: string) => string
+  handshakePhraseEmpty: string
+  handshakePhraseTooShort: string
+  handshakeEnabled: string
+  handshakeEnabledHint: string
+  profilePreview: string
+  profilePreviewTitle: string
+  profilePreviewSubtitle: string
+  profilePreviewClose: string
+  profilePreviewFooter: string
+  profilePreviewSave: string
+  profilePreviewSaving: string
+  profilePreviewSaved: string
+  profilePreviewSaveFailed: string
+  profilePreviewSaveTooLong: (max: number) => string
+  profilePreviewEditorHint: string
+  profilePreviewCopy: string
+  profilePreviewCopySummary: string
+  profilePreviewCopied: string
+  profilePreviewCopiedSummary: string
+  profilePreviewCopyFailed: string
+  profilePreviewLoading: string
+  profilePreviewProgressVault: string
+  profilePreviewProgressNotes: string
+  profilePreviewProgressSearch: string
+  profilePreviewProgressModel: string
+  profilePreviewProgressDone: string
+  profilePreviewEmptyVault: string
+  profilePreviewEmptyBrain: string
+  profilePreviewEmptyKnowledge: string
   connectPageLead: string
   connectChecklistTitle: string
   connectStepUrl: string
@@ -133,6 +233,13 @@ export interface UiLabels {
   connectPartialDetail: string
   connectPartialFix: string
   connectMacNoAppHint: string
+  /** Connect → opt-in agent rule (read auto / write on command). Not Desktop auto-capture. */
+  agentBrainMode: string
+  agentBrainModeHint: string
+  agentBrainModeBriefTitle: string
+  agentBrainModeBriefCopy: string
+  agentBrainModeRuleCopy: string
+  agentBrainModeNoPath: string
   embeddedBrainNotRunning: string
   embeddedBrainNotRunningLink: string
   settingsTitle: string
@@ -160,6 +267,8 @@ export interface UiLabels {
   unlockVaultForSnapshots: string
   moreSnapshots: (n: number) => string
   securityAbout: string
+  /** Settings → Bezpieczeństwo: portable unit = whole vault folder, not AppData / vague `.pomnia`. */
+  securityPortability: string
   /** Footer under Settings → Bezpieczeństwo; `version` from app.getVersion(). */
   securityAboutCli: (version: string) => string
   previewMode: string
@@ -205,6 +314,14 @@ export interface UiLabels {
   brainStateDistilled: string
   brainStateBacklog: string
   brainStatePendingNew: (n: number) => string
+  brainPipeCollect: string
+  brainPipeCollectNote: string
+  brainPipeDistill: string
+  brainPipeDistillNote: string
+  brainPipeIndex: string
+  brainPipeIndexNote: string
+  brainPipeDeploy: string
+  brainPipeDeployNote: string
   cancel: string
   distillEmptyBacklog: string
   distillEmptyBacklogDetail: string
@@ -243,6 +360,9 @@ export interface UiLabels {
   navSettings: string
   navGuide: string
   navNavigate: string
+  sidebarBusyDistill: string
+  sidebarBusyImport: string
+  sidebarBusyGeneric: string
   lockVaultBtn: string
   vaultLocked: string
   guideTitle: string
@@ -333,8 +453,27 @@ export interface UiLabels {
   statusNoDistill: string
   statusPendingDocs: (n: number) => string
   statusPendingDocsNone: string
+  statusDocuments: string
   dashboardTitle: string
   dashboardLead: string
+  dashboardStatSources: string
+  dashboardStatSourcesSub: string
+  dashboardStatChats: string
+  dashboardStatChatsSub: string
+  dashboardStatSnapshots: string
+  dashboardStatSnapshotsClosed: string
+  dashboardStatSkills: string
+  dashboardStatSkillsSub: string
+  dashboardStatDistilled: string
+  dashboardStatDistilledSub: string
+  dashboardStatKnowledge: string
+  dashboardStatKnowledgeOpen: string
+  dashboardStatKnowledgeClosed: string
+  dashboardSourcesHeading: string
+  dashboardSelectAll: string
+  dashboardDeselectAll: string
+  dashboardNoSourcesTitle: string
+  dashboardNoSourcesDetail: string
   dashboardSourcesSelected: (n: number) => string
   dashboardReadyVault: (name: string) => string
   dashboardOpenVaultHint: string
@@ -368,7 +507,7 @@ const PL_LABELS: UiLabels = {
   embedded: 'Lokalnie',
   remote: 'Na serwerze',
   reindex: 'Odśwież indeks',
-  mcpConnect: 'Podłącz Cursora',
+  mcpConnect: 'Podłącz agenta',
   brainPageTitle: 'Pamięć i wyszukiwarka',
   brainPageLead:
     'Przygotuj rozmowy do wyszukiwania i uruchom lokalną wyszukiwarkę — bez serwera w chmurze.',
@@ -381,7 +520,7 @@ const PL_LABELS: UiLabels = {
   advanced: 'Zaawansowane',
   simpleMode: 'Tryb prosty',
   simpleModeHint:
-    'Ukrywa serwer zdalny, deploy i ustawienia GPU. Wystarczy vault → backup → wyszukiwarka → Cursor.',
+    'Ukrywa serwer zdalny, deploy i ustawienia GPU. Wystarczy vault → backup → wyszukiwarka → agent.',
   systemTray: 'Zasobnik systemowy',
   closeToTray: 'Zamknij do zasobnika',
   closeToTrayHint:
@@ -390,6 +529,16 @@ const PL_LABELS: UiLabels = {
   minimizeToTrayHint: 'Przycisk minimalizacji chowa okno do traya zamiast paska zadań.',
   openAtLogin: 'Uruchom przy starcie Windows',
   openAtLoginHint: 'Pomnia startuje automatycznie po zalogowaniu do Windows. Domyślnie wyłączone.',
+  colorScheme: 'Kolorystyka',
+  colorSchemeHint: 'Wygląd aplikacji — tła, akcenty i szkło paneli. Logo pomarańczowe bez zmian.',
+  colorSchemeMint: 'Mint',
+  colorSchemeIris: 'Iris',
+  colorSchemeGlass: 'Szkło',
+  uiLocale: 'Język interfejsu',
+  uiLocaleHint:
+    'Tylko chrome aplikacji (menu, Settings, toasty). Brain działa dwujęzycznie automatycznie — bez osobnego ustawienia języka wiedzy.',
+  uiLocalePl: 'PL',
+  uiLocaleEn: 'EN',
   floatingMonitor: 'Pływający diagram',
   floatingMonitorOnMinimize: 'Pokaż przy minimalizacji',
   floatingMonitorOnMinimizeHint:
@@ -400,23 +549,51 @@ const PL_LABELS: UiLabels = {
   floatingMonitorUnpin: 'Odepnij — nie trzymaj na wierzchu',
   floatingMonitorOpenHint: 'Kliknij, aby otworzyć Pomnię na „Jak to działa”. Podwójne kliknięcie — zamknij.',
   handshake: 'Handshake',
-  handshakeHint: 'Twój rytuał — wpisz frazę i ruszamy.',
   handshakePlaceholder: 'OK to Go Go Go',
-  handshakeSubmit: 'OK',
-  handshakeWrong: 'Nie ta fraza — spróbuj jeszcze raz.',
-  handshakeReady: 'Gotowy',
-  handshakeClose: 'Zamknij Handshake',
-  handshakeArmedBadge: 'Go',
-  handshakeToastReady: 'Gotowy',
+  handshakePhrase: 'Fraza dowodu',
+  handshakePhraseHint:
+    'Fraza, którą agent (Claude/Cursor…) ma powiedzieć na start pierwszej odpowiedzi = dowód, że Pomnia Brain działa. Ustaw tutaj, potem skopiuj reguły w Connect (Brain Mode).',
+  handshakePhraseSave: 'Zapisz frazę',
+  handshakePhraseSaved: 'Fraza Handshake zaktualizowana',
+  handshakePhrasePreview: (phrase) => `Agent otworzy odpowiedź: „${phrase}”`,
+  handshakePhraseEmpty: 'Fraza nie może być pusta.',
+  handshakePhraseTooShort: 'Wpisz swoją frazę (min. 2 znaki).',
+  handshakeEnabled: 'Handshake',
+  handshakeEnabledHint:
+    'Gdy włączone — agent ma zacząć pierwszą odpowiedź w rozmowie tą frazą. Wyłącz, jeśli nie chcesz powitania.',
+  profilePreview: 'Profil',
+  profilePreviewTitle: 'PROFIL',
+  profilePreviewSubtitle: 'Kim jesteś dla agenta',
+  profilePreviewClose: 'Zamknij podgląd profilu',
+  profilePreviewFooter: '§ PROFIL = osoba · Zapisz → USER.md',
+  profilePreviewSave: 'Zapisz',
+  profilePreviewSaving: 'Zapisuję…',
+  profilePreviewSaved: 'Zapisano USER.md w vault',
+  profilePreviewSaveFailed: 'Nie udało się zapisać',
+  profilePreviewSaveTooLong: (max) => `Za długi profil — maks. ${max} znaków`,
+  profilePreviewEditorHint: '§ PROFIL = Ty · § TECH = tożsamość projektu (nie changelog) · § KOMUNIKACJA',
+  profilePreviewCopy: 'Kopiuj',
+  profilePreviewCopySummary: 'Kopiuj streszczenie',
+  profilePreviewCopied: 'Skopiowano USER.md',
+  profilePreviewCopiedSummary: 'Skopiowano streszczenie',
+  profilePreviewCopyFailed: 'Nie udało się skopiować',
+  profilePreviewLoading: 'Profiluję…',
+  profilePreviewProgressVault: 'Czytam USER.md…',
+  profilePreviewProgressNotes: 'Szukam sygnałów w notatkach…',
+  profilePreviewProgressSearch: 'Szukam w Brain…',
+  profilePreviewProgressModel: 'Składam profil…',
+  profilePreviewProgressDone: 'Gotowe',
+  profilePreviewEmptyVault: 'Sejf zablokowany — odblokuj vault, żeby zobaczyć profil.',
+  profilePreviewEmptyBrain: 'Lokalna wyszukiwarka nie działa — uruchom Brain na stronie Brain.',
+  profilePreviewEmptyKnowledge: 'Uzupełnij § PROFIL (kim jesteś) i Zapisz — TECH to projekt, nie Ty.',
   connectPageLead:
-    'Skopiuj konfigurację MCP i wklej w Cursorze — Pomnia nigdy nie dotyka Twoich plików.',
+    'Skopiuj konfigurację MCP i wklej u klienta (Cursor, Claude, Antigravity…) — Pomnia nigdy nie dotyka Twoich plików.',
   connectChecklistTitle: 'Pierwsze podłączenie (4 kroki)',
   connectStepUrl: 'URL Brain MCP (:7862)',
   connectStepToken: 'Token Bearer z dashboardu (:7860)',
   connectStepCopy: 'Kopiuj pełny mcp.json (3 serwery)',
-  connectStepReload: 'Reload Window w Cursorze',
-  connectCopyForClient: (name) =>
-    name === 'Cursor' ? 'Kopiuj mcp.json dla Cursora' : `Kopiuj mcp.json dla ${name}`,
+  connectStepReload: 'Przeładuj klienta MCP (np. Reload Window)',
+  connectCopyForClient: (name) => `Kopiuj mcp.json dla ${name}`,
   connectTokenPlaceholder: 'Bearer token (wymagany dla remote)',
   connectTokenRequired: 'Bez tokena remote MCP zwykle nie zadziała — wklej lub utwórz poniżej.',
   connectOpenDashboard: 'Otwórz dashboard tokenów',
@@ -425,7 +602,15 @@ const PL_LABELS: UiLabels = {
     'Wykryto tylko część serwerów Brain. Remote wymaga brain-rag + brain-vault + brain-library.',
   connectPartialFix: 'Skopiuj pełny config poniżej i nadpisz / zmerguj mcp.json',
   connectMacNoAppHint:
-    'Na Macu bez aplikacji: landing/cursor-mcp.html albo docs/CURSOR-MCP.md — ten sam pełny JSON.',
+    'Bez aplikacji Desktop: landing/cursor-mcp.html albo docs/CURSOR-MCP.md — ten sam pełny JSON MCP (przykład Cursor; kształt dla innych klientów w Connect).',
+  agentBrainMode: 'Tryb Brain dla agenta',
+  agentBrainModeHint:
+    'Dokłada regułę (rules / CLAUDE.md / AGENTS) + silniejsze opisy narzędzi MCP: agent sam czyta profil, skille i pamięć; zapisuje tylko na „zapisz do brain”. Pomnia nie przechwytuje czatu w tle.',
+  agentBrainModeBriefTitle: 'Reguła agenta (Brain Mode)',
+  agentBrainModeBriefCopy: 'Kopiuj regułę do pliku',
+  agentBrainModeRuleCopy: 'Kopiuj regułę (AGENTS.md / rules)',
+  agentBrainModeNoPath:
+    'Ten klient nie ma stałej ścieżki reguł — wklej blok do AGENTS.md albo system promptu.',
   embeddedBrainNotRunning: 'Lokalna wyszukiwarka nie działa. Otwórz zakładkę',
   embeddedBrainNotRunningLink: 'Brain',
   settingsTitle: 'Ustawienia',
@@ -457,6 +642,8 @@ const PL_LABELS: UiLabels = {
   unlockVaultForSnapshots: 'Odblokuj vault, żeby zobaczyć snapshoty.',
   moreSnapshots: (n) => `+ ${n} więcej…`,
   securityAbout: 'Bezpieczeństwo i informacje',
+  securityPortability:
+    'Skopiuj cały folder vaultu (np. C:\\Vault) na inny komputer → Otwórz vault → hasło.',
   securityAboutCli: (version) =>
     `Pomnia v${version} · ten sam silnik działa też w trybie CLI (bez okna).`,
   previewMode: 'Tryb podglądu (bez backendu Electron) — dane są przykładowe.',
@@ -503,6 +690,14 @@ const PL_LABELS: UiLabels = {
   brainStateDistilled: 'Zdestylowane',
   brainStateBacklog: 'Kolejka',
   brainStatePendingNew: (n) => `+${n} nowych`,
+  brainPipeCollect: 'Zbieraj',
+  brainPipeCollectNote: 'z asystentów',
+  brainPipeDistill: 'Destyluj',
+  brainPipeDistillNote: 'lokalny model',
+  brainPipeIndex: 'Indeksuj',
+  brainPipeIndexNote: 'embeddingi',
+  brainPipeDeploy: 'Wyślij',
+  brainPipeDeployNote: 'do Brain',
   cancel: 'Anuluj',
   distillEmptyBacklog: 'Brak nowych sesji do destylacji',
   distillEmptyBacklogDetail: 'Wszystkie czaty z wybranych źródeł są już w ledgerze destylacji.',
@@ -534,6 +729,9 @@ const PL_LABELS: UiLabels = {
   navSettings: 'Ustawienia',
   navGuide: 'Jak to działa',
   navNavigate: 'Nawigacja',
+  sidebarBusyDistill: 'destylacja…',
+  sidebarBusyImport: 'import…',
+  sidebarBusyGeneric: 'praca w tle…',
   lockVaultBtn: 'Zablokuj vault',
   vaultLocked: 'zablokowany',
   guideTitle: 'Mapa Pomnia',
@@ -546,7 +744,7 @@ const PL_LABELS: UiLabels = {
   guideStep1Where: 'Dashboard → Backup · Import',
   guideStep2Title: 'Krok 2 — Vault Pomnia',
   guideStep2Body:
-    'Folder *.pomnia (zaszyfrowany) — snapshoty backupów + dokumenty library.cvb. To archiwum, nie wyszukiwarka.',
+    'Folder vaultu, który wybrałeś przy tworzeniu (np. C:\\Vault — nazwa dowolna, czasem *.pomnia). Zaszyfrowane snapshoty + dokumenty. To archiwum, nie wyszukiwarka i nie AppData.',
   guideStep2Where: 'Dashboard · Ustawienia → Vault',
   guideStep3Title: 'Krok 3 — Destylacja',
   guideStep3Body:
@@ -558,7 +756,7 @@ const PL_LABELS: UiLabels = {
   guideStep4Where: 'Brain → Lokalna wyszukiwarka',
   guideStep5Title: 'Krok 5 — Agent przez MCP',
   guideStep5Body:
-    'Klient MCP (Cursor i inne) łączy agenta z lokalną wyszukiwarką. Podczas kodowania agent może wołać search_library (RAG) i opcjonalnie ładować skills — to nie jest zapis do pamięci, tylko pytanie w trakcie pracy.',
+    'Klient MCP łączy agenta z lokalną wyszukiwarką. Podczas kodowania agent może wołać search_library (RAG) i opcjonalnie ładować skills — to nie jest zapis do pamięci, tylko pytanie w trakcie pracy.',
   guideStep5Where: 'Connect · search_library · get_skill',
   guideStepOptionalTitle: 'Opcjonalnie — serwer Brain',
   guideStepOptionalBody:
@@ -586,10 +784,11 @@ const PL_LABELS: UiLabels = {
   flowNodeAiLabel: 'Narzędzia AI',
   flowNodeAiHint: 'Cursor, Claude Code, Antigravity — surowe logi sesji na dysku lokalnym.',
   flowNodeAiDisk: 'Cursor · Claude · Antigravity',
-  flowNodeVaultLabel: 'Vault .pomnia',
+  flowNodeVaultLabel: 'Folder vaultu',
   flowNodeVaultLabelPip: 'Vault',
-  flowNodeVaultHint: 'Zaszyfrowane archiwum snapshotów backupów i dokumentów library.cvb.',
-  flowNodeVaultDisk: 'folder *.pomnia',
+  flowNodeVaultHint:
+    'Zaszyfrowane archiwum (header.json, blobs, skills/, USER.md, distilled…) — cały folder, np. C:\\Vault.',
+  flowNodeVaultDisk: 'np. C:\\Vault',
   flowNodeDistillLabel: 'Destylacja',
   flowNodeDistillHint: 'Ollama (qwen) skraca rozmowy do zwięzłych notatek — nie pełne kopie czatów.',
   flowNodeDistillDisk: 'localhost:11434',
@@ -602,7 +801,7 @@ const PL_LABELS: UiLabels = {
   flowNodeLibraryDisk: 'core-data/library.db',
   flowNodeMcpLabel: 'Agent przez MCP',
   flowNodeMcpLabelPip: 'Agent MCP',
-  flowNodeMcpHint: 'Agent (Cursor i inni) łączy się przez MCP — most do lokalnej wyszukiwarki Brain.',
+  flowNodeMcpHint: 'Agent łączy się przez MCP — most do lokalnej wyszukiwarki Brain.',
   flowNodeMcpDisk: 'Connect · mcp.json',
   flowAgentLayerSkills: 'skills',
   flowAgentLayerSkillsOptional: 'opcj.',
@@ -639,9 +838,29 @@ const PL_LABELS: UiLabels = {
   statusNoDistill: 'jeszcze nie było',
   statusPendingDocs: (n) => `${n} dok. czeka na indeks`,
   statusPendingDocsNone: 'brak oczekujących',
+  statusDocuments: 'Dokumenty',
   dashboardTitle: 'Centrum dowodzenia',
   dashboardLead:
     'Zbierz rozmowy ze wszystkich asystentów do jednego zaszyfrowanego vaultu — backup to tylko mechanizm.',
+  dashboardStatSources: 'Źródła',
+  dashboardStatSourcesSub: 'zainstalowane',
+  dashboardStatChats: 'Czaty',
+  dashboardStatChatsSub: 'do wyciągnięcia',
+  dashboardStatSnapshots: 'Snapshoty',
+  dashboardStatSnapshotsClosed: 'brak vaultu',
+  dashboardStatSkills: 'Skills',
+  dashboardStatSkillsSub: 'w vault/skills',
+  dashboardStatDistilled: 'Notatki',
+  dashboardStatDistilledSub: 'distilled',
+  dashboardStatKnowledge: 'Wiedza',
+  dashboardStatKnowledgeOpen: 'otwarta',
+  dashboardStatKnowledgeClosed: 'zamknięta',
+  dashboardSourcesHeading: 'Źródła',
+  dashboardSelectAll: 'Zaznacz wszystkie',
+  dashboardDeselectAll: 'Odznacz wszystkie',
+  dashboardNoSourcesTitle: 'Brak wykrytych narzędzi AI na tej maszynie.',
+  dashboardNoSourcesDetail:
+    'Pomnia szuka Claude Code, Cursor, Claude Desktop, Antigravity i VS Code. Zainstaluj, porozmawiaj, potem Rescan — albo Import.',
   dashboardSourcesSelected: (n) =>
     n === 1 ? '1 źródło zaznaczone' : `${n} źródeł zaznaczonych`,
   dashboardReadyVault: (name) => `Gotowe — backup do „${name}”`,
@@ -669,7 +888,276 @@ const PL_LABELS: UiLabels = {
   dashboardBrainStartFailed: 'Nie udało się uruchomić Brain',
 }
 
+/**
+ * English chrome overlay — critical paths (nav, Settings, Dashboard, common toasts).
+ * Missing keys fall back to PL via merge in uiLabels(). Grow over time.
+ */
+const EN_LABELS: Partial<UiLabels> = {
+  distill: 'Prepare memory',
+  distillBacklog: (n) => `Prepare memory (${n} new)`,
+  runPipeline: 'Prepare memory',
+  deployToBrain: 'Send to search',
+  remoteDeployLead: 'For Brain on a server / KVM — leave empty for local.',
+  embedded: 'Local',
+  remote: 'Remote',
+  reindex: 'Refresh index',
+  mcpConnect: 'Connect agent',
+  brainPageTitle: 'Memory & search',
+  brainPageLead: 'Prepare chats for search and start the local search engine — no cloud server.',
+  embeddedBrain: 'Local search',
+  embeddedBrainStart: 'Start',
+  embeddedBrainStop: 'Stop',
+  embeddedBrainStoppedToast: 'Local search stopped',
+  brainServer: 'Brain server',
+  searchKnowledge: 'Search your memory',
+  advanced: 'Advanced',
+  simpleMode: 'Simple mode',
+  simpleModeHint: 'Hides remote server, deploy, and GPU settings. Vault → backup → search → agent is enough.',
+  systemTray: 'System tray',
+  closeToTray: 'Close to tray',
+  closeToTrayHint:
+    'The X button hides the app to the tray instead of quitting. Always on while local search is running.',
+  minimizeToTray: 'Minimize to tray',
+  minimizeToTrayHint: 'Minimize hides to the tray instead of the taskbar.',
+  openAtLogin: 'Open at Windows login',
+  openAtLoginHint: 'Start Pomnia automatically after Windows sign-in. Off by default.',
+  colorScheme: 'Color scheme',
+  colorSchemeHint: 'App look — backgrounds, accents, and panel glass. Orange logo stays.',
+  colorSchemeMint: 'Mint',
+  colorSchemeIris: 'Iris',
+  colorSchemeGlass: 'Glass',
+  uiLocale: 'Interface language',
+  uiLocaleHint:
+    'App chrome only (menus, Settings, toasts). Brain stays automatically bilingual — no separate knowledge language setting.',
+  uiLocalePl: 'PL',
+  uiLocaleEn: 'EN',
+  floatingMonitor: 'Floating diagram',
+  floatingMonitorOnMinimize: 'Show on minimize',
+  floatingMonitorOnMinimizeHint:
+    'When you hide to tray or minimize — a small desktop diagram shows live distill, indexing, and MCP queries (like YouTube PiP).',
+  floatingMonitorIdleBadge: 'Live',
+  floatingMonitorClose: 'Close floating diagram',
+  floatingMonitorPin: 'Pin — always on top',
+  floatingMonitorUnpin: 'Unpin — do not stay on top',
+  floatingMonitorOpenHint: 'Click to open Pomnia on “How it works”. Double-click — close.',
+  handshake: 'Handshake',
+  handshakePlaceholder: 'OK to Go Go Go',
+  handshakePhrase: 'Proof phrase',
+  handshakePhraseHint:
+    'Phrase the agent (Claude/Cursor…) should say at the start of its first reply = proof Pomnia Brain is wired. Set it here, then re-copy Connect rules (Brain Mode).',
+  handshakePhraseSave: 'Save phrase',
+  handshakePhraseSaved: 'Handshake phrase updated',
+  handshakePhrasePreview: (phrase) => `Agent opens with: “${phrase}”`,
+  handshakePhraseEmpty: 'Phrase cannot be empty.',
+  handshakePhraseTooShort: 'Enter your phrase (min. 2 characters).',
+  handshakeEnabled: 'Handshake',
+  handshakeEnabledHint:
+    'When on — the agent should open the first reply in a conversation with this phrase. Turn off to skip the greeting.',
+  profilePreview: 'Profile preview',
+  profilePreviewTitle: 'PROFILE',
+  profilePreviewSubtitle: 'Who you are to the agent',
+  profilePreviewClose: 'Close',
+  profilePreviewFooter: '§ PROFIL = you · Save → USER.md',
+  profilePreviewSave: 'Save',
+  profilePreviewSaving: 'Saving…',
+  profilePreviewSaved: 'USER.md saved to vault',
+  profilePreviewSaveFailed: 'Could not save',
+  profilePreviewSaveTooLong: (max) => `Profile too long — max ${max} characters`,
+  profilePreviewEditorHint: '§ PROFIL = you · § TECH = project identity (not changelog) · § KOMUNIKACJA',
+  profilePreviewCopy: 'Copy',
+  profilePreviewCopySummary: 'Copy summary',
+  profilePreviewCopied: 'USER.md copied',
+  profilePreviewCopiedSummary: 'Summary copied',
+  profilePreviewCopyFailed: 'Could not copy',
+  profilePreviewLoading: 'Profiling…',
+  profilePreviewProgressVault: 'Reading USER.md…',
+  profilePreviewProgressNotes: 'Gathering note signals…',
+  profilePreviewProgressSearch: 'Searching Brain…',
+  profilePreviewProgressModel: 'Building profile…',
+  profilePreviewProgressDone: 'Done',
+  profilePreviewEmptyVault: 'Open a vault to preview the profile.',
+  profilePreviewEmptyBrain: 'Start Brain to load profile context.',
+  profilePreviewEmptyKnowledge: 'No knowledge about you yet — fill § PROFIL and Save.',
+  settingsTitle: 'Settings',
+  settingsLead: 'Vault, tray, theme, and MCP client visibility.',
+  vault: 'Vault',
+  lockVault: 'Lock vault',
+  noVaultOpen: 'No vault open',
+  knowledgePathOpen: (path) => `Knowledge (USER.md, distilled): ${path}`,
+  knowledgePathLocked: 'Unlock the vault to see the knowledge path.',
+  brainBridge: 'Brain bridge',
+  brainBridgeLead: 'Export distilled notes to a Brain sessions folder.',
+  snapshot: 'Snapshot',
+  outDir: 'Output folder',
+  exportNotes: 'Export notes',
+  mcpClients: 'MCP clients',
+  mcpClientsLead: 'Which clients show up on the Connect tab.',
+  detectedOnMachine: 'Detected on this machine',
+  notFound: 'Not found',
+  customOverride: 'custom override',
+  resetAutoDetect: 'Reset to auto-detect',
+  snapshots: 'Snapshots',
+  verifyIntegrity: 'Verify integrity',
+  snapshotsEmpty: 'No snapshots yet — run a backup from the Dashboard.',
+  snapshotsCount: (n) => `${n} snapshot(s)`,
+  unlockVaultForSnapshots: 'Unlock the vault to list snapshots.',
+  moreSnapshots: (n) => `…and ${n} more`,
+  securityAbout: 'Security',
+  securityPortability: 'Portable unit = the whole vault folder (not AppData).',
+  securityAboutCli: (version) => `Pomnia ${version}`,
+  previewMode: 'Browser preview — Electron bridge unavailable.',
+  cancel: 'Cancel',
+  distillEmptyBacklog: 'No new sessions to distill',
+  distillEmptyBacklogDetail: 'Backup new chats first, or everything is already distilled.',
+  activityBanner: formatActivityBannerEn,
+  flowLiveBadge: formatFlowLiveBadgeEn,
+  flowFocusBanner: formatFlowFocusBannerEn,
+  flowLastMcpBadge: formatFlowLastMcpBadgeEn,
+  flowFinaleCaption: 'Index ready — memory available to the agent',
+  flowWaitingCaption: 'When something runs, only the active path lights up',
+  activityTrayBusy: 'Background task',
+  healthTitle: 'Diagnostics',
+  healthLead: 'Quick check — what must work for memory and MCP.',
+  healthRefresh: 'Refresh',
+  healthVault: 'Vault',
+  healthOllama: 'Ollama',
+  healthEmbedModel: 'Embedding model',
+  healthChatModel: 'Distill model',
+  healthBrainCore: 'Local search',
+  healthMcp: 'Brain MCP',
+  healthDeployPath: 'Deploy folder (optional)',
+  healthOpenLogs: 'Open logs',
+  healthOk: 'OK',
+  healthFail: 'Issue',
+  healthSkip: 'Skipped',
+  healthChecking: 'Checking…',
+  navDashboard: 'Dashboard',
+  navBrowse: 'Chats',
+  navImport: 'Import',
+  navBrain: 'Brain',
+  navConnect: 'Connect',
+  navSettings: 'Settings',
+  navGuide: 'How it works',
+  navNavigate: 'Navigate',
+  sidebarBusyDistill: 'distilling…',
+  sidebarBusyImport: 'import…',
+  sidebarBusyGeneric: 'working…',
+  lockVaultBtn: 'Lock vault',
+  vaultLocked: 'locked',
+  helpDontKnowStart: 'Not sure where to start →',
+  statusStripTitle: 'Where you are now',
+  statusVault: 'Vault',
+  statusVaultOpen: 'open',
+  statusVaultClosed: 'closed',
+  statusBrain: 'Local Brain',
+  statusBrainRunning: 'running',
+  statusBrainStopped: 'stopped',
+  statusOllama: 'Ollama',
+  statusOllamaOk: 'OK',
+  statusOllamaFail: 'unreachable',
+  statusLastDistill: 'Last distill',
+  statusNoDistill: 'none yet',
+  statusPendingDocs: (n) => `${n} doc(s) waiting for index`,
+  statusPendingDocsNone: 'none pending',
+  statusDocuments: 'Documents',
+  dashboardTitle: 'Command center',
+  dashboardLead:
+    'Collect chats from all assistants into one encrypted vault — backup is just the mechanism.',
+  dashboardStatSources: 'Sources',
+  dashboardStatSourcesSub: 'installed',
+  dashboardStatChats: 'Chats',
+  dashboardStatChatsSub: 'to capture',
+  dashboardStatSnapshots: 'Snapshots',
+  dashboardStatSnapshotsClosed: 'no vault',
+  dashboardStatSkills: 'Skills',
+  dashboardStatSkillsSub: 'in vault/skills',
+  dashboardStatDistilled: 'Notes',
+  dashboardStatDistilledSub: 'distilled',
+  dashboardStatKnowledge: 'Knowledge',
+  dashboardStatKnowledgeOpen: 'open',
+  dashboardStatKnowledgeClosed: 'closed',
+  dashboardSourcesHeading: 'Sources',
+  dashboardSelectAll: 'Select all',
+  dashboardDeselectAll: 'Deselect all',
+  dashboardNoSourcesTitle: 'No AI tools detected on this machine.',
+  dashboardNoSourcesDetail:
+    'Pomnia looks for Claude Code, Cursor, Claude Desktop, Antigravity, and VS Code. Install, chat, then Rescan — or Import.',
+  dashboardSourcesSelected: (n) => (n === 1 ? '1 source selected' : `${n} sources selected`),
+  dashboardReadyVault: (name) => `Ready — backup to “${name}”`,
+  dashboardOpenVaultHint: 'Open a vault to enable backup',
+  dashboardBackupNotePlaceholder: 'optional note…',
+  dashboardBackupAndBrain: 'Backup & to Brain',
+  dashboardBackupOnly: 'Backup only',
+  dashboardWorking: 'Working…',
+  dashboardDistilling: 'Distilling to Brain…',
+  dashboardBackupStarting: 'starting…',
+  dashboardNoVaultTitle: 'No vault open',
+  dashboardNoVaultDetail: 'Create or unlock a vault first.',
+  dashboardNothingSelected: 'Nothing selected',
+  dashboardBackupDone: (n) => `Backed up ${n} source(s)`,
+  dashboardBackupDoneSkipped: (n) => `Backup done — skipped ${n} locked file(s)`,
+  dashboardBackupSkippedHint: 'close running apps and backup again',
+  dashboardBackupFailed: 'Backup failed',
+  dashboardNoDistillSourcesTitle: 'Backup done — nothing to distill',
+  dashboardNoDistillSourcesDetail:
+    'Distill works for Claude Code, Cursor, and Claude Desktop. Select one of those or use the Brain tab.',
+  dashboardBrainOffTitle: 'Backup done — Brain is off',
+  dashboardBrainOffDetail: 'Distill needs local search. Start Brain, then continue distill.',
+  dashboardBrainStarted: 'Brain started — distilling…',
+  dashboardBrainStartFailed: 'Could not start Brain',
+  brainStateTitle: 'Brain status',
+  brainStateLastDistill: (rel) => `Last distill ${rel}`,
+  brainStateLoading: 'Loading…',
+  brainStateChatsInTools: 'Chats in tools',
+  brainStateDistilled: 'Distilled',
+  brainStateBacklog: 'Queue',
+  brainStatePendingNew: (n) => `+${n} new`,
+  brainPipeCollect: 'Collect',
+  brainPipeCollectNote: 'from assistants',
+  brainPipeDistill: 'Distill',
+  brainPipeDistillNote: 'local model',
+  brainPipeIndex: 'Index',
+  brainPipeIndexNote: 'embeddings',
+  brainPipeDeploy: 'Send',
+  brainPipeDeployNote: 'to Brain',
+  importDropFailed: 'Drop failed',
+  importDropNoPath: 'Pick a file from disk (browser preview has no path).',
+  importDocIndexedToast: (chunks) => `Indexed ${chunks} chunk(s)`,
+  importDocQueuedToast: 'Saved — index after Brain starts',
+  importDocNotIndexedBadge: 'no index',
+  importDocProgressBrainStart: 'Starting search',
+  guideTitle: 'Pomnia map',
+  guideSubtitle: 'How it works',
+  guideFlowReplay: 'Replay demo',
+  guideFlowReplayLast: 'Replay last activity',
+  connectPageLead:
+    'Copy the MCP config and paste it in your client (Cursor, Claude, Antigravity…) — Pomnia never touches your files.',
+  connectStepReload: 'Reload the MCP client (e.g. Reload Window)',
+  connectMacNoAppHint:
+    'Without Desktop: landing/cursor-mcp.html or docs/CURSOR-MCP.md — same MCP JSON (Cursor example; other clients via Connect).',
+  agentBrainMode: 'Agent Brain Mode',
+  agentBrainModeHint:
+    'Adds a rule snippet (rules / CLAUDE.md / AGENTS) plus stronger MCP tool descriptions: agent auto-reads profile, skills, and memory; writes only on “save to brain”. Pomnia does not silently capture chats.',
+  agentBrainModeBriefTitle: 'Agent rule (Brain Mode)',
+  agentBrainModeBriefCopy: 'Copy rule to file path',
+  agentBrainModeRuleCopy: 'Copy rule (AGENTS.md / rules)',
+  agentBrainModeNoPath:
+    'This client has no fixed rules path — paste the block into AGENTS.md or the system prompt.',
+}
+
+let cachedEn: UiLabels | null = null
+
 /** @param _simple ignored — kept for call-site compatibility; language does not depend on simple mode */
 export function uiLabels(_simple?: boolean): UiLabels {
+  if (getUiLocale() === 'en') {
+    if (!cachedEn) cachedEn = { ...PL_LABELS, ...EN_LABELS }
+    return cachedEn
+  }
   return PL_LABELS
 }
+
+/** Invalidate EN merge cache after locale switch (store calls this). */
+export function invalidateUiLabelsCache(): void {
+  cachedEn = null
+}
+

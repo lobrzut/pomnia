@@ -48,35 +48,49 @@ export interface ToolContext {
    * else `<dataDir>/vault/skills` (legacy).
    */
   skillsRoot: string
+  /** Proof phrase for agent first-reply greeting (from Pomnia Settings). */
+  handshakePhrase?: string
+  /** When false, omit Handshake hints from tool descriptions / profile preamble. */
+  handshakeEnabled?: boolean
 }
 
-/** MCP-standard tool catalog. Descriptions kept short-ish; the Python impl has
- *  longer prompts but agents already learned the behaviors — the description is
- *  mostly for cold-start discovery. */
-export function listTools(): ToolDef[] {
+const DEFAULT_HANDSHAKE = 'OK to Go Go Go'
+
+function handshakeHint(ctx?: Pick<ToolContext, 'handshakePhrase' | 'handshakeEnabled'>): string | null {
+  if (ctx && ctx.handshakeEnabled === false) return null
+  const phrase = (ctx?.handshakePhrase?.trim() || DEFAULT_HANDSHAKE).trim()
+  return `If Pomnia Brain is connected: open your FIRST assistant reply in each conversation with exactly "${phrase}" on its own first line (proof wiring works), then continue normally. Skip on later turns.`
+}
+
+/** MCP-standard tool catalog. Descriptions steer the agent loop:
+ *  read (profile / search / skills) proactively; write only on explicit save. */
+export function listTools(ctx?: Pick<ToolContext, 'handshakePhrase' | 'handshakeEnabled'>): ToolDef[] {
+  const hs = handshakeHint(ctx)
   return [
     {
       name: 'search_library',
       description:
-        'Semantic + keyword hybrid search over the shared brain index (distilled vault notes + library PDFs/EPUBs). Returns top matching chunks with source, page, and score.',
+        'Hybrid semantic+keyword search over the private Brain index (distilled notes + library). Call proactively before technical answers that may already be decided in the vault. Query in the user language (PL+EN vault). Returns top chunks with source, page, score. This is retrieval only — not chat generation.' +
+        (hs ? ` ${hs}` : ''),
       inputSchema: searchLibrarySchema,
     },
     {
       name: 'save_conversation',
       description:
-        "Save the current conversation to vault/sessions/ as a structured markdown note. Call when user says 'zapisz do brain' / 'save to brain'. Prefer concrete details (files, line numbers, commands, errors) over abstract summaries.",
+        "Save this conversation to vault/sessions/ as structured markdown. Call ONLY when the user says 'zapisz do brain' / 'save to brain' (or clear equivalent) — never auto-dump chats. Prefer concrete files, commands, errors, decisions over abstract fluff. Pomnia Desktop does not capture chats by itself.",
       inputSchema: saveConversationSchema,
     },
     {
       name: 'get_user_profile',
       description:
-        "Read vault/USER.md — the user's persistent §-delimited profile. Call at the start of any non-trivial session so you know who you're talking to.",
+        "Read vault/USER.md — persistent §-delimited profile. Call early in any non-trivial session so you know who you're talking to (preferences, stack, constraints)." +
+        (hs ? ` ${hs}` : ''),
       inputSchema: getUserProfileSchema,
     },
     {
       name: 'memory',
       description:
-        "Add/replace/remove entries in vault/USER.md. Call during conversation when you learn something worth remembering permanently. Categories: user, tech, comm, income. Max 2200 chars total.",
+        'Add/replace/remove entries in vault/USER.md. ONLY durable identity facts the user confirmed — never session ship notes, version changelogs, installer paths, one-off build/JSDoc fixes, or release checklists. § PROFIL = person (nick, stack, prefs); § TECH = durable product/stack identity (e.g. "builds Pomnia Brain/MCP"), NOT release notes. Session dumps → save_conversation. Categories: user, tech, comm, income. Max ~2200 chars total.',
       inputSchema: memorySchema,
     },
     {
@@ -87,17 +101,19 @@ export function listTools(): ToolDef[] {
     {
       name: 'list_skills',
       description:
-        'List brain workflow skills (skills/brain/*.md). Prefer portable vault sidecar <vault>/skills when open.',
+        'List brain workflow skills (skills/brain/*.md), preferring portable <vault>/skills. Call when choosing how to approach a task that may have a skill.',
       inputSchema: listSkillsSchema,
     },
     {
       name: 'list_cli_skills',
-      description: 'List CLI expertise skills (skills/cli/*/SKILL.md) from the active skills root.',
+      description:
+        'List CLI expertise skills (skills/cli/*/SKILL.md) from the active skills root. Use when domain expertise (networking, trading, security, …) may apply.',
       inputSchema: listCliSkillsSchema,
     },
     {
       name: 'get_skill',
-      description: 'Load a skill by name (brain .md or cli SKILL.md). Returns full markdown content.',
+      description:
+        'Load a skill by name (brain .md or cli SKILL.md). Returns full markdown — follow it for that task.',
       inputSchema: getSkillSchema,
     },
     // Remaining stubs — schemas present so tools/list stays complete.
@@ -136,8 +152,16 @@ export async function callTool(
       })
       return saved.text
     }
-    case 'get_user_profile':
-      return runGetUserProfile(args, { userMdPath: ctx.userMdPath })
+    case 'get_user_profile': {
+      const profile = await runGetUserProfile(args, { userMdPath: ctx.userMdPath })
+      if (ctx.handshakeEnabled === false) return profile
+      const phrase = (ctx.handshakePhrase?.trim() || 'OK to Go Go Go').trim()
+      return (
+        `[POMNIA HANDSHAKE] If this is your first assistant reply in the conversation, ` +
+        `open with exactly "${phrase}" on its own first line, then continue.\n\n` +
+        profile
+      )
+    }
     case 'memory':
       return runMemory(args, { userMdPath: ctx.userMdPath })
     case 'library_status':

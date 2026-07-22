@@ -77,6 +77,8 @@ export interface BrainServer {
   setSkillsRoot(path: string): void
   /** Update knowledge vault root at runtime (USER.md / distilled / sessions). */
   setVaultRoot(path: string): void
+  /** Update Handshake proof phrase for MCP tool descriptions / profile preamble. */
+  setHandshake(opts: { phrase: string; enabled: boolean }): void
 }
 
 /**
@@ -125,7 +127,7 @@ function createMcpServer(
     { capabilities: { tools: {} } },
   )
 
-  mcp.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: listTools() }))
+  mcp.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: listTools(ctx) }))
 
   mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
     const toolName = req.params.name
@@ -189,6 +191,15 @@ export async function createBrainServer(
       }
     },
 
+    setHandshake(opts: { phrase: string; enabled: boolean }) {
+      config.handshakePhrase = opts.phrase
+      config.handshakeEnabled = opts.enabled
+      if (ctx) {
+        ctx.handshakePhrase = opts.phrase
+        ctx.handshakeEnabled = opts.enabled
+      }
+    },
+
     async start() {
       // Open storage + embedder first so the MCP server refuses connections
       // if either is broken (fail-fast beats accepting requests we can't serve).
@@ -205,6 +216,8 @@ export async function createBrainServer(
         vaultRoot: vault.root,
         userMdPath: vault.userProfilePath,
         skillsRoot: resolveSkillsRoot(vault),
+        handshakePhrase: config.handshakePhrase,
+        handshakeEnabled: config.handshakeEnabled !== false,
       }
 
       http = createServer((req: IncomingMessage, res: ServerResponse) => {

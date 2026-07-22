@@ -101,10 +101,10 @@ export function Sidebar() {
       ? globalActivity.detail.slice(0, 28)
       : busy
         ? globalActivity.kind === 'distill'
-          ? 'destylacja…'
+          ? labels.sidebarBusyDistill
           : globalActivity.kind === 'doc-import'
-            ? 'import…'
-            : 'praca w tle…'
+            ? labels.sidebarBusyImport
+            : labels.sidebarBusyGeneric
         : null
   return (
     <nav className="relative z-10 flex w-[208px] shrink-0 flex-col gap-1 px-3 pb-4">

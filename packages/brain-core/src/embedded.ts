@@ -36,6 +36,7 @@ type ParentMsg =
   | { type: 'index-document'; doc: IndexDocumentInput }
   | { type: 'set-skills-root'; path: string }
   | { type: 'set-vault-root'; path: string }
+  | { type: 'set-handshake'; phrase: string; enabled: boolean }
   | { type: 'stop' }
 
 function send(msg: unknown): void {
@@ -164,6 +165,13 @@ process.on('message', (msg: ParentMsg) => {
     case 'set-vault-root':
       if (config) config.vaultRoot = msg.path
       server?.setVaultRoot(msg.path)
+      break
+    case 'set-handshake':
+      if (config) {
+        config.handshakePhrase = msg.phrase
+        config.handshakeEnabled = msg.enabled
+      }
+      server?.setHandshake({ phrase: msg.phrase, enabled: msg.enabled })
       break
     case 'stop':
       void handleStop()

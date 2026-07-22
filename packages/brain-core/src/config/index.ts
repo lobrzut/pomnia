@@ -34,6 +34,14 @@ export interface BrainConfig {
    */
   vaultRoot?: string
 
+  /**
+   * Handshake proof phrase — agents should open the first reply with this line
+   * when Pomnia Brain MCP is connected. Injected into tool descriptions.
+   */
+  handshakePhrase?: string
+  /** When false, omit Handshake greeting hints from MCP tools. Default true. */
+  handshakeEnabled?: boolean
+
   /** Ollama base URL — reachable http endpoint. */
   ollamaUrl: string
   /** Embedding model name known to Ollama (nomic-embed-text-v1.5 → dim 768). */
