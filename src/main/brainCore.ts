@@ -50,6 +50,11 @@ export interface StartOptions {
   port?: number
   /** Portable skills sidecar — typically `<encryptedVault>/skills`. */
   skillsRoot?: string
+  /**
+   * Plaintext knowledge root — typically the open encrypted vault folder
+   * (`USER.md`, `distilled/`, `sessions/` next to header.json).
+   */
+  vaultRoot?: string
 }
 
 function resolveNodeBin(): string | undefined {
@@ -162,6 +167,7 @@ export class BrainCoreManager {
             port: opts.port ?? 7862,
             host: '127.0.0.1',
             ...(opts.skillsRoot ? { skillsRoot: opts.skillsRoot } : {}),
+            ...(opts.vaultRoot ? { vaultRoot: opts.vaultRoot } : {}),
           },
         })
       })
@@ -288,6 +294,13 @@ export class BrainCoreManager {
     const child = this.child
     if (!child || !this.url) return
     child.send({ type: 'set-skills-root', path })
+  }
+
+  /** Point MCP USER.md / sessions (+ reindex target) at portable vault root. */
+  setVaultRoot(path: string): void {
+    const child = this.child
+    if (!child || !this.url) return
+    child.send({ type: 'set-vault-root', path })
   }
 }
 

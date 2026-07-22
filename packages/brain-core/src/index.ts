@@ -28,7 +28,7 @@ export type { IndexStats, IndexProgressEvent, IndexFileInput, IndexDocumentInput
 // Storage (sqlite-vec + vault filesystem)
 export { openDb } from './storage/db.js'
 export type { OpenDbOptions, BrainDb } from './storage/db.js'
-export { defaultVaultConfig, ensureLibraryDirs } from './storage/vault.js'
+export { defaultVaultConfig, vaultConfigFromRoot, ensureLibraryDirs } from './storage/vault.js'
 export type { VaultConfig } from './storage/vault.js'
 
 // Config (env + optional TOML/JSON file)

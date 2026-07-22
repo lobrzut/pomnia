@@ -24,8 +24,8 @@ export interface VaultConfig {
   libraryExtractedDir: string
 }
 
-export function defaultVaultConfig(dataDir: string): VaultConfig {
-  const root = join(dataDir, 'vault')
+/** Build vault paths for an explicit root (portable encrypted vault folder or legacy). */
+export function vaultConfigFromRoot(root: string): VaultConfig {
   const libraryDir = join(root, 'library')
   return {
     root,
@@ -36,6 +36,10 @@ export function defaultVaultConfig(dataDir: string): VaultConfig {
     librarySourcesDir: join(libraryDir, 'sources'),
     libraryExtractedDir: join(libraryDir, 'extracted'),
   }
+}
+
+export function defaultVaultConfig(dataDir: string): VaultConfig {
+  return vaultConfigFromRoot(join(dataDir, 'vault'))
 }
 
 /** Create vault/library dirs if missing (metadata only — blobs live in encrypted .pomnia). */

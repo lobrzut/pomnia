@@ -98,6 +98,7 @@ const bridge = {
     embeddedBrainAutoStart?: boolean
     onboarded?: boolean
     floatingMonitorOnMinimize?: boolean
+    openAtLogin?: boolean
   }) => ipcRenderer.invoke('app:settings:set', patch),
   openLogs: () => ipcRenderer.invoke('app:openLogs') as Promise<string>,
   floatingMonitorShow: () => ipcRenderer.invoke('floating-monitor:show') as Promise<{ visible: boolean }>,
@@ -124,6 +125,16 @@ const bridge = {
     const l = () => cb()
     ipcRenderer.on('handshake:toast-ready', l)
     return () => ipcRenderer.removeListener('handshake:toast-ready', l)
+  },
+  onAppToast: (
+    cb: (t: { kind: 'info' | 'success' | 'warn' | 'error'; title: string; detail?: string }) => void,
+  ) => {
+    const l = (
+      _: IpcRendererEvent,
+      t: { kind: 'info' | 'success' | 'warn' | 'error'; title: string; detail?: string },
+    ) => cb(t)
+    ipcRenderer.on('app:toast', l)
+    return () => ipcRenderer.removeListener('app:toast', l)
   },
   onAppNavigate: (cb: (route: string) => void) => {
     const l = (_: IpcRendererEvent, route: string) => cb(route)

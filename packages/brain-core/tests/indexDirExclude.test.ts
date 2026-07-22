@@ -116,4 +116,53 @@ describe('indexDir excludes skills/', () => {
 
     db.close()
   })
+
+  it('prunes orphan paths from a previous AppData vault root', async () => {
+    vaultDir = mkdtempSync(join(tmpdir(), 'pomnia-portable-'))
+    const legacyDir = mkdtempSync(join(tmpdir(), 'pomnia-appdata-vault-'))
+    dbDir = mkdtempSync(join(tmpdir(), 'pomnia-brain-index-'))
+
+    mkdirSync(join(vaultDir, 'distilled'), { recursive: true })
+    writeFileSync(
+      join(vaultDir, 'distilled', 'portable.md'),
+      'Portable vault note with enough text to form a chunk for indexing.',
+    )
+
+    const db = openDb({ dbPath: join(dbDir, 'library.db') })
+    const legacyPath = join(legacyDir, 'distilled', 'stale.md')
+    db.prepare(
+      'INSERT INTO chunks (pdf_path, pdf_name, page_num, chunk_idx, text, char_count) VALUES (?, ?, 1, 0, ?, 12)',
+    ).run(legacyPath, 'stale.md', 'old appdata junk')
+
+    // Logical library path under the NEW root must survive prune.
+    const libPath = `${vaultDir.replace(/\\/g, '/')}/library/doc-keep`
+    db.prepare(
+      'INSERT INTO chunks (pdf_path, pdf_name, page_num, chunk_idx, text, char_count) VALUES (?, ?, 1, 0, ?, 10)',
+    ).run(libPath, 'paper.pdf', 'library doc')
+
+    const stats = await indexDir(db, mockEmbedder(), vaultDir)
+    expect(stats.prunedFiles).toBeGreaterThanOrEqual(1)
+
+    const stale = db
+      .prepare('SELECT COUNT(*) AS c FROM chunks WHERE pdf_name = ?')
+      .get('stale.md') as { c: number }
+    expect(Number(stale.c)).toBe(0)
+
+    const portable = db
+      .prepare('SELECT COUNT(*) AS c FROM chunks WHERE pdf_name = ?')
+      .get('portable.md') as { c: number }
+    expect(Number(portable.c)).toBeGreaterThan(0)
+
+    const lib = db.prepare('SELECT COUNT(*) AS c FROM chunks WHERE pdf_path = ?').get(libPath) as {
+      c: number
+    }
+    expect(Number(lib.c)).toBeGreaterThan(0)
+
+    db.close()
+    try {
+      rmSync(legacyDir, { recursive: true, force: true })
+    } catch {
+      /* ignore */
+    }
+  })
 })

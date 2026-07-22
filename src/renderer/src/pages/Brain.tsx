@@ -68,7 +68,8 @@ export default function Brain() {
     setBrainDeployTarget,
     brainDeployReindex,
     setBrainDeployReindex,
-    simpleMode
+    simpleMode,
+    vault
   } = useStore()
   const labels = uiLabels()
   const [advancedOpen, setAdvancedOpen] = useState(!simpleMode)
@@ -311,6 +312,11 @@ export default function Brain() {
         <div>
           <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.brainPageTitle}</h1>
           <p className="text-sm text-ink-dim">{labels.brainPageLead}</p>
+          <p className="mt-1 text-xs text-ink-faint">
+            {vault.open
+              ? labels.knowledgePathOpen(vault.path ?? vault.name ?? '')
+              : labels.knowledgePathLocked}
+          </p>
         </div>
       </div>
 

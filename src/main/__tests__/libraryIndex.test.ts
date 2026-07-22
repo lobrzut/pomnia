@@ -18,6 +18,7 @@ vi.mock('../brainCore.js', () => ({
     start: (...args: unknown[]) => brainStart(...args),
     indexDocument: (...args: unknown[]) => indexDocument(...args),
     setSkillsRoot: vi.fn(),
+    setVaultRoot: vi.fn(),
   },
 }))
 
@@ -25,6 +26,7 @@ vi.mock('../brainPaths.js', () => ({
   brainCoreDataDir: () => '/tmp/brain-data',
   brainSkillsDir: (vault?: string | null) =>
     vault ? `${vault}/skills` : '/tmp/brain-data/vault/skills',
+  brainVaultRoot: (vault?: string | null) => vault || '/tmp/brain-data/vault',
 }))
 
 const probeOllama = vi.fn()
@@ -68,6 +70,7 @@ describe('ensureBrainForIndexing', () => {
       dataDir: '/tmp/brain-data',
       ollamaUrl: 'http://127.0.0.1:11434',
       skillsRoot: '/tmp/brain-data/vault/skills',
+      vaultRoot: '/tmp/brain-data/vault',
     })
   })
 

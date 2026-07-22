@@ -11,8 +11,10 @@ describe('handshakePhrase', () => {
     expect(isHandshakePhrase('ok to go go go')).toBe(true)
     expect(isHandshakePhrase('Ok to Go Go Go!')).toBe(true)
     expect(isHandshakePhrase('OK to Go Go Go!')).toBe(true)
+    expect(isHandshakePhrase('Ok to Go Go Go！')).toBe(true) // fullwidth !
     expect(isHandshakePhrase('  Ok   TO   go  go   go  ')).toBe(true)
     expect(isHandshakePhrase('ok  to   go go go')).toBe(true)
+    expect(isHandshakePhrase('"Ok to Go Go Go!"')).toBe(true)
     expect(normalizeHandshakePhrase('  Ok   TO   go  go   go!  ')).toBe(
       CANONICAL_HANDSHAKE_PHRASE,
     )

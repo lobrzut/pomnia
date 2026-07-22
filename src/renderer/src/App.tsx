@@ -73,6 +73,9 @@ export default function App() {
     const offHandshakeToast = api.onHandshakeToastReady(() => {
       toast({ kind: 'success', title: uiLabels().handshakeToastReady })
     })
+    const offAppToast = api.onAppToast((t) => {
+      toast(t)
+    })
     // Surface otherwise-silent async failures as toasts (diagnostics).
     const onErr = (e: ErrorEvent) => toast({ kind: 'error', title: 'Unexpected error', detail: e.message })
     const onRej = (e: PromiseRejectionEvent) =>
@@ -85,6 +88,7 @@ export default function App() {
       offActivity()
       offNavigate()
       offHandshakeToast()
+      offAppToast()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
