@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({
-  app: { getPath: () => '/tmp/pomnia-test' },
+  app: {
+    getPath: () => '/tmp/pomnia-test',
+    setLoginItemSettings: vi.fn(),
+  },
 }))
 
 vi.mock('node:fs', () => ({
@@ -52,6 +55,13 @@ describe('appSettings tray logic', () => {
     expect(mod.getAppSettings().floatingMonitorAlwaysOnTop).toBe(true)
     await mod.setAppSettings({ floatingMonitorAlwaysOnTop: false })
     expect(mod.getAppSettings().floatingMonitorAlwaysOnTop).toBe(false)
+  })
+
+  it('openAtLogin defaults off', async () => {
+    const mod = await import('../appSettings.js')
+    expect(mod.getAppSettings().openAtLogin).toBe(false)
+    await mod.setAppSettings({ openAtLogin: true })
+    expect(mod.getAppSettings().openAtLogin).toBe(true)
   })
 
   it('persists per-user brain settings', async () => {

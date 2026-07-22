@@ -282,9 +282,33 @@ function listTextFiles(root: string): string[] {
   return out
 }
 
+/** Normalize for root comparisons (Windows `\` vs `/`, trailing slash, case). */
+export function normalizeIndexPathKey(p: string): string {
+  return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+}
+
+/** True when `path` is exactly `root` or a descendant (slash-normalized). */
+export function isIndexPathUnderRoot(path: string, root: string): boolean {
+  const nRoot = normalizeIndexPathKey(root)
+  const nPath = normalizeIndexPathKey(path)
+  return nPath === nRoot || nPath.startsWith(`${nRoot}/`)
+}
+
+/**
+ * Encrypted vault library docs use a logical pdf_path (`…/library/<id>`), not a
+ * plaintext file on disk — never prune them as "missing" during text reindex.
+ */
+function isLibraryLogicalPath(path: string, root: string): boolean {
+  const nRoot = normalizeIndexPathKey(root)
+  const nPath = normalizeIndexPathKey(path)
+  return nPath.startsWith(`${nRoot}/library/`)
+}
+
 /**
  * Index every .md/.txt under `rootDir` (distilled / sessions / library only when
  * those dirs exist; never skills/) and prune DB rows whose files are gone.
+ * Also drops orphan rows from a previous vault root (e.g. AppData after portable
+ * vault open) so search only reflects the current root.
  * This is the "reindex" the embedded brain runs after each distill.
  */
 export async function indexDir(
@@ -298,17 +322,20 @@ export async function indexDir(
   const files: IndexFileInput[] = paths.map((p) => ({ path: p, text: readFileSync(p, 'utf8') }))
   const stats = await indexFiles(db, embedder, files, onProgress, signal)
 
-  // Prune: any indexed path under rootDir that no longer exists on disk.
-  const present = new Set(paths)
-  const known = db
-    .prepare("SELECT DISTINCT pdf_path AS p FROM chunks WHERE pdf_path LIKE ? || '%'")
-    .all(rootDir) as { p: string }[]
+  // Prune: missing files under current root + any path outside current root.
+  const present = new Set(paths.map(normalizeIndexPathKey))
+  const known = db.prepare('SELECT DISTINCT pdf_path AS p FROM chunks').all() as { p: string }[]
   const delVec = db.prepare('DELETE FROM chunks_vec WHERE rowid = ?')
   const selIds = db.prepare('SELECT id FROM chunks WHERE pdf_path = ?')
   const delChunks = db.prepare('DELETE FROM chunks WHERE pdf_path = ?')
   for (const { p } of known) {
     if (signal?.aborted) throwIfAborted(signal, 'reindex aborted')
-    if (present.has(p)) continue
+    const underRoot = isIndexPathUnderRoot(p, rootDir)
+    if (underRoot) {
+      if (isLibraryLogicalPath(p, rootDir)) continue
+      if (present.has(normalizeIndexPathKey(p))) continue
+    }
+    // else: orphan from a previous vault root (AppData, old folder, etc.)
     const ids = (selIds.all(p) as { id: number }[]).map((r) => r.id)
     const wipe = db.transaction(() => {
       for (const id of ids) delVec.run(BigInt(id))

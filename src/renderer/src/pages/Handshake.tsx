@@ -17,29 +17,40 @@ export default function Handshake() {
   useEffect(() => {
     void api.handshakeGetArmed().then((r) => setArmed(r.armed))
     const off = api.onHandshakeArmed((e) => setArmed(e.armed))
-    const t = window.setTimeout(() => inputRef.current?.focus(), 80)
+    const focusInput = () => {
+      window.setTimeout(() => inputRef.current?.focus(), 40)
+    }
+    focusInput()
+    window.addEventListener('focus', focusInput)
+    document.addEventListener('visibilitychange', focusInput)
     return () => {
       off()
-      window.clearTimeout(t)
+      window.removeEventListener('focus', focusInput)
+      document.removeEventListener('visibilitychange', focusInput)
     }
   }, [])
 
   async function submit() {
     if (!value.trim()) return
+    // Prefer main-process verdict; local check is instant UX only.
     if (!isHandshakePhrase(value)) {
       setHint('bad')
       return
     }
-    const r = await api.handshakeTry(value)
-    if (!r.ok) {
+    try {
+      const r = await api.handshakeTry(value)
+      if (!r.ok) {
+        setHint('bad')
+        return
+      }
+      setArmed(true)
+      setHint('ok')
+      setFlash(true)
+      window.setTimeout(() => setFlash(false), 900)
+      window.setTimeout(() => void api.handshakeHide(), 1100)
+    } catch {
       setHint('bad')
-      return
     }
-    setArmed(true)
-    setHint('ok')
-    setFlash(true)
-    window.setTimeout(() => setFlash(false), 900)
-    window.setTimeout(() => void api.handshakeHide(), 1100)
   }
 
   return (

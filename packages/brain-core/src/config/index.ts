@@ -26,6 +26,14 @@ export interface BrainConfig {
    */
   skillsRoot?: string
 
+  /**
+   * Plaintext knowledge root (`USER.md`, `distilled/`, `sessions/`).
+   * When set (Pomnia with open encrypted vault), equals the vault folder itself
+   * so knowledge travels with header.json / skills /. Default: `<dataDir>/vault`.
+   * Vectordb (`library.db`) stays under `dataDir` regardless.
+   */
+  vaultRoot?: string
+
   /** Ollama base URL — reachable http endpoint. */
   ollamaUrl: string
   /** Embedding model name known to Ollama (nomic-embed-text-v1.5 → dim 768). */

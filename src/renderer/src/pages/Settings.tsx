@@ -223,6 +223,8 @@ export default function Settings() {
     setCloseToTray,
     floatingMonitorOnMinimize,
     setFloatingMonitorOnMinimize,
+    openAtLogin,
+    setOpenAtLogin,
     brainTarget,
     remoteBrainUrl,
     connectToken
@@ -307,6 +309,13 @@ export default function Settings() {
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
+              <div className="text-sm font-medium text-ink">{labels.openAtLogin}</div>
+              <p className="mt-1 text-xs text-ink-dim">{labels.openAtLoginHint}</p>
+            </div>
+            <Toggle checked={openAtLogin} onChange={setOpenAtLogin} aria-label={labels.openAtLogin} />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
               <div className="text-sm font-medium text-ink">{labels.closeToTray}</div>
               <p className="mt-1 text-xs text-ink-dim">{labels.closeToTrayHint}</p>
             </div>
@@ -344,13 +353,16 @@ export default function Settings() {
             <div className="text-sm text-ink-dim">
               <span className="font-medium text-ink">{vault.name}</span>
               <div className="font-mono text-xs text-ink-faint">{vault.path}</div>
+              <p className="mt-2 text-xs text-ink-dim">
+                {labels.knowledgePathOpen(vault.path ?? vault.name ?? '')}
+              </p>
             </div>
             <Button variant="danger" onClick={lockVault}>
               <Lock className="h-4 w-4" /> {labels.lockVault}
             </Button>
           </div>
         ) : (
-          <p className="text-sm text-ink-faint">{labels.noVaultOpen}</p>
+          <p className="text-sm text-ink-faint">{labels.knowledgePathLocked}</p>
         )}
       </GlassCard>
 

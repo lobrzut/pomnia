@@ -46,7 +46,14 @@ import { brainCore } from './brainCore.js'
 import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused } from './mcpActivityPoll.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { indexPendingLibraryDocuments, type PendingIndexResult } from './libraryIndex.js'
-import { getAppSettings, loadAppSettings, setAppSettings, shouldHideOnClose, shouldHideOnMinimize } from './appSettings.js'
+import {
+  applyLoginItemSettings,
+  getAppSettings,
+  loadAppSettings,
+  setAppSettings,
+  shouldHideOnClose,
+  shouldHideOnMinimize,
+} from './appSettings.js'
 import { destroyTray, initTray, refreshTrayMenu } from './tray.js'
 import {
   destroyFloatingMonitor,
@@ -80,8 +87,17 @@ import {
 import { isCursorDbTooLarge } from '@core/adapters/cursor.js'
 import { migrateBrainIndexFile, migrateLegacyAppData } from './migrateLegacy.js'
 import { ensureBrainForIndexing } from './ensureBrain.js'
-import { brainCoreDataDir, brainVaultDistilledDir, brainVaultRoot, brainSkillsDir } from './brainPaths.js'
+import {
+  brainCoreDataDir,
+  brainVaultDistilledDir,
+  brainVaultRoot,
+  brainVaultLegacyRoot,
+  brainSkillsDir,
+  brainSkillsLegacyDir,
+  setOpenEncryptedVaultPath,
+} from './brainPaths.js'
 import { ensurePortableSkills } from './ensurePortableSkills.js'
+import { ensurePortableKnowledge } from './ensurePortableKnowledge.js'
 import { brainProcessFailedMessage, ollamaUnreachableMessage, probeOllama, resolveOllamaUrl } from './ollamaSettings.js'
 
 let win: BrowserWindow | null = null
@@ -238,6 +254,7 @@ async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
   const url = resolveOllamaUrl(ollamaUrl)
   if (brainCore.status().running) {
     await flushPendingLibraryDocs(url)
+    await maybeHygieneReindexAfterVaultChange()
     return
   }
   if (brainCore.status().starting) return
@@ -246,6 +263,71 @@ async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
   if (!ensured.running || !vault || !vaultPath) return
   refreshTrayMenu(win, requestQuit)
   await flushPendingLibraryDocs(url)
+  await maybeHygieneReindexAfterVaultChange()
+}
+
+/** Slash-normalize vault roots so AppData vs portable switches compare reliably. */
+function normalizeVaultRootKey(p: string): string {
+  return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+}
+
+type IndexHygieneToast = {
+  kind: 'info' | 'success' | 'warn' | 'error'
+  title: string
+  detail?: string
+}
+
+function sendAppToast(t: IndexHygieneToast): void {
+  safeSendMain('app:toast', t)
+}
+
+/**
+ * After portable vault open: reindex current vault root and prune orphan AppData
+ * paths from library.db. Toasts once when a full hygiene pass is needed.
+ */
+async function maybeHygieneReindexAfterVaultChange(): Promise<void> {
+  if (!vaultPath) return
+  const root = brainVaultRoot(vaultPath)
+  const last = getAppSettings().lastIndexedVaultRoot
+  if (last && normalizeVaultRootKey(last) === normalizeVaultRootKey(root)) return
+
+  if (!brainCore.status().running) {
+    sendAppToast({
+      kind: 'info',
+      title: 'Pełny reindex indeksu',
+      detail:
+        'Vault przenośny — po starcie lokalnej wyszukiwarki kliknij „Odśwież indeks” (raz), żeby usunąć stare ścieżki AppData z wyszukiwania.',
+    })
+    return
+  }
+  if (brainCore.status().indexing) return
+
+  activity.update({ kind: 'indexing', phase: 'reindex', detail: 'czyszczenie po zmianie vault…' })
+  try {
+    const stats = (await brainCore.reindex(root)) as {
+      files?: number
+      chunks?: number
+      prunedFiles?: number
+    }
+    await setAppSettings({ lastIndexedVaultRoot: root })
+    const pruned = stats?.prunedFiles ?? 0
+    sendAppToast({
+      kind: 'success',
+      title: 'Indeks dopasowany do vaultu',
+      detail: `${stats?.files ?? 0} plików · ${stats?.chunks ?? 0} chunków${
+        pruned ? ` · usunięto ${pruned} starych ścieżek` : ''
+      }`,
+    })
+  } catch (e) {
+    log.warn('vault hygiene reindex failed:', (e as Error).message)
+    sendAppToast({
+      kind: 'warn',
+      title: 'Reindex po otwarciu vaultu nieudany',
+      detail: `${(e as Error).message} — kliknij „Odśwież indeks” w Brain.`,
+    })
+  } finally {
+    activity.idle('indexing')
+  }
 }
 
 async function collectLive(sources: SourceId[], limit?: number): Promise<Conversation[]> {
@@ -426,26 +508,48 @@ function registerIpc(): void {
   ipcMain.handle('vault:create', async (_e, path: string, name: string, pass: string) => {
     vault = await Vault.create(path, name, pass)
     vaultPath = path
+    setOpenEncryptedVaultPath(path)
     const skillsRoot = await ensurePortableSkills(path)
+    const knowledgeRoot = await ensurePortableKnowledge(path)
     brainCore.setSkillsRoot(skillsRoot)
+    brainCore.setVaultRoot(knowledgeRoot)
     void maybeAutoStartEmbeddedBrain()
-    return { open: true, path, name, snapshots: 0, pendingLibraryIndex: 0 }
+    // When autostart is off, still prompt for one-shot index hygiene.
+    if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
+    return { open: true, path, name, snapshots: 0, pendingLibraryIndex: 0, knowledgeRoot }
   })
 
   ipcMain.handle('vault:open', async (_e, path: string, pass: string) => {
     vault = await Vault.open(path, pass)
     vaultPath = path
+    setOpenEncryptedVaultPath(path)
     const skillsRoot = await ensurePortableSkills(path)
+    const knowledgeRoot = await ensurePortableKnowledge(path)
     brainCore.setSkillsRoot(skillsRoot)
+    brainCore.setVaultRoot(knowledgeRoot)
     const m = vault.getManifest()
     const pendingLibraryIndex = vault.getPendingIndexDocuments().length
     void maybeAutoStartEmbeddedBrain()
-    return { open: true, path, name: m.name, snapshots: m.snapshots.length, pendingLibraryIndex }
+    if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
+    return {
+      open: true,
+      path,
+      name: m.name,
+      snapshots: m.snapshots.length,
+      pendingLibraryIndex,
+      knowledgeRoot,
+    }
   })
 
   ipcMain.handle('vault:lock', () => {
     vault = null
     vaultPath = null
+    // Stop using portable path; keep AppData backup intact (no wipe).
+    setOpenEncryptedVaultPath(null)
+    if (brainCore.status().running) {
+      brainCore.setVaultRoot(brainVaultLegacyRoot())
+      brainCore.setSkillsRoot(brainSkillsLegacyDir())
+    }
   })
 
   ipcMain.handle('snapshots:list', () => requireVault().getManifest().snapshots)
@@ -649,7 +753,7 @@ function registerIpc(): void {
         const dir = brainDir()
         // Staging copy for UI / legacy local index (userData/brain-notes).
         await deployFilesystem(notes, dir)
-        // Canonical vault for embedded MCP (brain-core-data/vault/distilled).
+        // Canonical vault for embedded MCP: portable vault/distilled when open.
         const vaultDistilled = brainVaultDistilledDir()
         await deployFilesystem(notes, vaultDistilled)
         const okNotes = notes.filter((n) => n.quality === 'ok')
@@ -676,8 +780,10 @@ function registerIpc(): void {
         if (brainCore.status().running && opts.reindex !== false) {
           activity.update({ kind: 'indexing', phase: 'reindex', done: 0, total: 1, detail: 'po destylacji…' })
           try {
-            await brainCore.reindex(brainVaultRoot())
+            const root = brainVaultRoot()
+            await brainCore.reindex(root)
             reindexed = true
+            await setAppSettings({ lastIndexedVaultRoot: root })
           } catch (e) {
             log.warn('embedded reindex failed:', (e as Error).message)
           }
@@ -770,9 +876,11 @@ function registerIpc(): void {
         dataDir: brainCoreDataDir(),
         ollamaUrl: url,
         skillsRoot: brainSkillsDir(vaultPath),
+        vaultRoot: brainVaultRoot(vaultPath),
       })
       await setAppSettings({ embeddedBrainAutoStart: true, ollamaUrl: url })
       await flushPendingLibraryDocs(url)
+      void maybeHygieneReindexAfterVaultChange()
       refreshTrayMenu(win, requestQuit)
       return brainCore.status()
     } catch (err) {
@@ -791,7 +899,9 @@ function registerIpc(): void {
   ipcMain.handle('brainCore:reindex', async () => {
     activity.update({ kind: 'indexing', phase: 'reindex' })
     try {
-      const stats = await brainCore.reindex(brainVaultRoot())
+      const root = brainVaultRoot()
+      const stats = await brainCore.reindex(root)
+      await setAppSettings({ lastIndexedVaultRoot: root })
       return { stats }
     } finally {
       activity.idle('indexing')
@@ -820,6 +930,7 @@ function registerIpc(): void {
         embeddedBrainAutoStart?: boolean
         onboarded?: boolean
         floatingMonitorOnMinimize?: boolean
+        openAtLogin?: boolean
       },
     ) => setAppSettings(patch),
   )
@@ -869,7 +980,11 @@ function registerIpc(): void {
     return result
   })
   ipcMain.handle('handshake:get-armed', () => ({ armed: isGoArmed() }))
-  ipcMain.handle('handshake:disarm', () => ({ armed: setGoArmed(false) }))
+  ipcMain.handle('handshake:disarm', () => {
+    const armed = setGoArmed(false)
+    refreshTrayMenu(win, requestQuit)
+    return { armed }
+  })
 
   app.on('before-quit', (e) => {
     if (quittingCleanup) return
@@ -940,7 +1055,9 @@ function registerIpc(): void {
         detail = `Copied ${files.length} notes → ${opts.target} (+ vault/distilled)`
         if (opts.reindex !== false && brainCore.status().running) {
           try {
-            await brainCore.reindex(brainVaultRoot())
+            const root = brainVaultRoot()
+            await brainCore.reindex(root)
+            await setAppSettings({ lastIndexedVaultRoot: root })
             detail += ' · embedded reindex ok'
           } catch (e) {
             detail += ` · embedded reindex failed: ${(e as Error).message}`
@@ -1021,6 +1138,7 @@ app.whenReady().then(async () => {
   await fs.mkdir(brainDir(), { recursive: true })
   await migrateBrainIndexFile(brainDir())
   await loadAppSettings()
+  applyLoginItemSettings()
   initActivityReplayStore(app.getPath('userData'))
   await loadLastActivityReplay()
   registerIpc()
@@ -1028,7 +1146,9 @@ app.whenReady().then(async () => {
   if (win) void initTray(win, requestQuit)
   // Personal ritual window — Ctrl+Shift+H (optional, discoverable via tray / Brain).
   const hk = globalShortcut.register('CommandOrControl+Shift+H', () => {
-    void showHandshake()
+    void showHandshake().then(() => {
+      if (win) refreshTrayMenu(win, requestQuit)
+    })
   })
   if (!hk) log.warn('handshake hotkey Ctrl+Shift+H not registered (conflict?)')
   app.on('will-quit', () => {

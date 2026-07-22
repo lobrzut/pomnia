@@ -1,3 +1,4 @@
+import { isHandshakePhrase } from '@core/handshakePhrase'
 import type {
   ActivityState,
   LastActivityReplay,
@@ -24,6 +25,9 @@ import type {
   TextHit,
   VaultStatus
 } from './types'
+
+/** Browser / no-preload mock session flag (mirrors main goArmed). */
+let mockGoArmed = false
 
 /** The bridge exposed by preload as window.pomnia. */
 export interface PomniaBridge {
@@ -119,6 +123,7 @@ export interface PomniaBridge {
     embeddedBrainAutoStart?: boolean
     onboarded?: boolean
     floatingMonitorOnMinimize?: boolean
+    openAtLogin?: boolean
   }>
   appSettingsSet(patch: {
     minimizeToTray?: boolean
@@ -131,6 +136,7 @@ export interface PomniaBridge {
     embeddedBrainAutoStart?: boolean
     onboarded?: boolean
     floatingMonitorOnMinimize?: boolean
+    openAtLogin?: boolean
   }): Promise<{
     minimizeToTray: boolean
     closeToTray: boolean
@@ -142,6 +148,7 @@ export interface PomniaBridge {
     embeddedBrainAutoStart?: boolean
     onboarded?: boolean
     floatingMonitorOnMinimize?: boolean
+    openAtLogin?: boolean
   }>
   openLogs(): Promise<string>
   appVersion(): Promise<{ version: string }>
@@ -159,6 +166,7 @@ export interface PomniaBridge {
   handshakeDisarm(): Promise<{ armed: boolean }>
   onHandshakeArmed(cb: (e: { armed: boolean }) => void): () => void
   onHandshakeToastReady(cb: () => void): () => void
+  onAppToast(cb: (t: { kind: 'info' | 'success' | 'warn' | 'error'; title: string; detail?: string }) => void): () => void
   onAppNavigate(cb: (route: string) => void): () => void
   minimize(): void
   toggleMaximize(): void
@@ -482,13 +490,19 @@ function mockBridge(): PomniaBridge {
       }
     },
     async appSettings() {
-      return { minimizeToTray: false, closeToTray: true, floatingMonitorOnMinimize: true }
+      return {
+        minimizeToTray: false,
+        closeToTray: true,
+        floatingMonitorOnMinimize: true,
+        openAtLogin: false,
+      }
     },
     async appSettingsSet(patch) {
       return {
         minimizeToTray: patch.minimizeToTray ?? false,
         closeToTray: patch.closeToTray ?? true,
         floatingMonitorOnMinimize: patch.floatingMonitorOnMinimize ?? true,
+        openAtLogin: patch.openAtLogin ?? false,
         onboarded: patch.onboarded,
       }
     },
@@ -526,19 +540,24 @@ function mockBridge(): PomniaBridge {
       return { visible: false }
     },
     async handshakeTry(phrase) {
-      const ok = /^ok\s+to\s+go\s+go\s+go$/i.test(phrase.trim().replace(/\s+/g, ' '))
-      return { ok, armed: ok }
+      const ok = isHandshakePhrase(phrase)
+      if (ok) mockGoArmed = true
+      return { ok, armed: mockGoArmed }
     },
     async handshakeGetArmed() {
-      return { armed: false }
+      return { armed: mockGoArmed }
     },
     async handshakeDisarm() {
+      mockGoArmed = false
       return { armed: false }
     },
     onHandshakeArmed() {
       return () => {}
     },
     onHandshakeToastReady() {
+      return () => {}
+    },
+    onAppToast() {
       return () => {}
     },
     onAppNavigate() {

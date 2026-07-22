@@ -31,7 +31,7 @@ import {
 import type { BrainConfig } from '../config/index.js'
 import { EmbedClient } from '../rag/embed.js'
 import { openDb } from '../storage/db.js'
-import { defaultVaultConfig } from '../storage/vault.js'
+import { defaultVaultConfig, vaultConfigFromRoot, type VaultConfig } from '../storage/vault.js'
 import { callTool, listTools, type ToolContext } from './tools/index.js'
 
 /** True when an existing brain-core already answers /healthz on host:port. */
@@ -75,6 +75,8 @@ export interface BrainServer {
   readonly adopted: boolean
   /** Update skills root at runtime (e.g. vault opened after brain start). */
   setSkillsRoot(path: string): void
+  /** Update knowledge vault root at runtime (USER.md / distilled / sessions). */
+  setVaultRoot(path: string): void
 }
 
 /**
@@ -152,8 +154,11 @@ export async function createBrainServer(
   config: BrainConfig,
   opts?: Pick<BrainServerOptions, 'onMcpQuery'>,
 ): Promise<BrainServer> {
-  const vault = defaultVaultConfig(config.dataDir)
-  const resolveSkillsRoot = (): string =>
+  const resolveVault = (): VaultConfig =>
+    config.vaultRoot?.trim()
+      ? vaultConfigFromRoot(config.vaultRoot.trim())
+      : defaultVaultConfig(config.dataDir)
+  const resolveSkillsRoot = (vault: VaultConfig): string =>
     config.skillsRoot?.trim() || join(vault.root, 'skills')
 
   // Lazy resources — opened at start(), closed at stop().
@@ -175,9 +180,20 @@ export async function createBrainServer(
       if (ctx) ctx.skillsRoot = path
     },
 
+    setVaultRoot(path: string) {
+      config.vaultRoot = path
+      const vault = vaultConfigFromRoot(path)
+      if (ctx) {
+        ctx.vaultRoot = vault.root
+        ctx.userMdPath = vault.userProfilePath
+      }
+    },
+
     async start() {
       // Open storage + embedder first so the MCP server refuses connections
       // if either is broken (fail-fast beats accepting requests we can't serve).
+      // library.db stays under dataDir (AppData) even when vaultRoot is portable.
+      const vault = resolveVault()
       const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
       const embedder = new EmbedClient({
         ollamaUrl: config.ollamaUrl,
@@ -188,7 +204,7 @@ export async function createBrainServer(
         embedder,
         vaultRoot: vault.root,
         userMdPath: vault.userProfilePath,
-        skillsRoot: resolveSkillsRoot(),
+        skillsRoot: resolveSkillsRoot(vault),
       }
 
       http = createServer((req: IncomingMessage, res: ServerResponse) => {

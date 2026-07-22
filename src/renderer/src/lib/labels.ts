@@ -99,6 +99,8 @@ export interface UiLabels {
   closeToTrayHint: string
   minimizeToTray: string
   minimizeToTrayHint: string
+  openAtLogin: string
+  openAtLoginHint: string
   floatingMonitor: string
   floatingMonitorOnMinimize: string
   floatingMonitorOnMinimizeHint: string
@@ -138,6 +140,8 @@ export interface UiLabels {
   vault: string
   lockVault: string
   noVaultOpen: string
+  knowledgePathOpen: (path: string) => string
+  knowledgePathLocked: string
   brainBridge: string
   brainBridgeLead: string
   snapshot: string
@@ -384,6 +388,8 @@ const PL_LABELS: UiLabels = {
     'Przycisk X chowa aplikację do traya zamiast kończyć proces. Gdy działa lokalna wyszukiwarka — zawsze.',
   minimizeToTray: 'Minimalizuj do zasobnika',
   minimizeToTrayHint: 'Przycisk minimalizacji chowa okno do traya zamiast paska zadań.',
+  openAtLogin: 'Uruchom przy starcie Windows',
+  openAtLoginHint: 'Pomnia startuje automatycznie po zalogowaniu do Windows. Domyślnie wyłączone.',
   floatingMonitor: 'Pływający diagram',
   floatingMonitorOnMinimize: 'Pokaż przy minimalizacji',
   floatingMonitorOnMinimizeHint:
@@ -427,6 +433,8 @@ const PL_LABELS: UiLabels = {
   vault: 'Vault',
   lockVault: 'Zablokuj',
   noVaultOpen: 'Brak otwartego vaultu.',
+  knowledgePathOpen: (path) => `Wiedza (USER.md, distilled): ${path}`,
+  knowledgePathLocked: 'otwórz vault',
   brainBridge: 'Most do Brain',
   brainBridgeLead:
     'Eksportuj rozmowy ze snapshotu jako notatki markdown — trafią do vaultu Brain i do indeksu RAG.',

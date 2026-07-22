@@ -220,7 +220,7 @@ interface State {
   setOllamaUrl: (url: string) => void
 
   /** Remote Brain (KVM) — auto-push distilled notes after pipeline.
-   *  Embedded always writes to brain-core-data/vault/distilled in main. */
+   *  Embedded writes to portable vault/distilled when open (else AppData). */
   brainAutoDeploy: boolean
   setBrainAutoDeploy: (on: boolean) => void
   brainDeployUrl: string
@@ -250,9 +250,11 @@ interface State {
   minimizeToTray: boolean
   closeToTray: boolean
   floatingMonitorOnMinimize: boolean
+  openAtLogin: boolean
   setMinimizeToTray: (on: boolean) => void
   setCloseToTray: (on: boolean) => void
   setFloatingMonitorOnMinimize: (on: boolean) => void
+  setOpenAtLogin: (on: boolean) => void
   loadAppSettings: () => Promise<void>
 
   /** Distill pipeline — lives in the store so progress survives tab switches. */
@@ -566,6 +568,7 @@ export const useStore = create<State>((set, get) => ({
   minimizeToTray: false,
   closeToTray: true,
   floatingMonitorOnMinimize: true,
+  openAtLogin: false,
   async loadAppSettings() {
     try {
       const s = await api.appSettings()
@@ -609,6 +612,7 @@ export const useStore = create<State>((set, get) => ({
         minimizeToTray: s.minimizeToTray,
         closeToTray: s.closeToTray,
         floatingMonitorOnMinimize: s.floatingMonitorOnMinimize !== false,
+        openAtLogin: !!s.openAtLogin,
         ollamaUrl,
         remoteBrainUrl,
         brainTarget,
@@ -629,6 +633,9 @@ export const useStore = create<State>((set, get) => ({
     void api.appSettingsSet({ floatingMonitorOnMinimize }).then((s) =>
       set({ floatingMonitorOnMinimize: s.floatingMonitorOnMinimize !== false }),
     )
+  },
+  setOpenAtLogin: (openAtLogin) => {
+    void api.appSettingsSet({ openAtLogin }).then((s) => set({ openAtLogin: !!s.openAtLogin }))
   },
 
   brainRunning: false,

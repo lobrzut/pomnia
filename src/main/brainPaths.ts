@@ -1,20 +1,54 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
 
-/** Embedded brain-core data root (`library.db`, vault, …). */
+/**
+ * Embedded brain-core data root.
+ *
+ * `library.db` (vectordb) stays here always — rebuildable from the plaintext
+ * vault tree via reindex. Do not move the SQLite index into the portable vault
+ * folder (binary, machine-local ABI / Ollama model pinning).
+ */
 export function brainCoreDataDir(): string {
   return join(app.getPath('userData'), 'brain-core-data')
 }
 
-/** Vault root used by MCP (`distilled/`, `sessions/`, `USER.md`, …). */
-export function brainVaultRoot(): string {
+/**
+ * Currently open encrypted vault folder (`…/MyVault.pomnia`), or null when locked.
+ * When set, plaintext Brain knowledge (USER.md, distilled/, sessions/) lives here
+ * alongside skills/ + header.json — one folder to travel.
+ */
+let openEncryptedVaultPath: string | null = null
+
+export function getOpenEncryptedVaultPath(): string | null {
+  return openEncryptedVaultPath
+}
+
+/** Call on vault open/create (path) and lock (null). Does not wipe AppData. */
+export function setOpenEncryptedVaultPath(path: string | null): void {
+  openEncryptedVaultPath = path
+}
+
+/** Legacy AppData plaintext vault — fallback when no encrypted vault is open. */
+export function brainVaultLegacyRoot(): string {
   return join(brainCoreDataDir(), 'vault')
 }
 
+/**
+ * Vault root used by MCP + distill + reindex (`distilled/`, `sessions/`, `USER.md`).
+ *
+ * Prefer the open encrypted vault folder; else AppData `brain-core-data/vault`.
+ * Optional override matches `brainSkillsDir(encryptedVaultPath?)`.
+ */
+export function brainVaultRoot(encryptedVaultPath?: string | null): string {
+  const p = encryptedVaultPath !== undefined ? encryptedVaultPath : openEncryptedVaultPath
+  if (p) return p
+  return brainVaultLegacyRoot()
+}
+
 /** Where host-side distill writes notes for the embedded MCP index. */
-export function brainVaultDistilledDir(): string {
-  return join(brainVaultRoot(), 'distilled')
+export function brainVaultDistilledDir(encryptedVaultPath?: string | null): string {
+  return join(brainVaultRoot(encryptedVaultPath), 'distilled')
 }
 
 /**
@@ -22,7 +56,7 @@ export function brainVaultDistilledDir(): string {
  * Kept as fallback when no encrypted vault is open.
  */
 export function brainSkillsLegacyDir(): string {
-  return join(brainVaultRoot(), 'skills')
+  return join(brainVaultLegacyRoot(), 'skills')
 }
 
 /**
@@ -33,7 +67,8 @@ export function brainSkillsLegacyDir(): string {
  * Fallback: brain-core-data/vault/skills (legacy).
  */
 export function brainSkillsDir(encryptedVaultPath?: string | null): string {
-  if (encryptedVaultPath) return join(encryptedVaultPath, 'skills')
+  const p = encryptedVaultPath !== undefined ? encryptedVaultPath : openEncryptedVaultPath
+  if (p) return join(p, 'skills')
   return brainSkillsLegacyDir()
 }
 
@@ -44,5 +79,27 @@ export function portableSkillsPresent(encryptedVaultPath: string): boolean {
     existsSync(join(root, 'brain')) ||
     existsSync(join(root, 'cli')) ||
     existsSync(join(root, 'index.json'))
+  )
+}
+
+function dirHasEntries(dir: string): boolean {
+  if (!existsSync(dir)) return false
+  try {
+    return readdirSync(dir).length > 0
+  } catch {
+    return false
+  }
+}
+
+/**
+ * True when portable vault already has knowledge (or a one-shot migrate marker).
+ * Marker is a dotfile so reindex skips it.
+ */
+export function portableKnowledgePresent(encryptedVaultPath: string): boolean {
+  return (
+    existsSync(join(encryptedVaultPath, 'USER.md')) ||
+    existsSync(join(encryptedVaultPath, '.portable-knowledge')) ||
+    dirHasEntries(join(encryptedVaultPath, 'distilled')) ||
+    dirHasEntries(join(encryptedVaultPath, 'sessions'))
   )
 }

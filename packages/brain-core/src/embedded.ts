@@ -7,6 +7,7 @@
  *     { type: 'reindex', dir: string }        // distilled/sessions/library only (never skills/)
  *     { type: 'index-document', doc: IndexDocumentInput }
  *     { type: 'set-skills-root', path: string } // portable vault sidecar skills/
+ *     { type: 'set-vault-root', path: string }  // portable USER.md/distilled/sessions
  *     { type: 'stop' }
  *
  *   child → parent
@@ -34,6 +35,7 @@ type ParentMsg =
   | { type: 'reindex'; dir: string }
   | { type: 'index-document'; doc: IndexDocumentInput }
   | { type: 'set-skills-root'; path: string }
+  | { type: 'set-vault-root'; path: string }
   | { type: 'stop' }
 
 function send(msg: unknown): void {
@@ -158,6 +160,10 @@ process.on('message', (msg: ParentMsg) => {
     case 'set-skills-root':
       if (config) config.skillsRoot = msg.path
       server?.setSkillsRoot(msg.path)
+      break
+    case 'set-vault-root':
+      if (config) config.vaultRoot = msg.path
+      server?.setVaultRoot(msg.path)
       break
     case 'stop':
       void handleStop()

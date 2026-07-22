@@ -9,11 +9,13 @@
  *   blobs/<sha256>.cvb       encrypted file contents, deduplicated across snapshots
  *   skills/                  plaintext sidecar (brain/*.md, cli/<skill>/SKILL.md) — NOT encrypted;
  *                            travels with the vault folder; ignored by crypto open/create
- *   distilled/               optional plaintext notes (host-side); also ignored by crypto
+ *   USER.md                  plaintext Brain profile — travels with the vault; ignored by crypto
+ *   distilled/               plaintext distilled notes (host-side); ignored by crypto
+ *   sessions/                plaintext MCP-saved sessions; ignored by crypto
  *
  * The header holds NO secrets — only the salt and an encrypted check token used to
  * validate the passphrase at unlock. The folder is fully portable: copy it to any
- * OS and open with the same passphrase.
+ * OS and open with the same passphrase. Vectordb (library.db) stays in AppData.
  */
 import { promises as fs } from 'node:fs'
 import path from 'node:path'

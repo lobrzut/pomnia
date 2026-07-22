@@ -34,6 +34,13 @@ export interface AppSettings {
   floatingMonitorAlwaysOnTop?: boolean
   /** Last floating monitor window position (multi-monitor). */
   floatingMonitorPosition?: { x: number; y: number }
+  /** Launch Pomnia when the user logs into Windows (OS login item). Default off. */
+  openAtLogin?: boolean
+  /**
+   * Last vault root successfully reindexed into library.db.
+   * Used to detect portable-vault switches and prune AppData orphans once.
+   */
+  lastIndexedVaultRoot?: string
 }
 
 const DEFAULTS: AppSettings = {
@@ -42,6 +49,7 @@ const DEFAULTS: AppSettings = {
   embeddedBrainAutoStart: false,
   floatingMonitorOnMinimize: true,
   floatingMonitorAlwaysOnTop: true,
+  openAtLogin: false,
 }
 
 let cached: AppSettings = { ...DEFAULTS }
@@ -69,6 +77,8 @@ export async function loadAppSettings(): Promise<AppSettings> {
       floatingMonitorOnMinimize: parsed.floatingMonitorOnMinimize ?? DEFAULTS.floatingMonitorOnMinimize,
       floatingMonitorAlwaysOnTop: parsed.floatingMonitorAlwaysOnTop ?? DEFAULTS.floatingMonitorAlwaysOnTop,
       floatingMonitorPosition: parsed.floatingMonitorPosition,
+      openAtLogin: parsed.openAtLogin ?? DEFAULTS.openAtLogin,
+      lastIndexedVaultRoot: parsed.lastIndexedVaultRoot,
     }
   } catch {
     cached = { ...DEFAULTS }
@@ -84,7 +94,19 @@ export async function setAppSettings(patch: Partial<AppSettings>): Promise<AppSe
   cached = { ...cached, ...patch }
   await fs.mkdir(app.getPath('userData'), { recursive: true })
   await fs.writeFile(filePath(), JSON.stringify(cached, null, 2), 'utf8')
+  if (Object.prototype.hasOwnProperty.call(patch, 'openAtLogin')) {
+    applyLoginItemSettings()
+  }
   return { ...cached }
+}
+
+/** Sync Electron OS login item with persisted openAtLogin (default off). */
+export function applyLoginItemSettings(): void {
+  try {
+    app.setLoginItemSettings({ openAtLogin: !!cached.openAtLogin })
+  } catch {
+    /* unsupported platform / tests */
+  }
 }
 
 /** Whether closing the window should hide to tray instead of quitting. */
