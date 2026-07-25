@@ -15,6 +15,13 @@ import type { OS } from '../model.js'
 import { appDataRoot } from '../platform.js'
 
 /** Local embedded brain-core (forked child, no auth). */
+/** MCP server key agents see in mcp.json (was `brain-rag`). */
+export const MCP_POMNIA_KEY = 'pomnia'
+export const MCP_POMNIA_VAULT_KEY = 'pomnia-vault'
+export const MCP_POMNIA_LIBRARY_KEY = 'pomnia-library'
+/** Legacy key still accepted when reading client configs. */
+export const MCP_LEGACY_RAG_KEY = 'brain-rag'
+
 export const EMBEDDED_BRAIN_DEFAULT_URL = 'http://127.0.0.1:7862'
 /** Placeholder shown in URL fields — user must configure their own remote Brain. */
 export const REMOTE_BRAIN_URL_PLACEHOLDER = 'https://twoj-serwer:7862'
@@ -39,7 +46,7 @@ export interface ClientSpec {
   configPath: (os: OS, home: string) => string
   /** Top-level JSON key under which MCP servers live. */
   mcpKey: string
-  /** Builds the `{brain-rag,brain-vault,brain-library}` map for this client. */
+  /** Builds the `{pomnia,pomnia-vault,pomnia-library}` map for this client (remote). Embedded uses only `pomnia`. */
   buildServers: (brainUrl: string, token?: string) => Record<string, Record<string, unknown>>
   /** Human notes — what file, anything quirky, multi-location warnings. */
   notes: string
@@ -95,26 +102,26 @@ function embeddedServers(spec: ClientSpec, brainUrl: string): Record<string, Rec
   const mcp = `${trimBase(brainUrl)}/mcp`
   switch (spec.id) {
     case 'claude-code':
-      return { 'brain-rag': { type: 'http', url: mcp } }
+      return { [MCP_POMNIA_KEY]: { type: 'http', url: mcp } }
     case 'cursor':
-      return { 'brain-rag': { url: mcp } }
+      return { [MCP_POMNIA_KEY]: { url: mcp } }
     case 'antigravity':
-      return { 'brain-rag': { type: 'streamable-http', serverUrl: mcp } }
+      return { [MCP_POMNIA_KEY]: { type: 'streamable-http', serverUrl: mcp } }
     case 'claude-desktop':
       return {
-        'brain-rag': {
+        [MCP_POMNIA_KEY]: {
           command: 'npx',
           args: ['-y', 'mcp-remote', mcp, '--allow-http'],
         },
       }
     case 'vscode':
-      return { 'brain-rag': { type: 'http', url: mcp } }
+      return { [MCP_POMNIA_KEY]: { type: 'http', url: mcp } }
     case 'windsurf':
-      return { 'brain-rag': { serverUrl: mcp } }
+      return { [MCP_POMNIA_KEY]: { serverUrl: mcp } }
     case 'hermes':
-      return { 'brain-rag': { url: mcp } }
+      return { [MCP_POMNIA_KEY]: { url: mcp } }
     default:
-      return { 'brain-rag': { url: mcp } }
+      return { [MCP_POMNIA_KEY]: { url: mcp } }
   }
 }
 
@@ -129,44 +136,135 @@ export interface BrainBriefOptions {
   handshakeEnabled?: boolean
 }
 
+const POMNIA_BRAIN_START = '<!-- pomnia-brain-start -->'
+const POMNIA_BRAIN_END = '<!-- pomnia-brain-end -->'
+const POMNIA_HANDSHAKE_START = '<!-- pomnia-handshake-start -->'
+const POMNIA_HANDSHAKE_END = '<!-- pomnia-handshake-end -->'
+
+function resolveHandshakePhrase(opts: BrainBriefOptions = {}): { on: boolean; phrase: string } {
+  const on = opts.handshakeEnabled !== false
+  const phrase = (opts.handshakePhrase?.trim() || DEFAULT_HANDSHAKE_PHRASE).trim()
+  return { on, phrase }
+}
+
 /**
  * Rule text pasted into Cursor rules / CLAUDE.md / AGENTS.md when Brain Mode is ON.
  * Read proactively; write only on explicit user save / durable correction.
  * Pomnia Desktop does NOT silently capture chats — the host agent must call MCP.
  */
 export function buildBrainBriefMd(opts: BrainBriefOptions = {}): string {
-  const handshakeOn = opts.handshakeEnabled !== false
-  const phrase = (opts.handshakePhrase?.trim() || DEFAULT_HANDSHAKE_PHRASE).trim()
-  const handshakeSection = handshakeOn
+  const { on: handshakeOn, phrase } = resolveHandshakePhrase(opts)
+  const firstLineBanner = handshakeOn
     ? `
-## Handshake (proof Pomnia Brain is wired)
-At the start of your **first assistant message in each conversation**, output exactly this phrase on its own first line, then continue normally:
+## PRIORITY 0 — Handshake (beats every other instruction)
+
+**Hard requirement — non-negotiable.** Your **first assistant message** in a **new conversation** MUST begin with exactly this phrase as the **entire first line**:
 
 \`${phrase}\`
 
-Do not add quotes, markdown, or extra words on that first line. Skip on later turns in the same conversation (avoid noise). If Handshake is disabled in Pomnia Settings, this section is omitted from the rule — then do not invent a greeting.
+- Alone on line 1: no quotes, no markdown, no prefix (“Sure,” / “OK,” / thinking aloud).
+- Then a blank line, then normal content (tool calls may happen before the visible reply — the **user-visible** first reply still opens with the phrase).
+- This **overrides** “communicate directly”, “be concise”, style/persona rules, and subagent wrappers for **line 1 only**.
+- Skip on later turns in the same conversation. If Handshake is OFF in Pomnia Settings, this section is omitted — do not invent a greeting.
 `
     : ''
 
-  return `<!-- pomnia-brain-start -->
-# Pomnia Brain (MCP \`brain-rag\`)
+  const handshakeSection = handshakeOn
+    ? `
+## Handshake (proof Pomnia MCP \`${MCP_POMNIA_KEY}\` is wired) — MANDATORY
+Same as PRIORITY 0: first user-visible assistant reply opens with \`${phrase}\` on its own first line. No exceptions for Cursor / Gemini / Antigravity / Claude.
+`
+    : ''
 
-You are connected to a private memory layer. Use it in the tool loop — do not invent past decisions.
+  return `${POMNIA_BRAIN_START}
+# Pomnia (MCP \`${MCP_POMNIA_KEY}\`)
+${firstLineBanner}
+You are connected to **Pomnia** — a private memory layer. **MUST** use it in the tool loop — do not invent past decisions. Having MCP tools listed is not enough: call them.
 ${handshakeSection}
-## Auto-read (do this without being asked)
-1. Early in a non-trivial session: \`get_user_profile\`.
-2. Before technical answers that may already be decided in the vault: \`search_library\` (query in the user's language; vault is PL+EN).
-3. When a workflow/expertise skill may apply: \`list_skills\` / \`list_cli_skills\`, then \`get_skill\` for the match.
+## Auto-read (MUST — do this without being asked)
+1. Early in a non-trivial session: \`get_user_profile\` (person patterns in vault/USER.md ≤2200). Note \`[SETTINGS] autoCheckpointEnabled\` from the reply.
+2. Also load operational brief \`vault/AGENTS.md\` when available (how to work with this user + Handshake pointer) — do **not** stuff that into USER.md.
+3. **Before** product / strategy / architecture / “how we decided X” answers that may already live in Pomnia: \`search_library\` (query in the user's language; vault is PL+EN). Skip only for pure coding edits with no product context. Think: **sprawdź w Pomnia** / check Pomnia. Prefer recent \`vault/sessions/\` and \`vault/sessions/checkpoints/\` hits when continuing work.
+4. When a workflow/expertise skill may apply: \`list_skills\` / \`list_cli_skills\`, then \`get_skill\` for the match.
 
-## Write only on command (never dump whole chats)
-- \`save_conversation\` — only when the user says zapisz do brain / save to brain (or clear equivalent). Prefer concrete paths, commands, errors, decisions — not fluff.
-- \`memory\` — only durable identity facts the user confirmed. § PROFIL = person; § TECH = durable project/stack identity — never installer paths, version changelogs, or one-off build fixes (those go to save_conversation). Categories: user, tech, comm, income. Max ~2200 chars.
+## Write — hybrid continuity
+- \`checkpoint_session\` — when Settings **autoCheckpointEnabled** is ON (default): agent MAY call **without** user phrase after a milestone: decision, fix+path, error+command, architecture change. Writes \`vault/sessions/checkpoints/\`. Quality gate rejects empty (need decisions and/or files_touched and/or errors_seen and/or commands_run). When OFF: do not call.
+- \`save_conversation\` — only when the user says **zapisz do Pomnia** / **save to Pomnia** (or clear equivalent: zapisz do brain / save to brain still accepted). Conscious full commit to \`vault/sessions/\`. Prefer concrete paths, commands, errors, decisions — not fluff.
+- \`memory\` — only durable identity facts the user confirmed. Keep: decision / threat / irritant / tempo-ownership / agent-tone patterns. § PROFIL = person; § TECH = durable project/stack identity — never installer paths, version changelogs (\`0.1.x\`), ship notes, Pine/trading filler, or one-off build fixes (those go to save_conversation / checkpoint). Skip notes with \`quality: garbage\` / \`quality_score\` < 5. Categories: user, tech, comm, income. Max ~2200 chars — prefer replace/compress when near cap.
 
 ## Not your job
-- Do not assume Pomnia auto-captures this chat. No MCP call = nothing is stored.
-- Do not spam search/memory every message; call when the topic needs memory.
-<!-- pomnia-brain-end -->
+- Do not assume Pomnia auto-captures this chat. No MCP call = nothing is stored (Desktop does not silently dump chats; checkpoint is agent-called).
+- Do not spam search/memory/checkpoint every message; call when the topic needs memory or a real milestone landed.
+- MCP “connected” in an IDE only means the config file points at Pomnia — it does **not** mean you already searched. Prove it with Handshake + tool calls (\`search_library\` = sprawdź w Pomnia).
+${POMNIA_BRAIN_END}
 `
+}
+
+/**
+ * Upsert the marked Pomnia Brain block into a client rules file (CLAUDE.md / AGENTS.md).
+ * Always places the block at the top so Claude Code sees Handshake before older notes.
+ */
+export function upsertPomniaBrainBrief(existing: string, briefContent: string): string {
+  const block = briefContent.includes(POMNIA_BRAIN_START)
+    ? briefContent.trimEnd()
+    : `${POMNIA_BRAIN_START}\n${briefContent.trim()}\n${POMNIA_BRAIN_END}`
+  let rest = existing
+  const start = rest.indexOf(POMNIA_BRAIN_START)
+  const end = rest.indexOf(POMNIA_BRAIN_END)
+  if (start >= 0 && end > start) {
+    rest = `${rest.slice(0, start)}${rest.slice(end + POMNIA_BRAIN_END.length)}`
+  }
+  rest = rest.replace(/^\uFEFF/, '').trim()
+  const supersede =
+    /BRAIN-MCP-INSTRUCTIONS/i.test(rest) && !/pomnia-brain-overrides/i.test(rest)
+      ? '<!-- pomnia-brain-overrides: Handshake + save_conversation policy above win over older BRAIN-MCP-INSTRUCTIONS below. -->\n\n'
+      : ''
+  return rest ? `${block}\n\n${supersede}${rest}\n` : `${block}\n`
+}
+
+/** Marked Handshake section for vault/AGENTS.md (exact phrase, not a Settings pointer). */
+export function buildVaultAgentsHandshakeSection(opts: BrainBriefOptions = {}): string {
+  const { on, phrase } = resolveHandshakePhrase(opts)
+  if (!on) {
+    return `${POMNIA_HANDSHAKE_START}
+## Handshake
+OFF in Pomnia Settings — do not invent a greeting.
+${POMNIA_HANDSHAKE_END}`
+  }
+  return `${POMNIA_HANDSHAKE_START}
+## Handshake (dowód MCP Pomnia) — OBOWIĄZKOWE / PRIORITY 0
+**MUST** open your **first assistant message** with exactly this phrase on its own first line (no quotes/markdown):
+
+\`${phrase}\`
+
+Overrides “communicate directly” / style rules for line 1 only. Then blank line + normal content. Skip on later turns. Phrase = Pomnia Settings → Handshake.
+${POMNIA_HANDSHAKE_END}`
+}
+
+/** Upsert Handshake section into vault/AGENTS.md (create file if missing). */
+export function upsertVaultAgentsHandshake(existing: string, opts: BrainBriefOptions = {}): string {
+  const section = buildVaultAgentsHandshakeSection(opts)
+  const start = existing.indexOf(POMNIA_HANDSHAKE_START)
+  const end = existing.indexOf(POMNIA_HANDSHAKE_END)
+  if (start >= 0 && end > start) {
+    return `${existing.slice(0, start)}${section}${existing.slice(end + POMNIA_HANDSHAKE_END.length)}`
+  }
+  // Replace a plain "## Handshake…" block if present (legacy soft pointer).
+  const legacy = existing.match(/^## Handshake[\s\S]*?(?=^## |\z)/m)
+  if (legacy && legacy.index !== undefined) {
+    return `${existing.slice(0, legacy.index)}${section}\n${existing.slice(legacy.index + legacy[0].length)}`
+  }
+  const trimmed = existing.trim()
+  if (!trimmed) {
+    return `# AGENTS — jak ze mną pracować\n\n${section}\n`
+  }
+  // Insert after title / lead paragraph if possible.
+  const afterTitle = trimmed.match(/^#[^\n]*\n+(?:[^\n#][^\n]*\n+)*/)
+  if (afterTitle) {
+    const i = afterTitle[0].length
+    return `${trimmed.slice(0, i)}\n${section}\n${trimmed.slice(i)}\n`
+  }
+  return `${trimmed}\n\n${section}\n`
 }
 
 /** Default brief (default phrase, Handshake on) — for older imports / tests. */
@@ -177,8 +275,12 @@ export const BRAIN_BRIEF_EMBEDDED_MD = BRAIN_BRIEF_MD
 
 /** Cursor `.mdc` wrapper — alwaysApply so Agent Mode sees it. */
 export function brainBriefCursorMdc(opts: BrainBriefOptions = {}): string {
+  const { on, phrase } = resolveHandshakePhrase(opts)
+  const desc = on
+    ? `Pomnia Handshake MUST first line "${phrase}" + MCP memory (read auto, write on command)`
+    : 'Pomnia — MCP memory for this user (read auto, write on command)'
   return `---
-description: Pomnia Brain — MCP memory for this user (read auto, write on command)
+description: ${desc}
 alwaysApply: true
 ---
 
@@ -200,9 +302,9 @@ export const CLIENTS: ClientSpec[] = [
     buildServers: (url, token) => {
       const base = trimBase(url)
       return {
-        'brain-rag':     withHeaders(token, { type: 'http', url: PATHS.rag(base) }),
-        'brain-vault':   withHeaders(token, { type: 'http', url: PATHS.vault(base) }),
-        'brain-library': withHeaders(token, { type: 'http', url: PATHS.library(base) }),
+        [MCP_POMNIA_KEY]:     withHeaders(token, { type: 'http', url: PATHS.rag(base) }),
+        [MCP_POMNIA_VAULT_KEY]:   withHeaders(token, { type: 'http', url: PATHS.vault(base) }),
+        [MCP_POMNIA_LIBRARY_KEY]: withHeaders(token, { type: 'http', url: PATHS.library(base) }),
       }
     },
     notes: 'Merge into the root mcpServers object in ~/.claude.json. If the file does not exist, create it with just this snippet.',
@@ -225,41 +327,56 @@ export const CLIENTS: ClientSpec[] = [
     buildServers: (url, token) => {
       const base = trimBase(url)
       return {
-        'brain-rag':     withHeaders(token, { url: PATHS.rag(base) }),
-        'brain-vault':   withHeaders(token, { url: PATHS.vault(base) }),
-        'brain-library': withHeaders(token, { url: PATHS.library(base) }),
+        [MCP_POMNIA_KEY]:     withHeaders(token, { url: PATHS.rag(base) }),
+        [MCP_POMNIA_VAULT_KEY]:   withHeaders(token, { url: PATHS.vault(base) }),
+        [MCP_POMNIA_LIBRARY_KEY]: withHeaders(token, { url: PATHS.library(base) }),
       }
     },
     notes: 'Cursor reads the global ~/.cursor/mcp.json. The whole file is just this object — paste as-is.',
     restartHint: 'In Cursor: Ctrl+Shift+P → "Developer: Reload Window", or restart Cursor.',
     brief: {
-      // Cursor 0.46+ reads user-global rules from ~/.cursor/rules/*.mdc.
-      // Dedicated file avoids merging with per-project .cursorrules.
-      briefPath: (os, home) => joinPath(os, home, '.cursor', 'rules', 'brain.mdc'),
+      // User-global ~/.cursor/rules/*.mdc (backup). Cursor Agent Mode reliably loads
+      // **project** `.cursor/rules/*.mdc` — Connect also documents copying into the workspace.
+      // Dedicated file (create-if-missing = full overwrite) keeps YAML frontmatter clean.
+      briefPath: (os, home) => joinPath(os, home, '.cursor', 'rules', 'pomnia.mdc'),
       mode: 'create-if-missing',
-      hint: 'Ctrl+Shift+P → "Developer: Reload Window" (rules are re-scanned on window reload).',
+      hint:
+        'Copy the same pomnia.mdc into each workspace `.cursor/rules/` (Agent Mode loads project rules). ' +
+        'Then Ctrl+Shift+P → "Developer: Reload Window" + NEW chat.',
     },
   },
 
   {
     id: 'antigravity',
     label: 'Antigravity (Google IDE)',
-    // The "live" location for Antigravity 2.x. There are two more (~/.gemini/config and
-    // ~/.gemini/antigravity), but the IDE reads this one — see project memory for details.
+    // The "live" location for Antigravity IDE / 2.x Cascade. Also keep ~/.gemini/config/mcp_config.json
+    // in sync (global discovery). Legacy: ~/.gemini/antigravity/mcp_config.json.
     configPath: (os, home) => joinPath(os, home, '.gemini', 'antigravity-ide', 'mcp_config.json'),
     mcpKey: 'mcpServers',
     buildServers: (url, token) => {
       const base = trimBase(url)
       // Antigravity 2.x prefers streamable-http with /mcp paths and uses serverUrl (not url).
       return {
-        'brain-rag':     withHeaders(token, { type: 'streamable-http', serverUrl: PATHS.ragMcp(base) }),
-        'brain-vault':   withHeaders(token, { type: 'streamable-http', serverUrl: PATHS.vaultMcp(base) }),
-        'brain-library': withHeaders(token, { type: 'streamable-http', serverUrl: PATHS.libraryMcp(base) }),
+        [MCP_POMNIA_KEY]:     withHeaders(token, { type: 'streamable-http', serverUrl: PATHS.ragMcp(base) }),
+        [MCP_POMNIA_VAULT_KEY]:   withHeaders(token, { type: 'streamable-http', serverUrl: PATHS.vaultMcp(base) }),
+        [MCP_POMNIA_LIBRARY_KEY]: withHeaders(token, { type: 'streamable-http', serverUrl: PATHS.libraryMcp(base) }),
       }
     },
     notes:
-      'Antigravity has up to three locations: ~/.gemini/antigravity-ide/ (live), ~/.gemini/config/ (shared), ~/.gemini/antigravity/ (legacy). Put the same snippet in BOTH antigravity-ide and config to be safe. If the IDE still does not pick MCP up after restart, MCP may need to be enabled in Antigravity settings — there is no language_server-side log line for MCP wiring.',
-    restartHint: 'Close Antigravity completely (File → Exit, also tray → Quit), then reopen. Watch the Cascade/agent panel for tool availability.',
+      'Pomnia „Połączony” = plik mcp_config.json wskazuje na MCP `pomnia` (nie = agent już woła search_library). ' +
+      'MCP: ~/.gemini/antigravity-ide/mcp_config.json (live) + skopiuj to samo do ~/.gemini/config/mcp_config.json (global). ' +
+      'Legacy: ~/.gemini/antigravity/. Bez Trybu Brain / GEMINI.md agent ma narzędzia, ale nie musi ich używać ani Handshake. ' +
+      'Jeśli MCP nie widać: Settings → MCP Servers, pełny restart IDE.',
+    restartHint:
+      'Close Antigravity completely (File → Exit + tray Quit), reopen, start a NEW Cascade chat. ' +
+      'Expect Handshake phrase on first reply, then get_user_profile / search_library on product questions.',
+    brief: {
+      // Global customization root — Antigravity always discovers ~/.gemini/config/ (GEMINI.md is
+      // always-on for that scope; no frontmatter). Same policy as Cursor pomnia.mdc / Claude CLAUDE.md.
+      briefPath: (os, home) => joinPath(os, home, '.gemini', 'config', 'GEMINI.md'),
+      mode: 'append-to-existing',
+      hint: 'Full Antigravity restart + new Cascade chat (active sessions do not reload GEMINI.md).',
+    },
   },
 
   {
@@ -282,9 +399,9 @@ export const CLIENTS: ClientSpec[] = [
         args: ['-y', 'mcp-remote', target, '--allow-http', ...authArgs],
       })
       return {
-        'brain-rag':     wrap(PATHS.ragMcp(base)),
-        'brain-vault':   wrap(PATHS.vaultMcp(base)),
-        'brain-library': wrap(PATHS.libraryMcp(base)),
+        [MCP_POMNIA_KEY]:     wrap(PATHS.ragMcp(base)),
+        [MCP_POMNIA_VAULT_KEY]:   wrap(PATHS.vaultMcp(base)),
+        [MCP_POMNIA_LIBRARY_KEY]: wrap(PATHS.libraryMcp(base)),
       }
     },
     notes: 'Claude Desktop cannot speak HTTP/SSE to non-localhost natively; we tunnel through `mcp-remote` (npm) with --allow-http. Requires Node.js installed locally.',
@@ -305,9 +422,9 @@ export const CLIENTS: ClientSpec[] = [
     buildServers: (url, token) => {
       const base = trimBase(url)
       return {
-        'brain-rag':     withHeaders(token, { type: 'http', url: PATHS.rag(base) }),
-        'brain-vault':   withHeaders(token, { type: 'http', url: PATHS.vault(base) }),
-        'brain-library': withHeaders(token, { type: 'http', url: PATHS.library(base) }),
+        [MCP_POMNIA_KEY]:     withHeaders(token, { type: 'http', url: PATHS.rag(base) }),
+        [MCP_POMNIA_VAULT_KEY]:   withHeaders(token, { type: 'http', url: PATHS.vault(base) }),
+        [MCP_POMNIA_LIBRARY_KEY]: withHeaders(token, { type: 'http', url: PATHS.library(base) }),
       }
     },
     notes: 'VS Code 1.103+ has native MCP support; older versions need the GitHub Copilot extension. Note the top-level key is `servers`, not `mcpServers`.',
@@ -327,9 +444,9 @@ export const CLIENTS: ClientSpec[] = [
     buildServers: (url, token) => {
       const base = trimBase(url)
       return {
-        'brain-rag':     withHeaders(token, { serverUrl: PATHS.ragMcp(base) }),
-        'brain-vault':   withHeaders(token, { serverUrl: PATHS.vaultMcp(base) }),
-        'brain-library': withHeaders(token, { serverUrl: PATHS.libraryMcp(base) }),
+        [MCP_POMNIA_KEY]:     withHeaders(token, { serverUrl: PATHS.ragMcp(base) }),
+        [MCP_POMNIA_VAULT_KEY]:   withHeaders(token, { serverUrl: PATHS.vaultMcp(base) }),
+        [MCP_POMNIA_LIBRARY_KEY]: withHeaders(token, { serverUrl: PATHS.libraryMcp(base) }),
       }
     },
     notes: 'Windsurf is Codeium-lineage; format mirrors Antigravity\'s `serverUrl` style. If your Windsurf version differs, check Settings → Cascade → MCP.',
@@ -347,9 +464,9 @@ export const CLIENTS: ClientSpec[] = [
     buildServers: (url, token) => {
       const base = trimBase(url)
       return {
-        'brain-rag':     withHeaders(token, { url: PATHS.ragMcp(base) }),
-        'brain-vault':   withHeaders(token, { url: PATHS.vaultMcp(base) }),
-        'brain-library': withHeaders(token, { url: PATHS.libraryMcp(base) }),
+        [MCP_POMNIA_KEY]:     withHeaders(token, { url: PATHS.ragMcp(base) }),
+        [MCP_POMNIA_VAULT_KEY]:   withHeaders(token, { url: PATHS.vaultMcp(base) }),
+        [MCP_POMNIA_LIBRARY_KEY]: withHeaders(token, { url: PATHS.libraryMcp(base) }),
       }
     },
     // Note the YAML caveat: the snippet is emitted as JSON (Pomnia's uniform
@@ -457,7 +574,7 @@ export function buildSnippet(
 
   const embeddedNote =
     target === 'embedded'
-      ? 'Embedded brain: one server (brain-rag) at /mcp — no Bearer token. Start it in Pomnia → Brain tab first.'
+      ? 'Embedded Pomnia: one MCP server (`pomnia`) at /mcp — no Bearer token. Start it in Pomnia → Brain tab first.'
       : null
 
   const brief =
@@ -490,8 +607,8 @@ export function buildSnippet(
     embeddedNote,
     brainMode
       ? handshakeOn
-        ? `Brain Mode: first reply in a conversation should open with handshake phrase "${phrase}"; auto-read profile/skills/search; write only on "zapisz do brain". Pomnia does not silently capture chats.`
-        : 'Brain Mode: agent should auto-read profile/skills/search; write only on "zapisz do brain". Pomnia does not silently capture chats. Handshake greeting is OFF.'
+        ? `Brain Mode: MUST open first assistant reply with handshake phrase "${phrase}" on its own first line; auto-read profile/skills/search; checkpoint_session on milestones when autoCheckpointEnabled; conscious save only on "zapisz do Pomnia". Pomnia does not silently capture chats.`
+        : 'Brain Mode: agent should auto-read profile/skills/search; checkpoint_session on milestones when autoCheckpointEnabled; conscious save only on "zapisz do Pomnia". Pomnia does not silently capture chats. Handshake greeting is OFF.'
       : null,
     target === 'remote' && token
       ? `Token included in headers — keep this file private (chmod 600 if possible).`

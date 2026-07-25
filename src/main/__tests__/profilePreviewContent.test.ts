@@ -63,6 +63,35 @@ describe('profile identity helpers', () => {
     expect(isNoiseNote('pomnia-decyzje', 'Preferencje: agent najpierw search_library, UI PL')).toBe(false)
   })
 
+  it('flags ship/changelog notes as noise', async () => {
+    const { isNoiseNote } = await import('../profilePreviewContent.js')
+    expect(isNoiseNote('ship', 'next ship 0.1.22 installer pack:win changelog')).toBe(true)
+  })
+
+  it('skips low quality_score / garbage frontmatter', async () => {
+    const { isLowQualityNote, parseNoteQuality, scoreIdentitySignal } = await import(
+      '../profilePreviewContent.js'
+    )
+    const garbage = `---
+quality: garbage
+quality_score: 3.2
+---
+# note
+Preferencje: ownership vault
+`
+    expect(isLowQualityNote(garbage)).toBe(true)
+    expect(parseNoteQuality(garbage).qualityScore).toBe(3.2)
+    const ok = `---
+quality: ok
+quality_score: 7.1
+---
+# note
+threat MIT wrapper; irytanty glow; tempo product-owner
+`
+    expect(isLowQualityNote(ok)).toBe(false)
+    expect(scoreIdentitySignal('id', 'threat MIT irytant tempo ownership', 7.1)).toBeGreaterThan(5)
+  })
+
   it('fallback asks to fill § PROFIL when only TECH exists', async () => {
     const { promises: fsp, mkdirSync } = await import('node:fs')
     mkdirSync(join(vaultDir, 'distilled'), { recursive: true })

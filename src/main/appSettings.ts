@@ -13,7 +13,7 @@ import {
 
 export type BrainTargetSetting = 'embedded' | 'remote'
 
-/** UI color scheme — mint (current), iris (legacy purple), glass (frosted panels). */
+/** UI color scheme — mint (current), iris (legacy purple), glass (Szkło — CSS frosted panels). */
 export type ColorSchemeSetting = 'mint' | 'iris' | 'glass'
 
 /** App chrome language only — Brain search/distill stay auto bilingual (no knowledgeLang). */
@@ -61,10 +61,20 @@ export interface AppSettings {
    */
   handshakeEnabled?: boolean
   /**
+   * When true (default), agents may call checkpoint_session on milestones
+   * without „zapisz do Pomnia”. When false, checkpoint_session refuses.
+   */
+  autoCheckpointEnabled?: boolean
+  /**
    * Last vault root successfully reindexed into library.db.
    * Used to detect portable-vault switches and prune AppData orphans once.
    */
   lastIndexedVaultRoot?: string
+  /**
+   * Fingerprint from vaultHealth (path + note counts + index chunks).
+   * Compared on each vault open / Brain start to detect drift.
+   */
+  vaultHealthFingerprint?: string
 }
 
 const DEFAULTS: AppSettings = {
@@ -78,6 +88,7 @@ const DEFAULTS: AppSettings = {
   uiLocale: 'pl',
   handshakePhrase: DEFAULT_HANDSHAKE_PHRASE,
   handshakeEnabled: true,
+  autoCheckpointEnabled: true,
 }
 
 function normalizeColorScheme(v: unknown): ColorSchemeSetting {
@@ -127,7 +138,9 @@ export async function loadAppSettings(): Promise<AppSettings> {
         DEFAULTS.handshakePhrase,
       ),
       handshakeEnabled: parsed.handshakeEnabled ?? DEFAULTS.handshakeEnabled,
+      autoCheckpointEnabled: parsed.autoCheckpointEnabled ?? DEFAULTS.autoCheckpointEnabled,
       lastIndexedVaultRoot: parsed.lastIndexedVaultRoot,
+      vaultHealthFingerprint: parsed.vaultHealthFingerprint,
     }
     // Persist display canonicalization (e.g. "OK to Go Go Go!" → "OK to Go Go Go").
     if (
@@ -168,6 +181,9 @@ export async function setAppSettings(patch: Partial<AppSettings>): Promise<AppSe
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'handshakeEnabled')) {
     next.handshakeEnabled = !!patch.handshakeEnabled
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'autoCheckpointEnabled')) {
+    next.autoCheckpointEnabled = !!patch.autoCheckpointEnabled
   }
   cached = next
   await fs.mkdir(app.getPath('userData'), { recursive: true })

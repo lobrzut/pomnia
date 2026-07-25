@@ -107,6 +107,15 @@ describe('appSettings tray logic', () => {
     expect(mod.getAppSettings().handshakeEnabled).toBe(true)
   })
 
+  it('autoCheckpointEnabled defaults on and can be disabled', async () => {
+    const mod = await import('../appSettings.js')
+    expect(mod.getAppSettings().autoCheckpointEnabled).toBe(true)
+    await mod.setAppSettings({ autoCheckpointEnabled: false })
+    expect(mod.getAppSettings().autoCheckpointEnabled).toBe(false)
+    await mod.setAppSettings({ autoCheckpointEnabled: true })
+    expect(mod.getAppSettings().autoCheckpointEnabled).toBe(true)
+  })
+
   it('persists per-user brain settings', async () => {
     const mod = await import('../appSettings.js')
     await mod.setAppSettings({

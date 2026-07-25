@@ -37,6 +37,8 @@ type ParentMsg =
   | { type: 'set-skills-root'; path: string }
   | { type: 'set-vault-root'; path: string }
   | { type: 'set-handshake'; phrase: string; enabled: boolean }
+  | { type: 'set-auto-checkpoint'; enabled: boolean }
+  | { type: 'library-stats' }
   | { type: 'stop' }
 
 function send(msg: unknown): void {
@@ -66,6 +68,30 @@ async function handleStart(partial?: Partial<BrainConfig>): Promise<void> {
   send({ type: 'ready', url: server.url, adopted: server.adopted })
 }
 
+async function handleLibraryStats(): Promise<void> {
+  if (!config) {
+    send({ type: 'error', message: 'library-stats before start' })
+    return
+  }
+  try {
+    const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
+    try {
+      const chunks = (db.prepare('SELECT COUNT(*) AS n FROM chunks').get() as { n: number }).n
+      const files = (
+        db.prepare('SELECT COUNT(DISTINCT pdf_path) AS n FROM chunks').get() as { n: number }
+      ).n
+      send({ type: 'library-stats', stats: { files, chunks } })
+    } finally {
+      db.close()
+    }
+  } catch (err) {
+    send({
+      type: 'error',
+      message: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
 async function handleReindex(dir: string): Promise<void> {
   if (!config) {
     send({ type: 'error', message: 'reindex before start' })
@@ -87,6 +113,29 @@ async function handleReindex(dir: string): Promise<void> {
       const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
       const stats = await indexDir(db, embedder, dir, (p) => send({ type: 'reindex-progress', ...p }), ac.signal)
       send({ type: 'reindexed', stats })
+      // Sidecar for host vault-health without loading 200MB into sql.js next launch.
+      try {
+        const { writeFileSync, mkdirSync } = await import('node:fs')
+        const { join } = await import('node:path')
+        const dirOut = join(config.dataDir, 'vectordb')
+        mkdirSync(dirOut, { recursive: true })
+        writeFileSync(
+          join(dirOut, 'library-stats.json'),
+          JSON.stringify(
+            {
+              files: stats.files,
+              chunks: stats.chunks,
+              updatedAt: new Date().toISOString(),
+              vaultRoot: dir,
+            },
+            null,
+            2,
+          ),
+          'utf8',
+        )
+      } catch {
+        /* non-fatal */
+      }
     } finally {
       db.close()
     }
@@ -172,6 +221,13 @@ process.on('message', (msg: ParentMsg) => {
         config.handshakeEnabled = msg.enabled
       }
       server?.setHandshake({ phrase: msg.phrase, enabled: msg.enabled })
+      break
+    case 'set-auto-checkpoint':
+      if (config) config.autoCheckpointEnabled = msg.enabled
+      server?.setAutoCheckpoint(msg.enabled)
+      break
+    case 'library-stats':
+      void handleLibraryStats()
       break
     case 'stop':
       void handleStop()

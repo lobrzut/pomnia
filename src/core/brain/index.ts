@@ -16,7 +16,22 @@ export { deployFilesystem, deployDashboard, triggerReindex, noteFilename, dashbo
 export type { DeployDistilledResult } from './deploy.js'
 export { listAllSkills, syncSkills, readLocalIndex } from './skills.js'
 export type { SkillKind, SkillListEntry, SkillSyncResult } from './skills.js'
-export { CLIENTS, getClient, listClients, buildSnippet, buildBrainBriefMd, BRAIN_BRIEF_MD, BRAIN_BRIEF_EMBEDDED_MD, brainBriefCursorMdc, EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from './snippet.js'
+export {
+  CLIENTS,
+  getClient,
+  listClients,
+  buildSnippet,
+  buildBrainBriefMd,
+  upsertPomniaBrainBrief,
+  buildVaultAgentsHandshakeSection,
+  upsertVaultAgentsHandshake,
+  BRAIN_BRIEF_MD,
+  BRAIN_BRIEF_EMBEDDED_MD,
+  brainBriefCursorMdc,
+  EMBEDDED_BRAIN_DEFAULT_URL,
+  REMOTE_BRAIN_DEFAULT_URL,
+  REMOTE_BRAIN_URL_PLACEHOLDER,
+} from './snippet.js'
 export type { ClientId, ClientSpec, Snippet, SnippetBrief, BrainTarget, BuildSnippetOptions, BrainBriefOptions } from './snippet.js'
 export { checkClient, checkAllClients, pingBrain, fetchMcpActivity } from './status.js'
 export type { ClientStatus, WiredState, BrainPing, McpActivityRecord, McpActivityResponse } from './status.js'

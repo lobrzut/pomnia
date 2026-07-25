@@ -1,9 +1,12 @@
 {
   "name": "pomnia",
-  "version": "0.1.22",
+  "version": "0.1.31",
   "description": "Pomnia — local-first AI memory for developers: encrypted vault, distill pipeline, embedded Brain MCP.",
   "homepage": "https://pomnia.ai",
-  "author": "alice",
+  "author": {
+    "name": "Pomnia",
+    "url": "https://pomnia.ai"
+  },
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -22,17 +25,21 @@
     "cli": "tsx src/cli/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",
-    "build:brain-core": "npm run build -w @pomnia/brain-core",
-    "build:doc-parser": "npm run build -w @pomnia/doc-parser",
+    "test:golden": "node scripts/golden-path.mjs",
+    "build:brain-core": "npm run build --prefix packages/brain-core",
+    "build:doc-parser": "npm run build --prefix packages/doc-parser",
     "stage:brain-core": "node scripts/stage-brain-core.mjs",
-    "pack:win": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && electron-vite build && electron-builder --win",
-    "pack:mac": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && electron-vite build && electron-builder --mac"
+    "pack:win": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && electron-vite build && npm run test:golden && electron-builder --win",
+    "pack:mac": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && electron-vite build && npm run test:golden && electron-builder --mac"
   },
   "dependencies": {
     "@pomnia/brain-core": "*",
     "@pomnia/doc-parser": "*",
+    "bluebird": "^3.7.2",
     "fflate": "^0.8.3",
-    "sql.js": "^1.12.0"
+    "mammoth": "^1.12.0",
+    "sql.js": "^1.12.0",
+    "unpdf": "^1.6.2"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.5",

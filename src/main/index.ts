@@ -1,4 +1,4 @@
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { existsSync, promises as fs } from 'node:fs'
 import crypto from 'node:crypto'
 import { BrowserWindow, app, dialog, globalShortcut, ipcMain, shell, type WebContents } from 'electron'
@@ -7,6 +7,7 @@ import {
   Vault,
   buildIndex,
   buildSnippet,
+  upsertPomniaBrainBrief,
   checkAllClients,
   createMcpToken,
   currentOS,
@@ -42,7 +43,7 @@ import {
   localizePipelineProgress,
 } from '@core/index'
 
-import { brainCore } from './brainCore.js'
+import { brainCore, killLeftoverBrainHelpers } from './brainCore.js'
 import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused } from './mcpActivityPoll.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { indexPendingLibraryDocuments, type PendingIndexResult } from './libraryIndex.js'
@@ -71,6 +72,13 @@ import {
   toggleFloatingMonitor,
 } from './floatingMonitor.js'
 import { getHandshakePhrase, isHandshakeEnabled } from './handshake.js'
+import { syncVaultAgentsHandshake } from './syncVaultAgentsHandshake.js'
+import {
+  assessVaultHealth,
+  persistVaultHealthFingerprint,
+  writeLibraryStatsSidecar,
+  type VaultHealthReport,
+} from './vaultHealth.js'
 import {
   destroyProfilePreview,
   hideProfilePreview,
@@ -257,15 +265,23 @@ async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
   if (brainCore.status().running) {
     await flushPendingLibraryDocs(url)
     await maybeHygieneReindexAfterVaultChange()
+    void runVaultHealthCheck({ silentOk: true })
     return
   }
   if (brainCore.status().starting) return
-  if (!getAppSettings().embeddedBrainAutoStart) return
+  if (!getAppSettings().embeddedBrainAutoStart) {
+    void runVaultHealthCheck({ silentOk: true })
+    return
+  }
   const ensured = await ensureBrainForIndexing(url, undefined, vaultPath)
-  if (!ensured.running || !vault || !vaultPath) return
+  if (!ensured.running || !vault || !vaultPath) {
+    void runVaultHealthCheck({ silentOk: true })
+    return
+  }
   refreshTrayMenu(win, requestQuit)
   await flushPendingLibraryDocs(url)
   await maybeHygieneReindexAfterVaultChange()
+  void runVaultHealthCheck({ silentOk: true })
 }
 
 /** Slash-normalize vault roots so AppData vs portable switches compare reliably. */
@@ -281,6 +297,42 @@ type IndexHygieneToast = {
 
 function sendAppToast(t: IndexHygieneToast): void {
   safeSendMain('app:toast', t)
+}
+
+/**
+ * On every vault open / Brain start: compare vault note counts vs library.db.
+ * Surfaces the empty-index footgun (155 vs 32k chunks) without requiring AV exclusions.
+ */
+async function runVaultHealthCheck(opts?: { silentOk?: boolean }): Promise<VaultHealthReport> {
+  let live: { files: number; chunks: number } | null = null
+  if (brainCore.status().running) {
+    try {
+      live = await brainCore.libraryStats()
+      writeLibraryStatsSidecar({
+        files: live.files,
+        chunks: live.chunks,
+        vaultRoot: vaultPath ? brainVaultRoot(vaultPath) : undefined,
+      })
+    } catch (e) {
+      log.warn('vault health libraryStats failed:', (e as Error).message)
+    }
+  }
+  const report = assessVaultHealth(vaultPath, live)
+  await persistVaultHealthFingerprint(report)
+  safeSendMain('vault:health', report)
+  if (report.level === 'ok') {
+    if (!opts?.silentOk) {
+      log.info('vault health ok:', report.detailPl)
+    }
+    return report
+  }
+  const kind = report.level === 'critical' ? 'error' : report.level === 'warn' ? 'warn' : 'info'
+  sendAppToast({
+    kind,
+    title: getAppSettings().uiLocale === 'en' ? report.titleEn : report.titlePl,
+    detail: getAppSettings().uiLocale === 'en' ? report.detailEn : report.detailPl,
+  })
+  return report
 }
 
 /**
@@ -313,6 +365,10 @@ async function maybeHygieneReindexAfterVaultChange(): Promise<void> {
     }
     await setAppSettings({ lastIndexedVaultRoot: root })
     const pruned = stats?.prunedFiles ?? 0
+    if (typeof stats?.files === 'number' && typeof stats?.chunks === 'number') {
+      writeLibraryStatsSidecar({ files: stats.files, chunks: stats.chunks, vaultRoot: root })
+    }
+    void runVaultHealthCheck({ silentOk: true })
     sendAppToast({
       kind: 'success',
       title: 'Indeks dopasowany do vaultu',
@@ -674,6 +730,12 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('reveal', (_e, p: string) => shell.openPath(p))
+  ipcMain.handle('reveal:installDir', async () => {
+    // Packaged: …/Programs/Pomnia/Pomnia.exe — optional last-resort AV path browse.
+    const dir = app.isPackaged ? dirname(process.execPath) : app.getAppPath()
+    const err = await shell.openPath(dir)
+    return { ok: !err, path: dir, error: err || null }
+  })
 
   // ── Brain pipeline (host-side distill + pre-index → deploy) ──
   ipcMain.handle('brain:status', async (_e, url?: string) => {
@@ -896,10 +958,12 @@ function registerIpc(): void {
         vaultRoot: brainVaultRoot(vaultPath),
         handshakePhrase: getHandshakePhrase(),
         handshakeEnabled: isHandshakeEnabled(),
+        autoCheckpointEnabled: getAppSettings().autoCheckpointEnabled !== false,
       })
       await setAppSettings({ embeddedBrainAutoStart: true, ollamaUrl: url })
       await flushPendingLibraryDocs(url)
       void maybeHygieneReindexAfterVaultChange()
+      void runVaultHealthCheck()
       refreshTrayMenu(win, requestQuit)
       return brainCore.status()
     } catch (err) {
@@ -919,13 +983,18 @@ function registerIpc(): void {
     activity.update({ kind: 'indexing', phase: 'reindex' })
     try {
       const root = brainVaultRoot()
-      const stats = await brainCore.reindex(root)
+      const stats = (await brainCore.reindex(root)) as { files?: number; chunks?: number }
       await setAppSettings({ lastIndexedVaultRoot: root })
+      if (typeof stats?.files === 'number' && typeof stats?.chunks === 'number') {
+        writeLibraryStatsSidecar({ files: stats.files, chunks: stats.chunks, vaultRoot: root })
+      }
+      void runVaultHealthCheck({ silentOk: true })
       return { stats }
     } finally {
       activity.idle('indexing')
     }
   })
+  ipcMain.handle('vault:health', async () => runVaultHealthCheck({ silentOk: true }))
   ipcMain.handle('app:settings', () => getAppSettings())
   ipcMain.handle('app:version', () => ({ version: app.getVersion() }))
   ipcMain.handle('app:openLogs', async () => {
@@ -954,6 +1023,7 @@ function registerIpc(): void {
         uiLocale?: 'pl' | 'en'
         handshakePhrase?: string
         handshakeEnabled?: boolean
+        autoCheckpointEnabled?: boolean
       },
     ) => {
       const next = await setAppSettings(patch)
@@ -976,6 +1046,10 @@ function registerIpc(): void {
           if (canSendToWindow(w)) w.webContents.send('handshake:phrase', { phrase, enabled })
         }
         brainCore.setHandshake({ phrase, enabled })
+        void syncVaultAgentsHandshake(vaultPath)
+      }
+      if (Object.prototype.hasOwnProperty.call(patch, 'autoCheckpointEnabled')) {
+        brainCore.setAutoCheckpoint(next.autoCheckpointEnabled !== false)
       }
       return next
     },
@@ -1080,10 +1154,18 @@ function registerIpc(): void {
     destroyFloatingMonitor()
     destroyProfilePreview()
     destroyTray()
+    // Hard deadline: never leave a half-quit main that still owns Pomnia.exe
+    // (NSIS "cannot be closed" / zombie :7862). brainCore.stop() itself caps at ~7s.
+    const hardDeadline = setTimeout(() => {
+      log.warn('quit: brainCore.stop exceeded deadline — app.exit(0)')
+      app.exit(0)
+    }, 8_000)
     void brainCore
       .stop()
       .catch((err) => log.warn('brainCore stop on quit:', (err as Error).message))
       .finally(() => {
+        clearTimeout(hardDeadline)
+        killLeftoverBrainHelpers(true)
         app.quit()
       })
   })
@@ -1198,6 +1280,61 @@ function registerIpc(): void {
         handshakeEnabled: isHandshakeEnabled(),
       }),
   )
+
+  /** One-click: write Brain Mode rule (with current Handshake phrase) to the client rules path. */
+  ipcMain.handle('connect:write-brief', async (_e, clientId: ClientId) => {
+    const snippet = buildSnippet(
+      clientId,
+      'http://127.0.0.1:7862',
+      currentOS(),
+      homeDir(),
+      undefined,
+      'embedded',
+      {
+        brainMode: true,
+        handshakePhrase: getHandshakePhrase(),
+        handshakeEnabled: isHandshakeEnabled(),
+      },
+    )
+    if (!snippet.brief?.filePath || !snippet.brief.content) {
+      return { ok: false as const, error: 'no_brief_path' as const }
+    }
+    const filePath = snippet.brief.filePath
+    try {
+      await fs.mkdir(dirname(filePath), { recursive: true })
+      // Dedicated rule files (Cursor pomnia.mdc): full overwrite keeps YAML frontmatter clean.
+      // Shared files (CLAUDE.md / GEMINI.md): upsert marked Pomnia block at top.
+      let next: string
+      if (snippet.brief.mode === 'create-if-missing') {
+        next = snippet.brief.content.endsWith('\n')
+          ? snippet.brief.content
+          : `${snippet.brief.content}\n`
+      } else {
+        let existing = ''
+        try {
+          existing = await fs.readFile(filePath, 'utf8')
+        } catch {
+          /* create new */
+        }
+        next = upsertPomniaBrainBrief(existing, snippet.brief.content)
+      }
+      await fs.writeFile(filePath, next, 'utf8')
+      const agents = await syncVaultAgentsHandshake(vaultPath)
+      return {
+        ok: true as const,
+        path: filePath,
+        bytes: Buffer.byteLength(next, 'utf8'),
+        agentsPath: agents.path,
+      }
+    } catch (e) {
+      return {
+        ok: false as const,
+        error: 'write_failed' as const,
+        detail: e instanceof Error ? e.message : String(e),
+        path: filePath,
+      }
+    }
+  })
 
   ipcMain.handle('connect:skillsList', (_e, brainUrl: string, token?: string) =>
     listAllSkills(brainUrl, { token })

@@ -79,6 +79,8 @@ export interface BrainServer {
   setVaultRoot(path: string): void
   /** Update Handshake proof phrase for MCP tool descriptions / profile preamble. */
   setHandshake(opts: { phrase: string; enabled: boolean }): void
+  /** Update auto-checkpoint setting (Settings → autoCheckpointEnabled). */
+  setAutoCheckpoint(enabled: boolean): void
 }
 
 /**
@@ -200,6 +202,11 @@ export async function createBrainServer(
       }
     },
 
+    setAutoCheckpoint(enabled: boolean) {
+      config.autoCheckpointEnabled = enabled
+      if (ctx) ctx.autoCheckpointEnabled = enabled
+    },
+
     async start() {
       // Open storage + embedder first so the MCP server refuses connections
       // if either is broken (fail-fast beats accepting requests we can't serve).
@@ -218,6 +225,7 @@ export async function createBrainServer(
         skillsRoot: resolveSkillsRoot(vault),
         handshakePhrase: config.handshakePhrase,
         handshakeEnabled: config.handshakeEnabled !== false,
+        autoCheckpointEnabled: config.autoCheckpointEnabled !== false,
       }
 
       http = createServer((req: IncomingMessage, res: ServerResponse) => {
@@ -323,8 +331,22 @@ export async function createBrainServer(
       // Order matters: close inbound (http) first so no new requests land while
       // we're tearing down the db. When adopted, we do not own the listener.
       if (http) {
-        await new Promise<void>((resolve) => http?.close(() => resolve()))
+        const srv = http
         http = null
+        // Keep-alive / MCP clients can make close() hang forever — drop them.
+        const withAll = srv as typeof srv & { closeAllConnections?: () => void }
+        try {
+          withAll.closeAllConnections?.()
+        } catch {
+          /* ignore */
+        }
+        await new Promise<void>((resolve) => {
+          const t = setTimeout(resolve, 2_000)
+          srv.close(() => {
+            clearTimeout(t)
+            resolve()
+          })
+        })
       }
       if (ctx?.db) {
         ctx.db.close()

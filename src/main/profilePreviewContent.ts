@@ -6,6 +6,7 @@
 
 import { existsSync, promises as fs } from 'node:fs'
 import { join } from 'node:path'
+import { GARBAGE_THRESHOLD } from '@core/brain/distill.js'
 import { Ollama, defaultOllamaConfig } from '@core/brain/ollama.js'
 import { loadIndex, searchIndex } from '@core/brain/localIndex.js'
 import { log } from '@core/log.js'
@@ -37,7 +38,8 @@ const MAX_NOTES = 6
 const OLLAMA_TIMEOUT_MS = 22_000
 
 const EMPTY_USER_MD_STARTER = `# Preferred language: auto (PL+EN OK)
-# memory: trwałe wzorce osoby (decyzje, threat model, motywacja, brief agenta) — nie changelogi/ship notes.
+# memory: trwałe wzorce osoby (decyzje, threat, irytanty, tempo) — nie changelogi/ship notes.
+# operacyjny brief agenta → vault/AGENTS.md (poza limitem 2200).
 
 § PROFIL
 · Imię / nick:
@@ -51,14 +53,24 @@ const EMPTY_USER_MD_STARTER = `# Preferred language: auto (PL+EN OK)
 
 § KOMUNIKACJA
 · Język / ton:
-· Brief agenta (jak z Tobą pracować):
+· Brief operacyjny: vault/AGENTS.md
 `
 
 /** Sections that describe the person — not session changelog. */
 const IDENTITY_SECTIONS = new Set(['PROFIL', 'KOMUNIKACJA', 'USER', 'PROFILE', 'COMM'])
 
+/** Same spirit as distill GARBAGE_THRESHOLD — low-quality notes skip profiler pass. */
+export const PROFILE_QUALITY_MIN = GARBAGE_THRESHOLD
+
 const NOISE_NOTE_RE =
   /\b(pine\s*script|tradingview|atr\s*stop|heikin|renko|rsi\b|macd|futures|long\/short|take\s*profit|stop\s*loss|strategy\.|indicator\(|plot\()\b/i
+
+/** Ship / changelog / one-off tech dumps — never feed profiler. */
+const SHIP_NOTE_RE =
+  /\b(next\s*ship|pack:win|installer|\.exe\b|changelog|release\s*notes?|backlog\s*~|0\.\d+\.\d+(?:-setup)?|JSDoc\s*fix|build\s*fix)\b/i
+
+const IDENTITY_HIT_RE =
+  /\b(preferenc|profil|kim jest|decyzj|threat|MIT|ownership|irytant|glow|tempo|kontrola|motywac|wartości|partner|brutal|prawda|quality|paste-rate|garbage|product-owner|brief\s*agenta)\b/i
 
 const IDENTITY_SEARCH_QUERIES = [
   'kim jestem profil użytkownika preferencje wartości',
@@ -68,6 +80,34 @@ const IDENTITY_SEARCH_QUERIES = [
   'irytanty glow Liquid Glass Cursor baza garbage distill opaque Brain',
   'stack język programowania narzędzia Windows Pomnia',
 ]
+
+/** Parse YAML-ish frontmatter quality fields from a distilled note. */
+export function parseNoteQuality(raw: string): {
+  quality?: string
+  qualityScore?: number
+  body: string
+} {
+  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
+  if (!m) return { body: raw }
+  const fm = m[1] ?? ''
+  const body = m[2] ?? ''
+  const q = fm.match(/^quality:\s*(\S+)/m)?.[1]
+  const qsRaw = fm.match(/^quality_score:\s*([0-9.]+)/m)?.[1]
+  const qualityScore = qsRaw != null && qsRaw !== '' ? Number(qsRaw) : undefined
+  return {
+    quality: q,
+    qualityScore: Number.isFinite(qualityScore) ? qualityScore : undefined,
+    body,
+  }
+}
+
+/** True when note is below distill bar or explicitly marked garbage/stub. */
+export function isLowQualityNote(raw: string): boolean {
+  const { quality, qualityScore } = parseNoteQuality(raw)
+  if (quality === 'garbage' || quality === 'stub') return true
+  if (qualityScore != null && qualityScore < PROFILE_QUALITY_MIN) return true
+  return false
+}
 
 async function readUserMd(vaultRoot: string): Promise<string> {
   const p = join(vaultRoot, USER_MD)
@@ -157,10 +197,27 @@ export function hasIdentityProfile(userMd: string): boolean {
 export function isNoiseNote(title: string, text: string): boolean {
   const blob = `${title}\n${text}`
   if (NOISE_NOTE_RE.test(blob)) return true
+  if (SHIP_NOTE_RE.test(blob)) return true
   // Parameter dumps / open-question CTAs from bad distill
   if ((blob.match(/\n-\s+/g) || []).length >= 8 && blob.length > 500) return true
   if (/Czy chciałbyś|Would you like|Open Questions/i.test(blob) && blob.length < 800) return true
   return false
+}
+
+/** Score identity signal for profiler selection (higher = keep). */
+export function scoreIdentitySignal(title: string, text: string, qualityScore?: number): number {
+  const blob = `${title}\n${text}`
+  let score = 1
+  if (IDENTITY_HIT_RE.test(blob)) score += 4
+  if (/\b(decyzj|threat|irytant|tempo|ownership|kontrola|motywac)\b/i.test(blob)) score += 3
+  if (/\b(Pomnia|Brain|vault|MCP)\b/i.test(blob) && !SHIP_NOTE_RE.test(blob)) score += 1
+  if (SHIP_NOTE_RE.test(blob)) score -= 5
+  if (NOISE_NOTE_RE.test(blob)) score -= 5
+  if (qualityScore != null) {
+    if (qualityScore >= PROFILE_QUALITY_MIN) score += Math.min(3, (qualityScore - PROFILE_QUALITY_MIN) * 0.6)
+    else score -= 4
+  }
+  return score
 }
 
 async function readDistilledSnippets(vaultRoot: string): Promise<{ title: string; text: string; score: number }[]> {
@@ -193,22 +250,14 @@ async function readDistilledSnippets(vaultRoot: string): Promise<{ title: string
     try {
       const raw = (await fs.readFile(f.full, 'utf8')).trim()
       if (!raw) continue
+      // Bridge distill quality → profiler: skip garbage/stub / score < threshold
+      if (isLowQualityNote(raw)) continue
+      const { qualityScore, body } = parseNoteQuality(raw)
       const title = f.name.replace(/\.(md|txt)$/i, '')
-      const text = raw.slice(0, MAX_SNIPPET_CHARS)
+      const text = (body || raw).slice(0, MAX_SNIPPET_CHARS)
       if (isNoiseNote(title, text)) continue
-      // Prefer notes that reveal person patterns (not ship/release dumps)
-      const blob = `${title}\n${text}`
-      let score = 1
-      if (
-        /\b(preferenc|profil|kim jest|stack|Windows|developer|partner|brutal|prawda|threat|MIT|ownership|irytant|glow)\b/i.test(
-          blob,
-        )
-      )
-        score += 4
-      if (/\b(decyzj|wartości|motywac|kontrola|quality|paste-rate|garbage)\b/i.test(blob)) score += 3
-      if (/\b(Pomnia|Brain|vault|MCP)\b/i.test(blob)) score += 1
-      // Penalize ship/changelog tone even if Pomnia-tagged
-      if (/\b(next ship|0\.\d+\.\d+|installer|pack:win|changelog|backlog ~)\b/i.test(blob)) score -= 2
+      const score = scoreIdentitySignal(title, text, qualityScore)
+      if (score < 2) continue // require identity signal, not residual ship/tech
       out.push({ title, text, score })
     } catch {
       /* skip */
@@ -270,7 +319,7 @@ function looksLikeGarbageSummary(text: string): boolean {
   // Model dumping TOOL lists or MCP chatter
   if (/\b(search_library|save_conversation|get_user_profile)\b/i.test(text)) return true
   // Release-notes / ship dump disguised as a profile
-  if (/\b(next ship|installer|pack:win|0\.\d+\.\d+-setup)\b/i.test(text)) return true
+  if (SHIP_NOTE_RE.test(text)) return true
   if ((text.match(/\b(theme|dashboard|pipeline|handshake|locale)\b/gi) || []).length >= 4) return true
   return false
 }
@@ -394,12 +443,10 @@ export async function buildProfilePreview(opts?: {
               const title = h.notePath?.split(/[/\\]/).pop()?.replace(/\.md$/i, '') || 'nota'
               const text = (h.text || '').slice(0, MAX_SNIPPET_CHARS)
               if (isNoiseNote(title, text)) continue
+              if (isLowQualityNote(text) || isLowQualityNote(`${title}\n${text}`)) continue
               if (seen.has(title)) continue
-              const blob = `${title}\n${text}`
-              let hitScore = 4
-              if (/\b(partner|brutal|prawda|threat|MIT|ownership|irytant|glow|tempo|kontrola)\b/i.test(blob))
-                hitScore += 2
-              if (/\b(next ship|installer|pack:win|changelog)\b/i.test(blob)) hitScore -= 2
+              const hitScore = scoreIdentitySignal(title, text) + 3 // index hit bonus
+              if (hitScore < 2) continue
               notes.push({ title, text, score: hitScore })
               seen.add(title)
             }

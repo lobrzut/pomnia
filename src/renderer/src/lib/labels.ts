@@ -177,6 +177,11 @@ export interface UiLabels {
   floatingMonitorOnMinimize: string
   floatingMonitorOnMinimizeHint: string
   floatingMonitorIdleBadge: string
+  /** Idle PiP status when embedded Brain is stopped. */
+  floatingMonitorBrainOff: string
+  floatingMonitorBrainStarting: string
+  floatingMonitorBrainReady: string
+  floatingMonitorBrainError: string
   floatingMonitorClose: string
   floatingMonitorPin: string
   floatingMonitorUnpin: string
@@ -193,6 +198,12 @@ export interface UiLabels {
   handshakePhraseTooShort: string
   handshakeEnabled: string
   handshakeEnabledHint: string
+  /** After changing phrase — refresh Connect rules + new Claude session. */
+  handshakeRefreshHint: string
+  /** Auto milestone checkpoints (checkpoint_session). */
+  autoCheckpoint: string
+  autoCheckpointEnabled: string
+  autoCheckpointEnabledHint: string
   profilePreview: string
   profilePreviewTitle: string
   profilePreviewSubtitle: string
@@ -238,8 +249,12 @@ export interface UiLabels {
   agentBrainModeHint: string
   agentBrainModeBriefTitle: string
   agentBrainModeBriefCopy: string
+  agentBrainModeBriefWrite: string
+  agentBrainModeBriefWritten: string
+  agentBrainModeBriefWriteFailed: string
   agentBrainModeRuleCopy: string
   agentBrainModeNoPath: string
+  agentBrainModeRefreshHint: string
   embeddedBrainNotRunning: string
   embeddedBrainNotRunningLink: string
   settingsTitle: string
@@ -271,6 +286,17 @@ export interface UiLabels {
   securityPortability: string
   /** Footer under Settings → Bezpieczeństwo; `version` from app.getVersion(). */
   securityAboutCli: (version: string) => string
+  /** Settings → Windows AV — signed path first; exclusions = last resort only. */
+  antivirusTitle: string
+  antivirusLead: string
+  antivirusWhy: string
+  antivirusSteps: string
+  antivirusPathInstall: string
+  antivirusPathVault: string
+  antivirusPathSetup: string
+  antivirusPathBrain: string
+  antivirusSigningNote: string
+  antivirusOpenInstallFolder: string
   previewMode: string
   importTitle: string
   importLead: string
@@ -544,6 +570,10 @@ const PL_LABELS: UiLabels = {
   floatingMonitorOnMinimizeHint:
     'Gdy chowasz okno do traya lub minimalizujesz — mały diagram na pulpicie pokazuje na żywo destylację, indeksowanie i zapytania MCP (jak PiP na YouTube).',
   floatingMonitorIdleBadge: 'Na żywo',
+  floatingMonitorBrainOff: 'Brain wyłączony',
+  floatingMonitorBrainStarting: 'Brain startuje…',
+  floatingMonitorBrainReady: 'Brain gotowy',
+  floatingMonitorBrainError: 'Brain: błąd',
   floatingMonitorClose: 'Zamknij pływający diagram',
   floatingMonitorPin: 'Przypnij — zawsze na wierzchu',
   floatingMonitorUnpin: 'Odepnij — nie trzymaj na wierzchu',
@@ -552,7 +582,7 @@ const PL_LABELS: UiLabels = {
   handshakePlaceholder: 'OK to Go Go Go',
   handshakePhrase: 'Fraza dowodu',
   handshakePhraseHint:
-    'Fraza, którą agent (Claude/Cursor…) ma powiedzieć na start pierwszej odpowiedzi = dowód, że Pomnia Brain działa. Ustaw tutaj, potem skopiuj reguły w Connect (Brain Mode).',
+    'Fraza, którą agent (Claude/Cursor…) ma powiedzieć na start pierwszej odpowiedzi = dowód, że Pomnia Brain działa. Po zmianie frazy: Connect → odśwież/zapisz reguły Brain, potem nowa sesja Claude.',
   handshakePhraseSave: 'Zapisz frazę',
   handshakePhraseSaved: 'Fraza Handshake zaktualizowana',
   handshakePhrasePreview: (phrase) => `Agent otworzy odpowiedź: „${phrase}”`,
@@ -560,7 +590,13 @@ const PL_LABELS: UiLabels = {
   handshakePhraseTooShort: 'Wpisz swoją frazę (min. 2 znaki).',
   handshakeEnabled: 'Handshake',
   handshakeEnabledHint:
-    'Gdy włączone — agent ma zacząć pierwszą odpowiedź w rozmowie tą frazą. Wyłącz, jeśli nie chcesz powitania.',
+    'Gdy włączone — agent ma zacząć pierwszą odpowiedź w rozmowie tą frazą. Wyłącz, jeśli nie chcesz powitania. Po zmianie: Connect → zapisz reguły Brain + nowa sesja Claude.',
+  handshakeRefreshHint:
+    'Po zmianie frazy: Connect → klient (Claude / Cursor / Antigravity) → Tryb Brain → „Zapisz regułę na dysk”, potem NOWA sesja (aktywne nie przeładują CLAUDE.md / pomnia.mdc / GEMINI.md).',
+  autoCheckpoint: 'Kontynuacja sesji',
+  autoCheckpointEnabled: 'Auto-checkpoint',
+  autoCheckpointEnabledHint:
+    'Gdy włączone (domyślnie) — agent może zapisać milestone przez checkpoint_session bez frazy „zapisz do Pomnia” (decyzja, fix+ścieżka, błąd+komenda, architektura). Świadomy pełny zapis nadal wymaga frazy → save_conversation.',
   profilePreview: 'Profil',
   profilePreviewTitle: 'PROFIL',
   profilePreviewSubtitle: 'Kim jesteś dla agenta',
@@ -599,18 +635,23 @@ const PL_LABELS: UiLabels = {
   connectOpenDashboard: 'Otwórz dashboard tokenów',
   connectPartialTitle: 'Niepełny mcp.json — brak vault/library',
   connectPartialDetail:
-    'Wykryto tylko część serwerów Brain. Remote wymaga brain-rag + brain-vault + brain-library.',
+    'Wykryto tylko część serwerów Pomnia. Remote wymaga pomnia + pomnia-vault + pomnia-library.',
   connectPartialFix: 'Skopiuj pełny config poniżej i nadpisz / zmerguj mcp.json',
   connectMacNoAppHint:
     'Bez aplikacji Desktop: landing/cursor-mcp.html albo docs/CURSOR-MCP.md — ten sam pełny JSON MCP (przykład Cursor; kształt dla innych klientów w Connect).',
   agentBrainMode: 'Tryb Brain dla agenta',
   agentBrainModeHint:
-    'Dokłada regułę (rules / CLAUDE.md / AGENTS) + silniejsze opisy narzędzi MCP: agent sam czyta profil, skille i pamięć; zapisuje tylko na „zapisz do brain”. Pomnia nie przechwytuje czatu w tle.',
-  agentBrainModeBriefTitle: 'Reguła agenta (Brain Mode)',
+    'Dokłada regułę (Cursor rules / CLAUDE.md / Antigravity ~/.gemini/config/GEMINI.md) + silniejsze opisy narzędzi MCP: agent sam czyta profil, skille i pamięć; milestone → checkpoint_session (gdy Auto-checkpoint ON); świadomy zapis na „zapisz do Pomnia”. „Połączony” w Connect = plik MCP `pomnia`, nie gwarancja że agent już sprawdził w Pomnia.',
+  agentBrainModeBriefTitle: 'Reguła agenta (Tryb Brain / Pomnia)',
   agentBrainModeBriefCopy: 'Kopiuj regułę do pliku',
+  agentBrainModeBriefWrite: 'Zapisz regułę na dysk',
+  agentBrainModeBriefWritten: 'Reguła Pomnia zapisana',
+  agentBrainModeBriefWriteFailed: 'Nie udało się zapisać reguły',
   agentBrainModeRuleCopy: 'Kopiuj regułę (AGENTS.md / rules)',
   agentBrainModeNoPath:
     'Ten klient nie ma stałej ścieżki reguł — wklej blok do AGENTS.md albo system promptu.',
+  agentBrainModeRefreshHint:
+    'Po zmianie frazy Handshake: zapisz regułę ponownie. Cursor: skopiuj pomnia.mdc też do `.cursor/rules/` w projekcie (Agent ładuje reguły workspace), potem Reload Window + NOWA sesja. Claude / Antigravity: pełny restart + nowy czat. Aktywne czaty nie przeładują CLAUDE.md / pomnia.mdc / GEMINI.md.',
   embeddedBrainNotRunning: 'Lokalna wyszukiwarka nie działa. Otwórz zakładkę',
   embeddedBrainNotRunningLink: 'Brain',
   settingsTitle: 'Ustawienia',
@@ -646,6 +687,20 @@ const PL_LABELS: UiLabels = {
     'Skopiuj cały folder vaultu (np. C:\\Vault) na inny komputer → Otwórz vault → hasło.',
   securityAboutCli: (version) =>
     `Pomnia v${version} · ten sam silnik działa też w trybie CLI (bez okna).`,
+  antivirusTitle: 'Windows / antywirus',
+  antivirusLead:
+    'Cel produktu: Pomnia działa od razu na Windows (Defender / Symantec) bez proszenia o wykluczenia. Wykluczenia to nie strategia — to tymczasowe obejście.',
+  antivirusWhy:
+    'Lokalny Brain (MCP 127.0.0.1:7862, helper pomnia-brain.exe) + vault wyglądają heurystykom jak „dziwny” soft, zwłaszcza przy niepodpisanym instalatorze. To problem reputacji / podpisu, nie „trzeba dodać wyjątek w AV”.',
+  antivirusSteps:
+    'Ostatnia deska ratunku — tylko niepodpisane buildy deweloperskie albo polityka IT w firmie (nie wyłączaj AV). Symantec / Norton / Defender → wyjątki folderów:',
+  antivirusPathInstall: '%LOCALAPPDATA%\\Programs\\Pomnia',
+  antivirusPathVault: 'Folder vaultu (np. C:\\Vault)',
+  antivirusPathSetup: 'Folder z instalatorem *-setup.exe (np. Pulpit)',
+  antivirusPathBrain: '…\\Pomnia\\resources\\brain-core (opcjonalnie)',
+  antivirusSigningNote:
+    'Publiczny release Windows: ship blocker = Authenticode (OV/EV lub Azure Trusted Signing). Bez podpisu nie marketingujemy „just works” i nie budujemy onboardingu wokół wykluczeń.',
+  antivirusOpenInstallFolder: 'Otwórz folder instalacji',
   previewMode: 'Tryb podglądu (bez backendu Electron) — dane są przykładowe.',
   importTitle: 'Importuj',
   importLead: 'Wgraj eksport z Claude.ai, ChatGPT, Gemini albo Grok — trafi do vaultu.',
@@ -925,7 +980,7 @@ const EN_LABELS: Partial<UiLabels> = {
   colorSchemeHint: 'App look — backgrounds, accents, and panel glass. Orange logo stays.',
   colorSchemeMint: 'Mint',
   colorSchemeIris: 'Iris',
-  colorSchemeGlass: 'Glass',
+  colorSchemeGlass: 'Szkło',
   uiLocale: 'Interface language',
   uiLocaleHint:
     'App chrome only (menus, Settings, toasts). Brain stays automatically bilingual — no separate knowledge language setting.',
@@ -936,6 +991,10 @@ const EN_LABELS: Partial<UiLabels> = {
   floatingMonitorOnMinimizeHint:
     'When you hide to tray or minimize — a small desktop diagram shows live distill, indexing, and MCP queries (like YouTube PiP).',
   floatingMonitorIdleBadge: 'Live',
+  floatingMonitorBrainOff: 'Brain off',
+  floatingMonitorBrainStarting: 'Brain starting…',
+  floatingMonitorBrainReady: 'Brain ready',
+  floatingMonitorBrainError: 'Brain: error',
   floatingMonitorClose: 'Close floating diagram',
   floatingMonitorPin: 'Pin — always on top',
   floatingMonitorUnpin: 'Unpin — do not stay on top',
@@ -944,7 +1003,7 @@ const EN_LABELS: Partial<UiLabels> = {
   handshakePlaceholder: 'OK to Go Go Go',
   handshakePhrase: 'Proof phrase',
   handshakePhraseHint:
-    'Phrase the agent (Claude/Cursor…) should say at the start of its first reply = proof Pomnia Brain is wired. Set it here, then re-copy Connect rules (Brain Mode).',
+    'Phrase the agent (Claude/Cursor…) should say at the start of its first reply = proof Pomnia Brain is wired. After changing it: Connect → refresh/save Brain rules, then a new Claude session.',
   handshakePhraseSave: 'Save phrase',
   handshakePhraseSaved: 'Handshake phrase updated',
   handshakePhrasePreview: (phrase) => `Agent opens with: “${phrase}”`,
@@ -952,7 +1011,13 @@ const EN_LABELS: Partial<UiLabels> = {
   handshakePhraseTooShort: 'Enter your phrase (min. 2 characters).',
   handshakeEnabled: 'Handshake',
   handshakeEnabledHint:
-    'When on — the agent should open the first reply in a conversation with this phrase. Turn off to skip the greeting.',
+    'When on — the agent should open the first reply in a conversation with this phrase. Turn off to skip the greeting. After a change: Connect → save Brain rules + new Claude session.',
+  handshakeRefreshHint:
+    'After changing the phrase: Connect → client (Claude / Cursor / Antigravity) → Brain Mode → “Save rule to disk”, then a NEW session (active ones do not reload CLAUDE.md / pomnia.mdc / GEMINI.md).',
+  autoCheckpoint: 'Session continuity',
+  autoCheckpointEnabled: 'Auto-checkpoint',
+  autoCheckpointEnabledHint:
+    'When on (default) — the agent may write a milestone via checkpoint_session without “save to Pomnia” (decision, fix+path, error+command, architecture). Conscious full save still needs the phrase → save_conversation.',
   profilePreview: 'Profile preview',
   profilePreviewTitle: 'PROFILE',
   profilePreviewSubtitle: 'Who you are to the agent',
@@ -1005,6 +1070,20 @@ const EN_LABELS: Partial<UiLabels> = {
   securityAbout: 'Security',
   securityPortability: 'Portable unit = the whole vault folder (not AppData).',
   securityAboutCli: (version) => `Pomnia ${version}`,
+  antivirusTitle: 'Windows / antivirus',
+  antivirusLead:
+    'Product goal: Pomnia works out of the box on Windows (Defender / Symantec) without asking for exclusions. Exclusions are not a product strategy — only a temporary workaround.',
+  antivirusWhy:
+    'Local Brain (MCP 127.0.0.1:7862, pomnia-brain.exe) plus an encrypted vault look suspicious to heuristics, especially with an unsigned installer. That is a reputation / signing problem — not “users must whitelist us”.',
+  antivirusSteps:
+    'Last resort only — unsigned developer builds or enterprise IT policy (never turn AV off). Symantec / Norton / Defender → folder exceptions:',
+  antivirusPathInstall: '%LOCALAPPDATA%\\Programs\\Pomnia',
+  antivirusPathVault: 'Your vault folder (e.g. C:\\Vault)',
+  antivirusPathSetup: 'Folder with the *-setup.exe (e.g. Desktop)',
+  antivirusPathBrain: '…\\Pomnia\\resources\\brain-core (optional)',
+  antivirusSigningNote:
+    'Public Windows release ship blocker: Authenticode (OV/EV or Azure Trusted Signing). Without a signature we do not market “just works” and we do not center onboarding on exclusions.',
+  antivirusOpenInstallFolder: 'Open install folder',
   previewMode: 'Browser preview — Electron bridge unavailable.',
   cancel: 'Cancel',
   distillEmptyBacklog: 'No new sessions to distill',
@@ -1137,12 +1216,17 @@ const EN_LABELS: Partial<UiLabels> = {
     'Without Desktop: landing/cursor-mcp.html or docs/CURSOR-MCP.md — same MCP JSON (Cursor example; other clients via Connect).',
   agentBrainMode: 'Agent Brain Mode',
   agentBrainModeHint:
-    'Adds a rule snippet (rules / CLAUDE.md / AGENTS) plus stronger MCP tool descriptions: agent auto-reads profile, skills, and memory; writes only on “save to brain”. Pomnia does not silently capture chats.',
-  agentBrainModeBriefTitle: 'Agent rule (Brain Mode)',
+    'Adds a rule (Cursor rules / CLAUDE.md / Antigravity ~/.gemini/config/GEMINI.md) plus stronger MCP tool descriptions: agent auto-reads profile, skills, and memory; milestone → checkpoint_session (when Auto-checkpoint ON); conscious save on “save to Pomnia”. Connect “wired” = MCP config `pomnia`, not a guarantee the agent already checked Pomnia.',
+  agentBrainModeBriefTitle: 'Agent rule (Brain Mode / Pomnia)',
   agentBrainModeBriefCopy: 'Copy rule to file path',
+  agentBrainModeBriefWrite: 'Save rule to disk',
+  agentBrainModeBriefWritten: 'Pomnia rule saved',
+  agentBrainModeBriefWriteFailed: 'Could not save rule',
   agentBrainModeRuleCopy: 'Copy rule (AGENTS.md / rules)',
   agentBrainModeNoPath:
     'This client has no fixed rules path — paste the block into AGENTS.md or the system prompt.',
+  agentBrainModeRefreshHint:
+    'After changing the Handshake phrase: save the rule again. Cursor: also copy pomnia.mdc into the project `.cursor/rules/` (Agent loads workspace rules), then Reload Window + NEW chat. Claude / Antigravity: full restart + new chat. Active chats do not reload CLAUDE.md / pomnia.mdc / GEMINI.md.',
 }
 
 let cachedEn: UiLabels | null = null

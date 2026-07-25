@@ -27,6 +27,7 @@ const bridge = {
   docImport: (p?: string, ollamaUrl?: string) => ipcRenderer.invoke('doc:import', p, ollamaUrl),
   brainExport: (id: string, outDir: string) => ipcRenderer.invoke('brain:export', id, outDir),
   revealPath: (p: string) => ipcRenderer.invoke('reveal', p),
+  revealInstallDir: () => ipcRenderer.invoke('reveal:installDir'),
   brainStatus: (ollamaUrl?: string) => ipcRenderer.invoke('brain:status', ollamaUrl),
   brainRun: (opts: unknown) => ipcRenderer.invoke('brain:run', opts),
   brainRunCancel: () => ipcRenderer.invoke('brain:runCancel'),
@@ -35,6 +36,12 @@ const bridge = {
   brainCoreStart: (ollamaUrl?: string) => ipcRenderer.invoke('brainCore:start', ollamaUrl),
   brainCoreStop: () => ipcRenderer.invoke('brainCore:stop'),
   brainCoreReindex: () => ipcRenderer.invoke('brainCore:reindex'),
+  vaultHealth: () => ipcRenderer.invoke('vault:health'),
+  onVaultHealth: (cb: (r: unknown) => void) => {
+    const h = (_e: IpcRendererEvent, r: unknown) => cb(r)
+    ipcRenderer.on('vault:health', h)
+    return () => ipcRenderer.removeListener('vault:health', h)
+  },
   onBrainCoreEvent: (cb: (e: unknown) => void) => {
     const l = (_: IpcRendererEvent, e: unknown) => cb(e)
     ipcRenderer.on('brainCore:event', l)
@@ -86,6 +93,11 @@ const bridge = {
     target?: string,
     brainMode?: boolean,
   ) => ipcRenderer.invoke('connect:snippet', clientId, brainUrl, token, target, brainMode),
+  connectWriteBrief: (clientId: string) =>
+    ipcRenderer.invoke('connect:write-brief', clientId) as Promise<
+      | { ok: true; path: string; bytes: number; agentsPath?: string }
+      | { ok: false; error: string; detail?: string; path?: string }
+    >,
   connectSkillsList: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsList', brainUrl, token),
   connectSkillsSync: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsSync', brainUrl, token),
   connectMcpTokenCreate: (brainUrl: string, name: string, adminToken?: string) =>
@@ -108,6 +120,7 @@ const bridge = {
     uiLocale?: 'pl' | 'en'
     handshakePhrase?: string
     handshakeEnabled?: boolean
+    autoCheckpointEnabled?: boolean
   }) => ipcRenderer.invoke('app:settings:set', patch),
   onColorScheme: (cb: (scheme: 'mint' | 'iris' | 'glass') => void) => {
     const l = (_: IpcRendererEvent, scheme: 'mint' | 'iris' | 'glass') => cb(scheme)

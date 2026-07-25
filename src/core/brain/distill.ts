@@ -125,8 +125,8 @@ export function scoreFields(fields: DistilledNote['fields']): number {
 // Quality-first: scoreFields floors near-empty notes around ~4.0 (base offset).
 // Gate at 5.0 so "chose X" / generic-ok scrapes do not enter RAG — they go to
 // _review/ and retry. Aligns closer to note_quality.py's solid>=6 band without
-// requiring solid for every note.
-const GARBAGE_THRESHOLD = 5.0
+// requiring solid for every note. Exported so profile ingest uses the same bar.
+export const GARBAGE_THRESHOLD = 5.0
 
 /** Render a conversation to a transcript, budgeting characters (head + tail on overflow). */
 export function transcript(conv: Conversation, maxChars = 14000): { text: string; truncated: boolean } {

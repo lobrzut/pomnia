@@ -64,6 +64,8 @@ export interface PomniaBridge {
   docImport(path?: string, ollamaUrl?: string): Promise<DocImportResult | null>
   brainExport(snapshotId: string, outDir: string): Promise<{ count: number; dir: string }>
   revealPath(p: string): Promise<void>
+  /** Open the app install folder (optional AV last-resort paths). */
+  revealInstallDir(): Promise<{ ok: boolean; path: string; error: string | null }>
   brainStatus(ollamaUrl?: string): Promise<BrainStatus>
   brainRun(opts: {
     sources: SourceId[]
@@ -84,6 +86,16 @@ export interface PomniaBridge {
   brainCoreStart(ollamaUrl?: string): Promise<EmbeddedBrainStatus>
   brainCoreStop(): Promise<EmbeddedBrainStatus>
   brainCoreReindex(): Promise<{ stats: { files: number; chunks: number; empty: number; prunedFiles: number } }>
+  vaultHealth(): Promise<{
+    level: string
+    code: string
+    titlePl: string
+    detailPl: string
+    distilledNotes: number
+    sessionNotes: number
+    indexChunks: number | null
+    action?: string
+  }>
   onBrainCoreEvent(cb: (e: { type: string; file?: string; done?: number; total?: number }) => void): () => void
   onBrainProgress(cb: (e: BrainProgressEvent) => void): () => void
   brainSearch(query: string, ollamaUrl?: string): Promise<BrainHit[]>
@@ -117,6 +129,10 @@ export interface PomniaBridge {
     target?: 'embedded' | 'remote',
     brainMode?: boolean,
   ): Promise<Snippet>
+  connectWriteBrief(clientId: ClientId): Promise<
+    | { ok: true; path: string; bytes: number; agentsPath?: string }
+    | { ok: false; error: string; detail?: string; path?: string }
+  >
   connectSkillsList(brainUrl: string, token?: string): Promise<SkillListEntry[]>
   connectSkillsSync(brainUrl: string, token?: string): Promise<SkillSyncResult>
   connectMcpTokenCreate(
@@ -140,6 +156,7 @@ export interface PomniaBridge {
     uiLocale?: 'pl' | 'en'
     handshakePhrase?: string
     handshakeEnabled?: boolean
+    autoCheckpointEnabled?: boolean
   }>
   appSettingsSet(patch: {
     minimizeToTray?: boolean
@@ -157,6 +174,7 @@ export interface PomniaBridge {
     uiLocale?: 'pl' | 'en'
     handshakePhrase?: string
     handshakeEnabled?: boolean
+    autoCheckpointEnabled?: boolean
   }): Promise<{
     minimizeToTray: boolean
     closeToTray: boolean
@@ -173,6 +191,7 @@ export interface PomniaBridge {
     uiLocale?: 'pl' | 'en'
     handshakePhrase?: string
     handshakeEnabled?: boolean
+    autoCheckpointEnabled?: boolean
   }>
   onColorScheme(cb: (scheme: 'mint' | 'iris' | 'glass') => void): () => void
   onUiLocale(cb: (locale: 'pl' | 'en') => void): () => void
@@ -206,6 +225,7 @@ const mockPullListeners = new Set<(e: OllamaPullEvent) => void>()
 let mockPullCancelled = false
 let mockHandshakePhrase = DEFAULT_HANDSHAKE_PHRASE
 let mockHandshakeEnabled = true
+let mockAutoCheckpointEnabled = true
 const mockEmbedded: EmbeddedBrainStatus = {
   running: false,
   starting: false,
@@ -383,6 +403,9 @@ function mockBridge(): PomniaBridge {
       return { count: 38, dir }
     },
     async revealPath() {},
+    async revealInstallDir() {
+      return { ok: true, path: '%LOCALAPPDATA%\\Programs\\Pomnia', error: null }
+    },
     async brainStatus() {
       return {
         reachable: true,
@@ -425,6 +448,18 @@ function mockBridge(): PomniaBridge {
       await new Promise((r) => setTimeout(r, 1200))
       mockEmbedded.indexing = false
       return { stats: { files: 38, chunks: 121, empty: 2, prunedFiles: 1 } }
+    },
+    async vaultHealth() {
+      return {
+        level: 'ok',
+        code: 'ok',
+        titlePl: 'Vault i indeks wyglądają spójnie',
+        detailPl: 'mock',
+        distilledNotes: 38,
+        sessionNotes: 4,
+        indexChunks: 121,
+        action: 'none',
+      }
     },
     onBrainCoreEvent() {
       return () => {}
@@ -490,19 +525,19 @@ function mockBridge(): PomniaBridge {
         clients: [
           { id: 'claude-code', label: 'Claude Code (CLI)', configPath: '~/.claude.json', configExists: true, state: 'wired',
             servers: [
-              { key: 'brain-rag', present: true, url: 'https://brain.example.com:7862/sse', transport: 'http' },
-              { key: 'brain-vault', present: true, url: 'https://brain.example.com:7862/servers/brain-vault/sse', transport: 'http' },
-              { key: 'brain-library', present: true, url: 'https://brain.example.com:7862/servers/brain-library/sse', transport: 'http' }
+              { key: 'pomnia', present: true, url: 'https://brain.example.com:7862/sse', transport: 'http' },
+              { key: 'pomnia-vault', present: true, url: 'https://brain.example.com:7862/servers/brain-vault/sse', transport: 'http' },
+              { key: 'pomnia-library', present: true, url: 'https://brain.example.com:7862/servers/brain-library/sse', transport: 'http' }
             ], issues: [] },
           { id: 'cursor', label: 'Cursor', configPath: '~/.cursor/mcp.json', configExists: true, state: 'wired',
             servers: [
-              { key: 'brain-rag', present: true, url: 'https://brain.example.com:7862/sse' },
-              { key: 'brain-vault', present: true, url: 'https://brain.example.com:7862/servers/brain-vault/sse' },
-              { key: 'brain-library', present: true, url: 'https://brain.example.com:7862/servers/brain-library/sse' }
+              { key: 'pomnia', present: true, url: 'https://brain.example.com:7862/sse' },
+              { key: 'pomnia-vault', present: true, url: 'https://brain.example.com:7862/servers/brain-vault/sse' },
+              { key: 'pomnia-library', present: true, url: 'https://brain.example.com:7862/servers/brain-library/sse' }
             ], issues: [] },
           { id: 'antigravity', label: 'Antigravity (Google IDE)', configPath: '~/.gemini/antigravity-ide/mcp_config.json', configExists: true, state: 'partial',
-            servers: [{ key: 'brain-rag', present: true, url: 'https://brain.example.com:7862/mcp', transport: 'streamable-http' }],
-            issues: ['brain-vault: missing', 'brain-library: missing'] },
+            servers: [{ key: 'pomnia', present: true, url: 'https://brain.example.com:7862/mcp', transport: 'streamable-http' }],
+            issues: ['pomnia-vault: missing', 'pomnia-library: missing'] },
           { id: 'claude-desktop', label: 'Claude Desktop', configPath: '~/AppData/Roaming/Claude/claude_desktop_config.json', configExists: false, state: 'not_wired', servers: [], issues: ['config file does not exist'] },
           { id: 'vscode', label: 'VS Code (1.103+ native MCP)', configPath: '~/AppData/Roaming/Code/User/mcp.json', configExists: false, state: 'not_wired', servers: [], issues: ['config file does not exist'] },
           { id: 'windsurf', label: 'Windsurf (Codeium)', configPath: '~/AppData/Roaming/Windsurf/User/mcp.json', configExists: false, state: 'not_wired', servers: [], issues: ['config file does not exist'] }
@@ -515,14 +550,27 @@ function mockBridge(): PomniaBridge {
         label: clientId,
         filePath: '~/.example/mcp.json',
         mcpKey: 'mcpServers',
-        fullFileJson: `{\n  "mcpServers": {\n    "brain-rag": { "url": "${brainUrl}/sse", "headers": { "Authorization": "Bearer …" } },\n    "brain-vault": { "url": "${brainUrl}/servers/brain-vault/sse", "headers": { "Authorization": "Bearer …" } },\n    "brain-library": { "url": "${brainUrl}/servers/brain-library/sse", "headers": { "Authorization": "Bearer …" } }\n  }\n}\n`,
-        mergeJson: `{\n  "brain-rag": { "url": "${brainUrl}/sse" },\n  "brain-vault": { "url": "${brainUrl}/servers/brain-vault/sse" },\n  "brain-library": { "url": "${brainUrl}/servers/brain-library/sse" }\n}\n`,
+        fullFileJson: `{\n  "mcpServers": {\n    "pomnia": { "url": "${brainUrl}/sse", "headers": { "Authorization": "Bearer …" } },\n    "pomnia-vault": { "url": "${brainUrl}/servers/brain-vault/sse", "headers": { "Authorization": "Bearer …" } },\n    "pomnia-library": { "url": "${brainUrl}/servers/brain-library/sse", "headers": { "Authorization": "Bearer …" } }\n  }\n}\n`,
+        mergeJson: `{\n  "pomnia": { "url": "${brainUrl}/sse" },\n  "pomnia-vault": { "url": "${brainUrl}/servers/brain-vault/sse" },\n  "pomnia-library": { "url": "${brainUrl}/servers/brain-library/sse" }\n}\n`,
         instructions: `▶ ${clientId}\n\n1. Open or create the config file.\n2. Paste the FULL 3-server snippet.\n3. Restart the client.`,
         restartHint: 'Restart the client to pick up the new config.',
-        notes: 'Mock snippet (browser preview). Remote always includes brain-rag + brain-vault + brain-library.',
+        notes: 'Mock snippet (browser preview). Remote always includes pomnia + pomnia-vault + pomnia-library.',
         agentRuleMarkdown: brainMode
-          ? '<!-- pomnia-brain-start -->\n# Pomnia Brain (preview)\n<!-- pomnia-brain-end -->\n'
+          ? '<!-- pomnia-brain-start -->\n# Pomnia (preview)\n<!-- pomnia-brain-end -->\n'
           : undefined,
+      }
+    },
+    async connectWriteBrief(clientId) {
+      const path =
+        clientId === 'claude-code'
+          ? 'C:/Users/Mock/.claude/CLAUDE.md'
+          : clientId === 'antigravity'
+            ? 'C:/Users/Mock/.gemini/config/GEMINI.md'
+            : 'C:/Users/Mock/.cursor/rules/brain.mdc'
+      return {
+        ok: true as const,
+        path,
+        bytes: 420,
       }
     },
     async connectSkillsList() {
@@ -553,6 +601,7 @@ function mockBridge(): PomniaBridge {
         uiLocale: 'pl' as const,
         handshakePhrase: mockHandshakePhrase,
         handshakeEnabled: mockHandshakeEnabled,
+        autoCheckpointEnabled: mockAutoCheckpointEnabled,
       }
     },
     async appSettingsSet(patch) {
@@ -561,6 +610,9 @@ function mockBridge(): PomniaBridge {
       }
       if (typeof patch.handshakeEnabled === 'boolean') {
         mockHandshakeEnabled = patch.handshakeEnabled
+      }
+      if (typeof patch.autoCheckpointEnabled === 'boolean') {
+        mockAutoCheckpointEnabled = patch.autoCheckpointEnabled
       }
       return {
         minimizeToTray: patch.minimizeToTray ?? false,
@@ -572,6 +624,7 @@ function mockBridge(): PomniaBridge {
         onboarded: patch.onboarded,
         handshakePhrase: mockHandshakePhrase,
         handshakeEnabled: mockHandshakeEnabled,
+        autoCheckpointEnabled: mockAutoCheckpointEnabled,
       }
     },
     onColorScheme(_cb) {

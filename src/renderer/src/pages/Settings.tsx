@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Activity, Brain, Clock, FileArchive, FolderOpen, Handshake, Languages, Lock, Minimize2, Palette, Plug, RefreshCw, RotateCcw, ShieldCheck, Vault } from 'lucide-react'
+import { Activity, Brain, Clock, FileArchive, FolderOpen, Handshake, Languages, Lock, Minimize2, Palette, Plug, RefreshCw, RotateCcw, Shield, ShieldCheck, Vault } from 'lucide-react'
 import {
   isValidHandshakePhraseSetting,
 } from '@core/handshakePhrase'
@@ -238,6 +238,8 @@ export default function Settings() {
     setHandshakePhrase,
     handshakeEnabled,
     setHandshakeEnabled,
+    autoCheckpointEnabled,
+    setAutoCheckpointEnabled,
     brainTarget,
     remoteBrainUrl,
     connectToken
@@ -508,6 +510,24 @@ export default function Settings() {
           </Button>
         </div>
         {phraseError ? <p className="mt-2 text-xs text-rose-300/90">{phraseError}</p> : null}
+        <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">{labels.handshakeRefreshHint}</p>
+      </GlassCard>
+
+      <GlassCard className="mb-4 p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+          <Brain className="h-4 w-4 text-mint" /> {labels.autoCheckpoint}
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-medium text-ink">{labels.autoCheckpointEnabled}</div>
+            <p className="mt-1 text-xs text-ink-dim">{labels.autoCheckpointEnabledHint}</p>
+          </div>
+          <Toggle
+            checked={autoCheckpointEnabled}
+            onChange={setAutoCheckpointEnabled}
+            aria-label={labels.autoCheckpointEnabled}
+          />
+        </div>
       </GlassCard>
 
       <HealthCheck />
@@ -664,6 +684,33 @@ export default function Settings() {
               </li>
             )}
           </ul>
+        )}
+      </GlassCard>
+
+      <GlassCard className="mb-4 p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+          <Shield className="h-4 w-4 text-mint" /> {labels.antivirusTitle}
+        </div>
+        <p className="mb-2 text-xs text-ink-dim">{labels.antivirusLead}</p>
+        <p className="mb-3 text-xs text-ink-dim">{labels.antivirusWhy}</p>
+        <p className="mb-2 text-xs font-medium text-ink">{labels.antivirusSteps}</p>
+        <ul className="mb-3 space-y-1 font-mono text-[11px] text-ink-faint">
+          <li>• {labels.antivirusPathInstall}</li>
+          <li>• {labels.antivirusPathVault}</li>
+          <li>• {labels.antivirusPathSetup}</li>
+          <li>• {labels.antivirusPathBrain}</li>
+        </ul>
+        <p className="mb-3 text-[11px] leading-relaxed text-ink-dim">{labels.antivirusSigningNote}</p>
+        {!isMock && (
+          <Button
+            type="button"
+            variant="soft"
+            onClick={() => {
+              void api.revealInstallDir().catch(() => {})
+            }}
+          >
+            <FolderOpen className="h-4 w-4" /> {labels.antivirusOpenInstallFolder}
+          </Button>
         )}
       </GlassCard>
 

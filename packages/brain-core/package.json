@@ -11,6 +11,7 @@
   },
   "exports": {
     ".": "./dist/index.js",
+    "./vault": "./dist/storage/vault.js",
     "./daemon": "./dist/daemon.js",
     "./embedded": "./dist/embedded.js"
   },
