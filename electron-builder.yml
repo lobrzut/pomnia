@@ -1,26 +1,100 @@
+# Pomnia desktop packager — keep metadata honest & AV-friendly (no fake signing).
+# Windows Authenticode: set CSC_LINK + CSC_KEY_PASSWORD (see docs/CODE-SIGNING.md).
+# Without a cert, builds stay unsigned; SmartScreen/Defender noise is expected.
+
 appId: ai.pomnia.app
 productName: Pomnia
+copyright: Copyright © 2026 Pomnia
 directories:
   output: release
   buildResources: resources
 files:
   - out/**/*
-  - resources/**/*
+  - resources/icon.ico
+  - resources/icon.png
+  - "!**/*.{map,md}"
+  - "!**/*.bak*"
+  # npm workspaces → junction/symlink; electron-builder skips them unless copied explicitly.
+  # Main should bundle doc-parser + mammoth/unpdf/bluebird (electron.vite.config).
+  # Safety net: still ship those packages into asar if any bare import remains.
+  - from: packages/doc-parser
+    to: node_modules/@pomnia/doc-parser
+    filter:
+      - package.json
+      - dist/**/*
+  - from: packages/brain-core
+    to: node_modules/@pomnia/brain-core
+    filter:
+      - package.json
+      - dist/**/*
+  # Top-level bluebird (root dep) — required for residual subpath imports
+  # like bluebird/js/release/promise from out/main.
+  - from: node_modules/bluebird
+    to: node_modules/bluebird
+  - from: node_modules/mammoth
+    to: node_modules/mammoth
+  - from: node_modules/unpdf
+    to: node_modules/unpdf
+  # mammoth transitive deps (hoisted or nested) — cover residual requires
+  - from: node_modules/@xmldom/xmldom
+    to: node_modules/@xmldom/xmldom
+  - from: node_modules/argparse
+    to: node_modules/argparse
+  - from: node_modules/base64-js
+    to: node_modules/base64-js
+  - from: node_modules/dingbat-to-unicode
+    to: node_modules/dingbat-to-unicode
+  - from: node_modules/jszip
+    to: node_modules/jszip
+  - from: node_modules/lop
+    to: node_modules/lop
+  - from: node_modules/path-is-absolute
+    to: node_modules/path-is-absolute
+  - from: node_modules/underscore
+    to: node_modules/underscore
+  - from: node_modules/xmlbuilder
+    to: node_modules/xmlbuilder
+
 asarUnpack:
   - "**/*.wasm"
-# brain-core forked child (embedded MCP) — lives outside asar with native bindings
+# brain-core forked child (embedded MCP) — outside asar; includes pomnia-brain.exe helper
 extraResources:
-  - from: build/brain-core-runtime
+  - from: build/brain-core-runtime-v2
     to: brain-core
     filter:
       - "**/*"
+      - "!**/README*"
+      - "!**/CHANGELOG*"
+      - "!**/*.{map,md}"
+      - "!**/test/**"
+      - "!**/tests/**"
+      - "!**/*.ts"
 win:
   target: [nsis]
   icon: resources/icon.ico
+  executableName: Pomnia
+  # Must match Authenticode certificate Subject CN when you sign.
+  publisherName: Pomnia
   artifactName: ${productName}-${version}-setup.${ext}
+  # Signing is automatic when CSC_LINK / WIN_CSC_LINK is set. Do not force-sign
+  # without a cert (CI/local unsigned packs would fail).
+  # forceCodeSigning: true
+  # Optional local PFX (prefer CSC_LINK env — never commit certs):
+  # certificateFile: C:\\secure\\pomnia-codesign.pfx
+  # certificatePassword: ${env.CSC_KEY_PASSWORD}
+  requestedExecutionLevel: asInvoker
+  # No fileAssociations — avoids extra shell/AV surface for a vault app.
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  allowElevation: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Pomnia
+  uninstallDisplayName: Pomnia
+  include: installer.nsh
+  # Quit running app before replacing files (see installer.nsh customCheckAppRunning).
+  deleteAppDataOnUninstall: false
 mac:
   target: [dmg]
   category: public.app-category.utilities

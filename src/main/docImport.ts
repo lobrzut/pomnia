@@ -15,7 +15,8 @@ import {
   parseDocument,
   suggestOcr,
 } from '@pomnia/doc-parser'
-import { defaultVaultConfig, ensureLibraryDirs } from '@pomnia/brain-core'
+// Subpath only — full @pomnia/brain-core entry pulls better-sqlite3 into main.
+import { defaultVaultConfig, ensureLibraryDirs } from '@pomnia/brain-core/vault'
 import { libraryDocLogicalPath, Vault } from '@core/vault.js'
 import { brainCore } from './brainCore.js'
 import { brainCoreDataDir } from './brainPaths.js'

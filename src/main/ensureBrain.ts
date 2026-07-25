@@ -1,5 +1,7 @@
 import { brainCore } from './brainCore.js'
 import { brainCoreDataDir, brainSkillsDir, brainVaultRoot } from './brainPaths.js'
+import { getAppSettings } from './appSettings.js'
+import { getHandshakePhrase, isHandshakeEnabled } from './handshake.js'
 import {
   brainProcessFailedMessage,
   ollamaUnreachableMessage,
@@ -44,18 +46,20 @@ export async function ensureBrainForIndexing(
   }
   if (status.starting) {
     onProgress?.({ phase: 'brain-start', done: 0, total: 1, detail: 'czekam…' })
-    for (let i = 0; i < 40; i++) {
+    // Match brainCore START_TIMEOUT_MS (45s) + small buffer.
+    for (let i = 0; i < 100; i++) {
       await new Promise((r) => setTimeout(r, 500))
       if (brainCore.status().running) {
         applyPortableRoots(encryptedVaultPath)
         return { running: true, autoStarted: false, ollamaUrl: baseUrl }
       }
+      if (!brainCore.status().starting && !brainCore.status().running) break
     }
     return {
       running: false,
       autoStarted: false,
       ollamaUrl: baseUrl,
-      error: 'Uruchamianie wyszukiwarki trwa zbyt długo',
+      error: brainCore.status().lastError || 'Uruchamianie wyszukiwarki trwa zbyt długo',
     }
   }
 
@@ -77,6 +81,9 @@ export async function ensureBrainForIndexing(
       ollamaUrl: baseUrl,
       skillsRoot,
       vaultRoot,
+      handshakePhrase: getHandshakePhrase(),
+      handshakeEnabled: isHandshakeEnabled(),
+      autoCheckpointEnabled: getAppSettings().autoCheckpointEnabled !== false,
     })
     onProgress?.({ phase: 'brain-start', done: 1, total: 1 })
     return { running: true, autoStarted: true, ollamaUrl: baseUrl }

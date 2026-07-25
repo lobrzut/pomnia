@@ -5,7 +5,19 @@ import { AppLogo } from '../components/AppLogo'
 import { FlowDiagram } from '../components/FlowDiagram'
 import { api } from '../lib/api'
 import { formatFlowLiveBadge, uiLabels } from '../lib/labels'
+import type { EmbeddedBrainStatus } from '../lib/types'
 import { useStore } from '../store/useStore'
+
+function brainIdleBadge(
+  labels: ReturnType<typeof uiLabels>,
+  core: EmbeddedBrainStatus | null,
+): string {
+  if (!core) return labels.floatingMonitorIdleBadge
+  if (core.starting) return labels.floatingMonitorBrainStarting
+  if (core.running) return labels.floatingMonitorBrainReady
+  if (core.lastError) return labels.floatingMonitorBrainError
+  return labels.floatingMonitorBrainOff
+}
 
 export default function FloatingMonitor() {
   const labels = uiLabels()
@@ -14,6 +26,7 @@ export default function FloatingMonitor() {
   const initGlobalActivity = useStore((s) => s.initGlobalActivity)
   const loadAppSettings = useStore((s) => s.loadAppSettings)
   const [pinned, setPinned] = useState(true)
+  const [core, setCore] = useState<EmbeddedBrainStatus | null>(null)
 
   useEffect(() => {
     void loadAppSettings()
@@ -26,18 +39,38 @@ export default function FloatingMonitor() {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
+    const refresh = () => {
+      void api.brainCoreStatus().then((s) => {
+        if (!cancelled) setCore(s)
+      }).catch(() => {
+        if (!cancelled) setCore(null)
+      })
+    }
+    refresh()
+    const id = setInterval(refresh, 4_000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!onboarded) void api.floatingMonitorHide()
   }, [onboarded])
 
   const isIdle = globalActivity.kind === 'idle'
-  const badge = isIdle ? labels.floatingMonitorIdleBadge : formatFlowLiveBadge(globalActivity)
+  const badge = isIdle ? brainIdleBadge(labels, core) : formatFlowLiveBadge(globalActivity)
   const pinLabel = pinned ? labels.floatingMonitorUnpin : labels.floatingMonitorPin
+  const brainLive = !!(core?.running || core?.starting)
+  const brainError = !!(core && !core.running && !core.starting && core.lastError)
 
   return (
     <div
       className={clsx(
         'floating-pip-shell flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl',
         isIdle ? 'floating-pip-shell--idle' : 'floating-pip-shell--live',
+        brainError && isIdle && 'floating-pip-shell--error',
       )}
     >
       <div className="drag flex h-8 shrink-0 items-center justify-between gap-2 border-b border-white/10 px-2">
@@ -47,7 +80,19 @@ export default function FloatingMonitor() {
           {isIdle ? (
             <>
               <span className="shrink-0 text-[10px] font-bold tracking-[0.14em] text-grad">POMNIA</span>
-              <span className="min-w-0 truncate text-[10px] font-medium text-ink-dim">{badge}</span>
+              <span
+                className={clsx(
+                  'min-w-0 truncate text-[10px] font-medium',
+                  brainError
+                    ? 'text-amber'
+                    : brainLive
+                      ? 'text-mint'
+                      : 'text-ink-dim',
+                )}
+                title={core?.lastError ?? badge}
+              >
+                {badge}
+              </span>
             </>
           ) : (
             <>
@@ -105,7 +150,8 @@ export default function FloatingMonitor() {
           }
         }}
       >
-        <FlowDiagram compact />
+        {/* Must be variant="pip" — default "full" overflows 300×118 and shows only bottom icon row. */}
+        <FlowDiagram variant="pip" />
       </div>
     </div>
   )

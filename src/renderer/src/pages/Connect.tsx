@@ -81,6 +81,7 @@ export default function Connect() {
   const [mode, setMode] = useState<'new' | 'merge'>('new')
   const [copied, setCopied] = useState<string | null>(null)
   const [minting, setMinting] = useState(false)
+  const [writingBrief, setWritingBrief] = useState(false)
 
   async function mintToken() {
     if (minting) return
@@ -196,6 +197,37 @@ export default function Connect() {
     setCopied(key)
     window.setTimeout(() => setCopied((c) => (c === key ? null : c)), 1600)
     toast({ kind: 'success', title: 'Skopiowano', detail: label })
+  }
+
+  async function writeBrief() {
+    if (!picked || !snippet?.brief || writingBrief) return
+    setWritingBrief(true)
+    try {
+      const r = await api.connectWriteBrief(picked)
+      if (!r.ok) {
+        toast({
+          kind: 'error',
+          title: labels.agentBrainModeBriefWriteFailed,
+          detail: r.detail || r.error,
+        })
+        return
+      }
+      setCopied('brain-rule-write')
+      window.setTimeout(() => setCopied((c) => (c === 'brain-rule-write' ? null : c)), 1600)
+      toast({
+        kind: 'success',
+        title: labels.agentBrainModeBriefWritten,
+        detail: r.path,
+      })
+    } catch (e) {
+      toast({
+        kind: 'error',
+        title: labels.agentBrainModeBriefWriteFailed,
+        detail: (e as Error).message,
+      })
+    } finally {
+      setWritingBrief(false)
+    }
   }
 
   async function syncSkills() {
@@ -526,7 +558,7 @@ export default function Connect() {
 
               {effectiveTarget === 'remote' && (
                 <div className="mb-3 flex flex-wrap gap-1.5">
-                  <Badge color="#22d3ee">brain-rag</Badge>
+                  <Badge color="#22d3ee">pomnia</Badge>
                   <Badge color="#22d3ee">brain-vault</Badge>
                   <Badge color="#22d3ee">brain-library</Badge>
                 </div>
@@ -609,27 +641,45 @@ export default function Connect() {
                 <div className="mt-4 rounded-xl border border-mint/25 bg-mint/5 p-3.5">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <div className="text-sm font-semibold text-ink">{labels.agentBrainModeBriefTitle}</div>
-                    <Button
-                      variant="soft"
-                      onClick={() =>
-                        void copy(
-                          snippet.brief?.content ?? snippet.agentRuleMarkdown ?? '',
-                          'brain-rule',
-                          labels.agentBrainModeBriefTitle,
-                        )
-                      }
-                    >
-                      {copied === 'brain-rule' ? (
-                        <Check className="h-3.5 w-3.5 text-mint" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )}
-                      {snippet.brief ? labels.agentBrainModeBriefCopy : labels.agentBrainModeRuleCopy}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      {snippet.brief ? (
+                        <Button
+                          variant="soft"
+                          disabled={writingBrief}
+                          onClick={() => void writeBrief()}
+                        >
+                          {writingBrief ? (
+                            <Spinner className="h-3.5 w-3.5" />
+                          ) : copied === 'brain-rule-write' ? (
+                            <Check className="h-3.5 w-3.5 text-mint" />
+                          ) : (
+                            <FilePlus2 className="h-3.5 w-3.5" />
+                          )}
+                          {labels.agentBrainModeBriefWrite}
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="soft"
+                        onClick={() =>
+                          void copy(
+                            snippet.brief?.content ?? snippet.agentRuleMarkdown ?? '',
+                            'brain-rule',
+                            labels.agentBrainModeBriefTitle,
+                          )
+                        }
+                      >
+                        {copied === 'brain-rule' ? (
+                          <Check className="h-3.5 w-3.5 text-mint" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                        {snippet.brief ? labels.agentBrainModeBriefCopy : labels.agentBrainModeRuleCopy}
+                      </Button>
+                    </div>
                   </div>
                   {snippet.brief ? (
                     <p className="mb-2 text-[11px] text-ink-dim">
-                      {snippet.brief.mode === 'append-to-existing' ? 'Dopisz na końcu: ' : 'Utwórz / nadpisz: '}
+                      {snippet.brief.mode === 'append-to-existing' ? 'Dopisz / upsert: ' : 'Utwórz / nadpisz: '}
                       <button
                         type="button"
                         onClick={() => void copy(snippet.brief!.filePath, 'brief-path', 'ścieżka reguły')}
@@ -642,6 +692,9 @@ export default function Connect() {
                   ) : (
                     <p className="mb-2 text-[11px] text-ink-dim">{labels.agentBrainModeNoPath}</p>
                   )}
+                  <p className="mb-2 text-[11px] leading-relaxed text-ink-faint">
+                    {labels.agentBrainModeRefreshHint}
+                  </p>
                   <pre className="max-h-40 overflow-auto rounded-lg border border-white/8 bg-black/40 p-3 text-[11px] leading-relaxed text-ink-dim">
                     {snippet.brief?.content ?? snippet.agentRuleMarkdown}
                   </pre>
@@ -652,7 +705,7 @@ export default function Connect() {
                 <KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-faint" />
                 <p className="text-[11px] leading-relaxed text-ink-faint">
                   {brainTarget === 'embedded'
-                    ? 'Tryb lokalny: jeden serwer brain-rag na /mcp — bez Bearer tokena.'
+                    ? 'Tryb lokalny: jeden serwer pomnia na /mcp — bez Bearer tokena.'
                     : connectToken
                       ? 'Token jest w headers — trzymaj plik prywatny (chmod 600).'
                       : labels.connectTokenRequired}

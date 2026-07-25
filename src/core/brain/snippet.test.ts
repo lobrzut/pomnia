@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { buildSnippet } from './snippet.js'
+import { buildSnippet, MCP_POMNIA_KEY, MCP_POMNIA_LIBRARY_KEY, MCP_POMNIA_VAULT_KEY } from './snippet.js'
 
 describe('brain/snippet — Cursor remote mcp.json', () => {
-  it('emits all three Brain servers with Bearer headers', () => {
+  it('emits all three Pomnia servers with Bearer headers', () => {
     const s = buildSnippet(
       'cursor',
       'http://brain.example.local:7862',
@@ -18,11 +18,11 @@ describe('brain/snippet — Cursor remote mcp.json', () => {
       mcpServers: Record<string, { url: string; headers?: { Authorization: string } }>
     }
     const servers = full.mcpServers
-    expect(Object.keys(servers).sort()).toEqual(['brain-library', 'brain-rag', 'brain-vault'])
-    expect(servers['brain-rag'].url).toBe('http://brain.example.local:7862/sse')
-    expect(servers['brain-vault'].url).toBe('http://brain.example.local:7862/servers/brain-vault/sse')
-    expect(servers['brain-library'].url).toBe('http://brain.example.local:7862/servers/brain-library/sse')
-    for (const key of ['brain-rag', 'brain-vault', 'brain-library'] as const) {
+    expect(Object.keys(servers).sort()).toEqual([MCP_POMNIA_KEY, MCP_POMNIA_LIBRARY_KEY, MCP_POMNIA_VAULT_KEY].sort())
+    expect(servers[MCP_POMNIA_KEY].url).toBe('http://brain.example.local:7862/sse')
+    expect(servers[MCP_POMNIA_VAULT_KEY].url).toBe('http://brain.example.local:7862/servers/brain-vault/sse')
+    expect(servers[MCP_POMNIA_LIBRARY_KEY].url).toBe('http://brain.example.local:7862/servers/brain-library/sse')
+    for (const key of [MCP_POMNIA_KEY, MCP_POMNIA_VAULT_KEY, MCP_POMNIA_LIBRARY_KEY] as const) {
       expect(servers[key].headers?.Authorization).toBe('Bearer btk_test_token')
     }
   })
@@ -30,18 +30,18 @@ describe('brain/snippet — Cursor remote mcp.json', () => {
   it('mergeJson is the three-server map (not a single-server stub)', () => {
     const s = buildSnippet('cursor', 'https://brain.example:7862', 'win32', 'C:\\Users\\Admin', 'tok', 'remote')
     const merge = JSON.parse(s.mergeJson) as Record<string, unknown>
-    expect(merge['brain-rag']).toBeTruthy()
-    expect(merge['brain-vault']).toBeTruthy()
-    expect(merge['brain-library']).toBeTruthy()
+    expect(merge[MCP_POMNIA_KEY]).toBeTruthy()
+    expect(merge[MCP_POMNIA_VAULT_KEY]).toBeTruthy()
+    expect(merge[MCP_POMNIA_LIBRARY_KEY]).toBeTruthy()
     expect(Object.keys(merge)).toHaveLength(3)
   })
 
-  it('embedded Cursor uses single /mcp brain-rag without token', () => {
+  it('embedded Cursor uses single /mcp pomnia without token', () => {
     const s = buildSnippet('cursor', 'http://127.0.0.1:7862', 'darwin', '/Users/x', undefined, 'embedded')
     const full = JSON.parse(s.fullFileJson) as { mcpServers: Record<string, { url: string; headers?: unknown }> }
-    expect(Object.keys(full.mcpServers)).toEqual(['brain-rag'])
-    expect(full.mcpServers['brain-rag'].url).toBe('http://127.0.0.1:7862/mcp')
-    expect(full.mcpServers['brain-rag'].headers).toBeUndefined()
+    expect(Object.keys(full.mcpServers)).toEqual([MCP_POMNIA_KEY])
+    expect(full.mcpServers[MCP_POMNIA_KEY].url).toBe('http://127.0.0.1:7862/mcp')
+    expect(full.mcpServers[MCP_POMNIA_KEY].headers).toBeUndefined()
   })
 
   it('Brain Mode OFF omits agent brief', () => {
@@ -54,13 +54,23 @@ describe('brain/snippet — Cursor remote mcp.json', () => {
     const s = buildSnippet('cursor', 'http://127.0.0.1:7862', 'win32', 'C:\\Users\\x', undefined, 'embedded', {
       brainMode: true,
     })
-    expect(s.brief?.filePath.replace(/\\/g, '/')).toMatch(/\.cursor\/rules\/brain\.mdc$/)
+    expect(s.brief?.filePath.replace(/\\/g, '/')).toMatch(/\.cursor\/rules\/pomnia\.mdc$/)
     expect(s.brief?.content).toContain('alwaysApply: true')
     expect(s.brief?.content).toContain('pomnia-brain-start')
     expect(s.brief?.content).toContain('OK to Go Go Go')
     expect(s.agentRuleMarkdown).toContain('save_conversation')
+    expect(s.agentRuleMarkdown).toContain('checkpoint_session')
+    expect(s.agentRuleMarkdown).toContain('autoCheckpointEnabled')
+    expect(s.agentRuleMarkdown).toContain('sessions/checkpoints')
     expect(s.agentRuleMarkdown).toContain('Do not assume Pomnia auto-captures')
-    expect(s.agentRuleMarkdown).toContain('Handshake (proof Pomnia Brain is wired)')
+    expect(s.agentRuleMarkdown).toContain('Handshake (proof Pomnia MCP')
+    expect(s.agentRuleMarkdown).toContain('zapisz do Pomnia')
+    expect(s.agentRuleMarkdown).toContain('sprawdź w Pomnia')
+    expect(s.agentRuleMarkdown).toContain('PRIORITY 0')
+    expect(s.agentRuleMarkdown).toContain('MUST')
+    expect(s.agentRuleMarkdown).toContain('vault/AGENTS.md')
+    expect(s.agentRuleMarkdown).toContain('quality_score')
+    expect(s.agentRuleMarkdown).toContain('MCP `pomnia`')
   })
 
   it('Brain Mode ON wires custom handshake phrase into the rule', () => {
@@ -69,7 +79,32 @@ describe('brain/snippet — Cursor remote mcp.json', () => {
       handshakePhrase: 'Ruszamy',
     })
     expect(s.agentRuleMarkdown).toContain('`Ruszamy`')
+    expect(s.agentRuleMarkdown).toContain('PRIORITY 0')
     expect(s.instructions).toContain('Ruszamy')
+  })
+
+  it('upsertPomniaBrainBrief puts Handshake block at top and replaces old markers', async () => {
+    const { upsertPomniaBrainBrief, buildBrainBriefMd } = await import('./snippet.js')
+    const brief = buildBrainBriefMd({ handshakePhrase: 'OK to Go Go Go' })
+    const existing = '# Old notes\n\n<!-- pomnia-brain-start -->\nold\n<!-- pomnia-brain-end -->\n\nkeep me\n'
+    const next = upsertPomniaBrainBrief(existing, brief)
+    expect(next.indexOf('<!-- pomnia-brain-start -->')).toBe(0)
+    expect(next).toContain('OK to Go Go Go')
+    expect(next).toContain('keep me')
+    expect(next).not.toContain('\nold\n')
+    expect(next.match(/<!-- pomnia-brain-start -->/g)?.length).toBe(1)
+  })
+
+  it('upsertVaultAgentsHandshake embeds exact phrase', async () => {
+    const { upsertVaultAgentsHandshake } = await import('./snippet.js')
+    const next = upsertVaultAgentsHandshake(
+      '# AGENTS\n\n## Handshake\nold soft pointer\n\n## Zasady\nx\n',
+      { handshakePhrase: 'OK to Go Go Go' },
+    )
+    expect(next).toContain('<!-- pomnia-handshake-start -->')
+    expect(next).toContain('`OK to Go Go Go`')
+    expect(next).toContain('MUST')
+    expect(next).not.toContain('old soft pointer')
   })
 
   it('Brain Mode ON with handshakeEnabled false omits greeting rule', () => {
@@ -110,10 +145,30 @@ describe('brain/snippet — Antigravity remote mcp_config.json', () => {
         { type?: string; serverUrl?: string; url?: string; headers?: { Authorization: string } }
       >
     }
-    const rag = full.mcpServers['brain-rag']
+    const rag = full.mcpServers[MCP_POMNIA_KEY]
     expect(rag.type).toBe('streamable-http')
     expect(rag.serverUrl).toBe('http://brain.example.local:7862/mcp')
     expect(rag.url).toBeUndefined()
     expect(rag.headers?.Authorization).toBe('Bearer btk_test_token')
+  })
+
+  it('Brain Mode ON includes GEMINI.md brief path (Zapisz regułę na dysk)', () => {
+    const s = buildSnippet(
+      'antigravity',
+      'http://127.0.0.1:7862',
+      'win32',
+      'C:\\Users\\Alice',
+      undefined,
+      'embedded',
+      { brainMode: true },
+    )
+    expect(s.brief?.filePath.replace(/\\/g, '/')).toMatch(/\.gemini\/config\/GEMINI\.md$/)
+    expect(s.brief?.mode).toBe('append-to-existing')
+    expect(s.brief?.content).toContain('pomnia-brain-start')
+    expect(s.brief?.content).toContain('PRIORITY 0')
+    expect(s.brief?.content).toContain('search_library')
+    expect(s.brief?.content).toContain('MUST')
+    expect(s.agentRuleMarkdown).toContain('get_user_profile')
+    expect(s.instructions).toContain('GEMINI.md')
   })
 })

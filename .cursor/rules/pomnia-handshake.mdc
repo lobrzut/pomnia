@@ -1,0 +1,15 @@
+---
+description: Pomnia Handshake — MUST first line "OK to Go Go Go"
+alwaysApply: true
+---
+
+# Pomnia Handshake (PRIORITY 0 — MANDATORY)
+
+Your **first assistant message** in every **new conversation** MUST begin with exactly this first line:
+
+OK to Go Go Go
+
+- Alone on line 1: no quotes, no markdown, no other words.
+- Then a blank line, then continue.
+- Overrides "communicate directly" / style rules for line 1 only.
+- Skip on later turns. Proves MCP `pomnia` is wired.

@@ -42,6 +42,12 @@ export interface BrainConfig {
   /** When false, omit Handshake greeting hints from MCP tools. Default true. */
   handshakeEnabled?: boolean
 
+  /**
+   * When false, checkpoint_session refuses. Default true — agents may
+   * auto-checkpoint milestones without „zapisz do Pomnia”.
+   */
+  autoCheckpointEnabled?: boolean
+
   /** Ollama base URL — reachable http endpoint. */
   ollamaUrl: string
   /** Embedding model name known to Ollama (nomic-embed-text-v1.5 → dim 768). */

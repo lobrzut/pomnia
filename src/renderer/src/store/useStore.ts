@@ -270,6 +270,7 @@ interface State {
   uiLocale: UiLocale
   handshakePhrase: string
   handshakeEnabled: boolean
+  autoCheckpointEnabled: boolean
   setMinimizeToTray: (on: boolean) => void
   setCloseToTray: (on: boolean) => void
   setFloatingMonitorOnMinimize: (on: boolean) => void
@@ -278,6 +279,7 @@ interface State {
   setUiLocale: (locale: UiLocale) => void
   setHandshakePhrase: (phrase: string) => Promise<{ ok: boolean; phrase: string }>
   setHandshakeEnabled: (on: boolean) => void
+  setAutoCheckpointEnabled: (on: boolean) => void
   loadAppSettings: () => Promise<void>
 
   /** Distill pipeline — lives in the store so progress survives tab switches. */
@@ -605,6 +607,7 @@ export const useStore = create<State>((set, get) => ({
   uiLocale: 'pl',
   handshakePhrase: DEFAULT_HANDSHAKE_PHRASE,
   handshakeEnabled: true,
+  autoCheckpointEnabled: true,
   async loadAppSettings() {
     try {
       const s = await api.appSettings()
@@ -653,6 +656,7 @@ export const useStore = create<State>((set, get) => ({
           ? displayHandshakePhrase(s.handshakePhrase)
           : DEFAULT_HANDSHAKE_PHRASE
       const handshakeEnabled = s.handshakeEnabled !== false
+      const autoCheckpointEnabled = s.autoCheckpointEnabled !== false
 
       set({
         minimizeToTray: s.minimizeToTray,
@@ -663,6 +667,7 @@ export const useStore = create<State>((set, get) => ({
         uiLocale,
         handshakePhrase,
         handshakeEnabled,
+        autoCheckpointEnabled,
         ollamaUrl,
         remoteBrainUrl,
         brainTarget,
@@ -725,6 +730,11 @@ export const useStore = create<State>((set, get) => ({
   setHandshakeEnabled: (handshakeEnabled) => {
     void api.appSettingsSet({ handshakeEnabled }).then((s) =>
       set({ handshakeEnabled: s.handshakeEnabled !== false }),
+    )
+  },
+  setAutoCheckpointEnabled: (autoCheckpointEnabled) => {
+    void api.appSettingsSet({ autoCheckpointEnabled }).then((s) =>
+      set({ autoCheckpointEnabled: s.autoCheckpointEnabled !== false }),
     )
   },
 

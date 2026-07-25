@@ -69,6 +69,16 @@ src/renderer/        UI: React + Tailwind + Framer Motion
 | Cursor „Not connected" | Snippet z Connect; zrestartuj Cursor |
 | Cursor 0 czatów po backupie | Duży `state.vscdb` — użyj **Import** zamiast live backup |
 | SmartScreen / Gatekeeper | Unsigned build prywatny — „Uruchom mimo to" / obejście Gatekeeper |
+| Symantec / Defender na niepodpisanym buildzie | **Nie wyłączaj AV.** Reputacja = Authenticode (ship blocker): [docs/CODE-SIGNING.md](docs/CODE-SIGNING.md). Wykluczenia folderów tylko jako last resort (Settings → Windows / antywirus) |
+| Instalator „cannot be closed” | Tray → **Zakończ**, zamknij setup, spróbuj ponownie (NSIS zamyka `Pomnia.exe` + `pomnia-brain.exe`) |
+
+### Windows AV — nie budujemy produktu na wykluczeniach
+
+**Cel:** Pomnia działa od razu z Defender / Symantec **bez** proszenia użytkownika o wyjątki. Wykluczenia ≠ strategia produktu.
+
+**Publiczny release Windows** wymaga podpisu Authenticode (OV/EV lub Azure Trusted Signing) zanim marketingujemy „just works” — szczegóły: [docs/CODE-SIGNING.md](docs/CODE-SIGNING.md).
+
+Niepodpisane buildy deweloperskie mogą wpadać w heurystyki (Electron + `pomnia-brain.exe` + vault). W aplikacji: **Ustawienia → Windows / antywirus** — wyjątki folderów tylko jako tymczasowe obejście / polityka IT. Nigdy nie wyłączaj AV.
 
 **Instalatory** (Win `.exe` / Mac `.dmg`) budowane lokalnie (`npm run pack:win` / `pack:mac`) — nie publikujemy tu publicznych GitHub Releases.
 

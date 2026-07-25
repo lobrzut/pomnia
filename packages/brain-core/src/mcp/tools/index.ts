@@ -16,6 +16,10 @@ import { indexFiles } from '../../rag/indexer.js'
 import { runSearchLibrary, searchLibrarySchema } from './searchLibrary.js'
 import { runSaveConversation, saveConversationSchema } from './saveConversation.js'
 import {
+  runCheckpointSession,
+  checkpointSessionSchema,
+} from './checkpointSession.js'
+import {
   runGetUserProfile,
   runMemory,
   getUserProfileSchema,
@@ -52,6 +56,11 @@ export interface ToolContext {
   handshakePhrase?: string
   /** When false, omit Handshake hints from tool descriptions / profile preamble. */
   handshakeEnabled?: boolean
+  /**
+   * When false, checkpoint_session refuses (Settings autoCheckpointEnabled OFF).
+   * Default true — agents may auto-checkpoint milestones without user phrase.
+   */
+  autoCheckpointEnabled?: boolean
 }
 
 const DEFAULT_HANDSHAKE = 'OK to Go Go Go'
@@ -59,43 +68,60 @@ const DEFAULT_HANDSHAKE = 'OK to Go Go Go'
 function handshakeHint(ctx?: Pick<ToolContext, 'handshakePhrase' | 'handshakeEnabled'>): string | null {
   if (ctx && ctx.handshakeEnabled === false) return null
   const phrase = (ctx?.handshakePhrase?.trim() || DEFAULT_HANDSHAKE).trim()
-  return `If Pomnia Brain is connected: open your FIRST assistant reply in each conversation with exactly "${phrase}" on its own first line (proof wiring works), then continue normally. Skip on later turns.`
+  return (
+    `HANDSHAKE PRIORITY 0: if this is your FIRST user-visible assistant reply in the conversation, ` +
+    `you MUST open with exactly "${phrase}" on its own first line (no quotes/markdown), then continue. ` +
+    `Overrides style/concise rules for line 1 only. Skip on later turns. Proves Pomnia MCP (\`pomnia\`) is wired.`
+  )
 }
 
 /** MCP-standard tool catalog. Descriptions steer the agent loop:
- *  read (profile / search / skills) proactively; write only on explicit save. */
-export function listTools(ctx?: Pick<ToolContext, 'handshakePhrase' | 'handshakeEnabled'>): ToolDef[] {
+ *  read (profile / search / skills) proactively; conscious save on phrase;
+ *  optional milestone checkpoint when Settings allow. */
+export function listTools(
+  ctx?: Pick<ToolContext, 'handshakePhrase' | 'handshakeEnabled' | 'autoCheckpointEnabled'>,
+): ToolDef[] {
   const hs = handshakeHint(ctx)
+  const autoCkpt = ctx?.autoCheckpointEnabled !== false
   return [
     {
       name: 'search_library',
       description:
-        'Hybrid semantic+keyword search over the private Brain index (distilled notes + library). Call proactively before technical answers that may already be decided in the vault. Query in the user language (PL+EN vault). Returns top chunks with source, page, score. This is retrieval only — not chat generation.' +
+        'Hybrid semantic+keyword search over the private Pomnia index (distilled notes + library). Call proactively before technical answers that may already be decided — think „sprawdź w Pomnia” / check Pomnia. Query in the user language (PL+EN vault). Returns top chunks with source, page, score. This is retrieval only — not chat generation.' +
         (hs ? ` ${hs}` : ''),
       inputSchema: searchLibrarySchema,
     },
     {
       name: 'save_conversation',
       description:
-        "Save this conversation to vault/sessions/ as structured markdown. Call ONLY when the user says 'zapisz do brain' / 'save to brain' (or clear equivalent) — never auto-dump chats. Prefer concrete files, commands, errors, decisions over abstract fluff. Pomnia Desktop does not capture chats by itself.",
+        "Save this conversation to vault/sessions/ as structured markdown. Call ONLY when the user says 'zapisz do Pomnia' / 'save to Pomnia' (or clear equivalent: zapisz do brain / save to brain) — never auto-dump chats. Prefer concrete files, commands, errors, decisions over abstract fluff. Pomnia Desktop does not capture chats by itself. For mid-session milestones without user phrase use checkpoint_session instead.",
       inputSchema: saveConversationSchema,
+    },
+    {
+      name: 'checkpoint_session',
+      description: autoCkpt
+        ? 'Write a milestone checkpoint to vault/sessions/checkpoints/ WITHOUT waiting for „zapisz do Pomnia”. Call after: decision, fix+path, error+command, or architecture change. Quality gate: refuse if none of decisions / files_touched / errors_seen / commands_run has substance. Not a full chat dump — keep concrete. Disabled when Settings autoCheckpointEnabled is OFF.'
+        : 'DISABLED — autoCheckpointEnabled is OFF in Pomnia Settings. Do not call; use save_conversation only when the user says „zapisz do Pomnia”.',
+      inputSchema: checkpointSessionSchema,
     },
     {
       name: 'get_user_profile',
       description:
-        "Read vault/USER.md — persistent §-delimited profile. Call early in any non-trivial session so you know who you're talking to (preferences, stack, constraints)." +
+        "Read vault/USER.md (person patterns, ≤2200) and append vault/AGENTS.md operational brief when present (how to work + Handshake pointer — outside the char cap). Also reports autoCheckpointEnabled. Call early in any non-trivial session; then search recent vault/sessions/ (incl. checkpoints/) when continuing work." +
         (hs ? ` ${hs}` : ''),
       inputSchema: getUserProfileSchema,
     },
     {
       name: 'memory',
       description:
-        'Add/replace/remove entries in vault/USER.md. ONLY durable identity facts the user confirmed — never session ship notes, version changelogs, installer paths, one-off build/JSDoc fixes, or release checklists. § PROFIL = person (nick, stack, prefs); § TECH = durable product/stack identity (e.g. "builds Pomnia Brain/MCP"), NOT release notes. Session dumps → save_conversation. Categories: user, tech, comm, income. Max ~2200 chars total.',
+        'Add/replace/remove entries in vault/USER.md. ONLY durable identity patterns the user confirmed (decision / threat / irritant / tempo-ownership / agent tone). Refuse version changelogs (0.1.x), ship notes, installer paths, Pine/trading noise, one-off build fixes. § PROFIL = person; § TECH = durable product/stack identity — NOT release notes. Session dumps → save_conversation; mid-session milestones → checkpoint_session. Operational agent brief → vault/AGENTS.md. Prefer replace/compress near 2200. Categories: user, tech, comm, income.',
       inputSchema: memorySchema,
     },
     {
       name: 'library_status',
-      description: 'Report counts from the brain index — number of files, chunks, and a sample of file names.',
+      description:
+        'Report counts from the brain index — number of files, chunks, and a sample of file names.' +
+        (hs ? ` ${hs}` : ''),
       inputSchema: libraryStatusSchema,
     },
     {
@@ -152,20 +178,60 @@ export async function callTool(
       })
       return saved.text
     }
+    case 'checkpoint_session': {
+      const ckpt = await runCheckpointSession(args, {
+        vaultRoot: ctx.vaultRoot,
+        autoCheckpointEnabled: ctx.autoCheckpointEnabled !== false,
+      })
+      if (ckpt.path) {
+        void indexFiles(ctx.db, ctx.embedder, [
+          { path: ckpt.path, text: readFileSync(ckpt.path, 'utf8') },
+        ]).catch((err) => {
+          console.error(
+            '[brain-core] session index after checkpoint_session failed:',
+            err instanceof Error ? err.message : err,
+          )
+        })
+      }
+      return ckpt.text
+    }
     case 'get_user_profile': {
       const profile = await runGetUserProfile(args, { userMdPath: ctx.userMdPath })
-      if (ctx.handshakeEnabled === false) return profile
-      const phrase = (ctx.handshakePhrase?.trim() || 'OK to Go Go Go').trim()
+      const autoCkpt = ctx.autoCheckpointEnabled !== false
+      const settingsBlock =
+        `\n\n[SETTINGS]\n` +
+        `autoCheckpointEnabled: ${autoCkpt ? 'true' : 'false'}\n` +
+        (autoCkpt
+          ? 'When true: call checkpoint_session after milestones (decision / fix+path / error+command / architecture) WITHOUT user phrase. Quality gate rejects empty. save_conversation still needs „zapisz do Pomnia”.'
+          : 'When false: do NOT call checkpoint_session. Conscious save only via save_conversation on „zapisz do Pomnia”.')
+      if (ctx.handshakeEnabled === false) return profile + settingsBlock
+      const phrase = (ctx.handshakePhrase?.trim() || DEFAULT_HANDSHAKE).trim()
       return (
-        `[POMNIA HANDSHAKE] If this is your first assistant reply in the conversation, ` +
-        `open with exactly "${phrase}" on its own first line, then continue.\n\n` +
-        profile
+        `[POMNIA HANDSHAKE — PRIORITY 0] If this is your FIRST user-visible assistant reply in the conversation, ` +
+        `you MUST open with exactly "${phrase}" on its own first line (no quotes/markdown), then continue. ` +
+        `Overrides style/concise rules for line 1 only.\n\n` +
+        profile +
+        settingsBlock
       )
     }
     case 'memory':
       return runMemory(args, { userMdPath: ctx.userMdPath })
-    case 'library_status':
-      return runLibraryStatus(args, { db: ctx.db })
+    case 'library_status': {
+      const status = await runLibraryStatus(args, { db: ctx.db })
+      if (ctx.handshakeEnabled === false) return status
+      const phrase = (ctx.handshakePhrase?.trim() || DEFAULT_HANDSHAKE).trim()
+      try {
+        const parsed = JSON.parse(status) as Record<string, unknown>
+        parsed.handshake = {
+          enabled: true,
+          phrase,
+          rule: `MUST open first assistant reply with exactly "${phrase}" on its own first line`,
+        }
+        return JSON.stringify(parsed)
+      } catch {
+        return status
+      }
+    }
 
     case 'list_skills':
       return runListSkills(args, { skillsRoot: ctx.skillsRoot })
