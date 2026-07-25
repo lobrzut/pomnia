@@ -33,7 +33,12 @@ const FLOW_AGENT_JUNCTION_Y = 168
 const FLOW_MEMORY_LABEL_Y = 134
 /** Main-row x positions (%). Wider gap library ↔ MCP reduces label overlap. */
 const FLOW_LIBRARY_X = 65
-const FLOW_MCP_X = 94
+/** Keep ≤90 so MCP card (w-[124px], centered) clears the right gutter at ~900px cards. */
+const FLOW_MCP_X = 88
+/** Deploy sits on the optional branch; leave room for w-[108px] + disk label. */
+const FLOW_DEPLOY_X = 90
+/** Full-canvas height — HTML nodes+labels are taller than SVG point marks. */
+const FLOW_FULL_H = 400
 
 export interface FlowDiagramProps {
   variant?: 'full' | 'mini' | 'pip'
@@ -175,7 +180,7 @@ function buildNodes(L: ReturnType<typeof uiLabels>, mini: boolean): FlowNodeDef[
     },
     {
       id: 'deploy',
-      x: 96,
+      x: FLOW_DEPLOY_X,
       y: deployY,
       icon: CloudUpload,
       label: L.flowNodeDeployLabel,
@@ -219,7 +224,7 @@ function buildEdges(memoryReturnLabel: string): FlowEdge[] {
     },
     {
       id: 'e-library-deploy',
-      d: `M ${sx(FLOW_LIBRARY_X)} ${my} L ${sx(FLOW_LIBRARY_X)} ${FLOW_DEPLOY_Y} L ${sx(96)} ${FLOW_DEPLOY_Y}`,
+      d: `M ${sx(FLOW_LIBRARY_X)} ${my} L ${sx(FLOW_LIBRARY_X)} ${FLOW_DEPLOY_Y} L ${sx(FLOW_DEPLOY_X)} ${FLOW_DEPLOY_Y}`,
       branch: 'optional',
       particleDelay: 1.4
     }
@@ -775,8 +780,9 @@ export function FlowDiagram({
       <div
         className={clsx(
           'relative w-full',
-          pip ? 'min-h-0 flex-1' : mini ? 'h-[140px]' : 'h-[360px]',
+          pip ? 'min-h-0 flex-1' : mini ? 'h-[140px]' : null,
         )}
+        style={!pip && !mini ? { height: FLOW_FULL_H } : undefined}
       >
         {(pip || !mini) && (
           <div
@@ -803,6 +809,13 @@ export function FlowDiagram({
           />
         )}
 
+        {/* Full: inset so centered cards (MCP/Deploy) clear overflow-hidden edges. */}
+        <div
+          className={clsx(
+            'absolute',
+            !mini && !pip ? 'inset-x-12 inset-y-6 sm:inset-x-14' : 'inset-0',
+          )}
+        >
         <svg
           ref={svgRef}
           className="pointer-events-none absolute inset-0 z-0 h-full w-full"
@@ -931,6 +944,7 @@ export function FlowDiagram({
             </div>
           )
         })}
+        </div>
       </div>
 
       {mini && !pip && (

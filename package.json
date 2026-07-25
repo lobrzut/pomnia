@@ -1,6 +1,6 @@
 {
   "name": "pomnia",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "description": "Pomnia — local-first AI memory for developers: encrypted vault, distill pipeline, embedded Brain MCP.",
   "homepage": "https://pomnia.ai",
   "author": {
