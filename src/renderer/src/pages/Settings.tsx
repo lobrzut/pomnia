@@ -693,13 +693,6 @@ export default function Settings() {
         </div>
         <p className="mb-2 text-xs text-ink-dim">{labels.antivirusLead}</p>
         <p className="mb-3 text-xs text-ink-dim">{labels.antivirusWhy}</p>
-        <p className="mb-2 text-xs font-medium text-ink">{labels.antivirusSteps}</p>
-        <ul className="mb-3 space-y-1 font-mono text-[11px] text-ink-faint">
-          <li>• {labels.antivirusPathInstall}</li>
-          <li>• {labels.antivirusPathVault}</li>
-          <li>• {labels.antivirusPathSetup}</li>
-          <li>• {labels.antivirusPathBrain}</li>
-        </ul>
         <p className="mb-3 text-[11px] leading-relaxed text-ink-dim">{labels.antivirusSigningNote}</p>
         {!isMock && (
           <Button

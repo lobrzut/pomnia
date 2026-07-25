@@ -286,16 +286,12 @@ export interface UiLabels {
   securityPortability: string
   /** Footer under Settings → Bezpieczeństwo; `version` from app.getVersion(). */
   securityAboutCli: (version: string) => string
-  /** Settings → Windows AV — signed path first; exclusions = last resort only. */
+  /** Settings → Windows AV — OOB + signing framing; no exclusion checklist in UI. */
   antivirusTitle: string
   antivirusLead: string
   antivirusWhy: string
-  antivirusSteps: string
-  antivirusPathInstall: string
-  antivirusPathVault: string
-  antivirusPathSetup: string
-  antivirusPathBrain: string
   antivirusSigningNote: string
+  /** Generic open-install-dir utility (not an AV-exclusion affordance). */
   antivirusOpenInstallFolder: string
   previewMode: string
   importTitle: string
@@ -692,12 +688,6 @@ const PL_LABELS: UiLabels = {
     'Cel produktu: Pomnia działa od razu na Windows (Defender / Symantec) bez proszenia o wykluczenia. Wykluczenia to nie strategia — to tymczasowe obejście.',
   antivirusWhy:
     'Lokalny Brain (MCP 127.0.0.1:7862, helper pomnia-brain.exe) + vault wyglądają heurystykom jak „dziwny” soft, zwłaszcza przy niepodpisanym instalatorze. To problem reputacji / podpisu, nie „trzeba dodać wyjątek w AV”.',
-  antivirusSteps:
-    'Ostatnia deska ratunku — tylko niepodpisane buildy deweloperskie albo polityka IT w firmie (nie wyłączaj AV). Symantec / Norton / Defender → wyjątki folderów:',
-  antivirusPathInstall: '%LOCALAPPDATA%\\Programs\\Pomnia',
-  antivirusPathVault: 'Folder vaultu (np. C:\\Vault)',
-  antivirusPathSetup: 'Folder z instalatorem *-setup.exe (np. Pulpit)',
-  antivirusPathBrain: '…\\Pomnia\\resources\\brain-core (opcjonalnie)',
   antivirusSigningNote:
     'Publiczny release Windows: ship blocker = Authenticode (OV/EV lub Azure Trusted Signing). Bez podpisu nie marketingujemy „just works” i nie budujemy onboardingu wokół wykluczeń.',
   antivirusOpenInstallFolder: 'Otwórz folder instalacji',
@@ -1075,12 +1065,6 @@ const EN_LABELS: Partial<UiLabels> = {
     'Product goal: Pomnia works out of the box on Windows (Defender / Symantec) without asking for exclusions. Exclusions are not a product strategy — only a temporary workaround.',
   antivirusWhy:
     'Local Brain (MCP 127.0.0.1:7862, pomnia-brain.exe) plus an encrypted vault look suspicious to heuristics, especially with an unsigned installer. That is a reputation / signing problem — not “users must whitelist us”.',
-  antivirusSteps:
-    'Last resort only — unsigned developer builds or enterprise IT policy (never turn AV off). Symantec / Norton / Defender → folder exceptions:',
-  antivirusPathInstall: '%LOCALAPPDATA%\\Programs\\Pomnia',
-  antivirusPathVault: 'Your vault folder (e.g. C:\\Vault)',
-  antivirusPathSetup: 'Folder with the *-setup.exe (e.g. Desktop)',
-  antivirusPathBrain: '…\\Pomnia\\resources\\brain-core (optional)',
   antivirusSigningNote:
     'Public Windows release ship blocker: Authenticode (OV/EV or Azure Trusted Signing). Without a signature we do not market “just works” and we do not center onboarding on exclusions.',
   antivirusOpenInstallFolder: 'Open install folder',
