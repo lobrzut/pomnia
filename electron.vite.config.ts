@@ -7,7 +7,14 @@ import tailwindcss from '@tailwindcss/vite'
 // 0.1.26 excluded "bluebird" but Vite SSR still left bare
 // `import from "bluebird/js/release/promise"` — Node then looks for package
 // bluebird at asar root (missing; only mammoth/node_modules/bluebird existed).
-const mainExternals = ['electron']
+const mainExternals = [
+  'electron',
+  // Native + worker/wasm — must resolve at runtime from node_modules / asarUnpack.
+  'tesseract.js',
+  'tesseract.js-core',
+  '@napi-rs/canvas',
+  'pdfjs-dist',
+]
 
 /** Force-resolve mammoth's bluebird subpath so Rollup inlines it (no bare import). */
 function forceBundleBluebird(): Plugin {

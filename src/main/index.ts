@@ -25,6 +25,8 @@ import {
   listAllSkills,
   loadIndex,
   log,
+  noteFilename,
+  chunkText,
   parseExportPath,
   pingBrain,
   runBackup,
@@ -46,6 +48,7 @@ import {
 import { brainCore, killLeftoverBrainHelpers } from './brainCore.js'
 import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused } from './mcpActivityPoll.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
+import { runDocumentOcr } from './docOcr.js'
 import { indexPendingLibraryDocuments, type PendingIndexResult } from './libraryIndex.js'
 import {
   applyLoginItemSettings,
@@ -189,7 +192,7 @@ function emitDocImportProgress(ev: { phase: string; done: number; total: number;
       ? 'indexing'
       : ev.phase === 'brain-start'
         ? 'brain-start'
-        : ev.phase === 'encrypt' || ev.phase === 'parse'
+        : ev.phase === 'encrypt' || ev.phase === 'parse' || ev.phase === 'ocr'
           ? 'doc-import'
           : 'doc-import'
   activity.update({ kind, phase: ev.phase, done: ev.done, total: ev.total, detail: ev.detail })
@@ -836,12 +839,24 @@ function registerIpc(): void {
         const vaultDistilled = brainVaultDistilledDir()
         await deployFilesystem(notes, vaultDistilled)
         const okNotes = notes.filter((n) => n.quality === 'ok')
-        const idx = await buildIndex(
-          okNotes.map((n) => ({ source: n.source, notePath: n.sessionId, text: n.markdown })),
-          o,
-          (done, total) => emitBrainProgress({ phase: 'index', done, total })
-        )
-        await saveIndex(idx, brainIndexFile())
+        // library.db is SoT: when embedded brain will index new notes, skip
+        // host buildIndex (localIndex JSON) — that was a dual full embed.
+        const brainWillIndex = brainCore.status().running && opts.reindex !== false
+        let idxChunks = 0
+        let idxDim = 0
+        if (!brainWillIndex) {
+          const idx = await buildIndex(
+            okNotes.map((n) => ({ source: n.source, notePath: n.sessionId, text: n.markdown })),
+            o,
+            (done, total) => emitBrainProgress({ phase: 'index', done, total })
+          )
+          await saveIndex(idx, brainIndexFile())
+          idxChunks = idx.entries.length
+          idxDim = idx.dim
+        } else {
+          idxChunks = okNotes.reduce((n, note) => n + chunkText(note.markdown).length, 0)
+          idxDim = 768
+        }
         // Only quality:ok locks the ledger. Stub/garbage stay pending so the
         // next "distill backlog" retries them instead of stranding knowledge in _review/.
         const okIds = new Set(notes.filter((n) => n.quality === 'ok').map((n) => n.sessionId))
@@ -855,16 +870,19 @@ function registerIpc(): void {
         let deployMethod: 'filesystem' | 'http' | 'none' = okNotes.length > 0 ? 'filesystem' : 'none'
         let reindexed = false
 
-        // Reindex vault root (distilled + sessions) — not brain-notes staging.
-        if (brainCore.status().running && opts.reindex !== false) {
+        // Index only new distilled notes into library.db (not full vault + not localIndex).
+        if (brainWillIndex) {
           activity.update({ kind: 'indexing', phase: 'reindex', done: 0, total: 1, detail: 'po destylacji…' })
           try {
             const root = brainVaultRoot()
-            await brainCore.reindex(root)
+            const newPaths = okNotes.map((n) => join(vaultDistilled, noteFilename(n)))
+            if (newPaths.length > 0) {
+              await brainCore.indexFiles(newPaths)
+            }
             reindexed = true
             await setAppSettings({ lastIndexedVaultRoot: root })
           } catch (e) {
-            log.warn('embedded reindex failed:', (e as Error).message)
+            log.warn('embedded indexFiles after distill failed:', (e as Error).message)
           }
         }
 
@@ -904,8 +922,8 @@ function registerIpc(): void {
           garbage: notes.filter((n) => n.quality === 'garbage').length,
           skipped,
           failed: failed.length,
-          chunks: idx.entries.length,
-          dim: idx.dim,
+          chunks: idxChunks,
+          dim: idxDim,
           deployed,
           deployMethod,
           reindexed

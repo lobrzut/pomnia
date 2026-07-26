@@ -37,6 +37,9 @@ export async function parseDocument(
 
 /** Human-readable parser id for UI / frontmatter. */
 export function extractionPathLabel(parsed: ParsedDocument): string {
+  if (parsed.meta.tier === 2 && parsed.format === 'pdf') {
+    return 'unpdf+tesseract'
+  }
   switch (parsed.format) {
     case 'pdf':
       return 'unpdf'

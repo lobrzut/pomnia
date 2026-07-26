@@ -78,9 +78,9 @@ W Cursorze zapytaj agenta o coś z wcześniejszej sesji — powinien wołać `se
 | Typ | Ścieżka | LLM? |
 |-----|---------|------|
 | **Czaty** (live backup, import ZIP) | Vault → **Distill** → index | Tak (qwen) |
-| **Dokumenty** (PDF, DOCX, EPUB) | Vault → **Direct index** | Nie (tylko embed) |
+| **Dokumenty** (PDF, DOCX, EPUB) | Vault → **Direct index** (+ opcjonalnie thin OCR) | Nie (tylko embed; OCR = tesseract) |
 
-Nie destyluj PDF-ów — indeksuj je bezpośrednio z zakładki Import.
+Nie destyluj PDF-ów — indeksuj je bezpośrednio z zakładki Import. Skan PDF (mało tekstu) → **Uruchom OCR**, potem indeks. **Odśwież indeks** pomija niezmienione pliki. Auto-checkpoint vs „zapisz do Pomnia”: [README](../README.md#kontynuacja-sesji-mcp).
 
 ## Import vs Backup
 
@@ -103,7 +103,7 @@ Jeśli Cursor backup pokazuje 0 czatów — użyj Import.
 
 - Podpisany instalator (SmartScreen / Gatekeeper)
 - Instalator Linux
-- OCR skanów PDF
+- Pełny OCR wszystkich stron / Ollama vision (jest thin OCR: pierwsze sparse pages)
 - Sync vault do chmury
 - Gwarancja Antigravity na każdej maszynie (adapter w testach)
 

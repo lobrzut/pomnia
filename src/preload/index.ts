@@ -25,6 +25,7 @@ const bridge = {
   vaultSearchText: (query: string) => ipcRenderer.invoke('vault:searchText', query),
   importToVault: (p: string) => ipcRenderer.invoke('import:toVault', p),
   docImport: (p?: string, ollamaUrl?: string) => ipcRenderer.invoke('doc:import', p, ollamaUrl),
+  docOcr: (docId: string, ollamaUrl?: string) => ipcRenderer.invoke('doc:ocr', docId, ollamaUrl),
   brainExport: (id: string, outDir: string) => ipcRenderer.invoke('brain:export', id, outDir),
   revealPath: (p: string) => ipcRenderer.invoke('reveal', p),
   revealInstallDir: () => ipcRenderer.invoke('reveal:installDir'),

@@ -10,8 +10,12 @@
  *  - schema:   db.ts creates the same tables, insert shape matches
  *    (delete-then-insert per file, chunks row → chunks_vec rowid)
  *  - page_num: per PDF page; 1 for DOCX/MD/TXT (Python convention)
+ *
+ * Incremental: indexDir skips files whose mtime+size (or content hash) match
+ * `indexed_files` — no DELETE+re-embed. Orphan prune still runs.
  */
 
+import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import type Database from 'better-sqlite3'
@@ -33,18 +37,26 @@ function throwIfAborted(signal?: AbortSignal, message = 'aborted'): void {
   throw err
 }
 
+/** SHA-256 of UTF-8 file content — stable skip key when mtime drifts. */
+export function contentHash(text: string): string {
+  return createHash('sha256').update(text, 'utf8').digest('hex')
+}
+
 export interface IndexStats {
+  /** Files newly embedded (delete+re-insert). */
   files: number
   chunks: number
   /** Files whose content produced zero chunks (empty after collapse). */
   empty: number
   /** DB rows removed because their file vanished from disk (prune pass). */
   prunedFiles: number
+  /** Unchanged files skipped (no re-embed). */
+  skipped: number
 }
 
 export interface IndexProgressEvent {
   file: string
-  /** Files fully indexed so far. */
+  /** Files fully processed so far (indexed or skipped). */
   done: number
   total: number
 }
@@ -64,9 +76,43 @@ export interface IndexDocumentInput {
   pages: { page: number; text: string }[]
 }
 
+type FileMetaRow = { content_hash: string; mtime_ms: number | null; size: number | null }
+
+function upsertFileMeta(
+  db: Database.Database,
+  path: string,
+  hash: string,
+  mtimeMs: number | null,
+  size: number | null,
+): void {
+  db.prepare(
+    `INSERT INTO indexed_files (pdf_path, content_hash, mtime_ms, size, updated_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(pdf_path) DO UPDATE SET
+       content_hash = excluded.content_hash,
+       mtime_ms = excluded.mtime_ms,
+       size = excluded.size,
+       updated_at = excluded.updated_at`,
+  ).run(path, hash, mtimeMs, size, new Date().toISOString())
+}
+
+function deleteFileMeta(db: Database.Database, path: string): void {
+  db.prepare('DELETE FROM indexed_files WHERE pdf_path = ?').run(path)
+}
+
+function fileStatMeta(path: string): { mtimeMs: number; size: number } | null {
+  try {
+    const st = statSync(path)
+    return { mtimeMs: st.mtimeMs, size: st.size }
+  } catch {
+    return null
+  }
+}
+
 /**
  * (Re)index a set of in-memory documents. Existing rows for each path are
  * dropped first — same "re-index from scratch per file" semantics as Python.
+ * Always embeds (no skip) — callers that want incremental use indexDir.
  */
 export async function indexFiles(
   db: Database.Database,
@@ -83,7 +129,7 @@ export async function indexFiles(
   )
   const insVec = db.prepare('INSERT INTO chunks_vec (rowid, embedding) VALUES (?, ?)')
 
-  const stats: IndexStats = { files: 0, chunks: 0, empty: 0, prunedFiles: 0 }
+  const stats: IndexStats = { files: 0, chunks: 0, empty: 0, prunedFiles: 0, skipped: 0 }
   let done = 0
 
   for (const f of files) {
@@ -105,6 +151,8 @@ export async function indexFiles(
     const chunks = chunkText(f.text)
     if (chunks.length === 0) {
       stats.empty += 1
+      const st = fileStatMeta(f.path)
+      upsertFileMeta(db, f.path, contentHash(f.text), st?.mtimeMs ?? null, st?.size ?? null)
       done += 1
       onProgress?.({ file: name, done, total: files.length })
       continue
@@ -130,6 +178,9 @@ export async function indexFiles(
       write()
       stats.chunks += batch.length
     }
+
+    const st = fileStatMeta(f.path)
+    upsertFileMeta(db, f.path, contentHash(f.text), st?.mtimeMs ?? null, st?.size ?? null)
 
     stats.files += 1
     done += 1
@@ -159,7 +210,7 @@ export async function indexDocument(
   const insVec = db.prepare('INSERT INTO chunks_vec (rowid, embedding) VALUES (?, ?)')
 
   const name = doc.name ?? basename(doc.path)
-  const stats: IndexStats = { files: 0, chunks: 0, empty: 0, prunedFiles: 0 }
+  const stats: IndexStats = { files: 0, chunks: 0, empty: 0, prunedFiles: 0, skipped: 0 }
 
   if (signal?.aborted) throwIfAborted(signal, 'index aborted')
 
@@ -183,8 +234,12 @@ export async function indexDocument(
     }
   }
 
+  const joined = doc.pages.map((p) => p.text).join('\n\n')
+  const st = fileStatMeta(doc.path)
+
   if (pending.length === 0) {
     stats.empty = 1
+    upsertFileMeta(db, doc.path, contentHash(joined), st?.mtimeMs ?? null, st?.size ?? null)
     onProgress?.({ file: name, done: 1, total: 1 })
     return stats
   }
@@ -216,6 +271,7 @@ export async function indexDocument(
     onProgress?.({ file: name, done: Math.min(i + batch.length, pending.length), total: pending.length })
   }
 
+  upsertFileMeta(db, doc.path, contentHash(joined), st?.mtimeMs ?? null, st?.size ?? null)
   stats.files = 1
   onProgress?.({ file: name, done: pending.length, total: pending.length })
   return stats
@@ -305,11 +361,56 @@ function isLibraryLogicalPath(path: string, root: string): boolean {
 }
 
 /**
+ * Decide whether a vault text file needs re-embed.
+ * Fast path: mtime+size match. Else content-hash; if hash matches, refresh
+ * mtime/size and skip embed. Missing fingerprint but chunks already present →
+ * record current fingerprint and skip (upgrade path — no wipe/re-embed).
+ */
+function classifyForIndex(
+  db: Database.Database,
+  path: string,
+  selMeta: Database.Statement,
+  countChunks: Database.Statement,
+): { action: 'skip' } | { action: 'index'; text: string } {
+  const st = fileStatMeta(path)
+  if (!st) return { action: 'skip' }
+
+  const meta = selMeta.get(path) as FileMetaRow | undefined
+  if (
+    meta &&
+    meta.mtime_ms != null &&
+    meta.size != null &&
+    Number(meta.mtime_ms) === st.mtimeMs &&
+    Number(meta.size) === st.size
+  ) {
+    return { action: 'skip' }
+  }
+
+  const text = readFileSync(path, 'utf8')
+  const hash = contentHash(text)
+
+  if (meta && meta.content_hash === hash) {
+    upsertFileMeta(db, path, hash, st.mtimeMs, st.size)
+    return { action: 'skip' }
+  }
+
+  if (!meta) {
+    const row = countChunks.get(path) as { c: number | bigint }
+    if (Number(row.c) > 0) {
+      upsertFileMeta(db, path, hash, st.mtimeMs, st.size)
+      return { action: 'skip' }
+    }
+  }
+
+  return { action: 'index', text }
+}
+
+/**
  * Index every .md/.txt under `rootDir` (distilled / sessions / library only when
  * those dirs exist; never skills/) and prune DB rows whose files are gone.
  * Also drops orphan rows from a previous vault root (e.g. AppData after portable
  * vault open) so search only reflects the current root.
- * This is the "reindex" the embedded brain runs after each distill.
+ * Unchanged files are skipped (mtime+size / content-hash) — no re-embed.
  */
 export async function indexDir(
   db: Database.Database,
@@ -319,8 +420,38 @@ export async function indexDir(
   signal?: AbortSignal,
 ): Promise<IndexStats> {
   const paths = listTextFiles(rootDir)
-  const files: IndexFileInput[] = paths.map((p) => ({ path: p, text: readFileSync(p, 'utf8') }))
-  const stats = await indexFiles(db, embedder, files, onProgress, signal)
+  const selMeta = db.prepare(
+    'SELECT content_hash, mtime_ms, size FROM indexed_files WHERE pdf_path = ?',
+  )
+  const countChunks = db.prepare('SELECT COUNT(*) AS c FROM chunks WHERE pdf_path = ?')
+
+  const toIndex: IndexFileInput[] = []
+  let skipped = 0
+  const total = paths.length
+  let done = 0
+
+  for (const p of paths) {
+    if (signal?.aborted) throwIfAborted(signal, 'reindex aborted')
+    const name = basename(p)
+    const decision = classifyForIndex(db, p, selMeta, countChunks)
+    if (decision.action === 'skip') {
+      skipped += 1
+      done += 1
+      onProgress?.({ file: name, done, total })
+      continue
+    }
+    toIndex.push({ path: p, text: decision.text })
+  }
+
+  // Progress for the embed pass continues from skipped count.
+  const embedProgress = onProgress
+    ? (p: IndexProgressEvent): void => {
+        onProgress({ file: p.file, done: skipped + p.done, total })
+      }
+    : undefined
+
+  const stats = await indexFiles(db, embedder, toIndex, embedProgress, signal)
+  stats.skipped = skipped
 
   // Prune: missing files under current root + any path outside current root.
   const present = new Set(paths.map(normalizeIndexPathKey))
@@ -340,9 +471,23 @@ export async function indexDir(
     const wipe = db.transaction(() => {
       for (const id of ids) delVec.run(BigInt(id))
       delChunks.run(p)
+      deleteFileMeta(db, p)
     })
     wipe()
     stats.prunedFiles += 1
+  }
+
+  // Drop fingerprints for paths no longer on disk / outside root (even if chunks
+  // already gone — keeps indexed_files tidy).
+  const metaPaths = db.prepare('SELECT pdf_path AS p FROM indexed_files').all() as { p: string }[]
+  for (const { p } of metaPaths) {
+    const underRoot = isIndexPathUnderRoot(p, rootDir)
+    if (underRoot && (isLibraryLogicalPath(p, rootDir) || present.has(normalizeIndexPathKey(p)))) {
+      continue
+    }
+    if (!underRoot || !present.has(normalizeIndexPathKey(p))) {
+      deleteFileMeta(db, p)
+    }
   }
 
   return stats

@@ -313,6 +313,10 @@ export interface UiLabels {
   importUnsupportedFormat: string
   importDocDone: string
   importDocOcrHint: string
+  importDocOcrRun: string
+  importDocOcrBusy: string
+  importDocOcrDoneToast: (pages: number) => string
+  importDocOcrFailedToast: string
   importDocBrainOff: string
   importDocQueuedHint: string
   importDocIndexedToast: (chunks: number) => string
@@ -324,6 +328,7 @@ export interface UiLabels {
   importDocPagesBadge: (n: number) => string
   importDocEncryptedBadge: string
   importDocProgressParse: string
+  importDocProgressOcr: string
   importDocProgressIndex: string
   importDocProgressBrainStart: string
   importDocProgressEncrypt: string
@@ -710,7 +715,11 @@ const PL_LABELS: UiLabels = {
   importDropNoPath: 'Nie udało się odczytać ścieżki pliku. Użyj „Wybierz plik…”.',
   importUnsupportedFormat: 'Nieobsługiwany format',
   importDocDone: 'Dokument zaimportowany',
-  importDocOcrHint: 'Mało tekstu — w v0.3 uruchom OCR dla skanów.',
+  importDocOcrHint: 'Mało tekstu — prawdopodobnie skan. Uruchom OCR, potem zindeksujemy ten dokument.',
+  importDocOcrRun: 'Uruchom OCR',
+  importDocOcrBusy: 'OCR w toku…',
+  importDocOcrDoneToast: (pages) => `OCR gotowy (${pages} str.)`,
+  importDocOcrFailedToast: 'OCR nie powiódł się',
   importDocBrainOff: 'Uruchom lokalną wyszukiwarkę (Brain), żeby zindeksować chunki.',
   importDocQueuedHint: 'Zapisano w vault — indeks po uruchomieniu Brain.',
   importDocIndexedToast: (chunks) => `Zindeksowano ${chunks} chunków`,
@@ -722,6 +731,7 @@ const PL_LABELS: UiLabels = {
   importDocPagesBadge: (n) => `${n} str.`,
   importDocEncryptedBadge: 'zaszyfrowany w vault',
   importDocProgressParse: 'Parsowanie',
+  importDocProgressOcr: 'OCR',
   importDocProgressIndex: 'Indeksowanie',
   importDocProgressBrainStart: 'Uruchamianie wyszukiwarki',
   importDocProgressEncrypt: 'Szyfrowanie w vault',
@@ -1188,6 +1198,12 @@ const EN_LABELS: Partial<UiLabels> = {
   importDocIndexedToast: (chunks) => `Indexed ${chunks} chunk(s)`,
   importDocQueuedToast: 'Saved — index after Brain starts',
   importDocNotIndexedBadge: 'no index',
+  importDocOcrHint: 'Little text — likely a scan. Run OCR, then we re-index this document.',
+  importDocOcrRun: 'Run OCR',
+  importDocOcrBusy: 'OCR running…',
+  importDocOcrDoneToast: (pages) => `OCR done (${pages} page(s))`,
+  importDocOcrFailedToast: 'OCR failed',
+  importDocProgressOcr: 'OCR',
   importDocProgressBrainStart: 'Starting search',
   guideTitle: 'Pomnia map',
   guideSubtitle: 'How it works',

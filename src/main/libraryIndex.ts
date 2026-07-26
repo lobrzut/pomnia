@@ -5,7 +5,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { parseDocument } from '@pomnia/doc-parser'
+import { pagesFromExtractedMarkdown, parseDocument } from '@pomnia/doc-parser'
 import { libraryDocLogicalPath, type Vault } from '@core/vault.js'
 import { brainCore } from './brainCore.js'
 import { ensureBrainForIndexing } from './ensureBrain.js'
@@ -35,18 +35,26 @@ export async function indexVaultDocument(
   try {
     await writeFile(tmpPath, source)
     onProgress?.({ phase: 'parse', done: 0, total: 1, detail: doc.originalName })
-    const parsed = await parseDocument(tmpPath)
+
+    // Prefer vault extracted.md (keeps OCR merges); fall back to Tier 1 re-parse.
+    let pages = pagesFromExtractedMarkdown(
+      (await vault.readLibraryExtracted(docId)).toString('utf8'),
+    )
+    if (!pages || pages.length === 0) {
+      const parsed = await parseDocument(tmpPath)
+      pages = parsed.pages
+    }
     onProgress?.({ phase: 'parse', done: 1, total: 1 })
 
     const logicalPath = libraryDocLogicalPath(vaultDir, docId)
-    onProgress?.({ phase: 'index', done: 0, total: parsed.pages.length, detail: doc.originalName })
+    onProgress?.({ phase: 'index', done: 0, total: pages.length, detail: doc.originalName })
     const stats = (await brainCore.indexDocument({
       path: logicalPath,
       name: doc.originalName,
-      pages: parsed.pages,
+      pages,
     })) as { chunks?: number }
     const chunks = stats?.chunks ?? 0
-    onProgress?.({ phase: 'index', done: parsed.pages.length, total: parsed.pages.length })
+    onProgress?.({ phase: 'index', done: pages.length, total: pages.length })
     await vault.markLibraryDocIndexed(docId)
     return chunks
   } finally {

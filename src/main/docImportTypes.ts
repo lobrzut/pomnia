@@ -15,3 +15,9 @@ export interface DocImportResult {
   indexError?: string
   encrypted: boolean
 }
+
+/** Result of on-demand OCR + optional single-doc re-index. */
+export interface DocOcrResult extends DocImportResult {
+  ocrMethod: 'tesseract' | 'ollama-vision' | 'none'
+  ocrPages: number
+}

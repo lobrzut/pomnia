@@ -8,6 +8,7 @@ import type {
   BrainProgressEvent,
   DocImportProgressEvent,
   DocImportResult,
+  DocOcrResult,
   BrainStateInfo,
   BrainStatus,
   ClientId,
@@ -62,6 +63,7 @@ export interface PomniaBridge {
   vaultSearchText(query: string): Promise<TextHit[]>
   importToVault(path: string): Promise<{ sealed: number; sources: { source: string; count: number }[] }>
   docImport(path?: string, ollamaUrl?: string): Promise<DocImportResult | null>
+  docOcr(docId: string, ollamaUrl?: string): Promise<DocOcrResult>
   brainExport(snapshotId: string, outDir: string): Promise<{ count: number; dir: string }>
   revealPath(p: string): Promise<void>
   /** Open the app install folder (optional AV last-resort paths). */
@@ -391,6 +393,27 @@ function mockBridge(): PomniaBridge {
         brainRunning: true,
         brainAutoStarted: false,
         encrypted: true,
+      }
+    },
+    async docOcr(docId: string) {
+      await new Promise((r) => setTimeout(r, 1200))
+      return {
+        docId,
+        sourcePath: 'C:/Vault.pomnia/library/abc_scan.pdf',
+        extractedPath: 'C:/Vault.pomnia/library/abc_scan.pdf/extracted.md',
+        format: 'pdf',
+        pages: 3,
+        chunks: 4,
+        sparse: false,
+        extractionPath: 'unpdf+tesseract',
+        suggestOcr: false,
+        indexed: true,
+        pendingIndex: false,
+        brainRunning: true,
+        brainAutoStarted: false,
+        encrypted: true,
+        ocrMethod: 'tesseract' as const,
+        ocrPages: 2,
       }
     },
     async vaultSearchText(query) {

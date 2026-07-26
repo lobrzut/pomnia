@@ -101,6 +101,11 @@ export interface DocImportResult {
   encrypted: boolean
 }
 
+export interface DocOcrResult extends DocImportResult {
+  ocrMethod: 'tesseract' | 'ollama-vision' | 'none'
+  ocrPages: number
+}
+
 export interface DocImportProgressEvent {
   phase: string
   done: number

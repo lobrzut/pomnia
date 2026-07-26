@@ -1,6 +1,6 @@
 {
   "name": "pomnia",
-  "version": "0.1.32",
+  "version": "0.1.33",
   "description": "Pomnia — local-first AI memory for developers: encrypted vault, distill pipeline, embedded Brain MCP.",
   "homepage": "https://pomnia.ai",
   "author": {
@@ -29,16 +29,20 @@
     "build:brain-core": "npm run build --prefix packages/brain-core",
     "build:doc-parser": "npm run build --prefix packages/doc-parser",
     "stage:brain-core": "node scripts/stage-brain-core.mjs",
-    "pack:win": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && electron-vite build && npm run test:golden && electron-builder --win",
-    "pack:mac": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && electron-vite build && npm run test:golden && electron-builder --mac"
+    "stage:tessdata": "node scripts/stage-tessdata.mjs",
+    "pack:win": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && npm run stage:tessdata && electron-vite build && npm run test:golden && electron-builder --win",
+    "pack:mac": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && npm run stage:tessdata && electron-vite build && npm run test:golden && electron-builder --mac"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.80",
     "@pomnia/brain-core": "*",
     "@pomnia/doc-parser": "*",
     "bluebird": "^3.7.2",
     "fflate": "^0.8.3",
     "mammoth": "^1.12.0",
+    "pdfjs-dist": "^4.10.38",
     "sql.js": "^1.12.0",
+    "tesseract.js": "^6.0.0",
     "unpdf": "^1.6.2"
   },
   "devDependencies": {

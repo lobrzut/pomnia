@@ -489,6 +489,48 @@ export class BrainCoreManager {
     }
   }
 
+  /**
+   * Embed only the given absolute paths into library.db (no full vault walk).
+   * Used after distill for new notes — library.db is SoT; skips localIndex dual-embed.
+   */
+  async indexFiles(paths: string[]): Promise<unknown> {
+    const child = this.child
+    if (!child || !this.url) throw new Error('embedded brain is not running')
+    if (this.indexing) throw new Error('reindex already running')
+    if (paths.length === 0) return { files: 0, chunks: 0, empty: 0, prunedFiles: 0, skipped: 0 }
+    this.indexing = true
+    try {
+      return await new Promise((resolve, reject) => {
+        const t = setTimeout(() => {
+          this.pendingOpReject = null
+          reject(new Error('index-files timeout (10 min)'))
+        }, 600_000)
+        this.pendingOpReject = (err) => {
+          clearTimeout(t)
+          child.off('message', h)
+          reject(err)
+        }
+        const h = (m: ChildMsg): void => {
+          if (m.type === 'reindexed') {
+            clearTimeout(t)
+            this.pendingOpReject = null
+            child.off('message', h)
+            resolve(m.stats)
+          } else if (m.type === 'error') {
+            clearTimeout(t)
+            this.pendingOpReject = null
+            child.off('message', h)
+            reject(new Error(m.message ?? 'index-files failed'))
+          }
+        }
+        child.on('message', h)
+        child.send({ type: 'index-files', paths })
+      })
+    } finally {
+      this.indexing = false
+    }
+  }
+
   /** Fast COUNT(*) on library.db via child (no sql.js of 200MB). */
   async libraryStats(): Promise<{ files: number; chunks: number }> {
     const child = this.child
