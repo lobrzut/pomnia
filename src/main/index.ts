@@ -1337,11 +1337,21 @@ function registerIpc(): void {
         next = upsertPomniaBrainBrief(existing, snippet.brief.content)
       }
       await fs.writeFile(filePath, next, 'utf8')
+      let handshakePath: string | undefined
+      if (snippet.handshakeBrief?.filePath && snippet.handshakeBrief.content) {
+        handshakePath = snippet.handshakeBrief.filePath
+        await fs.mkdir(dirname(handshakePath), { recursive: true })
+        const hs = snippet.handshakeBrief.content.endsWith('\n')
+          ? snippet.handshakeBrief.content
+          : `${snippet.handshakeBrief.content}\n`
+        await fs.writeFile(handshakePath, hs, 'utf8')
+      }
       const agents = await syncVaultAgentsHandshake(vaultPath)
       return {
         ok: true as const,
         path: filePath,
         bytes: Buffer.byteLength(next, 'utf8'),
+        handshakePath,
         agentsPath: agents.path,
       }
     } catch (e) {

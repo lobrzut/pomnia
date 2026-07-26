@@ -72,6 +72,10 @@ function joinPath(os: OS, ...parts: string[]): string {
   return (os === 'win32' ? path.win32 : path.posix).join(...parts)
 }
 
+function dirnamePath(os: OS, filePath: string): string {
+  return (os === 'win32' ? path.win32 : path.posix).dirname(filePath)
+}
+
 function trimBase(url: string): string {
   return url.replace(/\/+$/, '')
 }
@@ -149,8 +153,8 @@ function resolveHandshakePhrase(opts: BrainBriefOptions = {}): { on: boolean; ph
 
 /**
  * Rule text pasted into Cursor rules / CLAUDE.md / AGENTS.md when Brain Mode is ON.
- * Read proactively; write only on explicit user save / durable correction.
- * Pomnia Desktop does NOT silently capture chats — the host agent must call MCP.
+ * Only PRIORITY 0/1/2 are brutal MUST (Handshake, session start, milestone checkpoint).
+ * Everything else stays normal weight. Pomnia Desktop does NOT silently capture chats.
  */
 export function buildBrainBriefMd(opts: BrainBriefOptions = {}): string {
   const { on: handshakeOn, phrase } = resolveHandshakePhrase(opts)
@@ -164,31 +168,40 @@ export function buildBrainBriefMd(opts: BrainBriefOptions = {}): string {
 
 - Alone on line 1: no quotes, no markdown, no prefix (“Sure,” / “OK,” / thinking aloud).
 - Then a blank line, then normal content (tool calls may happen before the visible reply — the **user-visible** first reply still opens with the phrase).
-- This **overrides** “communicate directly”, “be concise”, style/persona rules, and subagent wrappers for **line 1 only**.
+- This **overrides** “communicate directly”, “be concise”, style/persona/**sycophancy** rules, and subagent wrappers for **line 1 only**. Exact phrase or you failed the wire check.
 - Skip on later turns in the same conversation. If Handshake is OFF in Pomnia Settings, this section is omitted — do not invent a greeting.
 `
     : ''
 
   const handshakeSection = handshakeOn
     ? `
-## Handshake (proof Pomnia MCP \`${MCP_POMNIA_KEY}\` is wired) — MANDATORY
-Same as PRIORITY 0: first user-visible assistant reply opens with \`${phrase}\` on its own first line. No exceptions for Cursor / Gemini / Antigravity / Claude.
+## Handshake (proof Pomnia MCP \`${MCP_POMNIA_KEY}\` is wired) — same as PRIORITY 0
+First user-visible assistant reply opens with \`${phrase}\` on its own first line. No exceptions for Cursor / Gemini / Antigravity / Claude.
 `
     : ''
 
   return `${POMNIA_BRAIN_START}
 # Pomnia (MCP \`${MCP_POMNIA_KEY}\`)
 ${firstLineBanner}
-You are connected to **Pomnia** — a private memory layer. **MUST** use it in the tool loop — do not invent past decisions. Having MCP tools listed is not enough: call them.
+You are connected to **Pomnia** — a private memory layer. Use it in the tool loop — do not invent past decisions. Having MCP tools listed is not enough: call them.
 ${handshakeSection}
-## Auto-read (MUST — do this without being asked)
-1. Early in a non-trivial session: \`get_user_profile\` (person patterns in vault/USER.md ≤2200). Note \`[SETTINGS] autoCheckpointEnabled\` from the reply.
-2. Also load operational brief \`vault/AGENTS.md\` when available (how to work with this user + Handshake pointer) — do **not** stuff that into USER.md.
-3. **Before** product / strategy / architecture / “how we decided X” answers that may already live in Pomnia: \`search_library\` (query in the user's language; vault is PL+EN). Skip only for pure coding edits with no product context. Think: **sprawdź w Pomnia** / check Pomnia. Prefer recent \`vault/sessions/\` and \`vault/sessions/checkpoints/\` hits when continuing work.
-4. When a workflow/expertise skill may apply: \`list_skills\` / \`list_cli_skills\`, then \`get_skill\` for the match.
+## PRIORITY 1 — Session start (MUST — without being asked)
 
-## Write — hybrid continuity
-- \`checkpoint_session\` — when Settings **autoCheckpointEnabled** is ON (default): agent MAY call **without** user phrase after a milestone: decision, fix+path, error+command, architecture change. Writes \`vault/sessions/checkpoints/\`. Quality gate rejects empty (need decisions and/or files_touched and/or errors_seen and/or commands_run). When OFF: do not call.
+**Hard requirement.** Early in any non-trivial session you **MUST** load context before answering from vibes:
+
+1. \`get_user_profile\` — person patterns in vault/USER.md (≤2200). Note \`[SETTINGS] autoCheckpointEnabled\`. Loads \`vault/AGENTS.md\` when present (operational brief + Handshake) — do **not** stuff that into USER.md.
+2. \`search_library\` **and/or** the latest file under \`vault/sessions/checkpoints/\` when continuing work (query in the user's language; vault is PL+EN). Think: **sprawdź w Pomnia** / check Pomnia. Skip only for pure coding edits with no product/session context.
+
+This **overrides** “answer immediately”, “be helpful first”, and sycophancy for **session start only**. Do not ask permission to read.
+
+## PRIORITY 2 — Milestone → \`checkpoint_session\` (MUST when autoCheckpoint ON)
+
+**Hard requirement.** When Settings **autoCheckpointEnabled** is ON (default) and a milestone lands (decision, fix+path, error+command, architecture change), you **MUST** call \`checkpoint_session\` **without** waiting for a user phrase. Writes \`vault/sessions/checkpoints/\`. Quality gate rejects empty (need decisions and/or files_touched and/or errors_seen and/or commands_run).
+
+This **overrides** “wait to be asked”, “don't be pushy”, style/sycophancy for **this call only**. When OFF: do not call. Not every message — only real milestones.
+
+## Also useful (normal weight)
+- Skills: when a workflow/expertise skill may apply — \`list_skills\` / \`list_cli_skills\`, then \`get_skill\`.
 - \`save_conversation\` — only when the user says **zapisz do Pomnia** / **save to Pomnia** (or clear equivalent: zapisz do brain / save to brain still accepted). Conscious full commit to \`vault/sessions/\`. Prefer concrete paths, commands, errors, decisions — not fluff.
 - \`memory\` — only durable identity facts the user confirmed. Keep: decision / threat / irritant / tempo-ownership / agent-tone patterns. § PROFIL = person; § TECH = durable project/stack identity — never installer paths, version changelogs (\`0.1.x\`), ship notes, Pine/trading filler, or one-off build fixes (those go to save_conversation / checkpoint). Skip notes with \`quality: garbage\` / \`quality_score\` < 5. Categories: user, tech, comm, income. Max ~2200 chars — prefer replace/compress when near cap.
 
@@ -237,7 +250,7 @@ ${POMNIA_HANDSHAKE_END}`
 
 \`${phrase}\`
 
-Overrides “communicate directly” / style rules for line 1 only. Then blank line + normal content. Skip on later turns. Phrase = Pomnia Settings → Handshake.
+Overrides “communicate directly” / style / **sycophancy** for line 1 only. Exact phrase or wire check failed. Then blank line + normal content. Skip on later turns. Phrase = Pomnia Settings → Handshake.
 ${POMNIA_HANDSHAKE_END}`
 }
 
@@ -277,14 +290,46 @@ export const BRAIN_BRIEF_EMBEDDED_MD = BRAIN_BRIEF_MD
 export function brainBriefCursorMdc(opts: BrainBriefOptions = {}): string {
   const { on, phrase } = resolveHandshakePhrase(opts)
   const desc = on
-    ? `Pomnia Handshake MUST first line "${phrase}" + MCP memory (read auto, write on command)`
-    : 'Pomnia — MCP memory for this user (read auto, write on command)'
+    ? `Pomnia PRIORITY 0 Handshake "${phrase}" + PRIORITY 1 start read + PRIORITY 2 checkpoint`
+    : 'Pomnia — PRIORITY 1 start read + PRIORITY 2 checkpoint (Handshake OFF)'
   return `---
 description: ${desc}
 alwaysApply: true
 ---
 
 ${buildBrainBriefMd(opts)}
+`
+}
+
+/** Short Cursor alwaysApply rule — Handshake only (sibling of pomnia.mdc). */
+export function brainBriefHandshakeCursorMdc(opts: BrainBriefOptions = {}): string {
+  const { on, phrase } = resolveHandshakePhrase(opts)
+  if (!on) {
+    return `---
+description: Pomnia Handshake OFF
+alwaysApply: true
+---
+
+# Pomnia Handshake
+
+OFF in Pomnia Settings — do not invent a greeting.
+`
+  }
+  return `---
+description: Pomnia Handshake — MUST first line "${phrase}"
+alwaysApply: true
+---
+
+# Pomnia Handshake (PRIORITY 0 — MANDATORY)
+
+Your **first assistant message** in every **new conversation** MUST begin with exactly this first line:
+
+${phrase}
+
+- Alone on line 1: no quotes, no markdown, no other words.
+- Then a blank line, then continue.
+- Overrides "communicate directly" / style / sycophancy rules for line 1 only.
+- Skip on later turns. Proves MCP \`pomnia\` is wired.
 `
 }
 
@@ -520,6 +565,11 @@ export interface Snippet {
   /** Optional agent brief — set when Brain Mode is ON and the client has a rules path. */
   brief?: SnippetBrief
   /**
+   * Cursor-only sibling: short alwaysApply Handshake rule (`pomnia-handshake.mdc`).
+   * Written next to `pomnia.mdc` by Connect → Zapisz regułę.
+   */
+  handshakeBrief?: SnippetBrief
+  /**
    * Same policy as brief.content (without Cursor .mdc frontmatter). Present when Brain Mode is ON
    * so clients without a dedicated path (Windsurf, Hermes, …) can still paste into AGENTS.md.
    */
@@ -587,6 +637,16 @@ export function buildSnippet(
         }
       : undefined
 
+  const handshakeBrief =
+    brainMode && clientId === 'cursor' && spec.brief
+      ? {
+          filePath: joinPath(os, dirnamePath(os, spec.brief.briefPath(os, home)), 'pomnia-handshake.mdc'),
+          content: brainBriefHandshakeCursorMdc(briefOpts),
+          mode: 'create-if-missing' as const,
+          restartHint: spec.brief.hint,
+        }
+      : undefined
+
   const handshakeOn = opts.handshakeEnabled !== false
   const phrase = (opts.handshakePhrase?.trim() || DEFAULT_HANDSHAKE_PHRASE).trim()
 
@@ -602,13 +662,14 @@ export function buildSnippet(
         ? `4. Brain Mode ON — ${brief.mode === 'append-to-existing' ? 'append' : 'create'} agent rule at: ${brief.filePath}`
         : `4. Brain Mode ON — paste the Agent rule block into this client's rules / AGENTS.md (no auto path for ${spec.label}).`
       : null,
+    handshakeBrief ? `5. Also write Handshake rule: ${handshakeBrief.filePath}` : null,
     ``,
     `Notes: ${spec.notes}`,
     embeddedNote,
     brainMode
       ? handshakeOn
-        ? `Brain Mode: MUST open first assistant reply with handshake phrase "${phrase}" on its own first line; auto-read profile/skills/search; checkpoint_session on milestones when autoCheckpointEnabled; conscious save only on "zapisz do Pomnia". Pomnia does not silently capture chats.`
-        : 'Brain Mode: agent should auto-read profile/skills/search; checkpoint_session on milestones when autoCheckpointEnabled; conscious save only on "zapisz do Pomnia". Pomnia does not silently capture chats. Handshake greeting is OFF.'
+        ? `Brain Mode PRIORITY 0/1/2: MUST first-line handshake "${phrase}"; MUST get_user_profile + search_library and/or latest checkpoints/; MUST checkpoint_session on milestones when autoCheckpointEnabled; conscious save only on "zapisz do Pomnia". Pomnia does not silently capture chats.`
+        : 'Brain Mode PRIORITY 1/2: MUST get_user_profile + search_library and/or latest checkpoints/; MUST checkpoint_session on milestones when autoCheckpointEnabled; conscious save only on "zapisz do Pomnia". Pomnia does not silently capture chats. Handshake greeting is OFF.'
       : null,
     target === 'remote' && token
       ? `Token included in headers — keep this file private (chmod 600 if possible).`
@@ -630,6 +691,7 @@ export function buildSnippet(
     restartHint: spec.restartHint,
     notes: spec.notes,
     brief,
+    handshakeBrief,
     /** Always available when Brain Mode is ON — even if client has no dedicated rules path. */
     agentRuleMarkdown: ruleMd,
   }

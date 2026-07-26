@@ -58,6 +58,9 @@ describe('brain/snippet — Cursor remote mcp.json', () => {
     expect(s.brief?.content).toContain('alwaysApply: true')
     expect(s.brief?.content).toContain('pomnia-brain-start')
     expect(s.brief?.content).toContain('OK to Go Go Go')
+    expect(s.handshakeBrief?.filePath.replace(/\\/g, '/')).toMatch(/\.cursor\/rules\/pomnia-handshake\.mdc$/)
+    expect(s.handshakeBrief?.content).toContain('PRIORITY 0')
+    expect(s.handshakeBrief?.content).toContain('OK to Go Go Go')
     expect(s.agentRuleMarkdown).toContain('save_conversation')
     expect(s.agentRuleMarkdown).toContain('checkpoint_session')
     expect(s.agentRuleMarkdown).toContain('autoCheckpointEnabled')
@@ -67,10 +70,14 @@ describe('brain/snippet — Cursor remote mcp.json', () => {
     expect(s.agentRuleMarkdown).toContain('zapisz do Pomnia')
     expect(s.agentRuleMarkdown).toContain('sprawdź w Pomnia')
     expect(s.agentRuleMarkdown).toContain('PRIORITY 0')
+    expect(s.agentRuleMarkdown).toContain('PRIORITY 1')
+    expect(s.agentRuleMarkdown).toContain('PRIORITY 2')
     expect(s.agentRuleMarkdown).toContain('MUST')
     expect(s.agentRuleMarkdown).toContain('vault/AGENTS.md')
     expect(s.agentRuleMarkdown).toContain('quality_score')
     expect(s.agentRuleMarkdown).toContain('MCP `pomnia`')
+    expect(s.agentRuleMarkdown).toContain('Also useful (normal weight)')
+    expect(s.agentRuleMarkdown).not.toContain('agent MAY call')
   })
 
   it('Brain Mode ON wires custom handshake phrase into the rule', () => {
@@ -113,6 +120,8 @@ describe('brain/snippet — Cursor remote mcp.json', () => {
       handshakeEnabled: false,
     })
     expect(s.agentRuleMarkdown).not.toContain('Handshake (proof')
+    expect(s.agentRuleMarkdown).toContain('PRIORITY 1')
+    expect(s.agentRuleMarkdown).toContain('PRIORITY 2')
     expect(s.instructions).toContain('Handshake greeting is OFF')
   })
 

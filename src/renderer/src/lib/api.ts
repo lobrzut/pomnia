@@ -132,7 +132,7 @@ export interface PomniaBridge {
     brainMode?: boolean,
   ): Promise<Snippet>
   connectWriteBrief(clientId: ClientId): Promise<
-    | { ok: true; path: string; bytes: number; agentsPath?: string }
+    | { ok: true; path: string; bytes: number; handshakePath?: string; agentsPath?: string }
     | { ok: false; error: string; detail?: string; path?: string }
   >
   connectSkillsList(brainUrl: string, token?: string): Promise<SkillListEntry[]>

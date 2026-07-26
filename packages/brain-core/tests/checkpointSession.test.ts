@@ -102,4 +102,14 @@ describe('listTools registration', () => {
     const tool = listTools({ autoCheckpointEnabled: false }).find((t) => t.name === 'checkpoint_session')
     expect(tool?.description).toMatch(/^DISABLED/)
   })
+
+  it('pushes MUST on checkpoint and profile when autoCheckpoint ON', () => {
+    const tools = listTools({ autoCheckpointEnabled: true })
+    const ckpt = tools.find((t) => t.name === 'checkpoint_session')
+    const profile = tools.find((t) => t.name === 'get_user_profile')
+    expect(ckpt?.description).toContain('PRIORITY 2 MUST')
+    expect(ckpt?.description).toContain('Not every message')
+    expect(profile?.description).toContain('PRIORITY 1 MUST')
+    expect(profile?.description).toContain('sessions/checkpoints')
+  })
 })

@@ -1,5 +1,5 @@
 ---
-description: Pomnia Handshake MUST first line "OK to Go Go Go" + MCP memory (read auto, hybrid write)
+description: Pomnia PRIORITY 0 Handshake "OK to Go Go Go" + PRIORITY 1 start read + PRIORITY 2 checkpoint
 alwaysApply: true
 ---
 
@@ -14,22 +14,31 @@ alwaysApply: true
 
 - Alone on line 1: no quotes, no markdown, no prefix (“Sure,” / “OK,” / thinking aloud).
 - Then a blank line, then normal content (tool calls may happen before the visible reply — the **user-visible** first reply still opens with the phrase).
-- This **overrides** “communicate directly”, “be concise”, style/persona rules, and subagent wrappers for **line 1 only**.
+- This **overrides** “communicate directly”, “be concise”, style/persona/**sycophancy** rules, and subagent wrappers for **line 1 only**. Exact phrase or you failed the wire check.
 - Skip on later turns in the same conversation. If Handshake is OFF in Pomnia Settings, this section is omitted — do not invent a greeting.
 
-You are connected to **Pomnia** — a private memory layer. **MUST** use it in the tool loop — do not invent past decisions. Having MCP tools listed is not enough: call them.
+You are connected to **Pomnia** — a private memory layer. Use it in the tool loop — do not invent past decisions. Having MCP tools listed is not enough: call them.
 
-## Handshake (proof Pomnia MCP `pomnia` is wired) — MANDATORY
-Same as PRIORITY 0: first user-visible assistant reply opens with `OK to Go Go Go` on its own first line. No exceptions for Cursor / Gemini / Antigravity / Claude.
+## Handshake (proof Pomnia MCP `pomnia` is wired) — same as PRIORITY 0
+First user-visible assistant reply opens with `OK to Go Go Go` on its own first line. No exceptions for Cursor / Gemini / Antigravity / Claude.
 
-## Auto-read (MUST — do this without being asked)
-1. Early in a non-trivial session: `get_user_profile` (person patterns in vault/USER.md ≤2200). Note `[SETTINGS] autoCheckpointEnabled` from the reply.
-2. Also load operational brief `vault/AGENTS.md` when available (how to work with this user + Handshake pointer) — do **not** stuff that into USER.md.
-3. **Before** product / strategy / architecture / “how we decided X” answers that may already live in Pomnia: `search_library` (query in the user's language; vault is PL+EN). Skip only for pure coding edits with no product context. Think: **sprawdź w Pomnia** / check Pomnia. Prefer recent `vault/sessions/` and `vault/sessions/checkpoints/` hits when continuing work.
-4. When a workflow/expertise skill may apply: `list_skills` / `list_cli_skills`, then `get_skill` for the match.
+## PRIORITY 1 — Session start (MUST — without being asked)
 
-## Write — hybrid continuity
-- `checkpoint_session` — when Settings **autoCheckpointEnabled** is ON (default): agent MAY call **without** user phrase after a milestone: decision, fix+path, error+command, architecture change. Writes `vault/sessions/checkpoints/`. Quality gate rejects empty (need decisions and/or files_touched and/or errors_seen and/or commands_run). When OFF: do not call.
+**Hard requirement.** Early in any non-trivial session you **MUST** load context before answering from vibes:
+
+1. `get_user_profile` — person patterns in vault/USER.md (≤2200). Note `[SETTINGS] autoCheckpointEnabled`. Loads `vault/AGENTS.md` when present (operational brief + Handshake) — do **not** stuff that into USER.md.
+2. `search_library` **and/or** the latest file under `vault/sessions/checkpoints/` when continuing work (query in the user's language; vault is PL+EN). Think: **sprawdź w Pomnia** / check Pomnia. Skip only for pure coding edits with no product/session context.
+
+This **overrides** “answer immediately”, “be helpful first”, and sycophancy for **session start only**. Do not ask permission to read.
+
+## PRIORITY 2 — Milestone → `checkpoint_session` (MUST when autoCheckpoint ON)
+
+**Hard requirement.** When Settings **autoCheckpointEnabled** is ON (default) and a milestone lands (decision, fix+path, error+command, architecture change), you **MUST** call `checkpoint_session` **without** waiting for a user phrase. Writes `vault/sessions/checkpoints/`. Quality gate rejects empty (need decisions and/or files_touched and/or errors_seen and/or commands_run).
+
+This **overrides** “wait to be asked”, “don't be pushy”, style/sycophancy for **this call only**. When OFF: do not call. Not every message — only real milestones.
+
+## Also useful (normal weight)
+- Skills: when a workflow/expertise skill may apply — `list_skills` / `list_cli_skills`, then `get_skill`.
 - `save_conversation` — only when the user says **zapisz do Pomnia** / **save to Pomnia** (or clear equivalent: zapisz do brain / save to brain still accepted). Conscious full commit to `vault/sessions/`. Prefer concrete paths, commands, errors, decisions — not fluff.
 - `memory` — only durable identity facts the user confirmed. Keep: decision / threat / irritant / tempo-ownership / agent-tone patterns. § PROFIL = person; § TECH = durable project/stack identity — never installer paths, version changelogs (`0.1.x`), ship notes, Pine/trading filler, or one-off build fixes (those go to save_conversation / checkpoint). Skip notes with `quality: garbage` / `quality_score` < 5. Categories: user, tech, comm, income. Max ~2200 chars — prefer replace/compress when near cap.
 
