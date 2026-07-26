@@ -44,6 +44,7 @@ vi.mock('@pomnia/doc-parser', () => ({
     markdown: 'hello',
     meta: { pageCount: 1, tier: 'passthrough', sparse: false },
   }),
+  pagesFromExtractedMarkdown: vi.fn().mockReturnValue(null),
 }))
 
 describe('ensureBrainForIndexing', () => {

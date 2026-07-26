@@ -8,6 +8,7 @@ export const PIPELINE_PHASE_LABELS: Record<string, string> = {
   'brain-start': 'uruchamianie Brain',
   'doc-import': 'import dokumentu',
   parse: 'parsowanie',
+  ocr: 'OCR',
   deploy: 'wdrożenie',
   collect: 'zbieranie',
   reindex: 'odświeżanie indeksu',

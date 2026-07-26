@@ -56,6 +56,16 @@ export function openDb(opts: OpenDbOptions): Database.Database {
       );
 
       CREATE INDEX IF NOT EXISTS idx_chunks_pdf ON chunks(pdf_path);
+
+      -- Fingerprints for incremental reindex (skip unchanged files). Additive;
+      -- existing library.db opens fine without wipe.
+      CREATE TABLE IF NOT EXISTS indexed_files (
+        pdf_path TEXT PRIMARY KEY NOT NULL,
+        content_hash TEXT NOT NULL,
+        mtime_ms REAL,
+        size INTEGER,
+        updated_at TEXT NOT NULL
+      );
     `)
   }
 

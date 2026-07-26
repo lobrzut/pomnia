@@ -54,9 +54,19 @@ files:
     to: node_modules/underscore
   - from: node_modules/xmlbuilder
     to: node_modules/xmlbuilder
+  - from: node_modules/tesseract.js
+    to: node_modules/tesseract.js
+  - from: node_modules/tesseract.js-core
+    to: node_modules/tesseract.js-core
+  - from: node_modules/@napi-rs/canvas
+    to: node_modules/@napi-rs/canvas
+  - from: node_modules/pdfjs-dist
+    to: node_modules/pdfjs-dist
 
 asarUnpack:
   - "**/*.wasm"
+  - "**/node_modules/@napi-rs/canvas/**/*"
+  - "**/node_modules/tesseract.js-core/**/*"
 # brain-core forked child (embedded MCP) — outside asar; includes pomnia-brain.exe helper
 extraResources:
   - from: build/brain-core-runtime-v2
@@ -69,6 +79,11 @@ extraResources:
       - "!**/test/**"
       - "!**/tests/**"
       - "!**/*.ts"
+  - from: resources/tessdata
+    to: tessdata
+    filter:
+      - "**/*"
+      - "!**/.gitkeep"
 win:
   target: [nsis]
   icon: resources/icon.ico

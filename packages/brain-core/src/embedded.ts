@@ -5,6 +5,7 @@
  *   parent → child
  *     { type: 'start', config: Partial<BrainConfig> }
  *     { type: 'reindex', dir: string }        // distilled/sessions/library only (never skills/)
+ *     { type: 'index-files', paths: string[] } // embed only these paths (distill new notes)
  *     { type: 'index-document', doc: IndexDocumentInput }
  *     { type: 'set-skills-root', path: string } // portable vault sidecar skills/
  *     { type: 'set-vault-root', path: string }  // portable USER.md/distilled/sessions
@@ -22,17 +23,20 @@
  * exactly one BrainServer and one DB handle for indexing.
  */
 
+import { readFileSync } from 'node:fs'
+import { basename } from 'node:path'
 import process from 'node:process'
 
 import { defaultConfig, type BrainConfig } from './config/index.js'
 import { EmbedClient } from './rag/embed.js'
-import { indexDir, indexDocument, type IndexDocumentInput } from './rag/indexer.js'
+import { indexDir, indexDocument, indexFiles, type IndexDocumentInput } from './rag/indexer.js'
 import { createBrainServer, type BrainServer } from './mcp/server.js'
 import { openDb } from './storage/db.js'
 
 type ParentMsg =
   | { type: 'start'; config?: Partial<BrainConfig> }
   | { type: 'reindex'; dir: string }
+  | { type: 'index-files'; paths: string[] }
   | { type: 'index-document'; doc: IndexDocumentInput }
   | { type: 'set-skills-root'; path: string }
   | { type: 'set-vault-root'; path: string }
@@ -113,18 +117,22 @@ async function handleReindex(dir: string): Promise<void> {
       const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
       const stats = await indexDir(db, embedder, dir, (p) => send({ type: 'reindex-progress', ...p }), ac.signal)
       send({ type: 'reindexed', stats })
-      // Sidecar for host vault-health without loading 200MB into sql.js next launch.
+      // Sidecar: DISTINCT/total counts in DB — not this-run embed counts (incremental).
       try {
         const { writeFileSync, mkdirSync } = await import('node:fs')
         const { join } = await import('node:path')
         const dirOut = join(config.dataDir, 'vectordb')
         mkdirSync(dirOut, { recursive: true })
+        const fRow = db.prepare('SELECT COUNT(DISTINCT pdf_path) AS c FROM chunks').get() as {
+          c: number | bigint
+        }
+        const cRow = db.prepare('SELECT COUNT(*) AS c FROM chunks').get() as { c: number | bigint }
         writeFileSync(
           join(dirOut, 'library-stats.json'),
           JSON.stringify(
             {
-              files: stats.files,
-              chunks: stats.chunks,
+              files: Number(fRow.c),
+              chunks: Number(cRow.c),
               updatedAt: new Date().toISOString(),
               vaultRoot: dir,
             },
@@ -184,6 +192,50 @@ async function handleIndexDocument(doc: IndexDocumentInput): Promise<void> {
   }
 }
 
+async function handleIndexFiles(paths: string[]): Promise<void> {
+  if (!config) {
+    send({ type: 'error', message: 'index-files before start' })
+    return
+  }
+  if (busy) {
+    send({ type: 'error', message: 'index already running' })
+    return
+  }
+  busy = true
+  const ac = new AbortController()
+  opAbort = ac
+  try {
+    const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
+    try {
+      const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
+      const files = paths.map((p) => ({
+        path: p,
+        name: basename(p),
+        text: readFileSync(p, 'utf8'),
+      }))
+      const stats = await indexFiles(
+        db,
+        embedder,
+        files,
+        (p) => send({ type: 'reindex-progress', ...p }),
+        ac.signal,
+      )
+      send({ type: 'reindexed', stats })
+    } finally {
+      db.close()
+    }
+  } catch (err) {
+    if (isAbortError(err)) {
+      send({ type: 'error', message: 'index aborted' })
+    } else {
+      send({ type: 'error', message: err instanceof Error ? err.message : String(err) })
+    }
+  } finally {
+    busy = false
+    if (opAbort === ac) opAbort = null
+  }
+}
+
 async function handleStop(): Promise<void> {
   opAbort?.abort()
   try {
@@ -203,6 +255,9 @@ process.on('message', (msg: ParentMsg) => {
       break
     case 'reindex':
       void handleReindex(msg.dir)
+      break
+    case 'index-files':
+      void handleIndexFiles(msg.paths ?? [])
       break
     case 'index-document':
       void handleIndexDocument(msg.doc)

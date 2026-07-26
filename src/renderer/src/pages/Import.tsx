@@ -7,7 +7,7 @@ import { pathFromDroppedFile } from '../lib/dropFile'
 import { uiLabels } from '../lib/labels'
 import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
-import type { DocImportProgressEvent, DocImportResult } from '../lib/types'
+import type { DocImportProgressEvent, DocImportResult, DocOcrResult } from '../lib/types'
 
 const DOC_DROP_EXTENSIONS = new Set(['pdf', 'docx', 'md', 'txt', 'epub'])
 
@@ -30,9 +30,10 @@ export default function Import() {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ sealed: number; sources: { source: string; count: number }[] } | null>(null)
   const [docBusy, setDocBusy] = useState(false)
+  const [ocrBusy, setOcrBusy] = useState(false)
   const [docDragOver, setDocDragOver] = useState(false)
   const [docProgress, setDocProgress] = useState<DocImportProgressEvent | null>(null)
-  const [docResult, setDocResult] = useState<DocImportResult | null>(null)
+  const [docResult, setDocResult] = useState<DocImportResult | DocOcrResult | null>(null)
 
   useEffect(() => {
     const off = api.onDocImportProgress((e) => setDocProgress(e))
@@ -66,7 +67,7 @@ export default function Import() {
   }
 
   async function importDocFile(filePath?: string) {
-    if (!vault.open || docBusy) return
+    if (!vault.open || docBusy || ocrBusy) return
     setDocBusy(true)
     setDocResult(null)
     setDocProgress(null)
@@ -76,7 +77,7 @@ export default function Import() {
       const r = await api.docImport(file, ollamaUrl || undefined)
       if (!r) return
       setDocResult(r)
-      const detail = `${r.format.toUpperCase()} · ${labels.importDocPagesBadge(r.pages)} · ${r.extractionPath}${r.suggestOcr ? ' · OCR zalecane' : ''}`
+      const detail = `${r.format.toUpperCase()} · ${labels.importDocPagesBadge(r.pages)} · ${r.extractionPath}${r.suggestOcr ? ' · OCR' : ''}`
       if (r.indexed) {
         toast({
           kind: 'success',
@@ -102,10 +103,31 @@ export default function Import() {
     }
   }
 
+  async function runOcrOnDoc() {
+    if (!vault.open || !docResult?.suggestOcr || docBusy || ocrBusy) return
+    setOcrBusy(true)
+    setDocProgress(null)
+    try {
+      const r = await api.docOcr(docResult.docId, ollamaUrl || undefined)
+      setDocResult(r)
+      toast({
+        kind: r.indexed ? 'success' : 'warn',
+        title: labels.importDocOcrDoneToast(r.ocrPages),
+        detail: `${r.extractionPath} · ${labels.importDocIndexedBadge(r.chunks)}`,
+      })
+      await refreshVault()
+    } catch (e) {
+      toast({ kind: 'error', title: labels.importDocOcrFailedToast, detail: (e as Error).message })
+    } finally {
+      setOcrBusy(false)
+      setDocProgress(null)
+    }
+  }
+
   function handleDocDragOver(e: React.DragEvent) {
     e.preventDefault()
     e.stopPropagation()
-    if (vault.open && !docBusy) setDocDragOver(true)
+    if (vault.open && !docBusy && !ocrBusy) setDocDragOver(true)
   }
 
   function handleDocDragLeave(e: React.DragEvent) {
@@ -226,22 +248,27 @@ export default function Import() {
                 : labels.importVaultClosed}
         </div>
         <div className="text-xs text-ink-faint">{labels.importDocFormats}</div>
-        {docProgress && docBusy && (
+        {docProgress && (docBusy || ocrBusy) && (
           <div className="text-xs text-ink-dim">
             {docProgress.label ??
               `${docProgress.phase === 'parse'
                 ? labels.importDocProgressParse
-                : docProgress.phase === 'index'
-                  ? labels.importDocProgressIndex
-                  : docProgress.phase === 'brain-start'
-                    ? labels.importDocProgressBrainStart
-                    : docProgress.phase === 'encrypt'
-                      ? labels.importDocProgressEncrypt
-                      : docProgress.phase}…${docProgress.detail ? ` ${docProgress.detail}` : ''}`}
+                : docProgress.phase === 'ocr'
+                  ? labels.importDocProgressOcr
+                  : docProgress.phase === 'index'
+                    ? labels.importDocProgressIndex
+                    : docProgress.phase === 'brain-start'
+                      ? labels.importDocProgressBrainStart
+                      : docProgress.phase === 'encrypt'
+                        ? labels.importDocProgressEncrypt
+                        : docProgress.phase}…${docProgress.detail ? ` ${docProgress.detail}` : ''}`}
             {docProgress.total > 1 ? ` (${docProgress.done}/${docProgress.total})` : ''}
           </div>
         )}
-        <Button onClick={() => void importDocFile()} disabled={docBusy || !vault.open} className="mt-1">
+        {(docBusy || ocrBusy) && !docProgress && ocrBusy && (
+          <div className="text-xs text-ink-dim">{labels.importDocOcrBusy}</div>
+        )}
+        <Button onClick={() => void importDocFile()} disabled={docBusy || ocrBusy || !vault.open} className="mt-1">
           <Upload className="h-4 w-4" /> {labels.importDocSelect}
         </Button>
       </div>
@@ -265,7 +292,22 @@ export default function Import() {
               )}
             </div>
             {docResult.suggestOcr && (
-              <p className="text-xs text-amber-200/90">{labels.importDocOcrHint}</p>
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-amber-200/90">{labels.importDocOcrHint}</p>
+                <Button
+                  onClick={() => void runOcrOnDoc()}
+                  disabled={ocrBusy || docBusy || !vault.open}
+                  className="self-start"
+                >
+                  {ocrBusy ? (
+                    <>
+                      <Spinner className="h-4 w-4" /> {labels.importDocOcrBusy}
+                    </>
+                  ) : (
+                    labels.importDocOcrRun
+                  )}
+                </Button>
+              </div>
             )}
             {docResult.pendingIndex && (
               <p className="text-xs text-ink-dim">

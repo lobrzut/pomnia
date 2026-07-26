@@ -60,6 +60,19 @@ src/renderer/        UI: React + Tailwind + Framer Motion
 
 **W aplikacji:** zaszyfrowany vault, backup adapterów, import ZIP/JSON + PDF/DOCX/EPUB, embedded brain-core (MCP `:7862`), distill przez Ollamę, zakładki **Jak to działa** / **Connect**, tray + diagnostyka w Settings.
 
+### Kontynuacja sesji (MCP)
+
+- **Auto-checkpoint** (Settings, domyślnie ON) — agent może zapisać milestone przez `checkpoint_session` bez frazy użytkownika (decyzja, fix+ścieżka, błąd+komenda, architektura) → `vault/sessions/checkpoints/`.
+- **„Zapisz do Pomnia” / „save to Pomnia”** — świadomy pełny zapis → `save_conversation` → `vault/sessions/`.
+
+### Indeks inkrementalny
+
+**Odśwież indeks** / `indexDir` pomija niezmienione pliki (mtime+size, potem content-hash) — bez ponownego embedu. Distill indeksuje tylko nowe notatki przez `indexFiles` (SoT: `library.db`).
+
+### Thin OCR (skany PDF)
+
+Na Import: gdy warstwa tekstu jest rzadka → **Uruchom OCR** (`tesseract.js`, eng+pol; max ~3 sparse pages). **Bez scribe.js** (AGPL). Tessdata w `resources/tessdata` (`npm run stage:tessdata`).
+
 **Częste problemy:**
 
 | Objaw | Co zrobić |
