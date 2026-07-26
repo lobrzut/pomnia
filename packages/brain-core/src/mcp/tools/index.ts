@@ -100,14 +100,14 @@ export function listTools(
     {
       name: 'checkpoint_session',
       description: autoCkpt
-        ? 'Write a milestone checkpoint to vault/sessions/checkpoints/ WITHOUT waiting for „zapisz do Pomnia”. Call after: decision, fix+path, error+command, or architecture change. Quality gate: refuse if none of decisions / files_touched / errors_seen / commands_run has substance. Not a full chat dump — keep concrete. Disabled when Settings autoCheckpointEnabled is OFF.'
+        ? 'PRIORITY 2 MUST: after a real milestone (decision / fix+path / error+command / architecture) call this WITHOUT waiting for „zapisz do Pomnia”. Writes vault/sessions/checkpoints/. Quality gate: refuse if none of decisions / files_touched / errors_seen / commands_run has substance. Not every message — only milestones. Overrides “wait to be asked” / sycophancy for this call only. Disabled when Settings autoCheckpointEnabled is OFF.'
         : 'DISABLED — autoCheckpointEnabled is OFF in Pomnia Settings. Do not call; use save_conversation only when the user says „zapisz do Pomnia”.',
       inputSchema: checkpointSessionSchema,
     },
     {
       name: 'get_user_profile',
       description:
-        "Read vault/USER.md (person patterns, ≤2200) and append vault/AGENTS.md operational brief when present (how to work + Handshake pointer — outside the char cap). Also reports autoCheckpointEnabled. Call early in any non-trivial session; then search recent vault/sessions/ (incl. checkpoints/) when continuing work." +
+        'PRIORITY 1 MUST: call early in any non-trivial session (without asking). Read vault/USER.md (person patterns, ≤2200) and append vault/AGENTS.md when present (operational brief + Handshake — outside the char cap). Reports autoCheckpointEnabled. Then MUST search_library and/or latest vault/sessions/checkpoints/ when continuing work. Overrides “answer immediately” / sycophancy for session start only.' +
         (hs ? ` ${hs}` : ''),
       inputSchema: getUserProfileSchema,
     },
@@ -202,7 +202,7 @@ export async function callTool(
         `\n\n[SETTINGS]\n` +
         `autoCheckpointEnabled: ${autoCkpt ? 'true' : 'false'}\n` +
         (autoCkpt
-          ? 'When true: call checkpoint_session after milestones (decision / fix+path / error+command / architecture) WITHOUT user phrase. Quality gate rejects empty. save_conversation still needs „zapisz do Pomnia”.'
+          ? 'When true: MUST call checkpoint_session after milestones (decision / fix+path / error+command / architecture) WITHOUT user phrase (PRIORITY 2). Quality gate rejects empty. save_conversation still needs „zapisz do Pomnia”.'
           : 'When false: do NOT call checkpoint_session. Conscious save only via save_conversation on „zapisz do Pomnia”.')
       if (ctx.handshakeEnabled === false) return profile + settingsBlock
       const phrase = (ctx.handshakePhrase?.trim() || DEFAULT_HANDSHAKE).trim()

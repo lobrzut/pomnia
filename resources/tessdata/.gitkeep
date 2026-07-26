@@ -1,0 +1,2 @@
+# Placeholder — run `npm run stage:tessdata` to download eng+pol traineddata.gz
+# (Apache-2.0 tessdata_fast). Packaged into Electron extraResources/tessdata.
