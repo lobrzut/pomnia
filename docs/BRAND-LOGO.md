@@ -1,6 +1,18 @@
 # Pomnia — logo & branding (Slavic green rebrand)
 
-> **Status:** koncepcje wygenerowane 2026-07-07 · refinements flat 2026-07-07 · **depth pass (anti-flat)** 2026-07-07 · **finaliści depth** 2026-07-07 · **bold series (anti-mild)** 2026-07-07 wieczór · **tymczasowa ikona app (2026-07-09):** `logo-bold-vault-v1.png` → `resources/icon.png` + `icon.ico` — do czasu wyboru **jednego** finału.
+> **Status:** koncepcje 2026-07-07 · depth pass (anti-flat) · bold series (anti-mild) · **tymczasowa ikona app (2026-07-09):** `logo-bold-vault-v1.png` → `resources/icon.png` + `icon.ico` — do czasu wyboru **jednego** finału.
+>
+> **Pipeline:** prywatny pipeline ComfyUI (skrypty `gen-logo-*.py`, workflowi, `docs/COMFYUI-ASSETS.md`) został **usunięty z tego publicznego repo**. Gotowe assety logo/ikony żyją pod `assets/` oraz `resources/` — regeneracja nie jest częścią tego drzewa.
+
+## Gdzie są pliki
+
+| Lokalizacja | Opis |
+|-------------|------|
+| `assets/generated/` | Koncepcje, refinements, depth, final, bold series (PNG) + `preview.html` |
+| `resources/icon.png` / `resources/icon.ico` | Aktualna ikona aplikacji (placeholder bold-vault-v1) |
+| `assets/` | Zrzuty UI / referencje brandingowe (jeśli obecne) |
+
+---
 
 ## Bold series — feedback „za miękkie” (2026-07-07, wieczór)
 
@@ -11,16 +23,7 @@ Użytkownik: poprzednie depth/final batch **za miękkie, mało unikalne** — ch
 | **A: Ostry sigil** | `logo-bold-sigil-v1.png` … `v5.png` | Ostre kąty, agresywna geometria folk-art, rosa jako fasetki kryształu, wysoki kontrast emerald + amber |
 | **B: Rytuał skarbca** | `logo-bold-vault-v1.png` … `v5.png` | Monumentalna brama rytualna, labirynt pierścieni, pęknięta kora + patyna żelaza, bursztynowe serce |
 
-**Technika:** FLUX 512×512, `lora=none`, `quality_tier=final`, `FORBID` soft/mild/generic/corporate/rounded/pastel/dribbble.
-
-**Generator:**
-```powershell
-$env:COMFYUI_URL = "http://comfy.example.local:7821"
-$env:COMFY_WORKSPACE = "C:\Users\Alice\Projects\pomnia"
-python scripts/gen-logo-concepts.py --bold-a   # seria A (5)
-python scripts/gen-logo-concepts.py --bold-b   # seria B (5)
-python scripts/gen-logo-concepts.py --bold       # obie (10)
-```
+**Kierunek stylu (historycznie):** FLUX 512×512, bez soft/mild/generic/corporate/rounded/pastel/dribbble.
 
 Galeria: `assets/generated/preview.html` — **Seria A + B na górze** (slajdy 1–10).
 
@@ -85,32 +88,19 @@ Referencje UI: zrzuty w `assets/` (Command center z fioletowymi akcentami).
 
 ---
 
-## Anti-flat — dyrektywy promptów (feedback 2026-07-07)
+## Anti-flat — dyrektywy stylu (feedback 2026-07-07)
 
-Refinements z `lora=flat-ui` wpadły w **generyczny flat corporate icon** (użytkownik: „wszystko wlatuje w styl Lory”). Kolejne generacje **bez** flat-ui LoRA.
+Refinements flat-ui wpadły w **generyczny flat corporate icon** (użytkownik: „wszystko wlatuje w styl Lory”). Kolejne iteracje: **bez** flat-ui / soft corporate look.
 
-### FORBID (negative / composition_lock)
+### FORBID
 
 `flat design, minimalist vector logo, corporate app icon, gradient squircle, generic tech logo, dribbble logo, behance flat icon, simple geometric mark, Lory style, flat-ui, material design icon, ios app icon template, soft, mild, generic, rounded friendly app icon, pastel, subtle, bland, soft glow, cute, game UI`
 
-### SEEK (positive / style bible)
+### SEEK
 
 `dimensional depth, subtle emboss or engraving, organic texture moss bark amber resin, hand-crafted feel, Slavic folk art influence, carved wood or amber inlay, atmospheric rim lighting, tactile surface, symbolic object with depth — NOT illustration scene, NOT landscape`
 
-**Bold pass (2026-07-07):** dodatkowo `sharp angular geometry, high contrast chiaroscuro, crystal facets, iron patina, cracked bark, ritual threshold, monumental artifact, aggressive folk-art angles`
-
-### MCP dla depth pass
-
-```
-generate_image_smart
-  lora: none
-  lora_strength: (omit)
-  asset_type: icon
-  background: dark_navy
-  project_style: false
-  quality_tier: final
-  composition_lock: forbid=flat design,minimalist vector,corporate app icon,gradient squircle,dribbble,behance flat,Lory style
-```
+**Bold pass:** dodatkowo `sharp angular geometry, high contrast chiaroscuro, crystal facets, iron patina, cracked bark, ritual threshold, monumental artifact, aggressive folk-art angles`
 
 ---
 
@@ -125,19 +115,11 @@ generate_image_smart
 - Bursztyn = „zatrzymana pamięć” (słowiański skarb), nie generyczna żarówka
 - Koncentryczne pierścienie czytają się w 16×16 px (tray) lepiej niż litera
 
-**ComfyUI prompt (txt2img, v1 flat — archiwum):**
-```
-App icon logo mark, Moss Vault concept: nested vesica piscis forming a memory labyrinth vault, inner amber glow like trapped sunlight in forest moss, emerald and moss green palette, subtle Slavic woven border geometry original not Elder Futhark, flat vector UI icon, centered symbol generous padding, dark forest void background #0a120e, birch silver-green highlights, minimal geometric, no text no letters
-```
+**Opis depth (anti-flat):** concentric rings carved into dark forest stone like a memory tunnel vault, volumetric amber glow from center like trapped sunlight in resin, moss texture on ring edges, embossed Slavic woven border (original, not Elder Futhark), carved wood / amber inlay feel, emerald–moss on void `#0a120e`, symbolic object only — no scene/landscape/text.
 
-**ComfyUI prompt (depth pass — anti-flat):**
-```
-App icon logo mark, Moss Vault depth concept: concentric rings carved into dark forest stone like a memory tunnel vault, volumetric amber glow emanating from center like trapped sunlight in resin, moss texture on ring edges and crevices, subtle emboss and engraved Slavic woven border geometry original not Elder Futhark, hand-crafted carved wood and amber inlay feel, dimensional depth with atmospheric rim lighting, emerald moss green palette void background #0a120e, birch silver-green highlights, tactile organic surface, centered symbol generous padding, symbolic object only no scene no landscape, no text no letters
-```
+**Forbidden metaphors:** light bulb, letter R, kolovrat, swastika, purple/cyan Reliqua palette, flat corporate icon.
 
-**Negative / forbidden:** `text, watermark, light bulb, human, face, hands, purple, cyan, letter R, kolovrat, swastika, flat design, minimalist vector logo, corporate app icon, gradient squircle, generic tech logo, dribbble logo, behance flat icon, Lory style`
-
-**Pierwsza generacja:** `assets/generated/logo-concept-moss-vault.png` — **shortlist** (zielenie + bursztyn, czytelny symbol). Refinements: `logo-refine-moss-vault-v2.png`, `v3`.
+**Assety:** `assets/generated/logo-concept-moss-vault.png` (shortlist) · refinements `logo-refine-moss-vault-v2/v3` · depth `logo-depth-moss-vault-v1/v2`.
 
 ---
 
@@ -146,18 +128,13 @@ App icon logo mark, Moss Vault depth concept: concentric rings carved into dark 
 **Metafora:** Trzy splątane nici pamięci — haft, kora brzozy, węzły jak w snopom snów (bez dosłownego dreamcatchera).
 
 **Dlaczego oryginalne:**
-- Inspiracja haftem (haft) zamiast kopiowania kolowratu
+- Inspiracja haftem zamiast kopiowania kolowratu
 - Abstrakcyjny węzeł, nie litera „P”
 - Srebrno-zielona brzoza = charakterystyczny dla Europy Środkowej
 
-**ComfyUI prompt:**
-```
-App icon logo mark, Birch Thread concept: three interwoven memory threads forming abstract knot not a letter, inspired by Slavic haft embroidery and birch bark texture, silver-green birch and deep forest green only, delicate cross-stitch geometry, thread nodes at intersections, flat vector UI icon, centered, dark void background, minimal, no text, no magenta no teal no purple
-```
+**Uwaga historyczna:** pierwsza generacja dociągnęła magenta/teal — unikać tych akcentów.
 
-**Uwaga po 1. passie:** FLUX dodał magenta/teal — w kolejnej iteracji podnieść `lora_strength` flat-ui, dodać `forbid=magenta,teal,purple,cyan` w composition_lock lub refine z seedem 42012.
-
-**Pierwsza generacja:** `assets/generated/logo-concept-birch-thread.png` — **ODRZUCONY** (za kontrowersyjny). Archiwum tylko.
+**Asset:** `assets/generated/logo-concept-birch-thread.png` — **ODRZUCONY** (za kontrowersyjny). Archiwum tylko.
 
 ---
 
@@ -170,117 +147,31 @@ App icon logo mark, Birch Thread concept: three interwoven memory threads formin
 - Rosa = świeża pamięć, przebudzenie
 - Vesica jako „brama snu”
 
-**ComfyUI prompt (v1 flat — archiwum):**
-```
-App icon logo mark, Dew Sigil concept: single centered sigil symbol only, original angular lattice geometry not Elder Futhark, three dew droplets, vesica memory gate at center, emerald green glow with amber dew highlights, flat vector UI icon, square format, dark forest background, crisp edges, no text no rune alphabet, no landscape no trees no scene
-```
+**Opis depth:** angular lattice sigil carved into dark stone / polished amber, three dew droplets as glass beads with rim light, recessed vesica memory gate, moss/bark micro-texture in grooves — symbolic carved object only, no landscape/trees/scene.
 
-**ComfyUI prompt (depth pass — anti-flat):**
-```
-App icon logo mark, Dew Sigil depth concept: original angular lattice sigil carved and engraved into dark stone or polished amber slab, three dew droplets as small 3D glass beads catching rim light, vesica memory gate recessed at center with subtle emboss, Slavic folk art geometric influence hand-crafted not rune alphabet, moss and bark micro-texture in grooves, dimensional depth atmospheric lighting, emerald green with amber resin highlights, void background #0a120e, symbolic carved object only no landscape no trees no scene, no text
-```
+**Uwaga historyczna:** v1 czasem wychodził pejzaż zamiast ikony — trzymać się jednego symbolu, zakazać landscape/scene/trees.
 
-**Uwaga po 1. passie:** model wygenerował pejzaż zamiast ikony — w kolejnej iteracji: `asset_type=icon`, `composition_lock=forbid=landscape,scene,trees`, krótszy prompt skupiony na jednym symbole.
-
-**Pierwsza generacja:** `assets/generated/logo-concept-dew-sigil.png` — **shortlist** (wymaga iteracji: za dużo sceny w v1). Refinements: `logo-refine-dew-sigil-v2.png`, `v3`; hybrid: `logo-refine-dew-vault-hybrid.png`.
+**Assety:** `assets/generated/logo-concept-dew-sigil.png` · refinements `logo-refine-dew-sigil-v2/v3` · hybrid `logo-refine-dew-vault-hybrid.png` · depth `logo-depth-dew-sigil-v1/v2`.
 
 ---
 
 ### Bonus: Amber Loom *(Bursztynowy krosno)*
 
-**Metafora:** Koło pamięci — przodkowie tkaą wątki wiedzy; bursztyt w centrum jak skamieniała wspomnienie.
+**Metafora:** Koło pamięci — przodkowie tkają wątki wiedzy; bursztyn w centrum jak skamieniałe wspomnienie.
 
-**ComfyUI prompt:**
-```
-App icon logo mark, Amber Loom concept: circular memory loom weaving threads, amber resin glow at center, moss green and emerald outer ring, loom spokes not kolovrat not sun wheel, flat vector UI icon, centered, dark void background, minimal geometric, no text, no light bulb no lamp
-```
+**Uwaga:** pierwsza generacja wpadła w żarówkę (zakazana metafora).
 
-**Uwaga:** pierwsza generacja wpadła w żarówkę (zakazana metafora) — dodać `forbid=lightbulb,lamp,bulb` i refine.
-
-**Pierwsza generacja:** `assets/generated/logo-concept-amber-loom.png` — wymaga iteracji.
-
----
-
-## ComfyUI — jak generować
-
-### Status serwera (2026-07-07)
-
-| Endpoint | Status |
-|----------|--------|
-| `http://127.0.0.1:8188` | **offline** (brak lokalnej instancji) |
-| `http://comfy.example.local:7821` (ISKRA) | **online** — ComfyUI 0.14.1, RTX 3060, FLUX |
-| MCP `comfyui` w Cursor | skonfigurowany, `COMFYUI_URL` → ISKRA |
-
-### Ważne: `COMFY_WORKSPACE`
-
-W `~/.cursor/mcp.json` jest `COMFY_WORKSPACE=//fileserver.example.local/Projekty` — MCP zapisuje tam PNG, **nie** do repo Pomnia. Dla generacji do tego repo:
-
-```powershell
-$env:COMFYUI_URL = "http://comfy.example.local:7821"
-$env:COMFY_WORKSPACE = "C:\Users\Alice\Projects\pomnia"
-python scripts/gen-logo-concepts.py
-```
-
-Albo zmień `COMFY_WORKSPACE` w `mcp.json` na ścieżkę do `pomnia` i przeładuj MCP.
-
-### Uruchomienie ComfyUI (gdy offline)
-
-**ISKRA (zalecane):** już działa na `:7821` — nic nie trzeba.
-
-**Lokalnie (Windows):**
-```powershell
-cd C:\path\to\ComfyUI
-python main.py --listen 127.0.0.1 --port 8188
-```
-Potem w `mcp.json`: `"COMFYUI_URL": "http://127.0.0.1:8188"`.
-
-### MCP — depth pass (zalecane od 2026-07-07)
-
-```
-generate_image_smart
-  prompt: <depth prompt z sekcji Moss Vault / Dew Sigil>
-  style: icon
-  size: 512x512
-  workflow: flux
-  lora: none
-  background: dark_navy
-  project_style: false
-  quality_tier: final
-  asset_type: icon
-  composition_lock: forbid=flat design,minimalist vector,corporate app icon,gradient squircle,dribbble,behance flat,Lory style
-  seed: 42051
-  filename: assets/generated/logo-depth-moss-vault-v1.png
-```
-
-### MCP — pierwsza generacja flat (archiwum)
-
-```
-generate_image_smart
-  prompt: <prompt z tabeli powyżej>
-  style: icon
-  size: 512x512
-  workflow: flux
-  lora: flat-ui
-  lora_strength: 0.55
-  ...
-```
-
-(Upewnij się, że `COMFY_WORKSPACE` wskazuje na repo Pomnia.)
-
-### Workflow JSON
-
-Patrz: [`assets/comfyui/logo-concept.json`](../assets/comfyui/logo-concept.json)
+**Asset:** `assets/generated/logo-concept-amber-loom.png` — depriorytet / archiwum.
 
 ---
 
 ## Po wyborze kierunku
 
 1. Użytkownik wybiera koncept (np. **Moss Vault**)
-2. 2–3 iteracje ComfyUI (refine, inne seedy) aż symbol jest czysty
+2. Iteracje poza tym repo (prywatny pipeline / ręczna edycja) aż symbol jest czysty
 3. Eksport wektorowy (Figma / Inkscape) lub ręczna wektoryzacja
-4. `resources/icon.png` + `node scripts/gen-icon.mjs` → `resources/icon.ico`
-5. Aktualizacja `.cursor/comfy-project.json` (paleta zielona)
-6. Landing + UI: zamiana akcentów violet/cyan na forest/moss/amber
+4. `resources/icon.png` + `node scripts/gen-icon.mjs` → `resources/icon.ico` (jeśli skrypt nadal w repo)
+5. Landing + UI: zamiana akcentów violet/cyan na forest/moss/amber
 
 **Tymczasowo (2026-07-09):** wdrożono **bold-vault-v1** jako placeholder — finalny wybór nadal otwarty.
 
@@ -288,17 +179,17 @@ Patrz: [`assets/comfyui/logo-concept.json`](../assets/comfyui/logo-concept.json)
 
 ---
 
-## Pliki
+## Pliki (w tym repo)
 
-| Plik | Opis |
-|------|------|
+| Plik / wzorzec | Opis |
+|----------------|------|
 | `assets/generated/logo-concept-*.png` | Pierwsze generacje (4 kierunki) |
-| `assets/generated/logo-refine-*.png` | Refinements shortlistu flat (Dew Sigil, Moss Vault, hybrid) — za generyczne |
-| `assets/generated/logo-depth-*.png` | Depth pass anti-flat (Dew Sigil, Moss Vault, hybrid) |
-| `assets/generated/logo-final-*.png` | Final depth refinements z wyborów użytkownika |
-| `assets/generated/logo-bold-sigil-v*.png` | Seria A: Ostry sigil (bold anti-mild) |
-| `assets/generated/logo-bold-vault-v*.png` | Seria B: Rytuał skarbca (bold anti-mild) |
-| `assets/generated/preview.html` | Galeria slideshow — bold series + archiwum |
-| `assets/comfyui/logo-concept.json` | Referencja workflow + prompty |
-| `scripts/gen-logo-concepts.py` | Batch generator (ISKRA, poprawny workspace) |
-| `docs/COMFYUI-ASSETS.md` | Pełny pipeline assetów |
+| `assets/generated/logo-refine-*.png` | Refinements shortlistu flat — za generyczne |
+| `assets/generated/logo-depth-*.png` | Depth pass anti-flat |
+| `assets/generated/logo-final-*.png` | Final depth refinements |
+| `assets/generated/logo-bold-sigil-v*.png` | Seria A: Ostry sigil |
+| `assets/generated/logo-bold-vault-v*.png` | Seria B: Rytuał skarbca |
+| `assets/generated/preview.html` | Galeria slideshow |
+| `resources/icon.png` / `icon.ico` | Ikona app (placeholder) |
+
+**Usunięte z publicznego repo (nie linkować):** `assets/comfyui/`, `scripts/gen-logo-*.py`, `docs/COMFYUI-ASSETS.md`, `.cursor/comfy-project.json` — prywatny ComfyUI pipeline.
