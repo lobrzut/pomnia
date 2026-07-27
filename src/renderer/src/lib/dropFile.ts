@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import { api } from './api'
 
 /** Resolve a filesystem path from a drag-dropped File (Electron preload webUtils). */

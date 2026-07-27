@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import { basename, dirname, join } from 'node:path'
 import { existsSync, promises as fs } from 'node:fs'
 import crypto from 'node:crypto'

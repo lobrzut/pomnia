@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Keep vault/AGENTS.md Handshake section in sync with Pomnia Settings phrase.
  * Agents that only load MCP (or AGENTS via get_user_profile) still see the exact phrase.

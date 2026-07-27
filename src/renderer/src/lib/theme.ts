@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /** App color schemes — persisted in app-settings, applied via html[data-theme]. */
 export type ColorScheme = 'mint' | 'iris' | 'glass'
 

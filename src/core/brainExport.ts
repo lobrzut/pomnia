@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Bridge to alice's Brain. Converts captured conversations into markdown notes
  * compatible with Brain's `data/vault/` ingest format, so a Pomnia backup can

@@ -70,7 +70,7 @@ describe('uiLabels', () => {
 
   it('exposes Connect first-time MCP labels in Polish', () => {
     const labels = uiLabels()
-    expect(labels.connectCopyForClient('Cursor')).toBe('Kopiuj mcp.json dla Cursora')
+    expect(labels.connectCopyForClient('Cursor')).toBe('Kopiuj mcp.json dla Cursor')
     expect(labels.connectCopyForClient('Antigravity (Google IDE)')).toBe(
       'Kopiuj mcp.json dla Antigravity (Google IDE)'
     )

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Import knowledge the user ALREADY has — official export archives from other
  * assistants — into Pomnia's normalized model, so they flow through the same

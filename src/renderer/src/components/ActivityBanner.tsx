@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import { FileText, Layers, Loader2, Plug, Rocket, Sparkles } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Button, ProgressBar } from './ui'

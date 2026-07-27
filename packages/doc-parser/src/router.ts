@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import { extname } from 'node:path'
 
 import { parseDocx } from './docx.js'

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /** Shared parser for Claude Code / Claude Desktop JSONL transcripts. */
 import { promises as fs } from 'node:fs'
 import path from 'node:path'

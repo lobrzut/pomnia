@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * RAG types — placed in a leaf module so both mcp/ handlers and storage/ can
  * import them without pulling the whole rag pipeline.

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Pomnia CLI — headless backup. Designed to be automation-friendly:
  * pass the vault passphrase via $POMNIA_PASS to run unattended (e.g. cron /

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Host-side preliminary indexing. Embeds distilled notes locally (nomic-embed-text
  * via Ollama) into a portable JSON index, so the user gets semantic search over

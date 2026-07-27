@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Text chunking — mirror of Python `pipeline/rag.py::_chunk_text`.
  *

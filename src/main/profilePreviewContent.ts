@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Ephemeral profile preview — gather USER.md + identity-relevant notes,
  * summarize WHO the user is (not session dumps / trading filler), and allow

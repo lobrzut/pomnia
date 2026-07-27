@@ -72,6 +72,9 @@ describe('ensureBrainForIndexing', () => {
       ollamaUrl: 'http://127.0.0.1:11434',
       skillsRoot: '/tmp/brain-data/vault/skills',
       vaultRoot: '/tmp/brain-data/vault',
+      autoCheckpointEnabled: true,
+      handshakeEnabled: true,
+      handshakePhrase: 'OK to Go Go Go',
     })
   })
 
@@ -111,6 +114,7 @@ describe('indexPendingLibraryDocuments', () => {
       getPendingIndexDocuments: () => [{ id: 'doc1', originalName: 'a.txt' }],
       getLibraryDocument: () => ({ id: 'doc1', originalName: 'a.txt' }),
       readLibrarySource: vi.fn().mockResolvedValue(Buffer.from('hello')),
+      readLibraryExtracted: vi.fn().mockResolvedValue(Buffer.from('')),
       markLibraryDocIndexed,
     }
     const { indexPendingLibraryDocuments } = await import('../libraryIndex.js')

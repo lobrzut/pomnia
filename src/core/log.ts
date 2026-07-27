@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /** Tiny structured logger shared by engine + CLI. Honors POMNIA_DEBUG (legacy: RELIQUA_DEBUG). */
 
 import { writeFileLog } from './logFile.js'

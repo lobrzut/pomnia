@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /** UI chrome language only — Brain knowledge stays auto bilingual (PL+EN). */
 
 export type UiLocale = 'pl' | 'en'

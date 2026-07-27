@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Embedded entry point — the file Pomnia's Electron main forks via
  * `child_process.fork()`. Message-driven, no CLI parsing:

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Poll remote Brain for recent MCP tool calls — used on Dashboard / HowItWorks
  * when Claude Code / Cursor / Antigravity hit Brain outside Pomnia's IPC.

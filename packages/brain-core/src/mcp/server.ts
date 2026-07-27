@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * MCP HTTP server — the entry point clients (Claude Code, Cursor, Antigravity, …)
  * hit at `POST /mcp` with JSON-RPC 2.0 messages.

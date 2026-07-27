@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import { brainCore } from './brainCore.js'
 import { brainCoreDataDir, brainSkillsDir, brainVaultRoot } from './brainPaths.js'
 import { getAppSettings } from './appSettings.js'

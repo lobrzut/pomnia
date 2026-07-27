@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Pomnia MCP "is it wired?" diagnostic.
  *
@@ -247,7 +249,7 @@ function normalizeMcpActivity(data: unknown): McpActivityResponse | null {
   if (!data || typeof data !== 'object') return null
   const d = data as Record<string, unknown>
   if (typeof d.recent === 'boolean' && 'last' in d) {
-    return d as McpActivityResponse
+    return d as unknown as McpActivityResponse
   }
   if (typeof d.tool === 'string' && typeof d.ts === 'number') {
     const ts = d.ts

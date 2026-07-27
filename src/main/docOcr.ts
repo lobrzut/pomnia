@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * On-demand OCR for a vault library PDF — merge text, update extracted blob, re-index that doc only.
  */

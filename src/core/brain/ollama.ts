@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Minimal Ollama client (zero deps, global fetch). Points at a host-local Ollama
  * by default — the whole idea is to do distillation + embedding on the user's own

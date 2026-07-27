@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Document import pipeline — parse → encrypted vault blobs → index in library.db.
  *
