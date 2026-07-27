@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pomnia — lokalna pamięć AI</title>
+  <meta name="description" content="Pomnia: local-first AI memory, encrypted vault, Brain MCP search across all your assistants." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --void: #06070d;
+      --abyss: #0a0c16;
+      --panel: #11141f;
+      --panel-2: #161a28;
+      --line: #232838;
+      --ink: #e9ecf5;
+      --ink-dim: #9aa3bd;
+      --ink-faint: #5b6178;
+      --violet: #8b5cf6;
+      --iris: #6366f1;
+      --cyan: #22d3ee;
+      --mint: #34d399;
+      --radius-xl: 1.25rem;
+      --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      background: var(--void);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    .aurora {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.45;
+      mix-blend-mode: screen;
+      animation: drift 24s ease-in-out infinite;
+    }
+    .blob-1 { width: 55vw; height: 55vw; top: -15%; left: -10%; background: var(--violet); }
+    .blob-2 { width: 45vw; height: 45vw; top: 30%; right: -15%; background: var(--iris); animation-delay: -8s; }
+    .blob-3 { width: 35vw; height: 35vw; bottom: -10%; left: 25%; background: var(--cyan); opacity: 0.25; animation-delay: -16s; }
+
+    @keyframes drift {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(4vw, -3vh) scale(1.12); }
+      66% { transform: translate(-3vw, 4vh) scale(0.94); }
+    }
+
+    .grain::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.035;
+      z-index: 1;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 2;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .brand-mark {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .brand-mark img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(100deg, var(--ink), #c7b8ff 55%, var(--cyan));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .lang-toggle {
+      display: flex;
+      gap: 0.25rem;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.2rem;
+    }
+    .lang-toggle button {
+      font: inherit;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.35rem 0.75rem;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      background: transparent;
+      color: var(--ink-faint);
+      transition: background 0.2s, color 0.2s;
+    }
+    .lang-toggle button.active {
+      background: linear-gradient(120deg, var(--violet), var(--iris));
+      color: white;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 3.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(2.5rem, 7vw, 4rem);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      margin-bottom: 1rem;
+      background: linear-gradient(100deg, var(--ink), #c7b8ff 55%, var(--cyan));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero .sub {
+      font-size: clamp(1.05rem, 2.5vw, 1.35rem);
+      color: var(--ink-dim);
+      max-width: 36rem;
+      margin: 0 auto 0.5rem;
+    }
+    .hero .tagline {
+      font-size: 0.9rem;
+      color: var(--ink-faint);
+      font-style: italic;
+    }
+
+    .features {
+      display: grid;
+      gap: 1rem;
+      margin-bottom: 3rem;
+    }
+    @media (min-width: 640px) {
+      .features { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    .card {
+      background: linear-gradient(160deg, #ffffff0e, #ffffff05);
+      border: 1px solid #ffffff14;
+      border-radius: var(--radius-xl);
+      padding: 1.5rem;
+      backdrop-filter: blur(18px) saturate(140%);
+      box-shadow: 0 1px 0 0 #ffffff1a inset, 0 20px 60px -28px #000000cc;
+      transition: border-color 0.35s, box-shadow 0.35s, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .card:hover {
+      border-color: #ffffff2e;
+      box-shadow: 0 1px 0 0 #ffffff24 inset, 0 28px 80px -30px #6366f188;
+      transform: translateY(-2px);
+    }
+    .card-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      margin-bottom: 0.75rem;
+    }
+    .card h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+    .card p {
+      font-size: 0.875rem;
+      color: var(--ink-dim);
+      line-height: 1.5;
+    }
+
+    .cta-section {
+      background: linear-gradient(160deg, #ffffff0e, #ffffff05);
+      border: 1px solid #ffffff14;
+      border-radius: var(--radius-xl);
+      padding: 2rem;
+      text-align: center;
+      box-shadow: 0 0 0 1px #ffffff1f, 0 0 40px -8px var(--iris);
+      margin-bottom: 2rem;
+    }
+    .cta-section h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .cta-section .hint {
+      font-size: 0.875rem;
+      color: var(--ink-dim);
+      margin-bottom: 1.25rem;
+    }
+
+    .waitlist-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-width: 24rem;
+      margin: 0 auto;
+    }
+    @media (min-width: 480px) {
+      .waitlist-form { flex-direction: row; }
+    }
+    .waitlist-form input[type="email"] {
+      flex: 1;
+      font: inherit;
+      font-size: 0.9rem;
+      padding: 0.75rem 1rem;
+      border-radius: 0.75rem;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .waitlist-form input[type="email"]:focus {
+      border-color: var(--iris);
+      box-shadow: 0 0 0 3px #6366f133;
+    }
+    .waitlist-form button {
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 0.75rem;
+      cursor: pointer;
+      background: linear-gradient(120deg, var(--violet), var(--iris) 50%, var(--cyan));
+      color: white;
+      white-space: nowrap;
+      box-shadow: 0 10px 30px -10px #6366f1cc;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    .waitlist-form button:hover { transform: translateY(-1px); }
+    .waitlist-form button:disabled { opacity: 0.6; cursor: wait; }
+
+    .form-status {
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+      min-height: 1.25rem;
+    }
+    .form-status.ok { color: var(--mint); }
+    .form-status.err { color: #fb7185; }
+
+    .download-section {
+      text-align: center;
+      padding: 1.5rem;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius-xl);
+      margin-bottom: 3rem;
+    }
+    .download-section h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+    .download-section p {
+      font-size: 0.875rem;
+      color: var(--ink-dim);
+      margin-bottom: 1rem;
+    }
+    .btn-secondary {
+      display: inline-block;
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 0.65rem 1.25rem;
+      border-radius: 0.75rem;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink-faint);
+      text-decoration: none;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--ink-faint);
+      padding-top: 2rem;
+      border-top: 1px solid var(--line);
+    }
+    footer a { color: var(--ink-dim); text-decoration: none; }
+    footer a:hover { color: var(--iris); }
+
+    [data-lang="en"] { display: none; }
+    html.lang-en [data-lang="pl"] { display: none; }
+    html.lang-en [data-lang="en"] { display: revert; }
+    html.lang-en .features { display: grid; }
+    html.lang-en .waitlist-form { display: flex; }
+    html.lang-en .cta-section .hint { display: block; }
+  </style>
+</head>
+<body class="grain">
+  <div class="aurora" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="brand-mark"><img src="../resources/icon.png" alt="" width="32" height="32" /></div>
+        <div class="logo">Pomnia</div>
+      </div>
+      <div class="lang-toggle" role="group" aria-label="Language">
+        <button type="button" id="btn-pl" class="active" aria-pressed="true">PL</button>
+        <button type="button" id="btn-en" aria-pressed="false">EN</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <h1>Pomnia</h1>
+      <p class="sub" data-lang="pl">Lokalna pamięć AI — jeden sejf na wszystkie rozmowy, przeszukiwalny przez Brain MCP.</p>
+      <p class="sub" data-lang="en">Local-first AI memory — one vault for all your chats, searchable via Brain MCP.</p>
+      <p class="tagline" data-lang="pl">Twoja pamięć. Twoja maszyna. Zero chmury.</p>
+      <p class="tagline" data-lang="en">Your memory. Your machine. Zero cloud.</p>
+    </section>
+
+    <section class="features" aria-label="Features">
+      <article class="card">
+        <div class="card-icon" style="background:#8b5cf61f;color:#8b5cf6">🔐</div>
+        <h3 data-lang="pl">Sejf</h3>
+        <h3 data-lang="en">Vault</h3>
+        <p data-lang="pl">Zaszyfrowane archiwum rozmów ze wszystkich asystentów — Claude, Cursor, Antigravity i więcej.</p>
+        <p data-lang="en">Encrypted archive of chats from every assistant — Claude, Cursor, Antigravity, and more.</p>
+      </article>
+      <article class="card">
+        <div class="card-icon" style="background:#6366f11f;color:#6366f1">⚗️</div>
+        <h3 data-lang="pl">Distill</h3>
+        <h3 data-lang="en">Distill</h3>
+        <p data-lang="pl">Ekstrakcja wiedzy z czatów do notatek vault — gotowe do indeksowania i RAG.</p>
+        <p data-lang="en">Extract knowledge from chats into vault notes — ready for indexing and RAG.</p>
+      </article>
+      <article class="card">
+        <div class="card-icon" style="background:#22d3ee1f;color:#22d3ee">🧠</div>
+        <h3 data-lang="pl">Brain search</h3>
+        <h3 data-lang="en">Brain search</h3>
+        <p data-lang="pl">Lokalny serwer MCP — przeszukuj pamięć z Cursora, Claude Desktop i innych narzędzi.</p>
+        <p data-lang="en">Local MCP server — search your memory from Cursor, Claude Desktop, and other tools.</p>
+      </article>
+    </section>
+
+    <section class="cta-section" id="waitlist">
+      <h2 data-lang="pl">Dołącz do listy oczekujących</h2>
+      <h2 data-lang="en">Join the waitlist</h2>
+      <p class="hint" data-lang="pl">Beta wkrótce — 10–50 pierwszych użytkowników. Bez spamu.</p>
+      <p class="hint" data-lang="en">Beta coming soon — first 10–50 users. No spam.</p>
+
+      <!-- Replace YOUR_FORM_ID with Formspree form ID, or switch to mailto fallback below -->
+      <form
+        class="waitlist-form"
+        id="waitlist-form"
+        action="https://formspree.io/f/YOUR_FORM_ID"
+        method="POST"
+      >
+        <input
+          type="email"
+          name="email"
+          required
+          autocomplete="email"
+          placeholder="email@example.com"
+          aria-label="Email"
+        />
+        <input type="hidden" name="_subject" value="Pomnia waitlist signup" />
+        <button type="submit" id="submit-btn">
+          <span data-lang="pl">Zapisz mnie</span>
+          <span data-lang="en">Join waitlist</span>
+        </button>
+      </form>
+      <p class="form-status" id="form-status" role="status"></p>
+      <p class="hint" style="margin-top:1rem;font-size:0.8rem" data-lang="pl">
+        Alternatywnie: <a href="mailto:waitlist@pomnia.ai?subject=Pomnia%20waitlist" style="color:var(--iris)">waitlist@pomnia.ai</a>
+      </p>
+      <p class="hint" style="margin-top:1rem;font-size:0.8rem" data-lang="en">
+        Or email: <a href="mailto:waitlist@pomnia.ai?subject=Pomnia%20waitlist" style="color:var(--iris)">waitlist@pomnia.ai</a>
+      </p>
+    </section>
+
+    <section class="download-section">
+      <h2 data-lang="pl">Pomnia 0.1.2 — Windows</h2>
+      <h2 data-lang="en">Pomnia 0.1.2 — Windows</h2>
+      <p data-lang="pl">Instalator dostępny dla uczestników bety. Publiczny release wkrótce.</p>
+      <p data-lang="en">Installer available for beta participants. Public release coming soon.</p>
+      <span class="btn-secondary" data-lang="pl">Wkrótce — dołącz do waitlisty</span>
+      <span class="btn-secondary" data-lang="en">Coming soon — join waitlist</span>
+    </section>
+
+    <section class="download-section" style="margin-top:1.5rem">
+      <h2 data-lang="pl">Mac / bez aplikacji — Podłącz Cursor</h2>
+      <h2 data-lang="en">Mac / no app — Connect Cursor</h2>
+      <p data-lang="pl">DMG jeszcze nie ma. Wygeneruj pełny <code>~/.cursor/mcp.json</code> (3 serwery Brain) w przeglądarce.</p>
+      <p data-lang="en">No DMG yet. Generate a full <code>~/.cursor/mcp.json</code> (3 Brain servers) in the browser.</p>
+      <a class="btn-secondary" href="cursor-mcp.html" style="display:inline-block;text-decoration:none;margin-top:0.75rem" data-lang="pl">Otwórz generator MCP →</a>
+      <a class="btn-secondary" href="cursor-mcp.html" style="display:inline-block;text-decoration:none;margin-top:0.75rem" data-lang="en">Open MCP generator →</a>
+    </section>
+
+    <footer>
+      <p>© 2026 Pomnia · <a href="https://pomnia.ai">pomnia.ai</a> · <a href="cursor-mcp.html">Cursor MCP</a></p>
+    </footer>
+  </div>
+
+  <script>
+    const html = document.documentElement;
+    const btnPl = document.getElementById('btn-pl');
+    const btnEn = document.getElementById('btn-en');
+    const saved = localStorage.getItem('pomnia-lang');
+
+    function setLang(lang) {
+      const isEn = lang === 'en';
+      html.classList.toggle('lang-en', isEn);
+      btnPl.classList.toggle('active', !isEn);
+      btnEn.classList.toggle('active', isEn);
+      btnPl.setAttribute('aria-pressed', String(!isEn));
+      btnEn.setAttribute('aria-pressed', String(isEn));
+      html.lang = lang;
+      localStorage.setItem('pomnia-lang', lang);
+    }
+
+    btnPl.addEventListener('click', () => setLang('pl'));
+    btnEn.addEventListener('click', () => setLang('en'));
+    if (saved === 'en') setLang('en');
+
+    const form = document.getElementById('waitlist-form');
+    const status = document.getElementById('form-status');
+    const submitBtn = document.getElementById('submit-btn');
+    const isEn = () => html.classList.contains('lang-en');
+
+    form.addEventListener('submit', async (e) => {
+      const action = form.getAttribute('action') || '';
+      if (action.includes('YOUR_FORM_ID')) {
+        e.preventDefault();
+        const email = form.querySelector('[name="email"]').value;
+        window.location.href = `mailto:waitlist@pomnia.ai?subject=Pomnia%20waitlist&body=${encodeURIComponent(email)}`;
+        return;
+      }
+      e.preventDefault();
+      submitBtn.disabled = true;
+      status.textContent = '';
+      status.className = 'form-status';
+      try {
+        const res = await fetch(action, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { Accept: 'application/json' }
+        });
+        if (res.ok) {
+          status.textContent = isEn() ? 'Thanks! We\'ll be in touch.' : 'Dzięki! Odezwiemy się wkrótce.';
+          status.className = 'form-status ok';
+          form.reset();
+        } else {
+          throw new Error('submit failed');
+        }
+      } catch {
+        status.textContent = isEn()
+          ? 'Something went wrong — try waitlist@pomnia.ai'
+          : 'Coś poszło nie tak — napisz na waitlist@pomnia.ai';
+        status.className = 'form-status err';
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
