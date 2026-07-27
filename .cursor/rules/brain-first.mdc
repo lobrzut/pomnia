@@ -25,4 +25,4 @@ BEFORE answering prompts about: quotes, philosophy, strategy, wisdom, lessons fr
 
 For pure coding tasks (fix bug, implement feature): Brain search is optional — only if the user asks or the topic is in their knowledge base.
 
-Brain MCP tools live in `mcps/user-brain-rag` — read schema before calling.
+Brain MCP tools live in `mcps/user-pomnia` — read schema before calling.
