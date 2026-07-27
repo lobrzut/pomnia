@@ -1,4 +1,4 @@
-# Pomnia — Document Ingestion Pipeline (master doc)
+﻿# Pomnia — Document Ingestion Pipeline (master doc)
 
 > **Cel:** jeden dokument opisujący **cały łańcuch** od akcji użytkownika do wyszukiwania RAG — dla czatów (działa dziś) i dokumentów (w budowie).  
 > Powiązane: [PDF-LOCAL.md](./PDF-LOCAL.md) (szczegóły parserów), [BRAIN-KVM-ARCHITECTURE.md](./BRAIN-KVM-ARCHITECTURE.md), [BRAIN-INTEGRATION.md](../BRAIN-INTEGRATION.md).
@@ -252,7 +252,7 @@ Szyfrowanie dokumentów jest płacone **tylko podczas importu** — nie w pętli
 
 | Surface | Rola | Ingest |
 |---------|------|--------|
-| **Landing** (`landing/`) | marketing, waitlist | brak ingest |
+| **Landing** (poza tym repo — Cloudflare / pomnia.ai) | marketing | brak ingest |
 | **Mobile** | read-only vault browse? | export-only, distill na desktop |
 | **Web Brain dashboard** | admin, upload, reindex | już istnieje na homelab |
 

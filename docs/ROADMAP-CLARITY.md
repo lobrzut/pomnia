@@ -1,4 +1,4 @@
-# Pomnia — Roadmap przejrzystości i gotowości beta
+﻿# Pomnia — Roadmap przejrzystości i gotowości beta
 
 > **Audyt:** 2026-07-09 · repo `pomnia` + ekosystem Brain / Cursor / landing  
 > **Kontekst:** poza buildem Mac — użytkownik nie czuje, że aplikacja i ekosystem są jasne; brak pewności, że funkcje zadziałają u innych.
@@ -151,8 +151,8 @@ Instalacja → Vault (hasło) → Backup czatów → Import (opcjonalnie)
 | `BRAIN-INTEGRATION.md` | operator homelab | Stare nazwy Continuum, IP 192.168.x.x |
 | `docs/BRAIN-KVM-ARCHITECTURE.md` | infra | Zbyt niszowy na start |
 | `docs/MAC-BUILD.md` | release | OK |
-| `docs/LANDING-DEPLOY.md` | ops | OK |
-| `landing/index.html` | public | Waitlist + „coming soon" — **luka vs działający beta exe** |
+| Landing deploy docs | ops | **usunięte z repo produktu** — site poza drzewem AGPL |
+| Marketing site | public | poza tym repo (Cloudflare / pomnia.ai) — nie w drzewie produktu |
 | Brain vault / chat | tylko u operatora | Decyzje produktowe niewidoczne w repo |
 
 ### 3.2 Brakujący artefakt

@@ -1,4 +1,4 @@
-# Pomnia — START HERE
+﻿# Pomnia — START HERE
 
 > Jedna strona dla beta testera. Szczegóły techniczne: [README](../README.md) · audyt: [ROADMAP-CLARITY.md](./ROADMAP-CLARITY.md).
 
@@ -63,7 +63,7 @@ To zamienia surowe logi rozmów w skondensowane notatki `.md` i buduje indeks we
 
 **Windows (aplikacja Pomnia):** zakładka **Connect** → tryb remote/embedded → skopiuj pełny snippet → wklej → Reload Window.
 
-**Mac / bez aplikacji:** otwórz [`landing/cursor-mcp.html`](../landing/cursor-mcp.html) (albo [docs/CURSOR-MCP.md](./CURSOR-MCP.md)) → URL `:7862` + token z dashboardu `:7860` → **Kopiuj mcp.json** → `~/.cursor/mcp.json` → Reload Window.
+**Mac / bez aplikacji:** zobacz [docs/CURSOR-MCP.md](./CURSOR-MCP.md) → URL `:7862` + token z dashboardu `:7860` → **Kopiuj mcp.json** → `~/.cursor/mcp.json` → Reload Window.
 
 Remote zawsze wymaga **trzech** serwerów: `brain-rag`, `brain-vault`, `brain-library`. Sam rag = niepełna konfiguracja.
 

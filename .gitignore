@@ -1,4 +1,4 @@
-node_modules/
+ï»¿node_modules/
 out/
 dist/
 release/
@@ -14,7 +14,7 @@ vault/
 sandbox/
 build/brain-core-runtime/
 
-# ComfyUI MCP outputs — review before promoting to resources/ or landing/
+# ComfyUI MCP outputs - review before promoting to resources/
 assets/generated/*
 !assets/generated/.gitkeep
 
