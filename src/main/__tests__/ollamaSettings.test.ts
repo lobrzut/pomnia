@@ -22,14 +22,14 @@ describe('resolveOllamaUrl', () => {
 
   it('prefers explicit IPC argument', async () => {
     const { resolveOllamaUrl } = await import('../ollamaSettings.js')
-    expect(resolveOllamaUrl('http://brain.example.local:11434/')).toBe('http://brain.example.local:11434')
+    expect(resolveOllamaUrl('http://127.0.0.1:11434/')).toBe('http://127.0.0.1:11434')
   })
 
   it('falls back to saved app settings', async () => {
-    getAppSettings.mockReturnValue({ ollamaUrl: 'http://brain.example.local:11434' })
+    getAppSettings.mockReturnValue({ ollamaUrl: 'http://127.0.0.1:11434' })
     const { resolveOllamaUrl } = await import('../ollamaSettings.js')
-    expect(resolveOllamaUrl()).toBe('http://brain.example.local:11434')
-    expect(resolveOllamaUrl('')).toBe('http://brain.example.local:11434')
+    expect(resolveOllamaUrl()).toBe('http://127.0.0.1:11434')
+    expect(resolveOllamaUrl('')).toBe('http://127.0.0.1:11434')
   })
 
   it('defaults to 127.0.0.1 when nothing saved', async () => {
@@ -41,7 +41,7 @@ describe('resolveOllamaUrl', () => {
 describe('probeOllama', () => {
   beforeEach(() => {
     vi.resetModules()
-    getAppSettings.mockReturnValue({ ollamaUrl: 'http://brain.example.local:11434' })
+    getAppSettings.mockReturnValue({ ollamaUrl: 'http://127.0.0.1:11434' })
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, status: 200 }),
@@ -53,7 +53,7 @@ describe('probeOllama', () => {
     const r = await probeOllama()
     expect(r.ok).toBe(true)
     expect(fetch).toHaveBeenCalledWith(
-      'http://brain.example.local:11434/api/tags',
+      'http://127.0.0.1:11434/api/tags',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
   })

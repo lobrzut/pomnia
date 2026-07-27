@@ -11,7 +11,7 @@ MCP server [`comfyui-cursor-mcp`](https://github.com/lobrzut/comfyui-cursor-mcp)
 
 ## Export custom workflow from ComfyUI (ISKRA)
 
-1. Open ComfyUI: `http://brain.example.local:7821`
+1. Open ComfyUI: `http://comfy.example.local:7821`
 2. Build graph (FLUX txt2img + optional LoRA `cursor-approved/flat-ui`)
 3. **Save (API Format)** → save as `assets/comfyui/your-name.json`
 4. Set `COMFYUI_WORKFLOWS_DIR` in MCP env if you want MCP to load from this folder

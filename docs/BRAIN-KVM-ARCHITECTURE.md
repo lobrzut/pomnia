@@ -12,7 +12,7 @@
 ## Przepływ (Remote master)
 
 ```
-PC klienta                         KVM Brain (brain.example.local)
+PC klienta                         KVM Brain (192.168.x.x)
 ────────────                       ───────────────────────────
 backup → Vault (NAS)
 distill (qwen, Ollama LAN)
@@ -29,7 +29,7 @@ Cursor / Claude ──MCP :7862──────► search_library
 Gdy **Connect → Remote master** i **Brain → Auto-deploy after distill**:
 
 1. Po distill + lokalnym pre-index (opcjonalnie)
-2. Kopia `.md` do `brainDeployTarget` (SMB, np. `\\brain.example.local\brain\vault\distilled`) **lub** HTTP `POST /api/vault/save-note`
+2. Kopia `.md` do `brainDeployTarget` (SMB, np. `\\192.168.x.x\brain\vault\distilled`) **lub** HTTP `POST /api/vault/save-note`
 3. `POST /api/library/reindex` na dashboard `:7860`
 
 Ustawienia w `localStorage`: `pomnia.brain.autoDeploy`, `pomnia.brain.deployUrl`, `pomnia.brain.deployTarget`.

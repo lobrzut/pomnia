@@ -10,7 +10,7 @@
 | **brain-core** (`packages/brain-core`, Node) | `POST {ollama}/api/embed` | `nomic-embed-text` → **dim 768** | **Tak** (MVP Ollama-only) |
 | **Pomnia desktop embedded** | fork child → ten sam `EmbedClient` | j.w. | **Tak** — URL z Settings / `127.0.0.1:11434` |
 | **Pomnia distill** | `qwen2.5:14b` (chat) | ~9 GB | Tak, na **PC klienta** (GPU) |
-| **Brain hub Python** (`Projects/brain`) | `BRAIN_EMBED_BACKEND=fastembed` **lub** `ollama` | `nomic-ai/nomic-embed-text-v1.5` / Ollama `nomic-embed-text` | Edge Docker: **nie**; live KVM Alice: Ollama z wieloma modelami |
+| **Brain hub Python** (`Projects/brain`) | `BRAIN_EMBED_BACKEND=fastembed` **lub** `ollama` | `nomic-ai/nomic-embed-text-v1.5` / Ollama `nomic-embed-text` | Edge Docker: **nie**; live KVM w homelabie: Ollama z wieloma modelami |
 | **Docker edge** (`brain/docker-compose.yml` + `Dockerfile`) | fastembed ONNX, model **prefetch w build** | v1.5 | **Nie** — „No Ollama, no GPU” |
 
 Klucz: wektory z Ollama `nomic-embed-text` i Python fastembed v1.5 są **zgodne kierunkowo** (dim 768) — istniejący `library.db` da się query’ować bez reindexu przy zmianie backendu (zweryfikowane Phase 0 / komentarze w `embed.ts` + `rag.py`).
@@ -28,7 +28,7 @@ Klucz: wektory z Ollama `nomic-embed-text` i Python fastembed v1.5 są **zgodne 
 ### Nie bundlować
 
 - **`qwen2.5:14b` (~9 GB) i inne chat/LLM** — distill zostaje na PC klienta (GPU). Serwer Brain = pamięć do pytań, nie fabryka notatek.
-- Pełny katalog 32 modeli z live KVM Alice — to homelab power-user, nie produkt „Brain Server”.
+- Pełny katalog 32 modeli z live KVM w homelabie — to homelab power-user, nie produkt „Brain Server”.
 
 ### Footprint (oczekiwania)
 
@@ -46,14 +46,14 @@ Mały KVM (2–4 GB RAM, bez GPU) → **tylko embed**. Distill opcjonalny / offb
 
 | # | Opcja | Pros | Cons | Homelab KVM | Produkt Brain Server |
 |---|-------|------|------|-------------|----------------------|
-| **1** | Ollama sidecar w compose + pre-pull `nomic-embed-text` | Ten sam kontrakt co desktop (`/api/embed`); łatwy swap modelu tagiem | Cięższy obraz (Ollama + model); kolejny proces; GPU niepotrzebne ale kusi „dokładanie LLM” | OK jako most do live 201 | OK, ale nadmiarowe |
+| **1** | Ollama sidecar w compose + pre-pull `nomic-embed-text` | Ten sam kontrakt co desktop (`/api/embed`); łatwy swap modelu tagiem | Cięższy obraz (Ollama + model); kolejny proces; GPU niepotrzebne ale kusi „dokładanie LLM” | OK jako most do live homelab | OK, ale nadmiarowe |
 | **2** | **ONNX / fastembed tylko pod embed** (bez Ollamy) | Już zrobione w hub Docker; `docker up` → search; mały RAM; zero ręcznego `ollama pull` | brain-core Node jeszcze tego nie ma; prefix `search_query:` trzeba trzymać w kodzie | Idealne dla lekkiego VM | **Najlepsze** |
 | **3** | Bake modelu w binary/data brain-core | Jedna paczka Electron/daemon | Gigantyczny update Electron; trudniejszy bump modelu; miesza app z serwerem | Słabe | Słabe |
 
 ### Rekomendacja
 
 1. **Brain Server / KVM image (produkt + lekki homelab):** **opcja 2** — utrzymać i utwardzić istniejący edge path w `Projects/brain` (`BRAIN_EMBED_BACKEND=fastembed`, model w warstwie Docker). Kryterium akceptacji: `docker compose … up` → `search_library` **bez** ręcznego `ollama pull`.
-2. **Live KVM Alice (201):** zostaw Ollamę z GPU do distill/eksperymentów; search może iść fastembed **lub** Ollama — nie mieszaj backendów w jednym `library.db` bez świadomej decyzji (oba nomic 768 są OK, ale trzymaj jeden backend na deploy).
+2. **Live KVM homelab:** zostaw Ollamę z GPU do distill/eksperymentów; search może iść fastembed **lub** Ollama — nie mieszaj backendów w jednym `library.db` bez świadomej decyzji (oba nomic 768 są OK, ale trzymaj jeden backend na deploy).
 3. **brain-core Node (przyszłość):** po desktop parity dodać backend `onnx`/`fastembed`-equivalent **albo** opcjonalny Ollama sidecar tylko w compose serwerowym — nie piecz modelu w Electron.
 
 ---

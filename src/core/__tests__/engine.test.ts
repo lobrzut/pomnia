@@ -25,27 +25,27 @@ describe('crypto', () => {
 
 describe('pathmap — cross-platform', () => {
   it('replicates Claude Code project-dir encoding', () => {
-    expect(encodeClaudeProject('C:\\Users\\Admin\\PROJEKTY')).toBe('C--Users-Admin-PROJEKTY')
+    expect(encodeClaudeProject('C:\\Users\\Alice\\PROJEKTY')).toBe('C--Users-Alice-PROJEKTY')
     expect(encodeClaudeProject('/Users/jane/PROJEKTY')).toBe('-Users-jane-PROJEKTY')
   })
 
   it('remaps a Windows project dir to a macOS home', () => {
-    const origin: HostContext = { os: 'win32', home: 'C:\\Users\\Admin', user: 'Admin' }
+    const origin: HostContext = { os: 'win32', home: 'C:\\Users\\Alice', user: 'Alice' }
     const target: HostContext = { os: 'darwin', home: '/Users/jane', user: 'jane' }
-    const enc = encodeClaudeProject('C:\\Users\\Admin\\PROJEKTY')
+    const enc = encodeClaudeProject('C:\\Users\\Alice\\PROJEKTY')
     const { encoded, confident } = remapClaudeProject(enc, origin, target)
     expect(confident).toBe(true)
     expect(encoded).toBe('-Users-jane-PROJEKTY')
   })
 
   it('rewrites absolute home paths inside a config across separators', () => {
-    const origin: HostContext = { os: 'win32', home: 'C:\\Users\\Admin', user: 'Admin' }
+    const origin: HostContext = { os: 'win32', home: 'C:\\Users\\Alice', user: 'Alice' }
     const target: HostContext = { os: 'darwin', home: '/Users/jane', user: 'jane' }
-    const cfg = JSON.stringify({ path: 'C:\\Users\\Admin\\.claude', alt: 'C:/Users/Alice/x' })
+    const cfg = JSON.stringify({ path: 'C:\\Users\\Alice\\.claude', alt: 'C:/Users/Alice/x' })
     const { text, changed } = remapTextPaths(cfg, origin, target)
     expect(changed).toBe(true)
     expect(text).toContain('/Users/jane')
-    expect(text).not.toContain('Admin')
+    expect(text).not.toContain('Alice')
   })
 })
 

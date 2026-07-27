@@ -8,7 +8,7 @@
  *  1. Claude Code project-dir encoding. Claude Code stores each project under
  *     `~/.claude/projects/<encoded-cwd>/` where the cwd has every `/`, `\` and `:`
  *     replaced by `-`. Example (Windows):
- *         C:\Users\Alice\PROJEKTY   →   C--Users-Admin-PROJEKTY
+ *         C:\Users\Alice\PROJEKTY   →   C--Users-Alice-PROJEKTY
  *     The same project on macOS would be:
  *         /Users/jane/PROJEKTY    →   -Users-jane-PROJEKTY
  *     The encoding is lossy (a literal `-` is indistinguishable from a separator),
@@ -23,7 +23,7 @@ import type { OS } from './model.js'
 export interface HostContext {
   os: OS
   home: string // e.g. C:\Users\Alice  or  /Users/jane
-  user: string // e.g. Admin / jane
+  user: string // e.g. Alice / jane
 }
 
 /** Replicate Claude Code's project-dir encoding. */

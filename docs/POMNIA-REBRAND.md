@@ -35,7 +35,7 @@ Product: local-first AI memory, vault, Brain MCP
 ## Not changed (intentional)
 
 - External `lobrzut/reliqua-brain-hub` repo link in brain-core docs (separate Python hub).
-- Homelab Brain server at brain.example.local — doc references only.
+- Homelab Brain server at 192.168.x.x — doc references only.
 - Legacy env/paths (`RELIQUA_*`, `~/.reliqua`, `%AppData%/Reliqua`) — migration only.
 
 ## Done later

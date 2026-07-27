@@ -19,7 +19,7 @@ Pomnia ma **działający rdzeń techniczny**: szyfrowany vault, backup czatów, 
 |--------|--------|-----------|
 | Silnik vault + crypto | 🟢 | 7/7 testów engine, incremental backup OK |
 | Backup adapterów | 🟢 | Claude Code, Cursor — zweryfikowane; Antigravity — 🟡 |
-| Distill + embedded brain | 🟢 | Wymaga Ollama + 2 modele; działa u Alice |
+| Distill + embedded brain | 🟢 | Wymaga Ollama + 2 modele; działa u operatora |
 | Doc import (PDF/DOCX/EPUB) | 🟡 | Parser + vault + index — kod i testy OK; OCR 🔲 |
 | MCP Connect (Cursor) | 🟢 | Snippet + mint token; wymaga restartu klienta |
 | Przejrzystość UX | 🟢 | Mapa (75c15d4) + animowany FlowDiagram (b85e410) ✅ |
@@ -120,7 +120,7 @@ Legenda: 🟢 **DZIAŁA** · 🟡 **CZĘŚCIOWO** · ⚪ **NIE TESTOWANE** · �
 | **Doc import — MD/TXT** | 🟢 DZIAŁA | passthrough |
 | **Encrypted library** (bloby w vault) | 🟢 DZIAŁA | `stores library documents as encrypted blobs` test |
 | **Embedded brain-core** | 🟢 DZIAŁA | fork child, port 7862; bundled w exe; Settings health check |
-| **Remote brain** (homelab MCP) | 🟡 CZĘŚCIOWO | Kod OK; **default URL = alice IP**; wymaga token Bearer |
+| **Remote brain** (homelab MCP) | 🟡 CZĘŚCIOWO | Kod OK; **default URL = homelab IP**; wymaga token Bearer |
 | **MCP Connect** (Cursor) | 🟢 DZIAŁA | `Connect.tsx`, snippet, mint token; ⚪ Hermes/Antigravity client — mniej testów |
 | **Deploy homelab** | 🟡 CZĘŚCIOWO | CLI `brain deploy`; SMB/HTTP; błędy 404 słabo widoczne w UI |
 | **Tray** (system tray) | 🟢 DZIAŁA | `tray.ts`; status brain + activity line; release 0.1.2 |
@@ -152,7 +152,7 @@ Legenda: 🟢 **DZIAŁA** · 🟡 **CZĘŚCIOWO** · ⚪ **NIE TESTOWANE** · �
 |---|---------|-------|-----------|
 | 1 | **Dwa „vaulty"** — `.pomnia` vs `brain-core-data/` | Cała appka | 🔴 |
 | 2 | **Dwa pipeline'y** — czaty (distill+LLM) vs dokumenty (direct index) | Import, Brain | 🟡 |
-| 3 | ~~**Embedded vs remote** — domyślnie remote URL Alice~~ | Connect, Onboarding, store | ✅ FIXED `74db87d` |
+| 3 | ~~**Embedded vs remote** — domyślnie remote URL operatora~~ | Connect, Onboarding, store | ✅ FIXED `74db87d` |
 | 4 | **Backup vs Import** — kiedy którego użyć | Dashboard, Import | 🟡 |
 | 5 | **Full onboarding pomija backup** | `Onboarding.tsx` FULL_STEPS | 🟡 |
 | 6 | **Ollama jako ukryta zależność** | Distill milczy bez preflight w UI | 🟡 |
@@ -176,7 +176,7 @@ Legenda: 🟢 **DZIAŁA** · 🟡 **CZĘŚCIOWO** · ⚪ **NIE TESTOWANE** · �
 
 | Ryzyko | Severity | Szczegół | Mitigacja |
 |--------|----------|----------|-----------|
-| ~~**Hardcoded IP brain.example.local**~~ | ✅ FIXED | `74db87d` — per-user `app-settings.json`, pusty default remote | Embedded zalecany; remote tylko user URL |
+| ~~**Hardcoded IP 192.168.x.x**~~ | ✅ FIXED | `74db87d` — per-user `app-settings.json`, pusty default remote | Embedded zalecany; remote tylko user URL |
 | **Ollama wymagane** | 🟡 | distill, embed, doc index — bez Ollama pipeline stoi | Health check ✅; brak preflight blokady przed distill |
 | **Modele ~8 GB RAM** | 🟡 | `qwen2.5:14b` + `nomic-embed-text` | Dokumentacja START-HERE; brak profilu „light" w UI |
 | **Unsigned installer** | 🔴 | SmartScreen blokuje; brak Authenticode | README ma instrukcję; code signing — track osobny |
@@ -187,7 +187,7 @@ Legenda: 🟢 **DZIAŁA** · 🟡 **CZĘŚCIOWO** · ⚪ **NIE TESTOWANE** · �
 | **Brak telemetrii / crash report** | ⚪ | Trudna diagnoza u bety | Eksport logów ✅ (`api.openLogs`) |
 | **Repo private + brak public release** | 🔴 | Tester nie ma skąd pobrać oficjalnie | GitHub Release + landing |
 | **Token MCP remote** | 🟡 | Wymaga dashboard :7860 lub mint w Connect | Brak instrukcji „skąd token ręcznie" |
-| **Ścieżki deploy SMB** | 🟡 | Przykłady `\\brain.example.local\brain\` w docs | Wizard deploy |
+| **Ścieżki deploy SMB** | 🟡 | Przykłady `\\192.168.x.x\brain\` w docs | Wizard deploy |
 
 ### ~~Mapa hardcoded IP~~ — FIXED (`74db87d`, 2026-07-09)
 
@@ -231,7 +231,7 @@ Domyślny homelab URL usunięty z UI/store/snippet/CLI. Remote Brain wymaga jawn
 
 | # | Zadanie | Effort | Faza | Dlaczego |
 |---|---------|--------|------|----------|
-| 1 | ~~Usunąć default `brain.example.local` z UI/store/snippet~~ ✅ **2026-07-09** | S | A | Bloker remote dla obcych |
+| 1 | ~~Usunąć default `192.168.x.x` z UI/store/snippet~~ ✅ **2026-07-09** | S | A | Bloker remote dla obcych |
 | 2 | `docs/BETA-SMOKE.md` + checklist 15 min | S | B | Powtarzalna weryfikacja przed każdym exe |
 | 3 | GitHub Release 0.1.2 z `Pomnia-0.1.2-setup.exe` | S | C | Oficjalny link dla testerów |
 | 4 | Landing: link pobierania + naprawa 503 | S | C | Waitlist ≠ produkt |
@@ -253,7 +253,7 @@ Domyślny homelab URL usunięty z UI/store/snippet/CLI. Remote Brain wymaga jawn
 - [ ] Każdy przechodzi `BETA-SMOKE.md` na czystym Windows 11 **bez Node**
 - [ ] Health check zielony: Ollama + nomic-embed-text + vault + MCP
 - [ ] Cursor Connect na ≥2 różnych maszynach
-- [x] Zero `brain.example.local` w ścieżce UI *(naprawione 2026-07-09 — per-user `app-settings.json`)*
+- [x] Zero `192.168.x.x` w ścieżce UI *(naprawione 2026-07-09 — per-user `app-settings.json`)*
 - [ ] Jeden link START-HERE + download exe
 
 ---
@@ -297,4 +297,4 @@ Asystenci (Claude Code, Cursor, …)
 
 ---
 
-*Pomnia · local-first AI memory · audyt wewnętrzny dla Alice*
+*Pomnia · local-first AI memory · audyt wewnętrzny dla operatora*

@@ -10,8 +10,8 @@ vi.mock('./api', () => ({
 describe('pathFromDroppedFile', () => {
   it('returns path from preload webUtils bridge', () => {
     const file = new File(['x'], 'report.pdf') as File & { path?: string }
-    file.path = 'C:\\Users\\Admin\\Downloads\\report.pdf'
-    expect(pathFromDroppedFile(file)).toBe('C:\\Users\\Admin\\Downloads\\report.pdf')
+    file.path = 'C:\\Users\\Alice\\Downloads\\report.pdf'
+    expect(pathFromDroppedFile(file)).toBe('C:\\Users\\Alice\\Downloads\\report.pdf')
   })
 
   it('returns null when path cannot be resolved', () => {

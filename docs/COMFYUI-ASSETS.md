@@ -10,13 +10,13 @@ Generowanie unikalnych assetów (ikona, hero, tray, OG) przez **ComfyUI MCP** w 
 Cursor Agent
     → MCP stdio (comfyui)          ~/.cursor/mcp.json
     → comfyui-cursor-mcp/server.py  C:/Users/Alice/Projects/comfyui-cursor-mcp
-    → ComfyUI HTTP API              http://brain.example.local:7821  (ISKRA)
+    → ComfyUI HTTP API              http://comfy.example.local:7821  (ISKRA)
     → PNG w assets/generated/       COMFY_WORKSPACE = ten repo
 ```
 
 | Serwis | URL | Rola |
 |--------|-----|------|
-| **ComfyUI ISKRA** | `http://brain.example.local:7821` | GPU, FLUX/SDXL, LoRA |
+| **ComfyUI ISKRA** | `http://comfy.example.local:7821` | GPU, FLUX/SDXL, LoRA |
 | **Brain MCP** | `http://brain.example.local:7862/mcp` | RAG, vault — **nie ruszamy** |
 | **Comfy lokalnie** | `http://127.0.0.1:8188` | Opcjonalnie — zmień `COMFYUI_URL` |
 
@@ -45,10 +45,10 @@ Plik: `%USERPROFILE%\.cursor\mcp.json`
       "headers": { "Authorization": "Bearer …" }
     },
     "comfyui": {
-      "command": "C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "command": "C:\\Users\\Alice\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
       "args": ["C:/Users/Alice/Projects/comfyui-cursor-mcp/server.py"],
       "env": {
-        "COMFYUI_URL": "http://brain.example.local:7821",
+        "COMFYUI_URL": "http://comfy.example.local:7821",
         "COMFY_WORKSPACE": "C:/Users/Alice/Projects/pomnia"
       }
     }
@@ -60,7 +60,7 @@ Plik: `%USERPROFILE%\.cursor\mcp.json`
 
 ```powershell
 git clone https://github.com/lobrzut/comfyui-cursor-mcp.git C:\Users\Alice\Projects\comfyui-cursor-mcp
-$env:COMFYUI_URL = "http://brain.example.local:7821"
+$env:COMFYUI_URL = "http://comfy.example.local:7821"
 $env:COMFY_WORKSPACE = "C:\Users\Alice\Projects\pomnia"
 cd C:\Users\Alice\Projects\comfyui-cursor-mcp
 .\apply.ps1
@@ -86,7 +86,7 @@ Potem w Cursor: **Settings → MCP → Reload** (wyłącz/włącz `comfyui`).
 ComfyUI na serwerze homelab. Sprawdzenie:
 
 ```powershell
-Invoke-WebRequest http://brain.example.local:7821/system_stats -UseBasicParsing
+Invoke-WebRequest http://comfy.example.local:7821/system_stats -UseBasicParsing
 ```
 
 Jeśli offline — uruchom usługę na ISKRA (Docker/systemd — zależnie od Twojego deployu). W Brain vault jest kontekst sesji `MCP_comfyui` (port 7821, FLUX LoRA).
@@ -199,7 +199,7 @@ MCP domyślnie używa **wbudowanego** workflow FLUX w Pythonie — JSON opcjonal
 | Problem | Rozwiązanie |
 |---------|-------------|
 | MCP `comfyui` czerwony | Reload MCP; sprawdź Python 3.12 + `pip install -r requirements.txt` w comfyui-cursor-mcp |
-| ComfyUI timeout | Kolejka zajęta na ISKRA — poczekaj lub sprawdź `http://brain.example.local:7821/queue` |
+| ComfyUI timeout | Kolejka zajęta na ISKRA — poczekaj lub sprawdź `http://comfy.example.local:7821/queue` |
 | Brak LoRA `flat-ui` | Skopiuj na ISKRA: `models/loras/cursor-approved/` — patrz `comfyui-cursor-mcp/loras/README.md` |
 | Brain MCP padł | Nie dotykaj wpisu `brain-rag` w mcp.json — osobny serwis |
 
