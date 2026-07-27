@@ -1,6 +1,6 @@
 # Pomnia rebrand — complete (2026-07-07)
 
-Reliqua branding has been fully removed from user-facing copy, package metadata, installers, and internal identifiers. GitHub remote may still point at `lobrzut/reliqua` until renamed manually.
+Reliqua branding has been fully removed from user-facing copy, package metadata, installers, and internal identifiers. GitHub repo renamed to `lobrzut/pomnia` (2026-07-27); old URL redirects.
 
 Domain: **pomnia.ai**  
 Product: local-first AI memory, vault, Brain MCP
@@ -34,9 +34,13 @@ Product: local-first AI memory, vault, Brain MCP
 
 ## Not changed (intentional)
 
-- GitHub repo URL (`github.com/lobrzut/reliqua`) — rename when ready.
-- External `lobrzut/reliqua-brain-hub` repo link in brain-core docs.
+- External `lobrzut/reliqua-brain-hub` repo link in brain-core docs (separate Python hub).
 - Homelab Brain server at brain.example.local — doc references only.
+- Legacy env/paths (`RELIQUA_*`, `~/.reliqua`, `%AppData%/Reliqua`) — migration only.
+
+## Done later
+
+- GitHub repo: `lobrzut/reliqua` → `lobrzut/pomnia` (2026-07-27).
 
 ## Verify after upgrade
 

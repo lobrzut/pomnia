@@ -39,7 +39,7 @@ KROKI NA MACU
    (host zwykle: brain.example.local).
 
 2) Sklonuj / zaktualizuj repo Pomnia:
-   git clone https://github.com/lobrzut/reliqua.git pomnia
+   git clone https://github.com/lobrzut/pomnia.git pomnia
    cd pomnia
    # albo jeśli już masz:
    git pull
