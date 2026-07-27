@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * One-shot rebrand: Reliqua → Pomnia across source/docs (excludes node_modules, out, release, .git).
  */
@@ -15,6 +15,7 @@ const REPLACEMENTS = [
   ['window.reliqua', 'window.pomnia'],
   ["exposeInMainWorld('reliqua'", "exposeInMainWorld('pomnia'"],
   ['(window as any).reliqua', '(window as any).pomnia'],
+  // legacy Electron appId (technical identifier — not a username path; keep for migration accuracy)
   ['dev.helluk.reliqua', 'ai.pomnia.app'],
   ['.reliqua-index.json', '.pomnia-index.json'],
   ['.reliqua-skills', '.pomnia-skills'],

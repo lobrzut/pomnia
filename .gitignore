@@ -40,3 +40,6 @@ scripts/gen-logo-refines.py
 
 # Personal Claude Code local config
 .claude/
+
+# Local landing workspace (not Desktop product publish root)
+landing/
