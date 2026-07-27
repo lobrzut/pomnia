@@ -1,7 +1,9 @@
 # Audyt Pomnia — 2026-07-09
 
-> **Zakres:** repozytorium `C:\Users\Alice\Projects\pomnia` + ekosystem (Brain MCP, landing, homelab)  
-> **Wersja produktu:** 0.1.2 · **Branch:** `master` · **Audytor:** agent (na podstawie kodu, testów, dokumentacji i stanu repo)
+> **Historical snapshot (2026-07-09).** Not current product state. For live facts use [README](../README.md), [SECURITY.md](../SECURITY.md), and [docs/START-HERE.md](START-HERE.md). Remote is now `lobrzut/pomnia`; marketing landing is **outside** this repo; release line is 0.1.35+.
+
+> **Zakres (ówczesny):** lokalne drzewo + ekosystem (Brain MCP, landing, homelab)  
+> **Wersja produktu wtedy:** 0.1.2 · **Branch:** `master` · **Audytor:** agent (kod, testy, docs, stan repo)
 
 ---
 

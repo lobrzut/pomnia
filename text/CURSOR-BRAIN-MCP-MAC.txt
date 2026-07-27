@@ -47,9 +47,8 @@ KROKI NA MACU
 3) Weź token (A/B/C powyżej). Nie wklejaj go do gita.
 
 4) Utwórz plik ~/.cursor/mcp.json z SZABLONEM poniżej
-   (podstaw HOST i TOKEN). Albo otwórz w przeglądarce:
-     open landing/cursor-mcp.html
-   wklej URL http://HOST:7862 + token → Kopiuj mcp.json.
+   (podstaw HOST i TOKEN). Albo skopiuj JSON z docs/CURSOR-MCP.md
+   / Connect w Desktop — wklej URL http://HOST:7862 + token.
 
 5) Szablon (3 serwery — nie tylko pomnia):
 

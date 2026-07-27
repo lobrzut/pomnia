@@ -641,7 +641,7 @@ const PL_LABELS: UiLabels = {
     'Wykryto tylko część serwerów Pomnia. Remote wymaga pomnia + pomnia-vault + pomnia-library.',
   connectPartialFix: 'Skopiuj pełny config poniżej i nadpisz / zmerguj mcp.json',
   connectMacNoAppHint:
-    'Bez aplikacji Desktop: landing/cursor-mcp.html albo docs/CURSOR-MCP.md — ten sam pełny JSON MCP (przykład Cursor; kształt dla innych klientów w Connect).',
+    'Bez aplikacji Desktop: docs/CURSOR-MCP.md — ten sam pełny JSON MCP (przykład Cursor; kształt dla innych klientów w Connect).',
   agentBrainMode: 'Tryb Brain dla agenta',
   agentBrainModeHint:
     'Dokłada regułę (Cursor rules / CLAUDE.md / Antigravity ~/.gemini/config/GEMINI.md) + silniejsze opisy narzędzi MCP: agent sam czyta profil, skille i pamięć; milestone → checkpoint_session (gdy Auto-checkpoint ON); świadomy zapis na „zapisz do Pomnia”. „Połączony” w Connect = plik MCP `pomnia`, nie gwarancja że agent już sprawdził w Pomnia.',
@@ -1215,7 +1215,7 @@ const EN_LABELS: Partial<UiLabels> = {
     'Copy the MCP config and paste it in your client (Cursor, Claude, Antigravity…) — Pomnia never touches your files.',
   connectStepReload: 'Reload the MCP client (e.g. Reload Window)',
   connectMacNoAppHint:
-    'Without Desktop: landing/cursor-mcp.html or docs/CURSOR-MCP.md — same MCP JSON (Cursor example; other clients via Connect).',
+    'Without Desktop: docs/CURSOR-MCP.md — same MCP JSON (Cursor example; other clients via Connect).',
   agentBrainMode: 'Agent Brain Mode',
   agentBrainModeHint:
     'Adds a rule (Cursor rules / CLAUDE.md / Antigravity ~/.gemini/config/GEMINI.md) plus stronger MCP tool descriptions: agent auto-reads profile, skills, and memory; milestone → checkpoint_session (when Auto-checkpoint ON); conscious save on “save to Pomnia”. Connect “wired” = MCP config `pomnia`, not a guarantee the agent already checked Pomnia.',

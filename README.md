@@ -58,7 +58,7 @@ src/renderer/        UI: React + Tailwind + Framer Motion
 
 ## Desktop user guide
 
-> [docs/START-HERE.md](docs/START-HERE.md) · audit: [docs/AUDYT-POMNIA-2026-07-09.md](docs/AUDYT-POMNIA-2026-07-09.md)
+> [docs/START-HERE.md](docs/START-HERE.md) · historical audit snapshot: [docs/AUDYT-POMNIA-2026-07-09.md](docs/AUDYT-POMNIA-2026-07-09.md)
 
 **In the app:** encrypted vault, adapter backup, ZIP/JSON + PDF/DOCX/EPUB import, embedded brain-core (MCP `:7862`), distill via Ollama, **How it works** / **Connect** tabs, tray + diagnostics in Settings.
 
