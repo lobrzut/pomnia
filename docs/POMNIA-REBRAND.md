@@ -1,4 +1,4 @@
-# Pomnia rebrand — complete (2026-07-07)
+﻿# Pomnia rebrand — complete (2026-07-07)
 
 Reliqua branding has been fully removed from user-facing copy, package metadata, installers, and internal identifiers. GitHub repo renamed to `lobrzut/pomnia` (2026-07-27); old URL redirects.
 
@@ -14,7 +14,7 @@ Product: local-first AI memory, vault, Brain MCP
 | npm package | `reliqua` | `pomnia` |
 | CLI binary | `reliqua` | `pomnia` |
 | Workspace | `@reliqua/brain-core` | `@pomnia/brain-core` |
-| appId | `dev.helluk.reliqua` | `ai.pomnia.app` |
+| Electron appId | `dev.helluk.reliqua` (legacy technical id — keep for installs that still map userData via old appId) | `ai.pomnia.app` |
 | productName | Reliqua | Pomnia |
 | Preload bridge | `window.reliqua` | `window.pomnia` |
 | Env vars | `RELIQUA_*` | `POMNIA_*` (legacy `RELIQUA_*` still read) |

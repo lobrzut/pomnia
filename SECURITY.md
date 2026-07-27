@@ -1,30 +1,30 @@
-# Pomnia — zasady bezpieczeństwa i zaufania
+﻿# Pomnia - zasady bezpieczenstwa i zaufania
 
-**Dokument wewnętrzny** dla zespołu i przyszłego audytu. Opisuje model zaufania przy premierze (v1). Nie jest specyfikacją open-source ani dokumentacją publiczną implementacji kryptograficznej.
+**Dokument wewnetrzny** dla zespolu i przyszlego audytu. Opisuje model zaufania przy premierze (v1). Kod zrodlowy produktu (wlacznie z vault/crypto) jest publikowany na **AGPL-3.0-only** - ten plik nie jest specyfikacja kryptograficzna ani instrukcja ataku; streszcza gwarancje dla uzytkownika i audytu.
 
 ---
 
-## 1. Vault jako chroniony rdzeń
+## 1. Vault jako chroniony rdzen
 
-Sejf (vault) ma bezpośredni dostęp do wszystkich danych użytkownika zgromadzonych w Pomnia — rozmów, snapshotów konfiguracji, metadanych importów. To **najbardziej chroniona warstwa** produktu.
+Sejf (vault) ma bezposredni dostep do wszystkich danych uzytkownika zgromadzonych w Pomnia - rozmow, snapshotow konfiguracji, metadanych importow. To **najbardziej chroniona warstwa** produktu pod wzgledem izolacji runtime i klucza.
 
-- Kod vault, format plików sejfu oraz implementacja kryptografii **pozostają zamknięte** przy premierze — bez publikacji kodu, specyfikacji formatu ani szczegółów crypto.
-- Pomnia **nie jest modelem „open core”**. Sejf to zamknięty, przenośny „safe” użytkownika; reszta produktu może ewoluować osobno, ale rdzeń danych nie podlega otwarciu w v1.
+- Implementacja vault/crypto jest w publicznym kodzie AGPL (`src/core/vault.ts`, `crypto` itd.) - przejrzystosc zrodla nie oznacza otwartego dostepu do danych uzytkownika.
+- Sejf to lokalny, przenosny "safe": dane na dysku pozostaja zaszyfrowane; fraza dostepu nie opuszcza maszyny uzytkownika. Model zaufania opiera sie na kryptografii i izolacji IPC, nie na ukrywaniu kodu.
 
 ---
 
 ## 2. Gwarancje techniczne (poziom wysoki)
 
-Poniżej streszczenie zachowania systemu — **bez odwołań do kodu, ścieżek plików kluczy ani wewnętrznego układu binarnego sejfu**.
+Ponizej streszczenie zachowania systemu - **bez odwolan do sciezek plikow kluczy ani wewnetrznego ukladu binarnego sejfu**.
 
 | Obszar | Gwarancja |
 |--------|-----------|
-| **Fraza dostępu** | Nigdy nie jest zapisywana na dysku. Utrata frazy = brak odzyskania sejfu. |
-| **Szyfrowanie** | AES-256-GCM (szyfrowanie uwierzytelnione). Klucz wyprowadzany przez scrypt (parametr N=2¹⁷ — zgodnie z UI Ustawień). |
-| **Blokada sejfu** | Po zamknięciu klucz jest usuwany z pamięci procesu głównego; dane na dysku pozostają zaszyfrowane. |
-| **Izolacja UI** | Proces renderera (React) **nie ma** bezpośredniego dostępu do plików sejfu. Wszystkie operacje przechodzą przez IPC do procesu głównego. |
-| **Import** | Wejście kontrolowane — walidacja formatu i normalizacja przed zapisem. Brak „surowego” zapisu dowolnych plików do sejfu. |
-| **Eksport** | Brak cichego wycieku. Dane opuszczają sejf wyłącznie przy **jawnej akcji użytkownika**: backup, eksport do Brain, deploy pipeline. |
+| **Fraza dostepu** | Nigdy nie jest zapisywana na dysku. Utrata frazy = brak odzyskania sejfu. |
+| **Szyfrowanie** | AES-256-GCM (szyfrowanie uwierzytelnione). Klucz wyprowadzany przez scrypt (parametr N=2^17 - zgodnie z UI Ustawien). |
+| **Blokada sejfu** | Po zamknieciu klucz jest usuwany z pamieci procesu glownego; dane na dysku pozostaja zaszyfrowane. |
+| **Izolacja UI** | Proces renderera (React) **nie ma** bezposredniego dostepu do plikow sejfu. Wszystkie operacje przechodza przez IPC do procesu glownego. |
+| **Import** | Wejscie kontrolowane - walidacja formatu i normalizacja przed zapisem. Brak "surowego" zapisu dowolnych plikow do sejfu. |
+| **Eksport** | Brak cichego wycieku. Dane opuszczaja sejf wylacznie przy **jawnej akcji uzytkownika**: backup, eksport do Brain, deploy pipeline. |
 
 ---
 
@@ -32,35 +32,35 @@ Poniżej streszczenie zachowania systemu — **bez odwołań do kodu, ścieżek 
 
 | Kategoria | Co wchodzi |
 |-----------|------------|
-| **PUBLIC** | Instalatory (exe/dmg), strona landing, fragmenty dokumentacji MCP (integracja z zewnętrznymi klientami AI). |
-| **CLOSED** | UI aplikacji, adaptery źródeł, bundle brain-core, vault, pipeline importu. |
-| **SEPARATE** | Homelab Brain (serwer RAG/indeks na infrastrukturze użytkownika) — **nie** jest częścią publikacji klienta Pomnia. |
+| **PUBLIC (AGPL)** | Kod zrodlowy klienta Pomnia (UI, adaptery, vault/crypto, brain-core bundle, pipeline importu), instalatory (exe/dmg), landing, dokumentacja MCP. |
+| **SEPARATE** | Homelab Brain (serwer RAG/indeks na infrastrukturze uzytkownika) - **nie** jest czescia publikacji klienta Pomnia. |
+| **NIE PUBLIC** | Prywatne vaulty uzytkownikow, klucze, dane produkcyjne, lokalne artefakty build (`landing/` robocze, vault/, sandbox/). |
 
-Homelab Brain to osobny produkt/instancja; Pomnia dostarcza do niego dane tylko na żądanie użytkownika (eksport/deploy), nie bundluje serwera Brain w instalatorze klienta.
+Homelab Brain to osobny produkt/instancja; Pomnia dostarcza do niego dane tylko na zadanie uzytkownika (eksport/deploy), nie bundluje serwera Brain w instalatorze klienta.
 
 ---
 
 ## 4. Pitch zaufania
 
-**PL:** Twoje rozmowy leżą w lokalnym, zaszyfrowanym sejfie — klucz tylko w Twojej głowie, a aplikacja nie wysyła ich nigdzie bez Twojej wyraźnej decyzji.
+**PL:** Twoje rozmowy leza w lokalnym, zaszyfrowanym sejfie - klucz tylko w Twojej glowie, a aplikacja nie wysyla ich nigdzie bez Twojej wyraznej decyzji.
 
-**EN:** Your conversations live in a local encrypted vault — the key stays in your head, and the app never moves them anywhere without your explicit choice.
+**EN:** Your conversations live in a local encrypted vault - the key stays in your head, and the app never moves them anywhere without your explicit choice.
 
 ---
 
-## 5. Warstwy — dostęp i postawa ochronna
+## 5. Warstwy - dostep i postawa ochronna
 
-| Warstwa | Poziom dostępu do danych użytkownika | Postawa ochronna |
+| Warstwa | Poziom dostepu do danych uzytkownika | Postawa ochronna |
 |---------|-------------------------------------|------------------|
-| **Vault** | Pełny — odczyt/zapis całego archiwum po odblokowaniu | Zamknięty kod; najwyższa izolacja; brak bezpośredniego dostępu z renderera; klucz tylko w RAM procesu głównego |
-| **Adapters** | Odczyt źródeł zewnętrznych (Claude Code, Cursor, profile itd.) przed zapisem do sejfu | Tylko odczyt z znanych lokalizacji OS; normalizacja do wspólnego modelu; brak zapisu poza vault |
-| **Import** | Wejście z plików eksportu (ZIP/JSON/MD) użytkownika | Bramkowany punkt wejścia; walidacja i parsowanie; brak arbitralnego zapisu; ten sam model co backup |
-| **Brain-MCP** | Eksport wybranych rozmów / notatek na żądanie | Jednokierunkowy, jawny eksport; opcjonalny deploy do osobnego serwera Brain; brak domyślnej telemetrii |
+| **Vault** | Pelny - odczyt/zapis calego archiwum po odblokowaniu | Najwyzsza izolacja; brak bezposredniego dostepu z renderera; klucz tylko w RAM procesu glownego; kod AGPL audytowalny |
+| **Adapters** | Odczyt zrodel zewnetrznych (Claude Code, Cursor, profile itd.) przed zapisem do sejfu | Tylko odczyt z znanych lokalizacji OS; normalizacja do wspolnego modelu; brak zapisu poza vault |
+| **Import** | Wejscie z plikow eksportu (ZIP/JSON/MD) uzytkownika | Bramkowany punkt wejscia; walidacja i parsowanie; brak arbitralnego zapisu; ten sam model co backup |
+| **Brain-MCP** | Eksport wybranych rozmow / notatek na zadanie | Jednokierunkowy, jawny eksport; opcjonalny deploy do osobnego serwera Brain; brak domyslnej telemetrii |
 
 ---
 
 ## Zakres dokumentu
 
-Ten plik nie zastępuje polityki bezpieczeństwa organizacji ani raportu audytu. Aktualizacje modelu publikacji lub gwarancji technicznych powinny być odzwierciedlone tutaj przed każdą większą wersją produkcyjną.
+Ten plik nie zastepuje polityki bezpieczenstwa organizacji ani raportu audytu. Aktualizacje modelu publikacji lub gwarancji technicznych powinny byc odzwierciedlone tutaj przed kazda wieksza wersja produkcyjna.
 
-*Ostatnia aktualizacja: premiera v1.*
+*Ostatnia aktualizacja: 2026-07-27 - zgodnosc z AGPL (publiczne zrodlo vault/crypto).*

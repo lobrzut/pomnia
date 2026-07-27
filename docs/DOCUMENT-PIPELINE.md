@@ -17,7 +17,7 @@ Pomnia operuje na **dwóch niezależnych magazynach** o różnej roli i szyfrowa
 | **Brain data dir** | `%AppData%/Pomnia/brain-core-data/` lub `~/.pomnia/brain` | Plaintext na dysku (tylko `library.db` chunki + distilled md) | `vault/distilled`, `vault/sessions`, `USER.md` | Brak plaintext sources — tylko indeks RAG |
 | **Encrypted backup** | NAS / kopia `.pomnia` | Jak vault | Pełna przenośność czatów + dokumentów | Docs jako bloby w vault ✅ v0.2 |
 
-**Zasada publikacji:** kod szyfrowania vault (`src/core/vault.ts`, `crypto.ts`) **nigdy** nie trafia do publicznego repo — tylko zamknięty instalator.
+**Zasada publikacji:** kod szyfrowania vault (`src/core/vault.ts`, `crypto.ts`) jest w publicznym zrodle **AGPL-3.0-only**. Dane uzytkownika (vaulty, frazy) nigdy nie naleza do repo - tylko lokalnie / w prywatnych backupach.
 
 ---
 
