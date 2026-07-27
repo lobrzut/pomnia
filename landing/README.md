@@ -13,9 +13,7 @@ Static site for [pomnia.ai](https://pomnia.ai). No build step — plain HTML.
 `index.html` carries two placeholders that are deliberately invalid, so the page
 cannot go live half-wired:
 
-| Placeholder | Replace with |
-|---|---|
-| `GITHUB_RELEASES_URL` | direct link to the Windows installer on GitHub Releases |
+Download CTA in `index.html` is wired to `https://github.com/lobrzut/pomnia/releases/latest`.
 
 The repository link is already wired to `github.com/lobrzut/pomnia`. The download
 link is deliberately still a placeholder: there is no release yet, and a dead
