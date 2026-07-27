@@ -19,7 +19,7 @@
     --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
     --ease: cubic-bezier(0.16, 1, 0.3, 1);
   }
-  /* Single visual world by design: the night sky the constellation needs.
+  /* Single visual world by design: the dark the neural field needs.
      The product this page sells lives in the same dark. */
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -514,12 +514,13 @@
 (() => {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* ═══ Memory constellation — two depth layers, pointer parallax,
-     and memory sparks that travel along the edges. ═══ */
+  /* ═══ Neural field — somas with dendrites, curved axons, and thoughts
+     that propagate as firing cascades across a fixed network. ═══ */
   const cv = document.getElementById('sky');
   const ctx = cv.getContext('2d');
 
-  let W, H, dpr, near = [], far = [], sparks = [];
+  let W, H, dpr, near = [], far = [], signals = [];
+  let scrollN = 0, scrollE = 0;   // progress through the document, 0..1 (eased)
   const pointer = { x: -1e4, y: -1e4, px: 0, py: 0 };
 
   const IRIS = [148, 163, 246], CYAN = [82, 211, 238], MINT = [52, 211, 153];
@@ -532,121 +533,251 @@
     seed();
   }
 
-  function seed() {
-    const nNear = Math.round(Math.min(110, Math.max(50, (W * H) / 17000)));
-    const nFar  = Math.round(nNear * 0.8);
-    const make = (speed) => {
-      const tint = Math.random();
-      return {
-        x: Math.random() * W, y: Math.random() * H,
-        vx: (Math.random() - 0.5) * (reduced ? 0 : speed),
-        vy: (Math.random() - 0.5) * (reduced ? 0 : speed),
-        r: 0.7 + Math.random() * 1.7,
-        c: tint < 0.72 ? IRIS : tint < 0.92 ? CYAN : MINT,
-        tw: Math.random() * Math.PI * 2,
-      };
+  /* ── A neuron: soma, a crown of dendrite stubs, outgoing axons ────────── */
+  function makeNeuron(sway, scale) {
+    const tint = Math.random();
+    const hub = Math.random() < 0.15;          // a few richly-connected cells
+    const padY = 96;                       // covers the parallax travel
+    const hx = Math.random() * W;
+    const hy = -padY + Math.random() * (H + padY * 2);
+    const n = {
+      hx, hy, x: hx, y: hy,          // home position — cells never migrate
+      amp: (2.5 + Math.random() * 4.5) * sway,
+      ph:  Math.random() * Math.PI * 2,
+      ph2: Math.random() * Math.PI * 2,
+      rate: 0.00011 + Math.random() * 0.00013,
+      r: (hub ? 2.1 + Math.random() * 1.5 : 1.0 + Math.random()) * scale,
+      c: tint < 0.70 ? IRIS : tint < 0.92 ? CYAN : MINT,
+      tw: Math.random() * Math.PI * 2,
+      spin: (Math.random() - 0.5) * 0.00012,   // dendrites rotate imperceptibly
+      hub,
+      out: [],        // axons leaving this cell
+      lit: 0,         // activation target
+      glow: 0,        // eased toward lit — no instant jumps in brightness
+      ready: 0,       // refractory period — cannot fire before this time
+      dend: [],
     };
-    near = Array.from({ length: nNear }, () => make(1.7)); // opening burst → settles
-    far  = Array.from({ length: nFar  }, () => { const s = make(0.25); s.r *= 0.55; return s; });
-    sparks = [];
+    const count = hub ? 5 + (Math.random() * 3 | 0) : 3 + (Math.random() * 2 | 0);
+    for (let i = 0; i < count; i++) {
+      n.dend.push({
+        a: (i / count) * Math.PI * 2 + Math.random() * 0.7,
+        len: (4 + Math.random() * 10) * scale * (hub ? 1.6 : 1),
+      });
+    }
+    return n;
   }
 
-  const LINK = 130, PLINK = 195;
-
-  function drift(list, damp) {
-    for (const n of list) {
-      n.x += n.vx; n.y += n.vy;
-      n.vx *= damp; n.vy *= damp;
-      if (Math.abs(n.vx) < 0.1) n.vx += (Math.random() - 0.5) * 0.012;
-      if (Math.abs(n.vy) < 0.1) n.vy += (Math.random() - 0.5) * 0.012;
-      if (n.x < -24) n.x = W + 24; else if (n.x > W + 24) n.x = -24;
-      if (n.y < -24) n.y = H + 24; else if (n.y > H + 24) n.y = -24;
+  /* ── Grow axons once: each cell reaches for its k nearest neighbours ──── */
+  function wire(list, maxDist, k) {
+    for (const a of list) {
+      const cand = [];
+      for (const b of list) {
+        if (a === b) continue;
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d < maxDist) cand.push({ b, d });
+      }
+      cand.sort((p, q) => p.d - q.d);
+      const take = Math.min(a.hub ? k + 2 : k, cand.length);
+      a.out = [];
+      for (let i = 0; i < take; i++) {
+        a.out.push({ b: cand[i].b, bend: (Math.random() - 0.5) * 0.32 });
+      }
     }
   }
 
-  function dots(list, ox, oy, alpha, t) {
+  function seed() {
+    const nNear = Math.round(Math.min(64, Math.max(28, (W * H) / 30000)));
+    const nFar  = Math.round(nNear * 0.85);
+    near = Array.from({ length: nNear }, () => makeNeuron(1, 1));
+    far  = Array.from({ length: nFar  }, () => makeNeuron(0.6, 0.55));
+    wire(near, 240, 3);
+    wire(far, 200, 2);
+    signals = [];
+  }
+
+  /* ── A point along an axon's quadratic curve ──────────────────────────── */
+  function axonPoint(a, o, t, ox, oy) {
+    const b = o.b;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const cx = (a.x + b.x) / 2 - dy * o.bend;
+    const cy = (a.y + b.y) / 2 + dx * o.bend;
+    const u = 1 - t;
+    return {
+      x: u * u * a.x + 2 * u * t * cx + t * t * b.x + ox,
+      y: u * u * a.y + 2 * u * t * cy + t * t * b.y + oy,
+    };
+  }
+
+  /* Tissue does not migrate. Each cell sways a few pixels around its home,
+     on its own phase and period, so the field breathes without travelling. */
+  function sway(list, t) {
     for (const n of list) {
-      const tw = reduced ? 1 : 0.7 + 0.3 * Math.sin(t / 900 + n.tw);
+      n.x = n.hx + Math.cos(t * n.rate + n.ph) * n.amp;
+      n.y = n.hy + Math.sin(t * n.rate * 1.31 + n.ph2) * n.amp * 0.8;
+    }
+  }
+
+  /* ── Draw the resting tissue: axons, dendrites, somas ─────────────────── */
+  function tissue(list, ox, oy, axonA, somaA, t, reach) {
+    ctx.lineCap = 'round';
+
+    /* attention lights the tissue: cells near the cursor glow brighter */
+    const hasP = pointer.x > -9000;
+    for (const n of list) {
+      n.near = 0;
+      if (hasP && reach > 0) {
+        const d = Math.hypot(n.x + ox - pointer.x, n.y + oy - pointer.y);
+        if (d < reach) { const k = 1 - d / reach; n.near = k * k; }
+      }
+    }
+
+    for (const a of list) {
+      for (const o of a.out) {
+        const b = o.b;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const cx = (a.x + b.x) / 2 - dy * o.bend;
+        const cy = (a.y + b.y) / 2 + dx * o.bend;
+        const heat = Math.max(a.glow, b.glow);
+        const att  = Math.max(a.near, b.near);
+        ctx.beginPath();
+        ctx.moveTo(a.x + ox, a.y + oy);
+        ctx.quadraticCurveTo(cx + ox, cy + oy, b.x + ox, b.y + oy);
+        ctx.strokeStyle = `rgba(${a.c[0]},${a.c[1]},${a.c[2]},${axonA + att * 0.17 + heat * 0.16})`;
+        ctx.lineWidth = 0.7 + att * 0.5 + heat * 0.5;
+        ctx.stroke();
+      }
+    }
+
+    for (const n of list) {
+      const rot = t * n.spin;
+      ctx.strokeStyle = `rgba(${n.c[0]},${n.c[1]},${n.c[2]},${(axonA + n.near * 0.16 + n.glow * 0.2) * 1.4})`;
+      ctx.lineWidth = 0.6;
+      for (const d of n.dend) {
+        const a = d.a + rot, L = d.len * (1 + n.glow * 0.18 + n.near * 0.12);
+        ctx.beginPath();
+        ctx.moveTo(n.x + ox, n.y + oy);
+        ctx.lineTo(n.x + ox + Math.cos(a) * L, n.y + oy + Math.sin(a) * L);
+        ctx.stroke();
+      }
+    }
+
+    for (const n of list) {
+      const breathe = reduced ? 1 : 0.75 + 0.25 * Math.sin(t / 1100 + n.tw);
+      const a = somaA * breathe + n.glow * 0.34 + n.near * 0.30;
+      if (n.glow > 0.03) {
+        ctx.shadowColor = `rgba(${n.c[0]},${n.c[1]},${n.c[2]},0.7)`;
+        ctx.shadowBlur = 9 * n.glow;
+      }
       ctx.beginPath();
-      ctx.arc(n.x + ox, n.y + oy, n.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${n.c[0]},${n.c[1]},${n.c[2]},${alpha * tw})`;
+      ctx.arc(n.x + ox, n.y + oy, n.r * (1 + n.glow * 0.3 + n.near * 0.18), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${n.c[0]},${n.c[1]},${n.c[2]},${a})`;
       ctx.fill();
+      ctx.shadowBlur = 0;
     }
   }
 
-  function spawnSpark() {
-    // pick a random currently-connected pair and send a pulse along the edge
-    for (let tries = 0; tries < 12; tries++) {
-      const a = near[(Math.random() * near.length) | 0];
-      const b = near[(Math.random() * near.length) | 0];
-      if (a === b) continue;
-      const d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (d > 30 && d < LINK) { sparks.push({ a, b, t: 0, v: 0.014 + Math.random() * 0.012 }); return; }
+  /* ── Firing: light the cell, send impulses down some of its axons ─────── */
+  function fire(n, t, depth) {
+    if (t < n.ready) return;
+    n.ready = t + 1100 + Math.random() * 800;
+    n.lit = 1;
+    if (!n.out.length || depth > 2) return;
+    const branches = depth === 0
+      ? Math.min(n.out.length, 2)
+      : (Math.random() < 0.72 ? 1 : 2);
+    const used = new Set();
+    for (let i = 0; i < branches; i++) {
+      const o = n.out[(Math.random() * n.out.length) | 0];
+      if (used.has(o)) continue;
+      used.add(o);
+      signals.push({ a: n, o, t: 0, v: 0.0065 + Math.random() * 0.005, depth });
     }
   }
 
-  let lastSpark = 0;
+  let lastFire = 0;
 
   function frame(t) {
     ctx.clearRect(0, 0, W, H);
 
-    // pointer parallax offsets (subtle depth)
     const cx = W / 2, cy = H / 2;
     const hasP = pointer.x > -9000;
-    pointer.px += (((hasP ? pointer.x : cx) - cx) * 1 - pointer.px) * 0.04;
-    pointer.py += (((hasP ? pointer.y : cy) - cy) * 1 - pointer.py) * 0.04;
-    const fx = -pointer.px * 0.008, fy = -pointer.py * 0.008;  // far layer
-    const nx = -pointer.px * 0.022, ny = -pointer.py * 0.022;  // near layer
+    pointer.px += (((hasP ? pointer.x : cx) - cx) - pointer.px) * 0.04;
+    pointer.py += (((hasP ? pointer.y : cy) - cy) - pointer.py) * 0.04;
+    /* scroll parallax: the field drifts a bounded amount from the top of the
+       document to the bottom, so it never runs out of tissue however long
+       the page gets. The near layer moves more than the far one. */
+    scrollE += (scrollN - scrollE) * 0.06;
+    const sFar  = (scrollE - 0.5) * 68;
+    const sNear = (scrollE - 0.5) * 156;
 
-    if (!reduced) { drift(far, 0.999); drift(near, 0.992); }
+    const fx = -pointer.px * 0.008, fy = -pointer.py * 0.008 - sFar;
+    const nx = -pointer.px * 0.022, ny = -pointer.py * 0.022 - sNear;
 
-    dots(far, fx, fy, 0.28, t);
+    if (!reduced) { sway(far, t); sway(near, t); }
 
-    // edges (near layer only)
-    for (let i = 0; i < near.length; i++) {
-      const a = near[i];
-      const pd = Math.hypot(a.x + nx - pointer.x, a.y + ny - pointer.y);
-      const boosted = pd < PLINK;
-      for (let j = i + 1; j < near.length; j++) {
-        const b = near[j];
-        const d = Math.hypot(a.x - b.x, a.y - b.y);
-        const reach = boosted ? LINK * 1.45 : LINK;
-        if (d < reach) {
-          const alpha = (1 - d / reach) * (boosted ? 0.3 : 0.13);
-          ctx.beginPath();
-          ctx.moveTo(a.x + nx, a.y + ny); ctx.lineTo(b.x + nx, b.y + ny);
-          ctx.strokeStyle = `rgba(${a.c[0]},${a.c[1]},${a.c[2]},${alpha})`;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
-      }
-    }
+    for (const n of far)  { n.lit *= 0.975; n.glow += (n.lit - n.glow) * 0.10; }
+    for (const n of near) { n.lit *= 0.980; n.glow += (n.lit - n.glow) * 0.10; }
 
-    dots(near, nx, ny, 0.62, t);
+    tissue(far,  fx, fy, 0.030, 0.20, t, 150);
+    tissue(near, nx, ny, 0.055, 0.50, t, 280);
 
-    // memory sparks — pulses travelling along live edges
     if (!reduced) {
-      if (t - lastSpark > 620 && sparks.length < 7) { spawnSpark(); lastSpark = t; }
-      for (let i = sparks.length - 1; i >= 0; i--) {
-        const s = sparks[i];
+      /* spontaneous activity — a cell near the cursor is likelier to fire */
+      if (t - lastFire > 1150) {
+        lastFire = t;
+        let pick = near[(Math.random() * near.length) | 0];
+        if (hasP) {
+          for (let i = 0; i < 5; i++) {
+            const c = near[(Math.random() * near.length) | 0];
+            const d = Math.hypot(c.x + nx - pointer.x, c.y + ny - pointer.y);
+            if (d < 260) { pick = c; break; }
+          }
+        }
+        fire(pick, t, 0);
+        if (Math.random() < 0.28) fire(far[(Math.random() * far.length) | 0], t, 2);
+      }
+
+      for (let i = signals.length - 1; i >= 0; i--) {
+        const s = signals[i];
         s.t += s.v;
-        if (s.t >= 1 || Math.hypot(s.a.x - s.b.x, s.a.y - s.b.y) > LINK * 1.6) { sparks.splice(i, 1); continue; }
-        const x = s.a.x + (s.b.x - s.a.x) * s.t + nx;
-        const y = s.a.y + (s.b.y - s.a.y) * s.t + ny;
+        const layerX = near.includes(s.a) ? nx : fx;
+        const layerY = near.includes(s.a) ? ny : fy;
+
+        if (s.t >= 1) {
+          fire(s.o.b, t, s.depth + 1);     // impulse arrives → next cell fires
+          signals.splice(i, 1);
+          continue;
+        }
+
+        /* depolarisation wave: the axon itself conducts, brightest at the
+           leading edge and fading behind — it never leaves the fibre */
         const fade = Math.sin(s.t * Math.PI);
-        ctx.beginPath();
-        ctx.arc(x, y, 1.7, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(52, 211, 153, ${0.85 * fade})`;
-        ctx.shadowColor = 'rgba(52, 211, 153, 0.9)';
-        ctx.shadowBlur = 8;
-        ctx.fill();
-        ctx.shadowBlur = 0;
+        const from = Math.max(0, s.t - 0.26);
+        const SEG = 9;
+        ctx.lineCap = 'round';
+        let prev = axonPoint(s.a, s.o, from, layerX, layerY);
+        for (let k = 1; k <= SEG; k++) {
+          const tt = from + (s.t - from) * (k / SEG);
+          const pt = axonPoint(s.a, s.o, tt, layerX, layerY);
+          const front = k / SEG;                  // 1 at the wavefront
+          ctx.beginPath();
+          ctx.moveTo(prev.x, prev.y);
+          ctx.lineTo(pt.x, pt.y);
+          ctx.strokeStyle = `rgba(52, 211, 153, ${0.40 * fade * front * front})`;
+          ctx.lineWidth = 0.8 + 1.4 * front * front;
+          ctx.stroke();
+          prev = pt;
+        }
       }
     }
 
     if (!document.hidden) requestAnimationFrame(frame);
   }
 
+  addEventListener('scroll', () => {
+    const max = Math.max(1, document.documentElement.scrollHeight - innerHeight);
+    scrollN = Math.min(1, scrollY / max);
+  }, { passive: true });
   addEventListener('resize', resize, { passive: true });
   addEventListener('pointermove', e => { pointer.x = e.clientX; pointer.y = e.clientY; }, { passive: true });
   addEventListener('pointerleave', () => { pointer.x = -1e4; pointer.y = -1e4; }, { passive: true });
