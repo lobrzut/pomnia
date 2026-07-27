@@ -158,7 +158,7 @@ export default function Onboarding() {
         </div>
 
         <p className="text-[10px] leading-relaxed text-ink-faint">
-          Local-first. Encrypted. Nothing leaves this machine unless you say so.
+          Local-first. Encrypted. Nothing leaves your hardware unless you say so.
         </p>
       </div>
 
