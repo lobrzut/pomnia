@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 out/
 dist/
 release/
@@ -27,8 +27,7 @@ _npm_install.log
 _pack_win.log
 _smoke_result.log
 build/
-resources/*.bak
-resources/*.bak-*
+resources/*.bak*
 
 # Private ComfyUI / branding tooling (not Desktop product)
 assets/comfyui/
