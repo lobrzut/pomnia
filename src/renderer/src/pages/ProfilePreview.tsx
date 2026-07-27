@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import clsx from 'clsx'
 import { Copy, GripHorizontal, Save, User, X } from 'lucide-react'
 import { useEffect, useState } from 'react'

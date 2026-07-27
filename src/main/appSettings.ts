@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Main-process preferences (tray behaviour). Kept separate from renderer
  * localStorage so close/minimize handlers work even when the window is hidden.

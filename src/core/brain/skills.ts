@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Brain skills sync — fetch skill catalogs from a brain server and persist them
  * locally so Pomnia works the same whether you're online or offline.

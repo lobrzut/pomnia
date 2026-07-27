@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Manage MCP Bearer tokens on Brain from Pomnia.
  *

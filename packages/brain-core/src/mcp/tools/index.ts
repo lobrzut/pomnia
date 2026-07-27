@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * MCP tools — public surface. One place that owns:
  *   - the full tool catalog (name + description + inputSchema) that MCP

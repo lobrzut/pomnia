@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import { useCallback, useEffect, useState } from 'react'
 import { History, Map, RotateCcw } from 'lucide-react'
 import { FlowDiagram } from '../components/FlowDiagram'

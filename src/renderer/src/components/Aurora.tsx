@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /** Animated aurora background — blob colors follow data-theme CSS vars. */
 export default function Aurora() {
   return (

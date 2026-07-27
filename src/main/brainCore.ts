@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * BrainCoreManager — lifecycle of the embedded brain-core child process.
  *

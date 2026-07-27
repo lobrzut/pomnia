@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * System tray — keeps Pomnia alive (embedded brain MCP) when the window is hidden.
  */

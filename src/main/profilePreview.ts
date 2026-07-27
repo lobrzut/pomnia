@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Ephemeral user profile preview — frameless floating panel (mirrors Handshake).
  * Destroyed on close; each open regenerates content. Save writes USER.md to vault.

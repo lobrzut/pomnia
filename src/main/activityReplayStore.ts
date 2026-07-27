@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import { promises as fs } from 'fs'
 import { join } from 'path'
 import { PIPELINE_FINALE_MS, type ActivityKind, type ActivityState } from './activity.js'

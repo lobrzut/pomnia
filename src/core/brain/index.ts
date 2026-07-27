@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /** Brain pipeline — public API. Collect (engine) → Distill → Pre-index → Deploy. */
 export { Ollama, defaultOllamaConfig } from './ollama.js'
 export type { OllamaConfig, OllamaModel } from './ollama.js'

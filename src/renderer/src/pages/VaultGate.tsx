@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { FolderOpen, KeyRound, ShieldCheck, Sparkles } from 'lucide-react'

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import { useCallback, useEffect, useState } from 'react'
 import clsx from 'clsx'
 import { BrainCircuit, Clock, Database, FileText, Sparkles } from 'lucide-react'

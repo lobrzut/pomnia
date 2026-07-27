@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bot, CloudUpload, Database, FileText, HardDriveDownload, Layers, Plug, Search, Sparkles } from 'lucide-react'
 import clsx from 'clsx'

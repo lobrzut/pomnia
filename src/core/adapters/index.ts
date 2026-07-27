@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import type { DetectedSource, SourceId } from '../model.js'
 import type { Adapter } from './types.js'
 import { claudeCodeAdapter } from './claudeCode.js'

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import { DEFAULT_HANDSHAKE_PHRASE } from '@core/handshakePhrase'
 import type {
   ActivityState,

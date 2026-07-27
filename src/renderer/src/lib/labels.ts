@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /** Polish + English UI chrome labels. Brain knowledge stays auto bilingual (no knowledgeLang). */
 
 import { formatPipelineProgressLabel } from '@core/pipelineLabels.js'

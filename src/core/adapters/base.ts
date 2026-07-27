@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import type { BackupOptions, DetectedSource, SourceId } from '../model.js'
 import { descriptorFor } from '../locations.js'
 import { currentOS, homeDir } from '../platform.js'

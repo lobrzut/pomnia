@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'

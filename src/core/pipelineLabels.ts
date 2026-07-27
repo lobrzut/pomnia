@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /** Polish labels for pipeline / activity phase ids — shared by main IPC and renderer. */
 
 export const PIPELINE_PHASE_LABELS: Record<string, string> = {

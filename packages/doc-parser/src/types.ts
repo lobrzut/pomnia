@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /** Extraction quality tier — maps to architecture doc tiers 1–3. */
 export type ExtractionTier = 1 | 2 | 3
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Tier 2 OCR — scanned / sparse PDFs via tesseract.js (Apache-2.0).
  * Never use scribe.js (AGPL). Ollama vision is optional later (prefer: auto → still tesseract here).

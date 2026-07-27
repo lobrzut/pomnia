@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Cross-platform path translation — the heart of "backup on Windows, restore on Mac".
  *

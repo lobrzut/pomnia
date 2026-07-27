@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Picture-in-Picture style floating flow monitor — always-on-top mini window.
  */

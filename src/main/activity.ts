@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Global background-operation state — shared by IPC, tray tooltip, and renderer banners.
  */

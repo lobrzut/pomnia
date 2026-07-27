@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import type { ActivityKind, ActivityReplayStep, ActivityState, LastActivityReplay } from './types'
 
 const PIPELINE_FINALE_MS = 2600

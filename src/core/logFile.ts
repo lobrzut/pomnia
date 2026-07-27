@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /** Append-only daily log files — used by Electron main (not renderer). */
 
 import { appendFile, mkdir } from 'node:fs/promises'

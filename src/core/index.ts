@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /** Pomnia engine — public API. Pure Node, no Electron, usable from CLI or main process. */
 export * from './model.js'
 export * from './platform.js'

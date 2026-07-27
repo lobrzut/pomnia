@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 // Re-export engine types for the renderer (type-only — erased at build, no node code pulled in).
 import type { SourceId } from '@core/model'
 export type {

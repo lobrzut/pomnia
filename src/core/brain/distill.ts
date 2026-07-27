@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Host-side distillation. Turns a raw Conversation into a Brain-compatible markdown
  * note (same frontmatter + sections Brain's own pipeline emits), using a local

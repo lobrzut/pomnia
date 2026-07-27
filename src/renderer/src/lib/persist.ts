@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /** Small localStorage helpers — every user-edited field should go through these. */
 
 const MIGRATION_FLAG = 'pomnia.migratedFromReliqua'

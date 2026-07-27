@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 /**
  * Handshake proof phrase — agent greeting when Pomnia Brain MCP is wired
  * (no Electron deps — unit-testable). Not a Desktop unlock ritual.

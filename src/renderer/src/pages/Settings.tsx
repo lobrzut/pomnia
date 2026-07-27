@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 import { useCallback, useEffect, useState } from 'react'
 import { Activity, Brain, Clock, FileArchive, FolderOpen, Handshake, Languages, Lock, Minimize2, Palette, Plug, RefreshCw, RotateCcw, Shield, ShieldCheck, Vault } from 'lucide-react'
 import {

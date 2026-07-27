@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Pomnia
 export interface ExtractedFrontmatter {
   source_file: string
   source_sha256: string
