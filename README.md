@@ -35,8 +35,9 @@ Optional: **Handshake** — personal start ritual in the UI; not required for th
 | **Claude Code** | hybrid | `~/.claude` | JSONL → conversations **+** snapshot of `projects/`, `sessions/`, `settings.json` |
 | **Cursor** | hybrid | `…/Cursor/User` | chats from `globalStorage/state.vscdb` **+** config snapshot |
 | **Claude Desktop** | snapshot | `%APPDATA%/Claude` / `~/Library/Application Support/Claude` | config, local sessions, Local Storage |
-| **Antigravity** | snapshot | `%APPDATA%/Antigravity` | Cascade / storage profile |
+| **Antigravity** | hybrid | `%APPDATA%/Antigravity` · chats in `~/.gemini/antigravity` | Cascade transcripts **+** profile snapshot |
 | **VS Code** / **Windsurf** | snapshot | `…/Code/User` · `…/Windsurf/User` | settings, snippets, `globalStorage` |
+| **Continue** | snapshot | `~/.continue` | config, sessions, assistants |
 
 Caches (GPUCache, blob_storage, Crashpad, …) are skipped automatically.
 

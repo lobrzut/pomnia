@@ -32,11 +32,11 @@ Ponizej streszczenie zachowania systemu - **bez odwolan do sciezek plikow kluczy
 
 | Kategoria | Co wchodzi |
 |-----------|------------|
-| **PUBLIC (AGPL)** | Kod zrodlowy klienta Pomnia (UI, adaptery, vault/crypto, brain-core bundle, pipeline importu), instalatory (exe/dmg), landing, dokumentacja MCP. |
-| **SEPARATE** | Homelab Brain (serwer RAG/indeks na infrastrukturze uzytkownika) - **nie** jest czescia publikacji klienta Pomnia. |
-| **NIE PUBLIC** | Prywatne vaulty uzytkownikow, klucze, dane produkcyjne, lokalne artefakty build (`landing/` robocze, vault/, sandbox/). |
+| **PUBLIC (AGPL)** | Kod zrodlowy klienta Pomnia (UI, adaptery, vault/crypto, embedded `packages/brain-core`, pipeline importu), instalatory (exe/dmg), dokumentacja MCP. |
+| **SEPARATE** | Strona marketingowa [pomnia.ai](https://pomnia.ai) (deploy poza tym tree) oraz Homelab Brain Hub (osobny serwer RAG na infrastrukturze uzytkownika) - **nie** sa wymagane w repo klienta. |
+| **NIE PUBLIC** | Prywatne vaulty uzytkownikow, klucze, dane produkcyjne, lokalne artefakty build (`out/`, `dist/`, sandbox/). |
 
-Homelab Brain to osobny produkt/instancja; Pomnia dostarcza do niego dane tylko na zadanie uzytkownika (eksport/deploy), nie bundluje serwera Brain w instalatorze klienta.
+Klient bundluje **embedded Brain** (`brain-core` / MCP `:7862`) w Desktop. Osobny Homelab Brain Hub (Python / remote) pozostaje opcjonalny - Pomnia wysyla do niego dane tylko na wyrazne zadanie (eksport/deploy).
 
 ---
 
