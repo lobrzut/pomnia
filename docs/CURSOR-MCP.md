@@ -6,13 +6,15 @@ Podłączenie Cursora do Brain na **nowej maszynie** (zwłaszcza Mac bez DMG Pom
 
 **Zawsze trzy serwery** na remote Brain (`:7862` + Bearer):
 
-| Serwer | Ścieżka |
-|--------|---------|
-| `brain-rag` | `/sse` |
-| `brain-vault` | `/servers/brain-vault/sse` |
-| `brain-library` | `/servers/brain-library/sse` |
+| Klucz MCP (client) | Ścieżka HTTP na serwerze |
+|--------------------|--------------------------|
+| `pomnia` | `/sse` |
+| `pomnia-vault` | `/servers/brain-vault/sse` |
+| `pomnia-library` | `/servers/brain-library/sse` |
 
-Sam `brain-rag` = **niepełna** konfiguracja (brak vault/library).
+Sam `pomnia` = **niepełna** konfiguracja (brak vault/library). Status w aplikacji nadal akceptuje legacy klucze `brain-rag` / `brain-vault` / `brain-library`.
+
+Ścieżki URL `/servers/brain-vault|library` to **ścieżki na proxy Brain** — nie zmieniaj ich; zmienia się tylko nazwa klucza w `mcp.json`.
 
 ## Mac / bez aplikacji Pomnia (teraz)
 
@@ -40,15 +42,15 @@ Connect wykrywa też config **Partial** (tylko rag) i podpowiada brak vault/libr
 ```json
 {
   "mcpServers": {
-    "brain-rag": {
+    "pomnia": {
       "url": "http://TWOJ-HOST:7862/sse",
       "headers": { "Authorization": "Bearer btk_…" }
     },
-    "brain-vault": {
+    "pomnia-vault": {
       "url": "http://TWOJ-HOST:7862/servers/brain-vault/sse",
       "headers": { "Authorization": "Bearer btk_…" }
     },
-    "brain-library": {
+    "pomnia-library": {
       "url": "http://TWOJ-HOST:7862/servers/brain-library/sse",
       "headers": { "Authorization": "Bearer btk_…" }
     }
@@ -65,4 +67,4 @@ Nie commituj prawdziwego tokena. Na macOS: `chmod 600 ~/.cursor/mcp.json`.
 
 ## Embedded (tylko z aplikacją Pomnia)
 
-Lokalny brain w Pomni = **jeden** serwer `brain-rag` na `http://127.0.0.1:7862/mcp`, bez tokena. To nie dotyczy Mac bez DMG — użyj remote + trzech serwerów powyżej.
+Lokalny brain w Pomni = **jeden** serwer `pomnia` na `http://127.0.0.1:7862/mcp`, bez tokena. To nie dotyczy Mac bez DMG — użyj remote + trzech serwerów powyżej.

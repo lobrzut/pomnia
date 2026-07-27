@@ -51,19 +51,19 @@ KROKI NA MACU
      open landing/cursor-mcp.html
    wklej URL http://HOST:7862 + token → Kopiuj mcp.json.
 
-5) Szablon (3 serwery — nie tylko brain-rag):
+5) Szablon (3 serwery — nie tylko pomnia):
 
 {
   "mcpServers": {
-    "brain-rag": {
+    "pomnia": {
       "url": "http://brain.example.local:7862/sse",
       "headers": { "Authorization": "Bearer btk_WSTAW_TOKEN" }
     },
-    "brain-vault": {
+    "pomnia-vault": {
       "url": "http://brain.example.local:7862/servers/brain-vault/sse",
       "headers": { "Authorization": "Bearer btk_WSTAW_TOKEN" }
     },
-    "brain-library": {
+    "pomnia-library": {
       "url": "http://brain.example.local:7862/servers/brain-library/sse",
       "headers": { "Authorization": "Bearer btk_WSTAW_TOKEN" }
     }

@@ -65,7 +65,7 @@ To zamienia surowe logi rozmów w skondensowane notatki `.md` i buduje indeks we
 
 **Mac / bez aplikacji:** zobacz [docs/CURSOR-MCP.md](./CURSOR-MCP.md) → URL `:7862` + token z dashboardu `:7860` → **Kopiuj mcp.json** → `~/.cursor/mcp.json` → Reload Window.
 
-Remote zawsze wymaga **trzech** serwerów: `brain-rag`, `brain-vault`, `brain-library`. Sam rag = niepełna konfiguracja.
+Remote zawsze wymaga **trzech** serwerów: `pomnia`, `pomnia-vault`, `pomnia-library`. Sam `pomnia` = niepełna konfiguracja (legacy klucz `brain-rag` status jeszcze akceptuje).
 
 ### 5. Weryfikacja
 

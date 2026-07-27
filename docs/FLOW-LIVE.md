@@ -1,6 +1,6 @@
 # FlowDiagram na żywo — jeden punkt obserwacji (Brain MCP)
 
-**Nie trzeba per agenta.** Cursor, Claude Code, Claude Desktop, Antigravity, Windsurf — każdy klient MCP woła ten sam serwer `brain-rag`. Pomnia obserwuje **wyłącznie Brain**, nie pliki konfiguracyjne agentów.
+**Nie trzeba per agenta.** Cursor, Claude Code, Claude Desktop, Antigravity, Windsurf — każdy klient MCP woła ten sam serwer `pomnia` (legacy klucz `brain-rag` nadal działa). Pomnia obserwuje **wyłącznie Brain**, nie pliki konfiguracyjne agentów.
 
 ## Architektura
 
@@ -14,7 +14,7 @@ flowchart LR
   end
 
   subgraph brain [Brain homelab — jeden punkt]
-    MCP[brain-rag mcp_rag.py]
+    MCP[pomnia / mcp_rag.py]
     ACT[last_mcp_activity.json]
     API["GET /mcp/activity (:7862)\nGET /api/mcp/last-activity (:7860)"]
     MCP -->|record_mcp_tool| ACT
@@ -81,7 +81,7 @@ curl -s http://brain.example.local:7862/mcp/activity
 curl -s http://brain.example.local:7860/api/mcp/last-activity
 ```
 
-W Cursorze: `brain-rag.search_library "test"` — w ciągu 2 s FlowDiagram w Pomni powinien mrugnąć gałęzią MCP.
+W Cursorze: `pomnia.search_library "test"` — w ciągu 2 s FlowDiagram w Pomni powinien mrugnąć gałęzią MCP.
 
 ## Konfiguracja Pomnia
 

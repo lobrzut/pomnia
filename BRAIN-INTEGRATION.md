@@ -19,7 +19,7 @@ claude-code ──┘                       ↓                 │
 
 Komponenty (z `/api/status` + `/openapi.json`):
 - **Dashboard** FastAPI :7860 — pełne API: `transcripts/*` (ingest+distill), `vault/*` (save-chat, notes, read, redistill, quality, dedupe), `library/*` (upload, reindex, search, status), `skills/*`, `code/*`, `user-profile/*`, `agents/*`, `schedule/*`.
-- **MCP** mcp-proxy :7862 (SSE) — wystawia brain-rag/vault/library zdalnym agentom.
+- **MCP** mcp-proxy :7862 (SSE) — wystawia `pomnia` / `pomnia-vault` / `pomnia-library` zdalnym agentom (ścieżki HTTP nadal `/servers/brain-vault|library`).
 - **Ollama** docker :11434 — **32 modele** (qwen2.5:14b default chat, nomic-embed-text dla embeddingów, do deepseek-r1:32b/qwen3:30b). 2× RTX 3060 (24 GB).
 - **Vault** `/opt/BRAIN/data/vault` — 1682 notatki md (frontmatter + Summary/Decisions/Solutions/Facts/Open Questions).
 - **vectordb** `library.db` 307 MB. **Library** 42 PDF/EPUB (sec/trading).
