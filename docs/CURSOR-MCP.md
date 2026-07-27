@@ -1,4 +1,4 @@
-# Cursor ↔ Brain MCP (first-time)
+﻿# Cursor ↔ Brain MCP (first-time)
 
 Podłączenie Cursora do Brain na **nowej maszynie** (zwłaszcza Mac bez DMG Pomni).
 
@@ -17,8 +17,7 @@ Sam `brain-rag` = **niepełna** konfiguracja (brak vault/library).
 ## Mac / bez aplikacji Pomnia (teraz)
 
 1. Otwórz generator w przeglądarce:
-   - lokalnie z repo: `landing/cursor-mcp.html`
-   - albo po deployu: `https://pomnia.ai/cursor-mcp.html`
+   - strona marketingowa (poza tym repo, Cloudflare / pomnia.ai): `https://pomnia.ai/cursor-mcp.html` (jeśli wdrożona)
 2. Wklej URL Brain (`http://…:7862`) i token Bearer.
 3. **Kopiuj mcp.json dla Cursora** → zapisz jako `~/.cursor/mcp.json`.
 4. Cursor → `Cmd+Shift+P` → **Developer: Reload Window**.
