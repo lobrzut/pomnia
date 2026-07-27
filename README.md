@@ -1,6 +1,6 @@
 # Pomnia
 
-**Local-first AI memory for developers** — one encrypted, offline archive of conversations, with local distill and an embedded **Brain MCP**.
+**One encrypted memory your AI agents share** — conversations from every assistant, distilled on your own hardware, recalled over MCP. Local-first: nothing depends on a vendor's cloud.
 
 Pomnia Desktop (Windows / macOS) collects chats from assistants (Claude Code, Cursor, Claude Desktop, Antigravity, VS Code, Continue) **and** imports from exports (Claude.ai, ChatGPT, Gemini, Grok) plus documents (PDF, DOCX, EPUB) into one vault — with search (**Chats**), distill via Ollama, and Brain on `127.0.0.1:7862`.
 
