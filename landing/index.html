@@ -263,6 +263,10 @@
     50%      { box-shadow: 0 0 40px -8px rgba(52, 211, 153, 0.85); }
   }
   .flow .core::before { content: "● "; color: var(--mint); font-size: 10px; vertical-align: 1px; }
+  .trinity .aside {
+    font-size: 13.5px; color: var(--ink-faint); margin-top: 10px;
+    padding-top: 10px; border-top: 1px solid var(--line);
+  }
   .flow-caption {
     text-align: center; margin-top: 26px; font-size: 14.5px; color: var(--ink-dim);
     max-width: 42em; margin-left: auto; margin-right: auto; text-wrap: balance;
@@ -425,9 +429,12 @@
         <div class="reveal d1" style="--g: var(--cyan)">
           <div class="glyph"></div>
           <h3>Capture</h3>
-          <p>Every conversation from Claude&nbsp;Code, Cursor, Claude&nbsp;Desktop, Antigravity
-             and friends — pulled into one encrypted vault. <code>AES-256-GCM</code>, on your disk,
-             portable as a folder.</p>
+          <p>Conversations from Claude&nbsp;Code, Cursor and Antigravity, pulled in
+             automatically. Exports from Claude.ai, ChatGPT, Gemini and Grok — and your
+             PDFs, DOCX, EPUBs — imported on demand. One encrypted vault:
+             <code>AES-256-GCM</code>, on your disk, portable as a folder.</p>
+          <p class="aside">Editor profiles and assistant configs are snapshotted alongside,
+             so a new machine gets your whole setup back — not just your memory.</p>
         </div>
         <div class="reveal d2" style="--g: var(--iris)">
           <div class="glyph"></div>
@@ -445,20 +452,21 @@
         </div>
       </div>
 
-      <div class="flow reveal" role="img" aria-label="Agents connect to Pomnia over MCP and share one memory">
+      <div class="flow reveal" role="img" aria-label="Claude Code, Cursor and Antigravity feed conversations into Pomnia; any MCP-speaking agent reads the memory back out">
         <span class="chip">Claude Code</span>
         <span class="chip">Cursor</span>
         <span class="chip">Antigravity</span>
-        <span class="arrows">⇄</span>
+        <span class="arrows">→</span>
         <span class="chip core">pomnia</span>
-        <span class="arrows">⇄</span>
+        <span class="arrows">→</span>
         <span class="chip">Claude Desktop</span>
         <span class="chip">VS Code</span>
         <span class="chip">…</span>
       </div>
       <p class="flow-caption reveal d1">
-        Agents write conversations in; distilled knowledge flows back out — over
-        <code>MCP</code>, the protocol they all already speak. No plugins, no per-tool setup ritual.
+        Chats are read from the assistants that keep them in a readable store; the distilled
+        memory flows back out to <strong>any</strong> MCP-speaking agent — over <code>MCP</code>,
+        the protocol they all already speak. No plugins, no per-tool setup ritual.
       </p>
     </section>
 
