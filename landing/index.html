@@ -332,20 +332,9 @@
     display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap;
     justify-content: center; width: 100%; max-width: 520px;
   }
-  .wl-input {
-    flex: 1 1 260px; min-width: 0;
-    font-family: var(--sans); font-size: 15px; color: var(--ink);
-    background: var(--abyss);
-    border: 1px solid var(--line); border-radius: 999px;
-    padding: 14px 22px; outline: none;
-    transition: border-color .18s var(--ease), box-shadow .18s var(--ease);
-  }
-  .wl-input::placeholder { color: var(--ink-faint); }
-  .wl-input:focus {
-    border-color: var(--iris);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
-  }
   .wl-btn { flex: 0 0 auto; border: 0; cursor: pointer; font-family: var(--sans); }
+  .wl-ghost { align-self: center; }
+  .wl-next { color: var(--ink-faint); opacity: 0.8; }
   .wl-note {
     font-family: var(--mono); font-size: 12px; letter-spacing: 0.05em;
     color: var(--ink-faint);
@@ -356,19 +345,13 @@
     transition: color .18s ease, border-color .18s ease;
   }
   .wl-privacy:hover { color: var(--ink-dim); border-color: var(--ink-dim); }
-  .wl-done {
-    font-family: var(--mono); font-size: 13px; letter-spacing: 0.04em;
-    color: var(--ink-dim);
-  }
-  .wl-done .ok { color: var(--mint); }
-  .wl-sink { display: none; }
   .sr-only {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip: rect(0,0,0,0); border: 0;
   }
   @media (max-width: 520px) {
     .wl { flex-direction: column; }
-    .wl-btn { width: 100%; }
+    .wl-btn { width: 100%; text-align: center; }
   }
 </style>
 </head>
@@ -386,7 +369,7 @@
 
     <nav>
       <a href="https://github.com/lobrzut" rel="noopener">GitHub</a>
-      <a class="cta-mini" href="#waitlist">Early access</a>
+      <a class="cta-mini" href="#get">Download</a>
     </nav>
   </header>
 
@@ -403,7 +386,7 @@
       </p>
 
       <div class="cta-row">
-        <a class="cta" href="#waitlist">Request early access</a>
+        <a class="cta" href="#get">Download for Windows</a>
         <a class="ghost" href="https://github.com/lobrzut" rel="noopener">watch the build →</a>
       </div>
 
@@ -487,60 +470,36 @@
       </div>
     </section>
 
-    <section class="closing" id="waitlist">
+    <section class="closing" id="get">
       <h2 class="reveal">Give your agents a past.<br>They'll give you a <em>sharper future</em>.</h2>
 
       <div class="reveal d1 wl-wrap">
-        <form class="wl" id="wlForm" method="post" target="wlSink"
-              action="https://assets.mailerlite.com/jsonp/2536223/forms/194140900887103139/subscribe">
-          <input type="hidden" name="groups[]" value="194139561111062233">
-          <input type="hidden" name="ml-submit" value="1">
-          <input type="hidden" name="anticsrf" value="true">
-          <label class="sr-only" for="wlEmail">Email address</label>
-          <input class="wl-input" id="wlEmail" type="email" name="fields[email]"
-                 placeholder="you@example.com" autocomplete="email" required>
-          <button class="cta wl-btn" type="submit">Request early access</button>
-        </form>
+        <div class="wl">
+          <a class="cta wl-btn" href="GITHUB_RELEASES_URL" rel="noopener">Download for Windows</a>
+          <a class="ghost wl-ghost" href="GITHUB_REPO_URL" rel="noopener">source on GitHub →</a>
+        </div>
 
-        <p class="wl-note" id="wlNote">
-          Launch notification only · no spam · unsubscribe any time ·
+        <p class="wl-note">
+          Free · no account · nothing to sign up for ·
           <a class="wl-privacy" href="/privacy.html">privacy</a>
         </p>
 
-        <p class="wl-done" id="wlDone" role="status" aria-live="polite" hidden>
-          <span class="ok" aria-hidden="true">●</span> Check your inbox — confirm the link and you're on the list.
+        <p class="wl-note wl-next">
+          macOS and a packaged server are next. Star the repo and GitHub will tell you.
         </p>
       </div>
-
-      <iframe class="wl-sink" name="wlSink" title="form target" aria-hidden="true" tabindex="-1"></iframe>
 
       <p class="wordless reveal d2">pomnia · the memory layer for your ai</p>
     </section>
 
-    <script>
-      (function () {
-        var form = document.getElementById('wlForm');
-        var sink = document.getElementsByName('wlSink')[0];
-        var note = document.getElementById('wlNote');
-        var done = document.getElementById('wlDone');
-        if (!form || !sink) return;
-        var sent = false;
-        form.addEventListener('submit', function () { sent = true; });
-        sink.addEventListener('load', function () {
-          if (!sent) return;               // ignore the initial about:blank load
-          form.hidden = true;
-          note.hidden = true;
-          done.hidden = false;
-        });
-      })();
-    </script>
+    
   </main>
 
   <footer>
     <div class="foot-in">
       <div class="badges">
         <span>local-first</span><span>AES-256-GCM vault</span><span>MCP-native</span>
-        <span>your GPU · your disk</span><span>Windows · self-hosted</span>
+        <span>your GPU · your disk</span><span>Windows</span>
       </div>
       <div class="foot-row">
         <p class="foot-etym">pomnia — from old polish <b>pomnieć</b>: to remember.</p>

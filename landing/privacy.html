@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Privacy — Pomnia</title>
-<meta name="description" content="What Pomnia does with your email address if you join the waitlist. Short version: one launch email, nothing else, delete any time.">
+<meta name="description" content="This site collects nothing. No analytics, no cookies, no third-party requests. Here is how to check that for yourself.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://pomnia.ai/privacy.html">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0c16'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%2334d399'/%3E%3Cg stroke='%236366f1' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M16 12V5'/%3E%3Cpath d='M16 20v7'/%3E%3Cpath d='M12.5 13.5 7 9'/%3E%3Cpath d='M19.5 18.5 25 23'/%3E%3Cpath d='M12.5 18.5 7 23'/%3E%3Cpath d='M19.5 13.5 25 9'/%3E%3C/g%3E%3C/svg%3E">
@@ -17,7 +17,6 @@
     --ink-dim:   #9aa3bd;
     --ink-faint: #5b6178;
     --line:      rgba(148, 163, 216, 0.14);
-    --iris:      #6366f1;
     --cyan:      #22d3ee;
     --mint:      #34d399;
     --sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -34,38 +33,22 @@
   .wrap { max-width: 660px; margin: 0 auto; padding: 56px 24px 96px; }
 
   .top { display: flex; align-items: baseline; gap: 18px; margin-bottom: 52px; }
-  .mark {
-    font-size: 19px; font-weight: 600; letter-spacing: -0.02em;
-    color: var(--ink); text-decoration: none;
-  }
+  .mark { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); text-decoration: none; }
   .mark .nd { color: var(--mint); }
-  .back {
-    font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em;
-    color: var(--ink-faint); text-decoration: none;
-  }
+  .back { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; color: var(--ink-faint); text-decoration: none; }
   .back:hover { color: var(--ink-dim); }
 
-  h1 {
-    font-size: clamp(30px, 5vw, 40px); font-weight: 300;
-    letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 14px;
-  }
-  .updated {
-    font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em;
-    color: var(--ink-faint); margin-bottom: 40px;
-  }
+  h1 { font-size: clamp(30px, 5vw, 40px); font-weight: 300; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 14px; }
+  .updated { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; color: var(--ink-faint); margin-bottom: 40px; }
 
   .tldr {
     border: 1px solid var(--line); border-radius: 14px;
-    background: var(--abyss); padding: 22px 24px; margin-bottom: 48px;
+    background: var(--abyss); padding: 24px 26px; margin-bottom: 48px;
   }
-  .tldr p { color: var(--ink-dim); }
+  .tldr p { color: var(--ink-dim); margin: 0; }
   .tldr strong { color: var(--ink); font-weight: 600; }
 
-  h2 {
-    font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
-    margin: 40px 0 12px; color: var(--ink);
-  }
-  h2:first-of-type { margin-top: 0; }
+  h2 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; margin: 40px 0 12px; color: var(--ink); }
   p { color: var(--ink-dim); margin-bottom: 14px; }
   ul { margin: 0 0 14px 20px; color: var(--ink-dim); }
   li { margin-bottom: 7px; }
@@ -74,14 +57,16 @@
   strong { color: var(--ink); font-weight: 600; }
   code {
     font-family: var(--mono); font-size: 0.9em;
-    background: rgba(148,163,216,0.10); padding: 1px 5px; border-radius: 4px;
-    color: var(--ink);
+    background: rgba(148,163,216,0.10); padding: 1px 5px; border-radius: 4px; color: var(--ink);
+  }
+  .check {
+    border-left: 2px solid var(--mint); padding: 4px 0 4px 18px;
+    margin: 18px 0 22px; color: var(--ink-dim); font-size: 14.5px;
   }
 
   footer {
     margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--line);
-    font-size: 12.5px; color: var(--ink-faint);
-    display: flex; gap: 14px; flex-wrap: wrap;
+    font-size: 12.5px; color: var(--ink-faint); display: flex; gap: 14px; flex-wrap: wrap;
   }
   footer a { color: var(--ink-dim); }
 </style>
@@ -100,92 +85,73 @@
 
   <div class="tldr">
     <p>
-      <strong>The short version.</strong> If you join the waitlist we store one thing:
-      your email address. We use it to tell you when Pomnia is released. There is no
-      tracking on this site, no analytics, no advertising, and nothing is shared with
-      anyone beyond the mailing provider that delivers the message. You can leave at
-      any time, and leaving deletes your address.
+      <strong>This site collects nothing.</strong> No analytics, no cookies, no tracking
+      pixel, no fonts loaded from someone else's server, no form to fill in. There is no
+      account to create and no newsletter to join. You are reading a static page.
     </p>
   </div>
 
-  <h2>Who is responsible</h2>
+  <h2>Don't take my word for it</h2>
   <p>
-    The controller of your data is <strong>Łukasz Obrzut</strong>, an individual
-    developer based in Poland, operating the Pomnia project. You can reach me at
-    <a href="mailto:hello@pomnia.ai">hello@pomnia.ai</a> about anything on this page.
+    A privacy claim you cannot verify is just marketing. This one takes about ten seconds:
+  </p>
+  <div class="check">
+    Open your browser's developer tools, switch to the <strong>Network</strong> tab, and
+    reload this page. Every request should be to <code>pomnia.ai</code> and nothing else.
+    Then view the page source and search for <code>http</code> — the only outbound links
+    point to GitHub, and they are links, not loads.
+  </div>
+  <p>
+    If you ever find that this stops being true, tell me and I will either fix it or change
+    this page. Both of those are better than the sentence quietly becoming false.
   </p>
 
-  <h2>What is collected, and when</h2>
+  <h2>What about server logs?</h2>
   <p>
-    <strong>Only if you submit the waitlist form:</strong> your email address, plus the
-    date and time of your sign-up and confirmation. Those timestamps exist so I can
-    demonstrate that you actually asked to be on the list.
-  </p>
-  <p>
-    <strong>If you just read the site:</strong> nothing. This page and the home page
-    load no analytics, no advertising scripts, no social widgets, no web fonts and no
-    third-party resources of any kind. You can verify that by viewing the page source —
-    the only outbound links point to GitHub.
+    The site is served by Cloudflare Pages. Like any web server, their infrastructure
+    processes the technical data needed to deliver a page — your IP address, the browser
+    you use, and what you requested. I do not add analytics on top of that, and I do not
+    build profiles from it. This is a hosting necessity, not a data collection choice.
   </p>
 
-  <h2>Why, and on what basis</h2>
+  <h2>The application itself</h2>
   <p>
-    Your address is used for one purpose: to send you a message when Pomnia is
-    released, and occasional updates about the project afterwards. The lawful basis is
-    your consent under Article 6(1)(a) GDPR, given by submitting the form and confirming
-    it through the link we email you. Nothing happens until you click that link.
+    Pomnia stores your vault on your own machine, or on a server you run. It is encrypted
+    with <code>AES-256-GCM</code> and a key derived from a passphrase that is never stored
+    anywhere — lose it and the vault is unrecoverable, including by me.
   </p>
   <p>
-    Your address is never used for profiling, never sold, never rented, and never
-    passed to advertisers.
-  </p>
-
-  <h2>Who processes it</h2>
-  <p>
-    The list is stored and delivered by <strong>MailerLite</strong> (UAB "MailerLite",
-    Vilnius, Lithuania), acting as a data processor under a data processing agreement.
-    They are inside the EU, so your data does not leave the European Economic Area.
-  </p>
-  <p>
-    Email sent to <code>hello@pomnia.ai</code> is handled by my hosting provider,
-    cyber_Folks S.A. (Poland).
+    Distillation runs against your own Ollama instance. <strong>No vault content is ever
+    transmitted to me</strong>, because there is no server of mine for it to be transmitted
+    to. If you point Pomnia at a cloud model instead of a local one, the content you send
+    goes to that provider under their terms — that is your choice, and it is off by default.
   </p>
 
-  <h2>How long it is kept</h2>
+  <h2>If you email me</h2>
   <p>
-    Until you unsubscribe. There is an unsubscribe link at the bottom of every message,
-    and using it removes your address from the list. You can also just email me and I
-    will delete it.
+    Mail sent to <a href="mailto:hello@pomnia.ai">hello@pomnia.ai</a> arrives in a mailbox
+    hosted by cyber_Folks S.A. in Poland. I keep correspondence for as long as it is useful
+    to answer you, and you can ask me to delete it. That is the only personal data connected
+    with this project, and it exists only because you chose to write to me.
   </p>
 
   <h2>Your rights</h2>
-  <p>Under GDPR you can, at any time:</p>
-  <ul>
-    <li>ask what data I hold about you, and get a copy of it</li>
-    <li>have it corrected if it is wrong</li>
-    <li>have it deleted</li>
-    <li>withdraw your consent, which has the same effect as unsubscribing</li>
-    <li>object to the processing, or ask for it to be restricted</li>
-  </ul>
   <p>
-    Write to <a href="mailto:hello@pomnia.ai">hello@pomnia.ai</a> and I will act on it.
-    If you think I have handled your data badly, you can complain to the Polish
-    supervisory authority, the President of the Personal Data Protection Office
-    (<a href="https://uodo.gov.pl" rel="noopener">UODO</a>).
+    Under GDPR you can ask what data is held about you, have it corrected or deleted, and
+    object to its processing. Since the only thing that can exist is an email you sent me,
+    that request is easy to satisfy. Write to
+    <a href="mailto:hello@pomnia.ai">hello@pomnia.ai</a>.
   </p>
-
-  <h2>About the Pomnia application</h2>
   <p>
-    This page covers the website only. The Pomnia application itself stores your vault
-    on your own machine or on a server you run. Its data handling is documented with the
-    application, and no vault content is ever transmitted to me.
+    The controller is <strong>Łukasz Obrzut</strong>, an individual developer in Poland.
+    If you think I have handled something badly, you can complain to the Polish supervisory
+    authority, <a href="https://uodo.gov.pl" rel="noopener">UODO</a>.
   </p>
 
   <h2>Changes</h2>
   <p>
-    If this policy changes in a way that affects you, I will say so in an email to the
-    list rather than quietly editing this page. The date at the top always reflects the
-    current version.
+    If this ever stops being accurate, the date above changes and the text changes with it.
+    I will not quietly edit a claim out of existence.
   </p>
 
   <footer>
