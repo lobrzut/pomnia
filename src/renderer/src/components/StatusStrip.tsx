@@ -20,13 +20,22 @@ interface StripItem {
   tab: Route
 }
 
+/** Survives Dashboard remounts so tab switches don't flash false reds. */
+let stripCache: {
+  ollama: BrainStatus | null
+  core: EmbeddedBrainStatus | null
+  state: BrainStateInfo | null
+} | null = null
+
 export function StatusStrip() {
   const labels = uiLabels()
   const { vault, setRoute, ollamaUrl, loadBrainState, brainState } = useStore()
-  const [checking, setChecking] = useState(true)
-  const [ollama, setOllama] = useState<BrainStatus | null>(null)
-  const [core, setCore] = useState<EmbeddedBrainStatus | null>(null)
-  const [localBrainState, setLocalBrainState] = useState<BrainStateInfo | null>(brainState)
+  const [checking, setChecking] = useState(() => stripCache === null)
+  const [ollama, setOllama] = useState<BrainStatus | null>(() => stripCache?.ollama ?? null)
+  const [core, setCore] = useState<EmbeddedBrainStatus | null>(() => stripCache?.core ?? null)
+  const [localBrainState, setLocalBrainState] = useState<BrainStateInfo | null>(
+    () => stripCache?.state ?? brainState
+  )
 
   const refresh = useCallback(async () => {
     setChecking(true)
@@ -39,6 +48,7 @@ export function StatusStrip() {
       setOllama(status)
       setCore(coreStatus)
       setLocalBrainState(state)
+      stripCache = { ollama: status, core: coreStatus, state }
     } finally {
       setChecking(false)
     }
@@ -52,9 +62,15 @@ export function StatusStrip() {
   }, [refresh, loadBrainState])
 
   const pendingDocs = vault.pendingLibraryIndex ?? 0
-  const lastDistill = localBrainState?.lastRun
-    ? relativeTime(localBrainState.lastRun)
-    : labels.statusNoDistill
+  const distillPending = checking && localBrainState === null && !brainState?.lastRun
+  const lastDistill = distillPending
+    ? labels.statusChecking
+    : localBrainState?.lastRun || brainState?.lastRun
+      ? relativeTime(localBrainState?.lastRun ?? brainState?.lastRun ?? '')
+      : labels.statusNoDistill
+
+  const brainPending = checking && core === null
+  const ollamaPending = checking && ollama === null
 
   const items: StripItem[] = [
     {
@@ -70,17 +86,25 @@ export function StatusStrip() {
       id: 'brain',
       icon: BrainCircuit,
       label: labels.statusBrain,
-      value: core?.running ? labels.statusBrainRunning : labels.statusBrainStopped,
-      ok: core?.running ?? false,
+      value: brainPending
+        ? labels.statusChecking
+        : core?.running
+          ? labels.statusBrainRunning
+          : labels.statusBrainStopped,
+      ok: brainPending ? null : (core?.running ?? false),
       tab: 'brain'
     },
     {
       id: 'ollama',
       icon: Sparkles,
       label: labels.statusOllama,
-      value: ollama?.reachable ? labels.statusOllamaOk : labels.statusOllamaFail,
-      detail: ollama?.baseUrl ? shortPath(ollama.baseUrl, 28) : undefined,
-      ok: ollama?.reachable ?? false,
+      value: ollamaPending
+        ? labels.statusChecking
+        : ollama?.reachable
+          ? labels.statusOllamaOk
+          : labels.statusOllamaFail,
+      detail: ollamaPending ? undefined : ollama?.baseUrl ? shortPath(ollama.baseUrl, 28) : undefined,
+      ok: ollamaPending ? null : (ollama?.reachable ?? false),
       tab: 'brain'
     },
     {
@@ -88,7 +112,7 @@ export function StatusStrip() {
       icon: Clock,
       label: labels.statusLastDistill,
       value: lastDistill,
-      ok: localBrainState?.lastRun ? true : null,
+      ok: distillPending ? null : localBrainState?.lastRun || brainState?.lastRun ? true : null,
       tab: 'brain'
     },
     {
