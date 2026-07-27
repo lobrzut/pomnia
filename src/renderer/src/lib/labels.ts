@@ -478,6 +478,7 @@ export interface UiLabels {
   statusOllama: string
   statusOllamaOk: string
   statusOllamaFail: string
+  statusChecking: string
   statusLastDistill: string
   statusNoDistill: string
   statusPendingDocs: (n: number) => string
@@ -692,11 +693,11 @@ const PL_LABELS: UiLabels = {
     `Pomnia v${version} · ten sam silnik działa też w trybie CLI (bez okna).`,
   antivirusTitle: 'Windows / antywirus',
   antivirusLead:
-    'Cel produktu: Pomnia działa od razu na Windows (Defender / Symantec) bez proszenia o wykluczenia. Wykluczenia to nie strategia — to tymczasowe obejście.',
+    'Obecne buildy open-source są niepodpisane — SmartScreen i Symantec/Defender mogą ostrzegać przy każdym nowym setup.exe. To normalne (nowy hash = zerowa reputacja), nie wirus.',
   antivirusWhy:
-    'Lokalny Brain (MCP 127.0.0.1:7862, helper pomnia-brain.exe) + vault wyglądają heurystykom jak „dziwny” soft, zwłaszcza przy niepodpisanym instalatorze. To problem reputacji / podpisu, nie „trzeba dodać wyjątek w AV”.',
+    'SmartScreen: „Więcej info → Uruchom mimo to”. Symantec: „ufam temu plikowi” raz jest OK. Folder instalacji wykluczaj tylko gdy AV dalej kwarantannuje helper (pomnia-brain.exe) albo vault — to obejście, nie docelowy UX.',
   antivirusSigningNote:
-    'Publiczny release Windows: ship blocker = Authenticode (OV/EV lub Azure Trusted Signing). Bez podpisu nie marketingujemy „just works” i nie budujemy onboardingu wokół wykluczeń.',
+    'Cel: Authenticode (OV/EV lub Azure Trusted Signing), żeby instalator „po prostu działał” bez ostrzeżeń. Do tego czasu nie wyłączaj AV i nie budujemy produktu na liście wyjątków.',
   antivirusOpenInstallFolder: 'Otwórz folder instalacji',
   previewMode: 'Tryb podglądu (bez backendu Electron) — dane są przykładowe.',
   importTitle: 'Importuj',
@@ -891,6 +892,7 @@ const PL_LABELS: UiLabels = {
   statusOllama: 'Ollama',
   statusOllamaOk: 'OK',
   statusOllamaFail: 'brak połączenia',
+  statusChecking: 'sprawdzam…',
   statusLastDistill: 'Ostatnia destylacja',
   statusNoDistill: 'jeszcze nie było',
   statusPendingDocs: (n) => `${n} dok. czeka na indeks`,
@@ -1074,11 +1076,11 @@ const EN_LABELS: Partial<UiLabels> = {
   securityAboutCli: (version) => `Pomnia ${version}`,
   antivirusTitle: 'Windows / antivirus',
   antivirusLead:
-    'Product goal: Pomnia works out of the box on Windows (Defender / Symantec) without asking for exclusions. Exclusions are not a product strategy — only a temporary workaround.',
+    'Current open-source builds are unsigned — SmartScreen and Symantec/Defender may warn on every new setup.exe. That is normal (new hash = zero reputation), not malware.',
   antivirusWhy:
-    'Local Brain (MCP 127.0.0.1:7862, pomnia-brain.exe) plus an encrypted vault look suspicious to heuristics, especially with an unsigned installer. That is a reputation / signing problem — not “users must whitelist us”.',
+    'SmartScreen: More info → Run anyway. Symantec: trusting the file once is fine. Only exclude the install folder if AV keeps quarantining the helper (pomnia-brain.exe) or vault — a workaround, not the long-term UX.',
   antivirusSigningNote:
-    'Public Windows release ship blocker: Authenticode (OV/EV or Azure Trusted Signing). Without a signature we do not market “just works” and we do not center onboarding on exclusions.',
+    'Goal: Authenticode (OV/EV or Azure Trusted Signing) so the installer just works without warnings. Until then: do not turn off AV, and we do not build the product around exclusion lists.',
   antivirusOpenInstallFolder: 'Open install folder',
   previewMode: 'Browser preview — Electron bridge unavailable.',
   cancel: 'Cancel',
@@ -1130,6 +1132,7 @@ const EN_LABELS: Partial<UiLabels> = {
   statusOllama: 'Ollama',
   statusOllamaOk: 'OK',
   statusOllamaFail: 'unreachable',
+  statusChecking: 'checking…',
   statusLastDistill: 'Last distill',
   statusNoDistill: 'none yet',
   statusPendingDocs: (n) => `${n} doc(s) waiting for index`,
