@@ -16,7 +16,10 @@ cannot go live half-wired:
 | Placeholder | Replace with |
 |---|---|
 | `GITHUB_RELEASES_URL` | direct link to the Windows installer on GitHub Releases |
-| `GITHUB_REPO_URL` | the public repository |
+
+The repository link is already wired to `github.com/lobrzut/pomnia`. The download
+link is deliberately still a placeholder: there is no release yet, and a dead
+Download button is worse than no page.
 
 Publishing is on hold until the Windows build **and** the packaged server are both
 ready. macOS is out of scope for now — the footer badge says `Windows` only, and
