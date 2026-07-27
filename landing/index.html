@@ -1,5 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="canonical" href="https://pomnia.ai/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0c16'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%2334d399'/%3E%3Cg stroke='%236366f1' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M16 12V5'/%3E%3Cpath d='M16 20v7'/%3E%3Cpath d='M12.5 13.5 7 9'/%3E%3Cpath d='M19.5 18.5 25 23'/%3E%3Cpath d='M12.5 18.5 7 23'/%3E%3Cpath d='M19.5 13.5 25 9'/%3E%3C/g%3E%3C/svg%3E">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Pomnia">
+<meta property="og:url" content="https://pomnia.ai/">
+<meta property="og:title" content="Pomnia — the memory layer for your AI">
+<meta property="og:description" content="Your AI forgets you every morning. Pomnia is the local-first, encrypted memory your agents share — captured from every assistant, distilled on hardware you control, recalled by all of them.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Pomnia — the memory layer for your AI">
+<meta name="twitter:description" content="One encrypted vault for every assistant. Local-first, MCP-native, no cloud required.">
 <title>Pomnia — the memory layer for your AI</title>
 <meta name="description" content="Your AI forgets you every morning. Pomnia is the local-first, encrypted memory your agents share — captured from every assistant, distilled on your GPU, recalled over MCP.">
 <style>
@@ -332,6 +346,12 @@
     font-family: var(--mono); font-size: 12px; letter-spacing: 0.05em;
     color: var(--ink-faint);
   }
+  .wl-privacy {
+    color: var(--ink-faint); text-decoration: none;
+    border-bottom: 1px solid rgba(148, 163, 216, 0.28);
+    transition: color .18s ease, border-color .18s ease;
+  }
+  .wl-privacy:hover { color: var(--ink-dim); border-color: var(--ink-dim); }
   .wl-done {
     font-family: var(--mono); font-size: 13px; letter-spacing: 0.04em;
     color: var(--ink-dim);
@@ -347,7 +367,9 @@
     .wl-btn { width: 100%; }
   }
 </style>
+</head>
 
+<body>
 <canvas id="sky" aria-hidden="true"></canvas>
 <div class="veil" aria-hidden="true"></div>
 <div class="grain" aria-hidden="true"></div>
@@ -355,7 +377,7 @@
 <div class="page">
 
   <header class="top">
-    <a class="mark" href="#">pomn<span class="nd">i</span>a</a>
+    <a class="mark" href="/" aria-label="Pomnia — home">pomn<span class="nd">i</span>a</a>
     <!-- normal readable wordmark; the i is the mint memory-node color -->
 
     <nav>
@@ -373,7 +395,7 @@
       <p class="thesis">
         Your AI forgets you every morning.
         <strong>Pomnia is the memory your agents share</strong> — captured from every
-        assistant, distilled on your own GPU, recalled by all of them.
+        assistant, distilled on hardware you control, recalled by all of them.
       </p>
 
       <div class="cta-row">
@@ -381,7 +403,7 @@
         <a class="ghost" href="https://github.com/lobrzut" rel="noopener">watch the build →</a>
       </div>
 
-      <p class="hint"><span class="ok">●</span> local-first · encrypted · no cloud required</p>
+      <p class="hint"><span class="ok" aria-hidden="true">●</span> local-first · encrypted · no cloud required</p>
     </section>
 
     <section id="recall">
@@ -471,10 +493,13 @@
           <button class="cta wl-btn" type="submit">Request early access</button>
         </form>
 
-        <p class="wl-note" id="wlNote">Launch notification only · no spam · unsubscribe any time</p>
+        <p class="wl-note" id="wlNote">
+          Launch notification only · no spam · unsubscribe any time ·
+          <a class="wl-privacy" href="/privacy.html">privacy</a>
+        </p>
 
-        <p class="wl-done" id="wlDone" hidden>
-          <span class="ok">●</span> Check your inbox — confirm the link and you're on the list.
+        <p class="wl-done" id="wlDone" role="status" aria-live="polite" hidden>
+          <span class="ok" aria-hidden="true">●</span> Check your inbox — confirm the link and you're on the list.
         </p>
       </div>
 
@@ -506,10 +531,10 @@
     <div class="foot-in">
       <div class="badges">
         <span>local-first</span><span>AES-256-GCM vault</span><span>MCP-native</span>
-        <span>your GPU · your disk</span><span>Windows · macOS</span>
+        <span>your GPU · your disk</span><span>Windows · self-hosted</span>
       </div>
       <div class="foot-row">
-        <p class="foot-etym">pomnia — od staropolskiego <b>pomnieć</b>: pamiętać.</p>
+        <p class="foot-etym">pomnia — from old polish <b>pomnieć</b>: to remember.</p>
         <p class="copy">
           <a class="foot-mail" href="mailto:hello@pomnia.ai">hello@pomnia.ai</a>
           <span class="sep">·</span>
@@ -858,3 +883,5 @@
   tio.observe(document.getElementById('recall'));
 })();
 </script>
+</body>
+</html>
