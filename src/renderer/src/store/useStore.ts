@@ -616,7 +616,7 @@ export const useStore = create<State>((set, get) => ({
       const state = get()
 
       // Hydrate from app-settings when localStorage has no value (migration / new machine).
-      // Existing localStorage values (incl. alice's brain.example.local) are never overwritten.
+      // Existing localStorage values (incl. a previously saved remote URL) are never overwritten.
       if (!hasLocalStorageKey(REMOTE_BRAIN_URL_KEY) && s.brainMcpUrl) {
         try {
           localStorage.setItem(REMOTE_BRAIN_URL_KEY, s.brainMcpUrl)

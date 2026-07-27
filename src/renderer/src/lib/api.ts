@@ -270,7 +270,7 @@ function mockBridge(): PomniaBridge {
     createdAt: new Date(Date.now() - Math.random() * 6e8).toISOString(),
     source: { id, label, strategy: 'hybrid', root: '~', os: 'win32' },
     stats: { conversations: n, messages: n * 22, files: n * 3, bytes: n * 1.2e6 },
-    origin: { host: 'WIN-DESK', user: 'Admin', home: 'C:\\Users\\Admin' }
+    origin: { host: 'WIN-DESK', user: 'Alice', home: 'C:\\Users\\Alice' }
   })
   return {
     platform: 'browser',

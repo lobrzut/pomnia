@@ -3,7 +3,7 @@
 > **Cel:** jeden dokument opisujący **cały łańcuch** od akcji użytkownika do wyszukiwania RAG — dla czatów (działa dziś) i dokumentów (w budowie).  
 > Powiązane: [PDF-LOCAL.md](./PDF-LOCAL.md) (szczegóły parserów), [BRAIN-KVM-ARCHITECTURE.md](./BRAIN-KVM-ARCHITECTURE.md), [BRAIN-INTEGRATION.md](../BRAIN-INTEGRATION.md).
 
-**Stan audytu:** 2026-07-08 · repo `pomnia` + wzorce z `reliqua-brain-hub` (Python na brain.example.local).
+**Stan audytu:** 2026-07-08 · repo `pomnia` + wzorce z `reliqua-brain-hub` (Python na 192.168.x.x).
 
 ---
 

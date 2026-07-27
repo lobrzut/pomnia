@@ -7,7 +7,7 @@
 
 ## Executive summary
 
-Pomnia ma **działający silnik** (vault, backup, import, distill, embedded brain-core, MCP Connect), ale produkt jest nadal **zaprojektowany wokół homelabu Alice**: hardcoded IP, dwa vaulty bez jednej narracji, dwa pipeline'y (czaty vs dokumenty), embedded vs remote brain — to wszystko wymaga **jednej ścieżki „START HERE"** i **ekranu zdrowia**, zanim beta testerzy dostaną installer.
+Pomnia ma **działający silnik** (vault, backup, import, distill, embedded brain-core, MCP Connect), ale produkt jest nadal **zaprojektowany wokół homelabu operatora**: hardcoded IP, dwa vaulty bez jednej narracji, dwa pipeline'y (czaty vs dokumenty), embedded vs remote brain — to wszystko wymaga **jednej ścieżki „START HERE"** i **ekranu zdrowia**, zanim beta testerzy dostaną installer.
 
 Priorytet: **najpierw przejrzystość (Faza A)**, potem **niezawodność u obcych maszyn (Faza B)**, na końcu **spójność ekosystemu (Faza C)**.
 
@@ -34,9 +34,9 @@ Instalacja → Vault (hasło) → Backup czatów → Import (opcjonalnie)
 | **5. Import czatów** | Import | ZIP Claude/ChatGPT/Gemini | Rozdzielone od backupu live — user nie wie, kiedy które |
 | **6. Brain start** | Brain + Onboarding engine | Ollama lokalnie **lub** remote homelab | Embedded wymaga Ollama + `nomic-embed-text`; bez tego distill/index milczy lub failuje pośrednio |
 | **7. Distill** | Brain | Czaty → notatki `.md` → embeddingi | **Dwa znaczenia „distill"**: Pomnia pipeline vs `save_conversation` w czacie MCP — opisane tylko w `DOCUMENT-PIPELINE.md` |
-| **8. Connect** | Connect | Wklej snippet MCP do Cursora | `REMOTE_URL` domyślnie `brain.example.local:7862`; token mint wymaga dashboardu `:7860` |
+| **8. Connect** | Connect | Wklej snippet MCP do Cursora | `REMOTE_URL` domyślnie `192.168.x.x:7862`; token mint wymaga dashboardu `:7860` |
 | **9. Doc import** | Import + Brain | PDF/DOCX → vault → index | Faza 1 częściowo; EPUB v0.2; OCR 🔲 — landing obiecuje więcej niż exe |
-| **10. Deploy homelab** | Brain (advanced) | SMB / HTTP do Brain VM | Domyślne ścieżki z dokumentacji Alice; brak wizarda „gdzie wkleić token" |
+| **10. Deploy homelab** | Brain (advanced) | SMB / HTTP do Brain VM | Domyślne ścieżki z dokumentacji homelab; brak wizarda „gdzie wkleić token" |
 
 ### 1.3 Diagram — dwa pipeline'y i dwa „brainy"
 
@@ -148,12 +148,12 @@ Instalacja → Vault (hasło) → Backup czatów → Import (opcjonalnie)
 |----------|----------|---------|
 | `README.md` | dev / power user | Silny technicznie, brak „START HERE" dla bety |
 | `docs/DOCUMENT-PIPELINE.md` | architekt | **Najlepszy** — ale 490 linii, nie dla bety |
-| `BRAIN-INTEGRATION.md` | alice homelab | Stare nazwy Continuum, IP brain.example.local |
+| `BRAIN-INTEGRATION.md` | operator homelab | Stare nazwy Continuum, IP 192.168.x.x |
 | `docs/BRAIN-KVM-ARCHITECTURE.md` | infra | Zbyt niszowy na start |
 | `docs/MAC-BUILD.md` | release | OK |
 | `docs/LANDING-DEPLOY.md` | ops | OK |
 | `landing/index.html` | public | Waitlist + „coming soon" — **luka vs działający beta exe** |
-| Brain vault / chat | tylko u Alice | Decyzje produktowe niewidoczne w repo |
+| Brain vault / chat | tylko u operatora | Decyzje produktowe niewidoczne w repo |
 
 ### 3.2 Brakujący artefakt
 
@@ -231,7 +231,7 @@ Instalacja → Vault (hasło) → Backup czatów → Import (opcjonalnie)
 |---|---------|------|--------|----------------|
 | 1 | `START-HERE.md` + README „Dla beta testera" | A | S | Natychmiastowa jasność ścieżki |
 | 2 | Health check w Settings | B | S | Odpowiedź na „czy u mnie zadziała" |
-| 3 | Usunąć hardcoded brain.example.local z UI | A | S | Blokuje obcych userów remote |
+| 3 | Usunąć hardcoded 192.168.x.x z UI | A | S | Blokuje obcych userów remote |
 | 4 | Preflight Ollama + modele przed distill | B | S | Najczęstszy silent fail |
 | 5 | Diagram / mapa w Dashboard | A | M | „Nie czuję przejrzystości" — core UX |
 | 6 | `BETA-SMOKE.md` + checklist ręczna | B | M | Powtarzalna weryfikacja przed każdym release |
@@ -251,7 +251,7 @@ Instalacja → Vault (hasło) → Backup czatów → Import (opcjonalnie)
 | **Tier 2 OCR / vision PDF** | Dokumentacja już mówi 🔲 — nie obiecywać w landing |
 | **Sync sejfu (git/S3/WebDAV)** | README roadmap — rozprasza przed betą |
 | **Tauri migracja** | Architektura OK na Electronie |
-| **Batch 1668 sesji inbox** | Problem Alice, nie beta testera |
+| **Batch 1668 sesji inbox** | Problem operatora, nie beta testera |
 | **Brain-side merge-index API** | Wymaga zmian w Python hub — po stabilizacji desktop |
 | **Publiczne repo vault crypto** | SECURITY.md — zamknięty instalator |
 | **Pełna telemetria SaaS** | Sprzeczna z „local-first"; ewentualnie opt-in później |
@@ -265,7 +265,7 @@ Instalacja → Vault (hasło) → Backup czatów → Import (opcjonalnie)
 - [x] README — sekcja **„Dla beta testera"**
 - [x] Settings — **Health check** (Ollama, brain-core, vault, MCP)
 - [x] `docs/START-HERE.md` — następny commit
-- [ ] PR: usunięcie `REMOTE_URL` default z IP Alice
+- [ ] PR: usunięcie `REMOTE_URL` default z IP homelabu
 
 ---
 
@@ -274,7 +274,7 @@ Instalacja → Vault (hasło) → Backup czatów → Import (opcjonalnie)
 - [ ] Każdy przechodzi `BETA-SMOKE.md` na czystym Windows 11 bez Node
 - [ ] Health check zielony: Ollama + nomic-embed-text + vault open + MCP reachable
 - [ ] Cursor Connect — snippet działa na co najmniej 2 różnych maszynach
-- [ ] Zero wystąpień `brain.example.local` w ścieżce UI (tylko docs/examples)
+- [ ] Zero wystąpień `192.168.x.x` w ścieżce UI (tylko docs/examples)
 - [ ] Jeden dokument START-HERE — wszyscy beta testerzy dostają ten sam link
 
 ---

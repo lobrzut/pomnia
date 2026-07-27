@@ -13,7 +13,7 @@ frozen at git tag `python-final`:
 - `pipeline/rag.py` — embedding + chunking + sqlite-vec search
 - `pipeline/mcp_auth_proxy.py` — Bearer auth + rate limit + audit log
 
-The Python codebase stays live on `brain.example.local` until this package reaches parity
+The Python codebase stays live on `192.168.x.x` until this package reaches parity
 and gets migrated (Phase 5 of the rewrite plan).
 
 ## Architecture (MVP: Ollama-only)
@@ -47,7 +47,7 @@ and gets migrated (Phase 5 of the rewrite plan).
 | Target                     | How                                                                |
 | -------------------------- | ------------------------------------------------------------------ |
 | **Home non-tech**          | Bundled inside Pomnia Electron via `child_process.fork()`         |
-| **Home tech** (alice)     | systemd service on the master, replaces Python `brain-*.service`   |
+| **Home tech** (homelab)     | systemd service on the master, replaces Python `brain-*.service`   |
 | **Enterprise** (future)    | Docker image `pomnia/brain-enterprise` with admin panel addon     |
 
 ## Status

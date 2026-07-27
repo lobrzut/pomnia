@@ -324,7 +324,7 @@ def generate_batch(
 ) -> int:
     out_dir = ROOT / "assets" / "generated"
     out_dir.mkdir(parents=True, exist_ok=True)
-    cfg = {"image_api_provider": "comfyui", "comfyui_url": "http://brain.example.local:7821"}
+    cfg = {"image_api_provider": "comfyui", "comfyui_url": "http://comfy.example.local:7821"}
     ok = 0
     for name, seed, prompt in concepts:
         dest = out_dir / f"{name}.png"

@@ -36,7 +36,7 @@ Token bierzesz stąd (wybierz JEDNĄ drogę):
 KROKI NA MACU
 -------------
 1) Połącz się z tą samą siecią LAN co Brain
-   (host zwykle: brain.example.local).
+   (host zwykle: 192.168.x.x).
 
 2) Sklonuj / zaktualizuj repo Pomnia:
    git clone https://github.com/lobrzut/pomnia.git pomnia

@@ -52,12 +52,12 @@ flowchart LR
 
 `recent=true` gdy ostatnie wywołanie &lt; 4 s temu. Tylko metadane — bez treści vaultu.
 
-## Deploy Brain (homelab / brain.example.local)
+## Deploy Brain (homelab / 192.168.x.x)
 
 Na serwerze Brain (repo `brain`, branch `main` → remote `hub`):
 
 ```powershell
-cd C:\Users\Alice\Projects\brain   # lub SSH na 201
+cd C:\Users\Alice\Projects\brain   # lub SSH na host
 
 # 1. Pull + upewnij się że jest pipeline/mcp_activity.py
 git pull hub main

@@ -15,7 +15,7 @@ Użytkownik: poprzednie depth/final batch **za miękkie, mało unikalne** — ch
 
 **Generator:**
 ```powershell
-$env:COMFYUI_URL = "http://brain.example.local:7821"
+$env:COMFYUI_URL = "http://comfy.example.local:7821"
 $env:COMFY_WORKSPACE = "C:\Users\Alice\Projects\pomnia"
 python scripts/gen-logo-concepts.py --bold-a   # seria A (5)
 python scripts/gen-logo-concepts.py --bold-b   # seria B (5)
@@ -208,7 +208,7 @@ App icon logo mark, Amber Loom concept: circular memory loom weaving threads, am
 | Endpoint | Status |
 |----------|--------|
 | `http://127.0.0.1:8188` | **offline** (brak lokalnej instancji) |
-| `http://brain.example.local:7821` (ISKRA) | **online** — ComfyUI 0.14.1, RTX 3060, FLUX |
+| `http://comfy.example.local:7821` (ISKRA) | **online** — ComfyUI 0.14.1, RTX 3060, FLUX |
 | MCP `comfyui` w Cursor | skonfigurowany, `COMFYUI_URL` → ISKRA |
 
 ### Ważne: `COMFY_WORKSPACE`
@@ -216,7 +216,7 @@ App icon logo mark, Amber Loom concept: circular memory loom weaving threads, am
 W `~/.cursor/mcp.json` jest `COMFY_WORKSPACE=//fileserver.example.local/Projekty` — MCP zapisuje tam PNG, **nie** do repo Pomnia. Dla generacji do tego repo:
 
 ```powershell
-$env:COMFYUI_URL = "http://brain.example.local:7821"
+$env:COMFYUI_URL = "http://comfy.example.local:7821"
 $env:COMFY_WORKSPACE = "C:\Users\Alice\Projects\pomnia"
 python scripts/gen-logo-concepts.py
 ```

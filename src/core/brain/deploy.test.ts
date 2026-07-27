@@ -12,11 +12,11 @@ describe('brain/deploy triggerReindex', () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true })
     vi.stubGlobal('fetch', fetchMock)
 
-    const ok = await triggerReindex('http://brain.example.local:7860', 'btk_test')
+    const ok = await triggerReindex('http://127.0.0.1:7860', 'btk_test')
 
     expect(ok).toBe(true)
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://brain.example.local:7860/api/library/reindex',
+      'http://127.0.0.1:7860/api/library/reindex',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
@@ -50,10 +50,10 @@ describe('brain/deploy deployDistilledHttp', () => {
     const notesDir = await mkdtemp(join(tmpdir(), 'pomnia-deploy-'))
     await writeFile(join(notesDir, 'note.md'), '# test', 'utf8')
 
-    await deployDistilledHttp(notesDir, 'http://brain.example.local:7860', 'btk_test')
+    await deployDistilledHttp(notesDir, 'http://127.0.0.1:7860', 'btk_test')
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://brain.example.local:7860/api/vault/save-note',
+      'http://127.0.0.1:7860/api/vault/save-note',
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: 'Bearer btk_test'

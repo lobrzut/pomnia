@@ -54,7 +54,7 @@ describe('profile identity helpers', () => {
     const { hasIdentityProfile } = await import('../profilePreviewContent.js')
     expect(hasIdentityProfile('§ TECH\nfoo\n')).toBe(false)
     expect(hasIdentityProfile('§ PROFIL\n· Imię / nick:\n')).toBe(false)
-    expect(hasIdentityProfile('§ PROFIL\n· alice — PL developer\n')).toBe(true)
+    expect(hasIdentityProfile('§ PROFIL\n· Alex — PL developer\n')).toBe(true)
   })
 
   it('flags trading/Pine notes as noise', async () => {
