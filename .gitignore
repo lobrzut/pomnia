@@ -29,3 +29,14 @@ _smoke_result.log
 build/
 resources/*.bak
 resources/*.bak-*
+
+# Private ComfyUI / branding tooling (not Desktop product)
+assets/comfyui/
+docs/COMFYUI-ASSETS.md
+scripts/gen-logo-concepts.py
+scripts/gen-logo-refines.py
+.cursor/comfy-project.json
+.cursor/rules/comfyui-graphics.mdc
+
+# Personal Claude Code local config
+.claude/
