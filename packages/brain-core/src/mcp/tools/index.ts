@@ -96,7 +96,7 @@ export function listTools(
     {
       name: 'save_conversation',
       description:
-        "Save this conversation to vault/sessions/ as structured markdown. Call ONLY when the user says 'zapisz do Pomnia' / 'save to Pomnia' (or clear equivalent: zapisz do brain / save to brain) — never auto-dump chats. Prefer concrete files, commands, errors, decisions over abstract fluff. Pomnia Desktop does not capture chats by itself. For mid-session milestones without user phrase use checkpoint_session instead.",
+        "Save this conversation to vault/sessions/ as structured markdown. Call ONLY when the user says 'zapisz do Pomnia' / 'save to Pomnia' (or clear equivalent: zapisz do brain / save to brain) — never auto-dump chats. Prefer concrete files, commands, errors, decisions over abstract fluff. Keep the note proportional to what actually happened — a short exchange gets a short note. Fill only the fields the session genuinely produced; empty is rejected, but padding is worse than brevity. Pomnia Desktop does not capture chats by itself. For mid-session milestones without user phrase use checkpoint_session instead.",
       inputSchema: saveConversationSchema,
     },
     {

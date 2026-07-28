@@ -97,7 +97,7 @@ Jeśli Cursor backup pokazuje 0 czatów — użyj Import.
 | Status systemu | Dashboard → pasek „Gdzie jesteś teraz” · Settings → Diagnostyka |
 | Logi | `%AppData%/Pomnia/logs/` |
 | Pełny pipeline dokumentów | [DOCUMENT-PIPELINE.md](./DOCUMENT-PIPELINE.md) |
-| Integracja z homelab Brain | [BRAIN-INTEGRATION.md](../BRAIN-INTEGRATION.md) |
+| Integracja z homelab Brain | [BRAIN-INTEGRATION.md](./BRAIN-INTEGRATION.md) (internal/historical) |
 
 ## Czego ta beta jeszcze nie ma
 

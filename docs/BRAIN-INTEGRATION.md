@@ -1,3 +1,5 @@
+> **Internal / historical note** — not user-facing docs. Continuum-era host-side pipeline analysis (2026-06); keep for operators, not onboarding.
+
 # Continuum × Brain — analiza i host-side pipeline
 
 Analiza Twojego BRAIN (przez API dashboardu :7860 + dane w vault, 2026-06-11) i projekt, jak Continuum staje się **on-rampem**: wciąga rozproszoną wiedzę, **destyluje i wstępnie indeksuje na hoście**, a do brain wrzuca gotowy produkt.
