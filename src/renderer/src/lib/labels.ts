@@ -273,6 +273,13 @@ export interface UiLabels {
   exportNotes: string
   mcpClients: string
   mcpClientsLead: string
+  strategyHybrid: string
+  strategySnapshot: string
+  strategySnapshotHint: string
+  sourceMcpReads: string
+  sourceMcpNotConnected: string
+  sourceChatsCount: (n: number) => string
+  sourceNoChats: string
   detectedOnMachine: string
   notFound: string
   customOverride: string
@@ -684,7 +691,15 @@ const PL_LABELS: UiLabels = {
   exportNotes: 'Eksportuj',
   mcpClients: 'Klienci MCP',
   mcpClientsLead:
-    'Wybierz, które klienty widać w zakładce Connect. Wykryte pokazują się domyślnie — przypnij brakujące albo ukryj nieużywane.',
+    'Te aplikacje czytają pamięć z Pomni. To niezależne od tego, czy oddają swoje rozmowy — czytać potrafi każdy klient mówiący MCP. Wybierz, które widać w zakładce Connect: wykryte pokazują się domyślnie — przypnij brakujące albo ukryj nieużywane.',
+  strategyHybrid: 'czaty + config',
+  strategySnapshot: 'tylko config',
+  strategySnapshotHint:
+    'To narzędzie nie udostępnia swoich rozmów w czytelnym formacie — zbieramy tylko jego konfigurację. Pamięć czyta normalnie, przez MCP.',
+  sourceMcpReads: '✅ czyta pamięć przez MCP',
+  sourceMcpNotConnected: '◽ MCP niepodłączone — skonfiguruj w Connect',
+  sourceChatsCount: (n) => `${n} rozmów`,
+  sourceNoChats: 'brak czatów do wyciągnięcia',
   detectedOnMachine: 'Wykryty na tym komputerze',
   notFound: 'Nie znaleziono',
   customOverride: 'własne',
@@ -911,7 +926,7 @@ const PL_LABELS: UiLabels = {
   statusDocuments: 'Dokumenty',
   dashboardTitle: 'Centrum dowodzenia',
   dashboardLead:
-    'Zbierz rozmowy ze wszystkich asystentów do jednego zaszyfrowanego vaultu — backup to tylko mechanizm.',
+    'Rozmowy z twoich asystentów w jednym zaszyfrowanym vaulcie — czyta je każdy agent mówiący MCP.',
   dashboardStatSources: 'Źródła',
   dashboardStatSourcesSub: 'zainstalowane',
   dashboardStatChats: 'Czaty',
@@ -1087,7 +1102,16 @@ const EN_LABELS: Partial<UiLabels> = {
   outDir: 'Output folder',
   exportNotes: 'Export notes',
   mcpClients: 'MCP clients',
-  mcpClientsLead: 'Which clients show up on the Connect tab.',
+  mcpClientsLead:
+    'These apps read memory from Pomnia. That is independent of whether they give up their chats — any MCP-speaking client can read. Choose which appear on the Connect tab: detected ones show by default — pin missing ones or hide unused.',
+  strategyHybrid: 'chats + config',
+  strategySnapshot: 'config only',
+  strategySnapshotHint:
+    'This tool does not expose its chats in a readable format — we only collect its configuration. Memory is still read normally, via MCP.',
+  sourceMcpReads: '✅ reads memory via MCP',
+  sourceMcpNotConnected: '◽ MCP not connected — set up in Connect',
+  sourceChatsCount: (n) => `${n} chats`,
+  sourceNoChats: 'no chats to capture',
   detectedOnMachine: 'Detected on this machine',
   notFound: 'Not found',
   customOverride: 'custom override',
@@ -1167,7 +1191,7 @@ const EN_LABELS: Partial<UiLabels> = {
   statusDocuments: 'Documents',
   dashboardTitle: 'Command center',
   dashboardLead:
-    'Collect chats from all assistants into one encrypted vault — backup is just the mechanism.',
+    'Chats from your assistants in one encrypted vault — every MCP-speaking agent can read them.',
   dashboardStatSources: 'Sources',
   dashboardStatSourcesSub: 'installed',
   dashboardStatChats: 'Chats',

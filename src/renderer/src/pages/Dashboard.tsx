@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import {
   Check,
   Database,
+  HelpCircle,
   MessageSquare,
   RefreshCw,
   Server,
@@ -18,8 +19,10 @@ import { ActivityBanner } from '../components/ActivityBanner'
 import { StatusStrip } from '../components/StatusStrip'
 import { humanBytes, relativeTime, shortPath, sourceMeta } from '../lib/format'
 import { uiLabels } from '../lib/labels'
+import { isMcpClientActive } from '../lib/mcpClientVisibility'
 import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
+import type { ClientId } from '../lib/types'
 
 function Stat({
   icon: Icon,
@@ -83,7 +86,10 @@ export default function Dashboard() {
     brainProgress,
     globalActivity,
     refreshVault,
-    loadBrainState
+    loadBrainState,
+    mcpClients,
+    loadMcpClients,
+    connectClientOverride,
   } = useStore()
   const labels = uiLabels()
   const busy = backingUp || brainRunning
@@ -129,10 +135,11 @@ export default function Dashboard() {
     void api.mcpActivityWatch(true)
     void loadBrainState()
     void refreshVault()
+    void loadMcpClients()
     return () => {
       void api.mcpActivityWatch(false)
     }
-  }, [loadBrainState, refreshVault])
+  }, [loadBrainState, refreshVault, loadMcpClients])
 
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col overflow-hidden">
@@ -246,6 +253,13 @@ export default function Dashboard() {
             installed.map((s, i) => {
               const meta = sourceMeta(s.id)
               const on = selected.has(s.id)
+              const strategyLabel =
+                s.strategy === 'hybrid' ? labels.strategyHybrid : labels.strategySnapshot
+              const chatsLabel =
+                s.conversations != null && s.conversations > 0
+                  ? labels.sourceChatsCount(s.conversations)
+                  : labels.sourceNoChats
+              const mcpActive = isMcpClientActive(s.id as ClientId, mcpClients, connectClientOverride)
               return (
                 <GlassCard
                   key={s.id}
@@ -266,12 +280,38 @@ export default function Dashboard() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className="truncate text-sm font-semibold text-ink">{s.label}</span>
-                        <Badge color={s.strategy === 'hybrid' ? '#34d399' : '#9aa3bd'}>{s.strategy}</Badge>
+                        <Badge color={s.strategy === 'hybrid' ? '#34d399' : '#9aa3bd'}>
+                          {strategyLabel}
+                        </Badge>
+                        {s.strategy === 'snapshot' && (
+                          <span
+                            className="inline-flex text-ink-faint"
+                            title={labels.strategySnapshotHint}
+                            aria-label={labels.strategySnapshotHint}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <HelpCircle className="h-3 w-3" />
+                          </span>
+                        )}
                       </div>
                       <div className="mt-0.5 flex flex-wrap gap-x-2.5 gap-y-0 text-[11px] text-ink-dim">
                         <span>{humanBytes(s.sizeBytes)}</span>
-                        {s.conversations != null && <span>{s.conversations} chats</span>}
+                        <span>{chatsLabel}</span>
                       </div>
+                      {mcpActive ? (
+                        <p className="mt-0.5 text-[10px] leading-snug text-mint">{labels.sourceMcpReads}</p>
+                      ) : (
+                        <button
+                          type="button"
+                          className="no-drag mt-0.5 block text-left text-[10px] leading-snug text-ink-faint hover:text-cyan"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setRoute('connect')
+                          }}
+                        >
+                          {labels.sourceMcpNotConnected}
+                        </button>
+                      )}
                       {s.notes?.some((n) => /too large|skipped|agent-transcripts/i.test(n)) && (
                         <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-ink-faint">
                           {s.notes.find((n) => /agent-transcripts|too large|skipped/i.test(n))}

@@ -13,7 +13,8 @@ import { uiLabels } from '../lib/labels'
 import { COLOR_SCHEMES, type ColorScheme } from '../lib/theme'
 import { UI_LOCALES, type UiLocale } from '../lib/uiLocale'
 import { useStore } from '../store/useStore'
-import type { ClientId, ClientStatus } from '../lib/types'
+import { isMcpClientActive } from '../lib/mcpClientVisibility'
+import type { ClientId } from '../lib/types'
 
 const ALL_CLIENTS: ClientId[] = ['claude-code', 'cursor', 'antigravity', 'claude-desktop', 'vscode', 'windsurf', 'hermes']
 
@@ -219,6 +220,8 @@ export default function Settings() {
     connectClientOverride,
     setConnectClientVisible,
     resetConnectClient,
+    mcpClients,
+    loadMcpClients,
     settingsExportDir,
     brainDeployTarget,
     setSettingsExportDir,
@@ -257,7 +260,6 @@ export default function Settings() {
     en: labels.uiLocaleEn,
   }
   const [exportSnap, setExportSnap] = useState(snapshots[0]?.id ?? '')
-  const [clients, setClients] = useState<ClientStatus[]>([])
   const [verifying, setVerifying] = useState(false)
   const [appVersion, setAppVersion] = useState('')
   const [phraseDraft, setPhraseDraft] = useState(handshakePhrase)
@@ -315,16 +317,8 @@ export default function Settings() {
   }
 
   useEffect(() => {
-    const url = (simpleMode ? 'embedded' : brainTarget) === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
-    api
-      .connectStatus(
-        url,
-        !simpleMode && brainTarget === 'remote' ? connectToken || undefined : undefined,
-        simpleMode ? 'embedded' : brainTarget
-      )
-      .then((r) => setClients(r.clients))
-      .catch(() => {})
-  }, [simpleMode, brainTarget, remoteBrainUrl, connectToken])
+    void loadMcpClients()
+  }, [loadMcpClients, simpleMode, brainTarget, remoteBrainUrl, connectToken])
 
   async function pickExport() {
     const d = await api.pickDirectory()
@@ -597,10 +591,10 @@ export default function Settings() {
         <p className="mb-4 text-xs text-ink-dim">{labels.mcpClientsLead}</p>
         <div className="space-y-2">
           {ALL_CLIENTS.map((id) => {
-            const c = clients.find((x) => x.id === id)
+            const c = mcpClients.find((x) => x.id === id)
             const detected = !!c?.configExists
             const override = connectClientOverride[id]
-            const visible = override ?? detected
+            const visible = isMcpClientActive(id, mcpClients, connectClientOverride)
             const overridden = override !== undefined
             return (
               <div
