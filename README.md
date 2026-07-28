@@ -192,6 +192,8 @@ The name **Pomnia** and the logo are **not** covered by the AGPL. You may fork t
 
 The reason is simple: code can be audited; a name has to be trusted. This rule protects people who download something believing it is the original.
 
+Pomnia is not a registered trademark; this section reserves the name rather than asserting registration. It is enforceable on the same basis as any unregistered sign — through use, and through the fact that the licence itself grants no rights to the name.
+
 ---
 
 Pomnia · [pomnia.ai](https://pomnia.ai) · [github.com/lobrzut/pomnia](https://github.com/lobrzut/pomnia)
