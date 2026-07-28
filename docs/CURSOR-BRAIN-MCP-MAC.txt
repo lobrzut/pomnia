@@ -1,3 +1,5 @@
+> Internal / historical note — outdated Mac MCP setup (Bearer/host); not user docs. Prefer docs/CURSOR-MCP.md + Connect in Desktop.
+
 CURSOR + Brain MCP na Macu — prosta instrukcja
 ================================================
 Cel: Cursor na Macu widzi Brain (pamięć / vault / library).

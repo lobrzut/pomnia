@@ -243,4 +243,4 @@ Kolejny krok: podpiąć pod `brain-core` `indexDocument()` i IPC `doc:import`.
 - `packages/brain-core/src/storage/vault.ts` — layout vault
 - `src/core/import/archives.ts` — import czatów (osobna ścieżka niż docs)
 - `docs/BRAIN-KVM-ARCHITECTURE.md` — Tier 3 remote deploy
-- `BRAIN-INTEGRATION.md` — Python library upload (homelab)
+- `docs/BRAIN-INTEGRATION.md` — Python library upload (homelab; internal/historical)

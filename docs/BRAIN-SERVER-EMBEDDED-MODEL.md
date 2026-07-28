@@ -1,7 +1,7 @@
 # Brain Server — bundled embed model (~250–500 MB)
 
 > Plan techniczny (2026-07-13). **Nie implementujemy tu pełnego obrazu** — tylko kontrakt, opcje i kolejność.
-> Powiązane: `docs/BRAIN-KVM-ARCHITECTURE.md`, `BRAIN-INTEGRATION.md`, hub `Projects/brain` (Docker edge).
+> Powiązane: `docs/BRAIN-KVM-ARCHITECTURE.md`, `docs/BRAIN-INTEGRATION.md` (internal/historical), hub `Projects/brain` (Docker edge).
 
 ## Stan dziś (research)
 

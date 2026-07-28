@@ -26,7 +26,7 @@ Every assistant keeps conversations somewhere else. Switch machines and you lose
 
 Optional: **Handshake** — personal start ritual in the UI; not required for the product to work.
 
-**Advanced:** remote Brain / homelab KVM (other host `:7862`, Bearer, auto-deploy) — [docs/START-HERE.md](docs/START-HERE.md), [docs/BRAIN-KVM-ARCHITECTURE.md](docs/BRAIN-KVM-ARCHITECTURE.md), [BRAIN-INTEGRATION.md](BRAIN-INTEGRATION.md).
+**Advanced:** remote Brain / homelab KVM (other host `:7862`, Bearer, auto-deploy) — [docs/START-HERE.md](docs/START-HERE.md), [docs/BRAIN-KVM-ARCHITECTURE.md](docs/BRAIN-KVM-ARCHITECTURE.md), [docs/BRAIN-INTEGRATION.md](docs/BRAIN-INTEGRATION.md).
 
 ## Sources
 

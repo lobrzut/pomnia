@@ -82,7 +82,7 @@ Instalacja → Vault (hasło) → Backup czatów → Import (opcjonalnie)
 | `Onboarding.tsx`, `Connect.tsx` | `REMOTE_URL = 'http://brain.example.local:7862'` | Remote brain „działa" tylko u Ciebie |
 | `Settings.tsx` | `connectStatus('http://brain.example.local:7862')` | Lista klientów MCP bez user URL |
 | `api.ts` (mock) | Ten sam IP w preview | OK w dev, mylące w demo |
-| `BRAIN-INTEGRATION.md`, `COMFYUI-ASSETS.md` | IP, ścieżki `/opt/BRAIN`, tokeny | Beta tester czyta i myśli, że to wymagane |
+| `docs/BRAIN-INTEGRATION.md`, `COMFYUI-ASSETS.md` | IP, ścieżki `/opt/BRAIN`, tokeny | Beta tester czyta i myśli, że to wymagane |
 | `brain/deploy.test.ts` | IP w teście | Niskie — tylko test |
 
 ### 2.2 Ciche błędy / słabe komunikaty
@@ -148,7 +148,7 @@ Instalacja → Vault (hasło) → Backup czatów → Import (opcjonalnie)
 |----------|----------|---------|
 | `README.md` | dev / power user | Silny technicznie, brak „START HERE" dla bety |
 | `docs/DOCUMENT-PIPELINE.md` | architekt | **Najlepszy** — ale 490 linii, nie dla bety |
-| `BRAIN-INTEGRATION.md` | operator homelab | Stare nazwy Continuum, IP 192.168.x.x |
+| `docs/BRAIN-INTEGRATION.md` | operator homelab | Stare nazwy Continuum, IP 192.168.x.x |
 | `docs/BRAIN-KVM-ARCHITECTURE.md` | infra | Zbyt niszowy na start |
 | `docs/MAC-BUILD.md` | release | OK |
 | Landing deploy docs | ops | **usunięte z repo produktu** — site poza drzewem AGPL |
@@ -219,7 +219,7 @@ Instalacja → Vault (hasło) → Backup czatów → Import (opcjonalnie)
 | C1 | **One-page architecture** dla userów (nie infra) — PDF/Mermaid w `docs/` | S |
 | C2 | **Support playbook** — „user nie widzi czatów Cursor" → kroki | M |
 | C3 | **Landing: strona beta** — link do GitHub Releases / Formspree z tokenem | S |
-| C4 | **Odświeżyć BRAIN-INTEGRATION.md** — Pomnia nie Continuum, bez IP | S |
+| C4 | **Odświeżyć docs/BRAIN-INTEGRATION.md** — Pomnia nie Continuum, bez IP | S |
 | C5 | **Spójność MCP docs** z `snippet.ts` (wersje transportów) | M |
 | C6 | **Code signing** (Windows Authenticode + Apple) — osobny track | L |
 

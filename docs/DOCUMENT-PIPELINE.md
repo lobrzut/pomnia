@@ -1,7 +1,7 @@
 ﻿# Pomnia — Document Ingestion Pipeline (master doc)
 
 > **Cel:** jeden dokument opisujący **cały łańcuch** od akcji użytkownika do wyszukiwania RAG — dla czatów (działa dziś) i dokumentów (w budowie).  
-> Powiązane: [PDF-LOCAL.md](./PDF-LOCAL.md) (szczegóły parserów), [BRAIN-KVM-ARCHITECTURE.md](./BRAIN-KVM-ARCHITECTURE.md), [BRAIN-INTEGRATION.md](../BRAIN-INTEGRATION.md).
+> Powiązane: [PDF-LOCAL.md](./PDF-LOCAL.md) (szczegóły parserów), [BRAIN-KVM-ARCHITECTURE.md](./BRAIN-KVM-ARCHITECTURE.md), [BRAIN-INTEGRATION.md](./BRAIN-INTEGRATION.md) (internal/historical).
 
 **Stan audytu:** 2026-07-08 · repo `pomnia` + wzorce z `reliqua-brain-hub` (Python na 192.168.x.x).
 
@@ -461,7 +461,7 @@ src/main/index.ts             IPC handlers
 src/renderer/pages/Import.tsx UI import (czaty only)
 docs/PDF-LOCAL.md             parser deep-dive
 docs/BRAIN-KVM-ARCHITECTURE.md split client/server
-BRAIN-INTEGRATION.md          host-side pipeline analysis
+docs/BRAIN-INTEGRATION.md     host-side pipeline analysis (internal/historical)
 ```
 
 ---
