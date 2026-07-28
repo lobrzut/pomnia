@@ -156,23 +156,36 @@ export async function search(
     }
   }
 
-  // Final score: semantic weight 1.0, kw_name_hits weight 0.15, kw_text_hits 0.05.
-  // Matches Python `pipeline/rag.py::search` ordering.
-  const scored = [...candidates.values()].map((c) => ({
-    hit: {
-      path: c.pdf_path,
-      chunkIdx: c.chunk_idx,
-      text: c.text,
-      score: c.sem_score + c.kw_name_hits * 0.15 + c.kw_text_hits * 0.05,
-      meta: {
-        name: c.pdf,
-        page: c.page,
-        sem_score: c.sem_score,
-        kw_name_hits: c.kw_name_hits,
-        kw_text_hits: c.kw_text_hits,
-      },
-    } satisfies SearchHit,
-  }))
+  // Final score: semantic 1.0, kw_name 0.15, kw_text 0.05, plus path-encoded
+  // quality: _weak/ penalty, sessions/ human boost. Quality lives in the path
+  // (not a chunks column) so legacy corpus can be re-ranked without re-embed.
+  const scored = [...candidates.values()].map((c) => {
+    const p = c.pdf_path
+    const weakPenalty = p.includes('_weak') ? 0.15 : 0
+    const humanBoost = p.includes('sessions') ? 0.05 : 0
+    return {
+      hit: {
+        path: c.pdf_path,
+        chunkIdx: c.chunk_idx,
+        text: c.text,
+        score:
+          c.sem_score -
+          weakPenalty +
+          humanBoost +
+          c.kw_name_hits * 0.15 +
+          c.kw_text_hits * 0.05,
+        meta: {
+          name: c.pdf,
+          page: c.page,
+          sem_score: c.sem_score,
+          kw_name_hits: c.kw_name_hits,
+          kw_text_hits: c.kw_text_hits,
+          weakPenalty,
+          humanBoost,
+        },
+      } satisfies SearchHit,
+    }
+  })
 
   scored.sort((a, b) => b.hit.score - a.hit.score)
   return scored.slice(0, topK).map((s) => s.hit)

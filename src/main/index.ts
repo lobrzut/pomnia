@@ -16,6 +16,7 @@ import {
   defaultOllamaConfig,
   deployDashboard,
   deployFilesystem,
+  copyNoteThroughQualityGate,
   deployDistilledToBrain,
   detectAll,
   distillAll,
@@ -109,11 +110,43 @@ import {
   brainSkillsLegacyDir,
   countDistilledNotes,
   countLocalSkills,
+  countSkillsSplit,
   setOpenEncryptedVaultPath,
 } from './brainPaths.js'
 import { ensurePortableSkills } from './ensurePortableSkills.js'
 import { ensurePortableKnowledge } from './ensurePortableKnowledge.js'
+import {
+  cleanupSkillsJunkAt,
+  listLocalSkillsAt,
+  writeSkillsIndexAt,
+} from './skillsScan.js'
 import { brainProcessFailedMessage, ollamaUnreachableMessage, probeOllama, resolveOllamaUrl } from './ollamaSettings.js'
+
+function vaultSkillsFields(path: string | null | undefined) {
+  if (!path) {
+    return { skillsCount: 0, skillsOwnCount: 0, skillsImportedCount: 0 }
+  }
+  const split = countSkillsSplit(path)
+  return {
+    skillsCount: split.total,
+    skillsOwnCount: split.own,
+    skillsImportedCount: split.imported,
+  }
+}
+
+/** One-shot hygiene after vault open/create: junk cleanup + truthful index.json. */
+function refreshPortableSkills(skillsRoot: string): void {
+  try {
+    cleanupSkillsJunkAt(skillsRoot)
+  } catch (err) {
+    log.warn('skills junk cleanup failed', err)
+  }
+  try {
+    writeSkillsIndexAt(skillsRoot)
+  } catch (err) {
+    log.warn('skills index write failed', err)
+  }
+}
 
 let win: BrowserWindow | null = null
 let forceQuit = false
@@ -517,11 +550,38 @@ function registerIpc(): void {
     name: vault?.getManifest().name,
     snapshots: vault?.getManifest().snapshots.length ?? 0,
     pendingLibraryIndex: vault?.getPendingIndexDocuments().length ?? 0,
-    // Only count portable sidecar when vault is open (label: "w vault/skills").
-    skillsCount: vault ? countLocalSkills(vaultPath) : 0,
+    // Only count portable sidecar when vault is open (label: own vs imported).
+    ...vaultSkillsFields(vault ? vaultPath : null),
     distilledNotes: vault ? countDistilledNotes(vaultPath) : 0,
     knowledgePath: vault ? brainVaultRoot(vaultPath) : undefined,
   }))
+
+  ipcMain.handle('skills:list', () => {
+    if (!vault || !vaultPath) return { own: [], imported: [], skillsRoot: null }
+    const skillsRoot = brainSkillsDir(vaultPath)
+    try {
+      writeSkillsIndexAt(skillsRoot)
+    } catch {
+      /* ignore */
+    }
+    const all = listLocalSkillsAt(skillsRoot)
+    return {
+      skillsRoot,
+      own: all.filter((s) => s.kind === 'own'),
+      imported: all.filter((s) => s.kind === 'imported'),
+    }
+  })
+
+  ipcMain.handle('skills:reveal', async (_e, target: string, mode: 'file' | 'folder' = 'file') => {
+    if (!target || typeof target !== 'string') return { ok: false, error: 'missing path' }
+    if (mode === 'folder') {
+      // showItemInFolder selects the file in Explorer; openPath opens the folder itself.
+      const err = await shell.openPath(target)
+      return { ok: !err, error: err || null }
+    }
+    const err = await shell.openPath(target)
+    return { ok: !err, error: err || null }
+  })
 
   ipcMain.handle('vault:pickDir', async () => {
     const r = await dialog.showOpenDialog(win!, {
@@ -577,6 +637,7 @@ function registerIpc(): void {
     vaultPath = path
     setOpenEncryptedVaultPath(path)
     const skillsRoot = await ensurePortableSkills(path)
+    refreshPortableSkills(skillsRoot)
     const knowledgeRoot = await ensurePortableKnowledge(path)
     brainCore.setSkillsRoot(skillsRoot)
     brainCore.setVaultRoot(knowledgeRoot)
@@ -589,7 +650,7 @@ function registerIpc(): void {
       name,
       snapshots: 0,
       pendingLibraryIndex: 0,
-      skillsCount: countLocalSkills(path),
+      ...vaultSkillsFields(path),
       distilledNotes: countDistilledNotes(path),
       knowledgePath: knowledgeRoot,
     }
@@ -600,6 +661,7 @@ function registerIpc(): void {
     vaultPath = path
     setOpenEncryptedVaultPath(path)
     const skillsRoot = await ensurePortableSkills(path)
+    refreshPortableSkills(skillsRoot)
     const knowledgeRoot = await ensurePortableKnowledge(path)
     brainCore.setSkillsRoot(skillsRoot)
     brainCore.setVaultRoot(knowledgeRoot)
@@ -613,7 +675,7 @@ function registerIpc(): void {
       name: m.name,
       snapshots: m.snapshots.length,
       pendingLibraryIndex,
-      skillsCount: countLocalSkills(path),
+      ...vaultSkillsFields(path),
       distilledNotes: countDistilledNotes(path),
       knowledgePath: knowledgeRoot,
     }
@@ -1233,12 +1295,16 @@ function registerIpc(): void {
         if (!opts.target) throw new Error('target dir required')
         await fs.mkdir(opts.target, { recursive: true })
         const files = (await fs.readdir(brainDir())).filter((f) => f.endsWith('.md'))
-        for (const f of files) await fs.copyFile(join(brainDir(), f), join(opts.target, f))
-        // Keep embedded vault in sync when manually deploying.
+        // Quality gate: never dump stub/garbage/weak into the searchable root.
+        for (const f of files) {
+          await copyNoteThroughQualityGate(join(brainDir(), f), opts.target)
+        }
         const vaultDistilled = brainVaultDistilledDir()
         await fs.mkdir(vaultDistilled, { recursive: true })
-        for (const f of files) await fs.copyFile(join(brainDir(), f), join(vaultDistilled, f))
-        detail = `Copied ${files.length} notes → ${opts.target} (+ vault/distilled)`
+        for (const f of files) {
+          await copyNoteThroughQualityGate(join(brainDir(), f), vaultDistilled)
+        }
+        detail = `Copied ${files.length} notes → ${opts.target} (+ vault/distilled, quality-gated)`
         if (opts.reindex !== false && brainCore.status().running) {
           try {
             const root = brainVaultRoot()
