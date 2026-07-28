@@ -3,32 +3,175 @@
 /**
  * BrainCoreManager — lifecycle of the embedded brain-core child process.
  *
- * Pomnia forks `packages/brain-core/dist/embedded.js` and talks to it over
- * the fork IPC channel (see brain-core/src/embedded.ts for the protocol).
- * One child max; crash puts us back in `stopped` with lastError set.
+ * Pomnia runs `packages/brain-core/dist/embedded.js` and talks over IPC
+ * (see brain-core/src/embedded.ts for the protocol). One child max; crash
+ * puts us back in `stopped` with lastError set.
  *
- * ABI note: better-sqlite3 is a native module. A fork from Electron main runs
- * Electron-as-node (ELECTRON_RUN_AS_NODE), which needs the binding compiled
- * for Electron's ABI — `electron-builder install-app-deps` handles that for
- * packaged builds. In dev we prefer the system `node` binary (matches the
- * prebuild that `npm install` fetched); POMNIA_NODE_BIN overrides.
+ * Packaged: Electron `utilityProcess.fork` — same Electron ABI as main, no
+ * second pomnia-brain.exe / Electron sidecars in the installer.
+ * Dev: prefer system `node` (matches npm prebuild); POMNIA_NODE_BIN overrides.
+ *
+ * ABI note: better-sqlite3 is rebuilt for Electron in stage:brain-core —
+ * utilityProcess loads that binding. Do not fork a plain Node ABI binary
+ * against the staged Electron-ABI .node in production.
  */
 
 import { fork, spawn, execSync, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { app } from 'electron'
+import { app, utilityProcess, type UtilityProcess } from 'electron'
 
 /** Cold start under AV scan can exceed 20s; IPC ready usually lands in 1–4s when healthy. */
 const START_TIMEOUT_MS = 45_000
 
-/** Force-kill a child (+ Windows process tree). Packaged brain-core is Pomnia.exe. */
-function forceKillChild(child: ChildProcess, sync = false): void {
+/** Unified handle for Node ChildProcess | Electron UtilityProcess. */
+interface BrainChild {
+  readonly pid?: number
+  stderr: NodeJS.ReadableStream | null
+  /** Set after exit (UtilityProcess has no exitCode property). */
+  exitCode: number | null
+  killed: boolean
+  /** True once spawn has fired / ChildProcess has spawnfile. */
+  spawned: boolean
+  send(msg: unknown): void
+  onMessage(handler: (m: ChildMsg) => void): void
+  offMessage(handler: (m: ChildMsg) => void): void
+  onceExit(handler: (code: number | null) => void): void
+  offExit(handler: (code: number | null) => void): void
+  onceSpawn(handler: () => void): void
+  /** Soft terminate (SIGTERM / UtilityProcess.kill). */
+  softKill(): void
+}
+
+function wrapNodeChild(child: ChildProcess): BrainChild {
+  const exitWrappers = new Map<(code: number | null) => void, (code: number | null) => void>()
+  const handle: BrainChild = {
+    get pid() {
+      return child.pid
+    },
+    stderr: child.stderr,
+    exitCode: null,
+    killed: false,
+    spawned: Boolean(child.spawnfile),
+    send(msg) {
+      child.send(msg as never)
+    },
+    onMessage(handler) {
+      child.on('message', handler as (m: unknown) => void)
+    },
+    offMessage(handler) {
+      child.off('message', handler as (m: unknown) => void)
+    },
+    onceExit(handler) {
+      const wrapper = (code: number | null): void => {
+        handle.exitCode = code
+        exitWrappers.delete(handler)
+        handler(code)
+      }
+      exitWrappers.set(handler, wrapper)
+      child.once('exit', wrapper)
+    },
+    offExit(handler) {
+      const wrapper = exitWrappers.get(handler)
+      if (!wrapper) return
+      exitWrappers.delete(handler)
+      child.off('exit', wrapper)
+    },
+    onceSpawn(handler) {
+      if (handle.spawned) {
+        handler()
+        return
+      }
+      child.once('spawn', () => {
+        handle.spawned = true
+        handler()
+      })
+    },
+    softKill() {
+      handle.killed = true
+      try {
+        child.kill()
+      } catch {
+        /* already gone */
+      }
+    },
+  }
+  child.once('exit', (code) => {
+    handle.exitCode = code
+  })
+  return handle
+}
+
+function wrapUtilityChild(child: UtilityProcess): BrainChild {
+  const exitWrappers = new Map<(code: number | null) => void, (code: number) => void>()
+  const handle: BrainChild = {
+    get pid() {
+      return child.pid
+    },
+    stderr: child.stderr,
+    exitCode: null,
+    killed: false,
+    spawned: child.pid != null,
+    send(msg) {
+      child.postMessage(msg)
+    },
+    onMessage(handler) {
+      child.on('message', handler)
+    },
+    offMessage(handler) {
+      child.off('message', handler)
+    },
+    onceExit(handler) {
+      const wrapper = (code: number): void => {
+        handle.exitCode = code
+        exitWrappers.delete(handler)
+        handler(code)
+      }
+      exitWrappers.set(handler, wrapper)
+      child.once('exit', wrapper)
+    },
+    offExit(handler) {
+      const wrapper = exitWrappers.get(handler)
+      if (!wrapper) return
+      exitWrappers.delete(handler)
+      child.off('exit', wrapper)
+    },
+    onceSpawn(handler) {
+      if (handle.spawned) {
+        handler()
+        return
+      }
+      child.once('spawn', () => {
+        handle.spawned = true
+        handler()
+      })
+    },
+    softKill() {
+      handle.killed = true
+      try {
+        child.kill()
+      } catch {
+        /* already gone */
+      }
+    },
+  }
+  child.once('exit', (code) => {
+    handle.exitCode = code
+  })
+  return handle
+}
+
+/** Force-kill a child (+ Windows process tree). UtilityProcess lives under Pomnia.exe tree. */
+function forceKillChild(child: BrainChild, sync = false): void {
   const pid = child.pid
-  if (!pid) return
+  child.killed = true
+  if (!pid) {
+    child.softKill()
+    return
+  }
   try {
     if (process.platform === 'win32') {
-      // /T kills the tree — avoids orphan Pomnia.exe holding :7862 / fooling NSIS.
+      // /T kills the tree — avoids orphan holding :7862 / fooling NSIS.
       if (sync) {
         try {
           execSync(`taskkill /PID ${pid} /T /F`, { stdio: 'ignore', windowsHide: true })
@@ -43,13 +186,9 @@ function forceKillChild(child: ChildProcess, sync = false): void {
       })
       return
     }
-    child.kill('SIGKILL')
+    child.softKill()
   } catch {
-    try {
-      child.kill()
-    } catch {
-      /* already gone */
-    }
+    child.softKill()
   }
 }
 
@@ -102,28 +241,11 @@ export interface StartOptions {
 function resolveNodeBin(): string | undefined {
   if (process.env.POMNIA_NODE_BIN) return process.env.POMNIA_NODE_BIN
   if (process.env.RELIQUA_NODE_BIN) return process.env.RELIQUA_NODE_BIN
-  if (app.isPackaged) return undefined // packaged: dedicated helper or Electron-as-node
+  if (app.isPackaged) return undefined
   for (const p of ['C:/Program Files/nodejs/node.exe', '/usr/local/bin/node', '/usr/bin/node']) {
     if (existsSync(p)) return p
   }
   return undefined
-}
-
-/**
- * Packaged helper binary (copy of Electron, renamed). Prefer this over forking
- * Pomnia.exe again — two identical app EXEs trip Defender / NSIS "cannot close".
- */
-function resolvePackagedBrainExec(): string | undefined {
-  if (!app.isPackaged) return undefined
-  const name = process.platform === 'win32' ? 'pomnia-brain.exe' : 'pomnia-brain'
-  const p = join(process.resourcesPath, 'brain-core', name)
-  return existsSync(p) ? p : undefined
-}
-
-/** Electron-as-node when exec is Electron / pomnia-brain, or when fork defaults to app EXE. */
-function needsElectronRunAsNode(execPath: string | undefined): boolean {
-  if (!execPath) return app.isPackaged
-  return /(?:^|[\\/])(electron|pomnia-brain)(\.exe)?$/i.test(execPath)
 }
 
 function entryPath(): string {
@@ -136,11 +258,11 @@ function entryDir(): string {
   return dirname(entryPath())
 }
 
-/** Packaged Win helper needs Electron sidecars beside the EXE (ICU/DLL), not only pomnia-brain.exe. */
+/** Packaged runtime: JS + Electron-ABI native deps only (no second Electron EXE). */
 function assertPackagedBrainRuntime(): void {
-  if (!app.isPackaged || process.platform !== 'win32') return
+  if (!app.isPackaged) return
   const dir = join(process.resourcesPath, 'brain-core')
-  const required = ['pomnia-brain.exe', 'icudtl.dat', 'embedded.js', 'ffmpeg.dll']
+  const required = ['embedded.js']
   const missing = required.filter((name) => !existsSync(join(dir, name)))
   if (missing.length) {
     throw new Error(
@@ -170,7 +292,10 @@ function trimStderr(buf: string): string {
   return t.length > 280 ? `${t.slice(-280)}` : t
 }
 
-/** Kill leftover helper after stop (does NOT kill Pomnia.exe — that would be us). */
+/**
+ * Legacy cleanup: ≤0.1.35 shipped pomnia-brain.exe. Harmless no-op when absent.
+ * Current packaged Brain is a utilityProcess under Pomnia.exe.
+ */
 export function killLeftoverBrainHelpers(sync = false): void {
   if (process.platform !== 'win32') return
   const cmd = 'taskkill /IM pomnia-brain.exe /F /T'
@@ -188,8 +313,35 @@ export function killLeftoverBrainHelpers(sync = false): void {
   }
 }
 
+function spawnBrainChild(entry: string): BrainChild {
+  const cwd = entryDir()
+  if (app.isPackaged) {
+    // Same Electron ABI as main — better-sqlite3 staged with electron-rebuild.
+    const child = utilityProcess.fork(entry, [], {
+      cwd,
+      stdio: 'pipe',
+      env: { ...process.env },
+      serviceName: 'pomnia-brain-core',
+    })
+    return wrapUtilityChild(child)
+  }
+
+  const execPath = resolveNodeBin()
+  const child = fork(entry, [], {
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+    cwd,
+    env: {
+      ...process.env,
+      // Dev fallback when no system node: Electron-as-node (same as historical path).
+      ...(!execPath ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
+    },
+    ...(execPath ? { execPath } : {}),
+  })
+  return wrapNodeChild(child)
+}
+
 export class BrainCoreManager {
-  private child: ChildProcess | null = null
+  private child: BrainChild | null = null
   private url: string | null = null
   private starting = false
   private indexing = false
@@ -249,29 +401,14 @@ export class BrainCoreManager {
       if (!existsSync(entry)) {
         throw new Error(`brain-core build missing: ${entry} — run \`npm run build -w @pomnia/brain-core\``)
       }
-      const execPath = resolveNodeBin() ?? resolvePackagedBrainExec()
-      if (app.isPackaged && !execPath && process.platform === 'win32') {
-        throw new Error(
-          'pomnia-brain.exe missing under resources/brain-core — reinstall Pomnia (helper is required).',
-        )
-      }
-      const child = fork(entry, [], {
-        stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-        cwd: entryDir(),
-        env: {
-          ...process.env,
-          // Electron / pomnia-brain.exe must run as Node, not open a second GUI.
-          ...(needsElectronRunAsNode(execPath) ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
-        },
-        ...(execPath ? { execPath } : {}),
-      })
-      child.stderr?.on('data', (d: Buffer) => {
-        const line = d.toString()
+      const child = spawnBrainChild(entry)
+      child.stderr?.on('data', (d: Buffer | string) => {
+        const line = typeof d === 'string' ? d : d.toString()
         stderrBuf += line
         if (stderrBuf.length > 8_000) stderrBuf = stderrBuf.slice(-4_000)
         console.error('[brain-core]', line.trimEnd())
       })
-      child.on('exit', (code) => {
+      child.onceExit((code) => {
         if (this.child === child) {
           this.child = null
           this.url = null
@@ -280,7 +417,7 @@ export class BrainCoreManager {
           this.onEvent?.({ type: 'exited', message: String(code ?? 0) })
         }
       })
-      child.on('message', (m: ChildMsg) => {
+      child.onMessage((m: ChildMsg) => {
         if (m.type === 'reindex-progress' || m.type === 'index-progress' || m.type === 'mcp-query') {
           this.onEvent?.(m)
         }
@@ -289,12 +426,12 @@ export class BrainCoreManager {
 
       // Wait briefly for spawn so send() is not racing a still-creating pipe.
       await new Promise<void>((resolve) => {
-        if (child.spawnfile) {
+        if (child.spawned) {
           resolve()
           return
         }
         const t = setTimeout(resolve, 500)
-        child.once('spawn', () => {
+        child.onceSpawn(() => {
           clearTimeout(t)
           resolve()
         })
@@ -309,8 +446,8 @@ export class BrainCoreManager {
           settled = true
           clearTimeout(t)
           if (healthTimer) clearInterval(healthTimer)
-          child.off('message', h)
-          child.off('exit', onEarlyExit)
+          child.offMessage(h)
+          child.offExit(onEarlyExit)
           fn()
         }
 
@@ -333,9 +470,9 @@ export class BrainCoreManager {
           finish(() =>
             reject(
               new Error(
-                `pomnia-brain exited before ready (code ${u})` +
+                `brain-core exited before ready (code ${u})` +
                   (hint ? ` — ${hint}` : '') +
-                  '. Usually incomplete brain-core runtime (ICU/DLLs) or process kill — reinstall / rebuild; exclusions are not the product fix.',
+                  '. Usually incomplete brain-core runtime or process kill — reinstall / rebuild; exclusions are not the product fix.',
               ),
             ),
           )
@@ -349,8 +486,8 @@ export class BrainCoreManager {
           }
         }
 
-        child.on('message', h)
-        child.once('exit', onEarlyExit)
+        child.onMessage(h)
+        child.onceExit(onEarlyExit)
 
         // Fallback: IPC ready lost but HTTP is up (and our child still alive).
         healthTimer = setInterval(() => {
@@ -403,8 +540,7 @@ export class BrainCoreManager {
     // Unblock IPC callers waiting on reindex / index-document before the child exits.
     this.failPendingOp('embedded brain stopped')
     // Must WAIT for exit before clearing this.child — otherwise tray Quit can
-    // proceed while a packaged Pomnia.exe (ELECTRON_RUN_AS_NODE) still holds :7862
-    // and NSIS reports "cannot be closed".
+    // proceed while a utilityProcess still holds :7862 and NSIS reports "cannot be closed".
     await new Promise<void>((resolve) => {
       let settled = false
       const done = (): void => {
@@ -428,7 +564,7 @@ export class BrainCoreManager {
         done()
       }, 7_000)
 
-      child.once('exit', () => {
+      child.onceExit(() => {
         clearTimeout(softTimer)
         clearTimeout(hardTimer)
         clearTimeout(giveUp)
@@ -440,7 +576,7 @@ export class BrainCoreManager {
       } catch {
         // IPC already dead — escalate immediately.
         try {
-          child.kill()
+          child.softKill()
         } catch {
           forceKillChild(child)
         }
@@ -449,7 +585,7 @@ export class BrainCoreManager {
     this.child = null
     this.url = null
     this.indexing = false
-    // Belt-and-suspenders: any orphaned helper left after exit.
+    // Belt-and-suspenders: any leftover ≤0.1.35 helper EXE.
     killLeftoverBrainHelpers(true)
     return this.status()
   }
@@ -467,23 +603,23 @@ export class BrainCoreManager {
         }, 600_000)
         this.pendingOpReject = (err) => {
           clearTimeout(t)
-          child.off('message', h)
+          child.offMessage(h)
           reject(err)
         }
         const h = (m: ChildMsg): void => {
           if (m.type === 'reindexed') {
             clearTimeout(t)
             this.pendingOpReject = null
-            child.off('message', h)
+            child.offMessage(h)
             resolve(m.stats)
           } else if (m.type === 'error') {
             clearTimeout(t)
             this.pendingOpReject = null
-            child.off('message', h)
+            child.offMessage(h)
             reject(new Error(m.message ?? 'reindex failed'))
           }
         }
-        child.on('message', h)
+        child.onMessage(h)
         child.send({ type: 'reindex', dir })
       })
     } finally {
@@ -509,23 +645,23 @@ export class BrainCoreManager {
         }, 600_000)
         this.pendingOpReject = (err) => {
           clearTimeout(t)
-          child.off('message', h)
+          child.offMessage(h)
           reject(err)
         }
         const h = (m: ChildMsg): void => {
           if (m.type === 'reindexed') {
             clearTimeout(t)
             this.pendingOpReject = null
-            child.off('message', h)
+            child.offMessage(h)
             resolve(m.stats)
           } else if (m.type === 'error') {
             clearTimeout(t)
             this.pendingOpReject = null
-            child.off('message', h)
+            child.offMessage(h)
             reject(new Error(m.message ?? 'index-files failed'))
           }
         }
-        child.on('message', h)
+        child.onMessage(h)
         child.send({ type: 'index-files', paths })
       })
     } finally {
@@ -539,22 +675,22 @@ export class BrainCoreManager {
     if (!child || !this.url) throw new Error('embedded brain is not running')
     return await new Promise((resolve, reject) => {
       const t = setTimeout(() => {
-        child.off('message', h)
+        child.offMessage(h)
         reject(new Error('library-stats timeout'))
       }, 15_000)
       const h = (m: ChildMsg): void => {
         if (m.type === 'library-stats' && m.stats && typeof m.stats === 'object') {
           clearTimeout(t)
-          child.off('message', h)
+          child.offMessage(h)
           const s = m.stats as { files?: number; chunks?: number }
           resolve({ files: s.files ?? 0, chunks: s.chunks ?? 0 })
         } else if (m.type === 'error') {
           clearTimeout(t)
-          child.off('message', h)
+          child.offMessage(h)
           reject(new Error(m.message ?? 'library-stats failed'))
         }
       }
-      child.on('message', h)
+      child.onMessage(h)
       child.send({ type: 'library-stats' })
     })
   }
@@ -572,23 +708,23 @@ export class BrainCoreManager {
         }, 600_000)
         this.pendingOpReject = (err) => {
           clearTimeout(t)
-          child.off('message', h)
+          child.offMessage(h)
           reject(err)
         }
         const h = (m: ChildMsg): void => {
           if (m.type === 'indexed-document') {
             clearTimeout(t)
             this.pendingOpReject = null
-            child.off('message', h)
+            child.offMessage(h)
             resolve(m.stats)
           } else if (m.type === 'error') {
             clearTimeout(t)
             this.pendingOpReject = null
-            child.off('message', h)
+            child.offMessage(h)
             reject(new Error(m.message ?? 'index-document failed'))
           }
         }
-        child.on('message', h)
+        child.onMessage(h)
         child.send({ type: 'index-document', doc })
       })
     } finally {

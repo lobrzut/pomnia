@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
 /**
- * Embedded entry point — the file Pomnia's Electron main forks via
- * `child_process.fork()`. Message-driven, no CLI parsing:
+ * Embedded entry point — forked by Pomnia Desktop:
+ *   - packaged: Electron `utilityProcess.fork` (same Electron ABI, no second EXE)
+ *   - dev: `child_process.fork` via system `node` (or ELECTRON_RUN_AS_NODE)
+ *
+ * Message-driven, no CLI parsing:
  *
  *   parent → child
  *     { type: 'start', config: Partial<BrainConfig> }
@@ -20,9 +23,9 @@
  *     { type: 'error', message: string }      // recoverable op errors
  *     { type: 'stopped' }                      // just before exit
  *
- * Why fork and not in-process: crash isolation (better-sqlite3 is native),
- * and embed/index work never blocks the Electron main loop. The child owns
- * exactly one BrainServer and one DB handle for indexing.
+ * IPC: `process.send` when available (Node fork); else `process.parentPort`
+ * (Electron utilityProcess). Crash isolation (better-sqlite3 native) + embed
+ * work never blocks the Electron main loop.
  */
 
 import { readFileSync } from 'node:fs'
@@ -47,8 +50,21 @@ type ParentMsg =
   | { type: 'library-stats' }
   | { type: 'stop' }
 
+/** Node fork uses process.send; Electron utilityProcess uses parentPort. */
 function send(msg: unknown): void {
-  process.send?.(msg)
+  if (typeof process.send === 'function') {
+    process.send(msg)
+    return
+  }
+  process.parentPort?.postMessage(msg)
+}
+
+function onParentMessage(handler: (msg: ParentMsg) => void): void {
+  if (typeof process.send === 'function') {
+    process.on('message', (msg) => handler(msg as ParentMsg))
+    return
+  }
+  process.parentPort?.on('message', (e) => handler(e.data as ParentMsg))
 }
 
 function isAbortError(err: unknown): boolean {
@@ -248,7 +264,7 @@ async function handleStop(): Promise<void> {
   }
 }
 
-process.on('message', (msg: ParentMsg) => {
+onParentMessage((msg: ParentMsg) => {
   switch (msg?.type) {
     case 'start':
       void handleStart(msg.config).catch((err) =>
