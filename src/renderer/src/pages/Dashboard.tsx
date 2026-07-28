@@ -26,22 +26,38 @@ function Stat({
   label,
   value,
   sub,
-  delay
+  delay,
+  onClick,
 }: {
   icon: typeof Database
   label: string
   value: string | number
   sub?: string
   delay: number
+  onClick?: () => void
 }) {
-  return (
-    <GlassCard delay={delay} className="p-2.5">
+  const inner = (
+    <>
       <div className="flex items-center justify-between gap-1">
         <span className="truncate text-[10px] font-medium uppercase tracking-wider text-ink-faint">{label}</span>
         <Icon className="h-3.5 w-3.5 shrink-0 text-iris" />
       </div>
       <div className="mt-1 text-xl font-bold tracking-tight text-ink">{value}</div>
       {sub && <div className="mt-0.5 truncate text-[10px] text-ink-dim">{sub}</div>}
+    </>
+  )
+  if (onClick) {
+    return (
+      <GlassCard delay={delay} className="p-2.5">
+        <button type="button" onClick={onClick} className="no-drag block w-full text-left hover:opacity-90">
+          {inner}
+        </button>
+      </GlassCard>
+    )
+  }
+  return (
+    <GlassCard delay={delay} className="p-2.5">
+      {inner}
     </GlassCard>
   )
 }
@@ -94,11 +110,20 @@ export default function Dashboard() {
       ? brainProgress?.label || labels.dashboardDistilling
       : null
 
-  const skillsCount = vault.skillsCount ?? 0
+  const skillsOwn = vault.skillsOwnCount ?? 0
+  const skillsImported = vault.skillsImportedCount ?? 0
+  const skillsCount = vault.skillsCount ?? skillsOwn + skillsImported
   const distilledNotes = vault.distilledNotes ?? brainState?.distilled ?? 0
   const knowledgeSub = vault.open
     ? shortPath(vault.knowledgePath ?? vault.path ?? vault.name ?? '', 22)
     : labels.dashboardStatKnowledgeClosed
+  const skillsValue =
+    vault.open && (skillsOwn > 0 || skillsImported > 0 || skillsCount > 0)
+      ? skillsCount
+      : skillsCount || '—'
+  const skillsSub = vault.open
+    ? labels.dashboardStatSkillsSub(skillsOwn, skillsImported)
+    : labels.dashboardStatSnapshotsClosed
 
   useEffect(() => {
     void api.mcpActivityWatch(true)
@@ -170,9 +195,10 @@ export default function Dashboard() {
         <Stat
           icon={Wand2}
           label={labels.dashboardStatSkills}
-          value={skillsCount}
-          sub={labels.dashboardStatSkillsSub}
+          value={skillsValue}
+          sub={skillsSub}
           delay={0.08}
+          onClick={vault.open ? () => setRoute('skills') : undefined}
         />
         <Stat
           icon={BookOpen}

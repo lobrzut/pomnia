@@ -29,6 +29,10 @@ _smoke_result.log
 build/
 resources/*.bak*
 
+# Python bytecode (skills packages / accidental vault sync)
+__pycache__/
+*.py[cod]
+
 # Private ComfyUI / branding tooling (not Desktop product)
 assets/comfyui/
 docs/COMFYUI-ASSETS.md

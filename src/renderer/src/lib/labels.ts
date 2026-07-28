@@ -493,12 +493,23 @@ export interface UiLabels {
   dashboardStatSnapshots: string
   dashboardStatSnapshotsClosed: string
   dashboardStatSkills: string
-  dashboardStatSkillsSub: string
+  dashboardStatSkillsSub: (own: number, imported: number) => string
   dashboardStatDistilled: string
   dashboardStatDistilledSub: string
   dashboardStatKnowledge: string
   dashboardStatKnowledgeOpen: string
   dashboardStatKnowledgeClosed: string
+  skillsPageTitle: string
+  skillsPageLead: string
+  skillsSectionOwn: string
+  skillsSectionImported: string
+  skillsOpenFile: string
+  skillsOpenFolder: string
+  skillsEmptyOwn: string
+  skillsEmptyImported: string
+  skillsBack: string
+  skillsSize: (bytes: number) => string
+  skillsModified: (isoOrRelative: string) => string
   dashboardSourcesHeading: string
   dashboardSelectAll: string
   dashboardDeselectAll: string
@@ -908,12 +919,28 @@ const PL_LABELS: UiLabels = {
   dashboardStatSnapshots: 'Snapshoty',
   dashboardStatSnapshotsClosed: 'brak vaultu',
   dashboardStatSkills: 'Skills',
-  dashboardStatSkillsSub: 'w vault/skills',
+  dashboardStatSkillsSub: (own, imported) => `${own} własnych · ${imported} zaimportowanych`,
   dashboardStatDistilled: 'Notatki',
   dashboardStatDistilledSub: 'distilled',
   dashboardStatKnowledge: 'Wiedza',
   dashboardStatKnowledgeOpen: 'otwarta',
   dashboardStatKnowledgeClosed: 'zamknięta',
+  skillsPageTitle: 'Skills',
+  skillsPageLead:
+    'Skille to instrukcje, po które agent sięga sam przez `get_skill`. Nie są częścią wyszukiwania — to gotowe procedury, nie wiedza.',
+  skillsSectionOwn: 'Własne (brain/)',
+  skillsSectionImported: 'Zaimportowane (cli/)',
+  skillsOpenFile: 'Otwórz plik',
+  skillsOpenFolder: 'Otwórz folder',
+  skillsEmptyOwn: 'Brak własnych skilli w vault/skills/brain/.',
+  skillsEmptyImported: 'Brak zaimportowanych pakietów w vault/skills/cli/.',
+  skillsBack: '← Dashboard',
+  skillsSize: (bytes) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  },
+  skillsModified: (s) => s,
   dashboardSourcesHeading: 'Źródła',
   dashboardSelectAll: 'Zaznacz wszystkie',
   dashboardDeselectAll: 'Odznacz wszystkie',
@@ -1148,12 +1175,28 @@ const EN_LABELS: Partial<UiLabels> = {
   dashboardStatSnapshots: 'Snapshots',
   dashboardStatSnapshotsClosed: 'no vault',
   dashboardStatSkills: 'Skills',
-  dashboardStatSkillsSub: 'in vault/skills',
+  dashboardStatSkillsSub: (own, imported) => `${own} own · ${imported} imported`,
   dashboardStatDistilled: 'Notes',
   dashboardStatDistilledSub: 'distilled',
   dashboardStatKnowledge: 'Knowledge',
   dashboardStatKnowledgeOpen: 'open',
   dashboardStatKnowledgeClosed: 'closed',
+  skillsPageTitle: 'Skills',
+  skillsPageLead:
+    'Skills are procedures the agent loads itself via `get_skill`. They are not part of search — ready-made workflows, not knowledge.',
+  skillsSectionOwn: 'Own (brain/)',
+  skillsSectionImported: 'Imported (cli/)',
+  skillsOpenFile: 'Open file',
+  skillsOpenFolder: 'Open folder',
+  skillsEmptyOwn: 'No own skills in vault/skills/brain/.',
+  skillsEmptyImported: 'No imported packages in vault/skills/cli/.',
+  skillsBack: '← Dashboard',
+  skillsSize: (bytes) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  },
+  skillsModified: (s) => s,
   dashboardSourcesHeading: 'Sources',
   dashboardSelectAll: 'Select all',
   dashboardDeselectAll: 'Deselect all',

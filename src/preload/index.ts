@@ -30,6 +30,9 @@ const bridge = {
   docOcr: (docId: string, ollamaUrl?: string) => ipcRenderer.invoke('doc:ocr', docId, ollamaUrl),
   brainExport: (id: string, outDir: string) => ipcRenderer.invoke('brain:export', id, outDir),
   revealPath: (p: string) => ipcRenderer.invoke('reveal', p),
+  skillsList: () => ipcRenderer.invoke('skills:list'),
+  skillsReveal: (target: string, mode?: 'file' | 'folder') =>
+    ipcRenderer.invoke('skills:reveal', target, mode ?? 'file'),
   revealInstallDir: () => ipcRenderer.invoke('reveal:installDir'),
   brainStatus: (ollamaUrl?: string) => ipcRenderer.invoke('brain:status', ollamaUrl),
   brainRun: (opts: unknown) => ipcRenderer.invoke('brain:run', opts),

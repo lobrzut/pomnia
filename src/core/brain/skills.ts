@@ -153,14 +153,55 @@ export async function syncSkills(
   return result
 }
 
-/** Read the local index written by syncSkills. Returns [] if not synced yet. */
+/** Read the local index — prefers index.json; if empty/missing, scans the filesystem. */
 export async function readLocalIndex(
   targetRoot: string
 ): Promise<Array<SkillListEntry & { syncedAt: string; localPath: string }>> {
   try {
     const raw = await fs.readFile(path.join(targetRoot, 'index.json'), 'utf8')
-    return JSON.parse(raw)
+    const parsed = JSON.parse(raw) as Array<SkillListEntry & { syncedAt: string; localPath: string }>
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed
   } catch {
-    return []
+    /* fall through to scan */
   }
+  return scanLocalSkillsIndex(targetRoot)
+}
+
+/** Build index entries from brain .md + cli SKILL.md packs (skips bak/dotfiles). */
+async function scanLocalSkillsIndex(
+  targetRoot: string
+): Promise<Array<SkillListEntry & { syncedAt: string; localPath: string }>> {
+  const now = new Date().toISOString()
+  const out: Array<SkillListEntry & { syncedAt: string; localPath: string }> = []
+  const brain = path.join(targetRoot, 'brain')
+  try {
+    for (const name of await fs.readdir(brain)) {
+      if (!name.endsWith('.md') || name.startsWith('.') || name.includes('.bak')) continue
+      const localPath = path.join(brain, name)
+      out.push({
+        kind: 'brain',
+        name: name.replace(/\.md$/, ''),
+        syncedAt: now,
+        localPath,
+      })
+    }
+  } catch {
+    /* missing */
+  }
+  const cli = path.join(targetRoot, 'cli')
+  try {
+    for (const name of await fs.readdir(cli)) {
+      if (name.startsWith('.') || name === '_backups' || name === '__pycache__') continue
+      const localPath = path.join(cli, name, 'SKILL.md')
+      try {
+        await fs.access(localPath)
+      } catch {
+        continue
+      }
+      out.push({ kind: 'cli', name, syncedAt: now, localPath })
+    }
+  } catch {
+    /* missing */
+  }
+  return out
 }

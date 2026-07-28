@@ -13,11 +13,13 @@ import {
   brainSkillsLegacyDir,
   portableSkillsPresent,
 } from './brainPaths.js'
+import { shouldSkipSkillsCopyEntry } from './skillsScan.js'
 
 async function copyDir(src: string, dest: string): Promise<void> {
   await fs.mkdir(dest, { recursive: true })
   const entries = await fs.readdir(src, { withFileTypes: true })
   for (const ent of entries) {
+    if (shouldSkipSkillsCopyEntry(ent.name)) continue
     const from = join(src, ent.name)
     const to = join(dest, ent.name)
     if (ent.isDirectory()) await copyDir(from, to)

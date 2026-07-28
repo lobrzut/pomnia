@@ -129,19 +129,19 @@ export function listTools(
     {
       name: 'list_skills',
       description:
-        'List brain workflow skills (skills/brain/*.md), preferring portable <vault>/skills. Call when choosing how to approach a task that may have a skill.',
+        "List skills from the active skills root. Pass scope: 'own' (brain/*.md workflows), 'cli' (cli/*/SKILL.md packages), or 'all' (default). Call when choosing how to approach a task that may have a skill — then get_skill by name.",
       inputSchema: listSkillsSchema,
     },
     {
       name: 'list_cli_skills',
       description:
-        'List CLI expertise skills (skills/cli/*/SKILL.md) from the active skills root. Use when domain expertise (networking, trading, security, …) may apply.',
+        "DEPRECATED alias — prefer list_skills({ scope: 'cli' }). Lists CLI expertise skills (skills/cli/*/SKILL.md).",
       inputSchema: listCliSkillsSchema,
     },
     {
       name: 'get_skill',
       description:
-        'Load a skill by name (brain .md or cli SKILL.md). Returns full markdown — follow it for that task.',
+        'Load a skill by name (brain .md or cli SKILL.md). Returns full markdown — follow it for that task. Discover names via list_skills.',
       inputSchema: getSkillSchema,
     },
     // Remaining stubs — schemas present so tools/list stays complete.

@@ -89,7 +89,7 @@ describe('portable vault knowledge', () => {
   })
 
   it('countLocalSkills counts brain/*.md + cli/*/SKILL.md and skips .bak', async () => {
-    const { countLocalSkills, portableSkillsPresent } = await import('../brainPaths.js')
+    const { countLocalSkills, countSkillsSplit, portableSkillsPresent } = await import('../brainPaths.js')
     mkdirSync(join(vaultDir, 'skills', 'brain'), { recursive: true })
     mkdirSync(join(vaultDir, 'skills', 'cli', 'mentor-suntzu'), { recursive: true })
     mkdirSync(join(vaultDir, 'skills', 'cli', 'empty-pack'), { recursive: true })
@@ -99,6 +99,7 @@ describe('portable vault knowledge', () => {
     writeFileSync(join(vaultDir, 'skills', 'cli', 'empty-pack', 'README.md'), 'no skill')
 
     expect(countLocalSkills(vaultDir)).toBe(2)
+    expect(countSkillsSplit(vaultDir)).toEqual({ own: 1, imported: 1, total: 2 })
     expect(portableSkillsPresent(vaultDir)).toBe(true)
     expect(countLocalSkills(join(tmpdir(), 'pomnia-no-skills-xyz'))).toBe(0)
   })
