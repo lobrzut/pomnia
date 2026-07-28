@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pagesFromExtractedMarkdown, parseDocument } from '@pomnia/doc-parser'
 import { libraryDocLogicalPath, type Vault } from '@core/vault.js'
+import { log } from '@core/log.js'
 import { brainCore } from './brainCore.js'
 import { ensureBrainForIndexing } from './ensureBrain.js'
 
@@ -20,6 +21,69 @@ export type LibraryIndexProgress = {
 }
 
 export { ensureBrainForIndexing } from './ensureBrain.js'
+
+export interface LibraryIndexConsistencyResult {
+  /** Doc ids re-marked pendingIndex because library.db had no chunks. */
+  repaired: string[]
+}
+
+/**
+ * Detect library.cvb ↔ library.db drift: docs with pendingIndex=false (or no
+ * pending flag) but zero chunks at their logical pdf_path — e.g. after a
+ * brain-core data-dir move that left the manifest claiming "done".
+ *
+ * Marks those docs pending so flushPending / indexPending rebuilds from blobs.
+ */
+export async function reconcileLibraryIndexConsistency(
+  vault: Vault,
+  vaultDir: string,
+  opts: {
+    /** Chunk count for a library.db pdf_path key (logical vault path). */
+    countChunks: (logicalPath: string) => Promise<number> | number
+  },
+): Promise<LibraryIndexConsistencyResult> {
+  const repaired: string[] = []
+  const docs = vault.getLibraryManifest().documents
+  for (const doc of docs) {
+    if (doc.pendingIndex) continue
+    const logicalPath = libraryDocLogicalPath(vaultDir, doc.id)
+    let chunks = 0
+    try {
+      chunks = Number(await opts.countChunks(logicalPath)) || 0
+    } catch (err) {
+      log.warn(
+        'library index consistency: count failed for',
+        doc.id,
+        err instanceof Error ? err.message : String(err),
+      )
+      continue
+    }
+    if (chunks > 0) continue
+    await vault.setLibraryDocPendingIndex(doc.id, true)
+    repaired.push(doc.id)
+  }
+  if (repaired.length > 0) {
+    log.info(
+      `library index consistency: re-queued ${repaired.length} doc(s) missing from library.db`,
+    )
+  }
+  return { repaired }
+}
+
+/** Reconcile via embedded brain COUNT queries when Brain is running. */
+export async function reconcileLibraryIndexWithBrain(
+  vault: Vault,
+  vaultDir: string,
+): Promise<LibraryIndexConsistencyResult> {
+  if (!brainCore.status().running) return { repaired: [] }
+  const docs = vault.getLibraryManifest().documents.filter((d) => !d.pendingIndex)
+  if (docs.length === 0) return { repaired: [] }
+  const paths = docs.map((d) => libraryDocLogicalPath(vaultDir, d.id))
+  const counts = await brainCore.documentChunkCounts(paths)
+  return reconcileLibraryIndexConsistency(vault, vaultDir, {
+    countChunks: (logicalPath) => counts[logicalPath] ?? 0,
+  })
+}
 
 /** Parse a vault library doc from its encrypted source blob and index in library.db. */
 export async function indexVaultDocument(

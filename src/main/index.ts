@@ -53,7 +53,7 @@ import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused 
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { runDocumentOcr } from './docOcr.js'
 import { removeLibraryDocumentWithIndex } from './libraryDocRemove.js'
-import { indexPendingLibraryDocuments, type PendingIndexResult } from './libraryIndex.js'
+import { indexPendingLibraryDocuments, reconcileLibraryIndexWithBrain, type PendingIndexResult } from './libraryIndex.js'
 import {
   applyLoginItemSettings,
   getAppSettings,
@@ -283,6 +283,15 @@ async function notifyLibraryIndexComplete(flush: PendingIndexResult): Promise<vo
 /** Index vault docs marked pendingIndex when embedded brain is already running. */
 async function flushPendingLibraryDocs(ollamaUrl?: string): Promise<PendingIndexResult | null> {
   if (!vault || !vaultPath || !brainCore.status().running) return null
+  // Repair library.cvb ↔ library.db drift before flushing (data-dir move footgun).
+  try {
+    await reconcileLibraryIndexWithBrain(vault, vaultPath)
+  } catch (err) {
+    log.warn(
+      'library index consistency check failed:',
+      err instanceof Error ? err.message : String(err),
+    )
+  }
   if (vault.getPendingIndexDocuments().length === 0) return null
   const url = resolveOllamaUrl(ollamaUrl)
   activity.update({ kind: 'indexing', phase: 'index', detail: 'oczekujące dokumenty…' })
@@ -1102,8 +1111,10 @@ function registerIpc(): void {
       if (typeof stats?.files === 'number' && typeof stats?.chunks === 'number') {
         writeLibraryStatsSidecar({ files: stats.files, chunks: stats.chunks, vaultRoot: root })
       }
+      // Also rebuild encrypted library docs missing from library.db (not covered by indexDir).
+      const flush = await flushPendingLibraryDocs()
       void runVaultHealthCheck({ silentOk: true })
-      return { stats }
+      return { stats, libraryFlush: flush }
     } finally {
       activity.idle('indexing')
     }

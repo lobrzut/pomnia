@@ -218,6 +218,7 @@ export class Vault {
     if (!doc) throw new Error(`Library document not found: ${id}`)
     doc.pendingIndex = pending
     if (!pending) doc.indexedAt = new Date().toISOString()
+    else delete doc.indexedAt
     await this.saveLibrary()
   }
 

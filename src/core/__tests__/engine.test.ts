@@ -153,6 +153,10 @@ describe('vault — encrypted, content-addressed', () => {
     const reopened = await Vault.open(vaultDir, 'pw-pend')
     expect(reopened.getPendingIndexDocuments()).toHaveLength(0)
     expect(reopened.getLibraryDocument('abc_note.txt')?.indexedAt).toBeTruthy()
+
+    await reopened.setLibraryDocPendingIndex('abc_note.txt', true)
+    expect(reopened.getPendingIndexDocuments()).toHaveLength(1)
+    expect(reopened.getLibraryDocument('abc_note.txt')?.indexedAt).toBeUndefined()
   })
 
   it('removes library documents and only their unreferenced blobs', async () => {

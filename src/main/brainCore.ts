@@ -206,6 +206,7 @@ interface ChildMsg {
   url?: string
   message?: string
   stats?: unknown
+  counts?: Record<string, number>
   file?: string
   done?: number
   total?: number
@@ -694,6 +695,32 @@ export class BrainCoreManager {
       }
       child.onMessage(h)
       child.send({ type: 'library-stats' })
+    })
+  }
+
+  /** Per-path chunk counts for library.cvb ↔ library.db consistency repair. */
+  async documentChunkCounts(paths: string[]): Promise<Record<string, number>> {
+    const child = this.child
+    if (!child || !this.url) throw new Error('embedded brain is not running')
+    if (paths.length === 0) return {}
+    return await new Promise((resolve, reject) => {
+      const t = setTimeout(() => {
+        child.offMessage(h)
+        reject(new Error('document-chunk-counts timeout'))
+      }, 30_000)
+      const h = (m: ChildMsg): void => {
+        if (m.type === 'document-chunk-counts' && m.counts && typeof m.counts === 'object') {
+          clearTimeout(t)
+          child.offMessage(h)
+          resolve(m.counts)
+        } else if (m.type === 'error') {
+          clearTimeout(t)
+          child.offMessage(h)
+          reject(new Error(m.message ?? 'document-chunk-counts failed'))
+        }
+      }
+      child.onMessage(h)
+      child.send({ type: 'document-chunk-counts', paths })
     })
   }
 
