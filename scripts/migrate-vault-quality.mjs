@@ -10,6 +10,8 @@
  *
  * Rules:
  *   HAS quality: label  → TRUST LABEL, ignore quality_score (dual 0–10 / 0–100 scales)
+ *   stub|garbage        → content override: empty markers → _review/; thin Facts/Solutions/Decisions → _weak/
+ *   quality: weak       → _weak/ (unchanged)
  *   NO quality label    → scoreFields (TS), asymmetric thresholds, write quality_score_ts
  *   Never overwrite existing quality_score.
  */

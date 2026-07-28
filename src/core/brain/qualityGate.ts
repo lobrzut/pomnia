@@ -4,12 +4,16 @@
  * Quality → path routing for distilled notes.
  *
  * Encode quality in the filesystem path (not a chunks.quality column):
- *   garbage|stub → distilled/_review/   (SKIP_DIRS — not indexed)
+ *   garbage|stub (contentless / stub markers) → distilled/_review/ (SKIP_DIRS)
+ *   garbage|stub WITH Facts/Solutions/Decisions → distilled/_weak/ (indexed)
  *   weak         → distilled/_weak/     (indexed, ranking penalty)
  *   ok|solid|good|unrated → distilled/  (indexed, no penalty)
  *
  * Two frontmatter vocabularies: new TS (ok|stub|garbage) and legacy Python
  * (weak|solid|good|ok|garbage|stub).
+ *
+ * Label alone is not enough for stub/garbage: thin-but-useful notes must stay
+ * searchable under _weak/; only empty stubs go to quarantine.
  */
 import { basename, join } from 'node:path'
 import type { DistilledNote } from './distill.js'
@@ -39,6 +43,41 @@ export function destinationForQuality(raw: string | undefined | null): QualityDe
   if (KEEP.has(q)) return 'keep'
   // Unknown labels: leave in place (don't quarantine on typos).
   return 'keep'
+}
+
+/** True when body has explicit empty-stub markers (legacy distill templates). */
+export function hasContentlessStubMarker(markdown: string): boolean {
+  const body = stripFrontmatter(markdown)
+  return /##\s+_Stub_/i.test(body) || /Distillation didn't extract/i.test(body)
+}
+
+/**
+ * True when Facts / Solutions / Decisions (or PL aliases) have real bullets —
+ * thin knowledge that should stay searchable under _weak/, not quarantine.
+ */
+export function hasThinSearchableSections(markdown: string): boolean {
+  const fields = parseNoteFieldsFromMarkdown(markdown)
+  return fields.decisions.length > 0 || fields.solutions.length > 0 || fields.facts.length > 0
+}
+
+/**
+ * Route by label, with content override for stub|garbage:
+ *   markers OR no Facts/Solutions/Decisions → review (quarantine)
+ *   non-empty Facts/Solutions/Decisions     → weak (thin but indexed)
+ * weak / ok / solid / good / unrated unchanged.
+ */
+export function destinationForQualityContent(
+  raw: string | undefined | null,
+  markdown: string,
+): QualityDestination {
+  if (!raw) return 'keep'
+  const q = raw.trim().toLowerCase()
+  if (REVIEW.has(q)) {
+    if (hasContentlessStubMarker(markdown)) return 'review'
+    if (hasThinSearchableSections(markdown)) return 'weak'
+    return 'review'
+  }
+  return destinationForQuality(raw)
 }
 
 /**
