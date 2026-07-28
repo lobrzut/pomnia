@@ -12,6 +12,7 @@
  *     { type: 'reindex', dir: string }        // distilled/sessions/library only (never skills/)
  *     { type: 'index-files', paths: string[] } // embed only these paths (distill new notes)
  *     { type: 'index-document', doc: IndexDocumentInput }
+ *     { type: 'document-chunk-counts', paths: string[] }
  *     { type: 'set-skills-root', path: string } // portable vault sidecar skills/
  *     { type: 'set-vault-root', path: string }  // portable USER.md/distilled/sessions
  *     { type: 'stop' }
@@ -28,7 +29,7 @@
  * work never blocks the Electron main loop.
  */
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import process from 'node:process'
 
@@ -48,6 +49,7 @@ type ParentMsg =
   | { type: 'set-handshake'; phrase: string; enabled: boolean }
   | { type: 'set-auto-checkpoint'; enabled: boolean }
   | { type: 'library-stats' }
+  | { type: 'document-chunk-counts'; paths: string[] }
   | { type: 'remove-document'; path: string }
   | { type: 'stop' }
 
@@ -113,6 +115,43 @@ async function handleLibraryStats(): Promise<void> {
         db.prepare('SELECT COUNT(DISTINCT pdf_path) AS n FROM chunks').get() as { n: number }
       ).n
       send({ type: 'library-stats', stats: { files, chunks } })
+    } finally {
+      db.close()
+    }
+  } catch (err) {
+    send({
+      type: 'error',
+      message: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
+/** Per-path chunk counts — used to detect library.cvb ↔ library.db drift. */
+async function handleDocumentChunkCounts(paths: string[]): Promise<void> {
+  if (!config) {
+    send({ type: 'error', message: 'document-chunk-counts before start' })
+    return
+  }
+  const counts: Record<string, number> = {}
+  for (const p of paths) {
+    if (p) counts[p] = 0
+  }
+  try {
+    const dbPath = `${config.dataDir}/vectordb/library.db`
+    // Missing DB = zero chunks for every path (manifest may still claim indexed).
+    if (!existsSync(dbPath)) {
+      send({ type: 'document-chunk-counts', counts })
+      return
+    }
+    const db = openDb({ dbPath, readonly: true })
+    try {
+      const stmt = db.prepare('SELECT COUNT(*) AS n FROM chunks WHERE pdf_path = ?')
+      for (const p of paths) {
+        if (!p) continue
+        const row = stmt.get(p) as { n: number | bigint } | undefined
+        counts[p] = Number(row?.n ?? 0)
+      }
+      send({ type: 'document-chunk-counts', counts })
     } finally {
       db.close()
     }
@@ -336,6 +375,9 @@ onParentMessage((msg: ParentMsg) => {
       break
     case 'library-stats':
       void handleLibraryStats()
+      break
+    case 'document-chunk-counts':
+      void handleDocumentChunkCounts(msg.paths ?? [])
       break
     case 'remove-document':
       void handleRemoveDocument(msg.path)
