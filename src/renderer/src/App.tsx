@@ -18,13 +18,23 @@ import ImportPage from './pages/Import'
 import Brain from './pages/Brain'
 import Connect from './pages/Connect'
 import Settings from './pages/Settings'
+import Skills from './pages/Skills'
 import VaultGate from './pages/VaultGate'
 import Onboarding from './pages/Onboarding'
 import HowItWorks from './pages/HowItWorks'
 import FloatingMonitor from './pages/FloatingMonitor'
 import ProfilePreview from './pages/ProfilePreview'
 
-const PAGES = { dashboard: Dashboard, browse: Browse, import: ImportPage, brain: Brain, connect: Connect, settings: Settings, guide: HowItWorks } as const
+const PAGES = {
+  dashboard: Dashboard,
+  browse: Browse,
+  import: ImportPage,
+  brain: Brain,
+  connect: Connect,
+  settings: Settings,
+  guide: HowItWorks,
+  skills: Skills,
+} as const
 
 function isFloatingMonitorRoute(): boolean {
   const hash = window.location.hash.replace(/^#/, '')

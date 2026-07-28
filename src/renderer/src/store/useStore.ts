@@ -29,7 +29,7 @@ function loadDistillChatModel(): string {
   }
 }
 
-export type Route = 'dashboard' | 'browse' | 'import' | 'brain' | 'connect' | 'settings' | 'guide'
+export type Route = 'dashboard' | 'browse' | 'import' | 'brain' | 'connect' | 'settings' | 'guide' | 'skills'
 
 /**
  * Connect-tab client visibility override. Default behaviour shows only clients

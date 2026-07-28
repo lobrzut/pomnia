@@ -6,12 +6,24 @@
  * Layout under skillsRoot (portable vault sidecar or legacy brain vault):
  *   brain/<name>.md
  *   cli/<name>/SKILL.md
+ *
+ * list_skills(scope: 'own' | 'cli' | 'all') — preferred.
+ * list_cli_skills — deprecated alias for scope:'cli'.
  */
-
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { join, basename } from 'node:path'
 
-export const listSkillsSchema = { type: 'object' as const, properties: {} }
+export const listSkillsSchema = {
+  type: 'object' as const,
+  properties: {
+    scope: {
+      type: 'string' as const,
+      enum: ['own', 'cli', 'all'],
+      description:
+        "own = brain/*.md workflow skills; cli = cli/*/SKILL.md packages; all = both (default)",
+    },
+  },
+}
 export const listCliSkillsSchema = { type: 'object' as const, properties: {} }
 export const getSkillSchema = {
   type: 'object' as const,
@@ -58,6 +70,12 @@ function parseFrontmatter(raw: string): { description?: string; name?: string } 
   return out
 }
 
+function isJunkSkillName(name: string): boolean {
+  if (!name || name.startsWith('.')) return true
+  if (name.includes('.bak')) return true
+  return false
+}
+
 function listBrain(skillsRoot: string): SkillMeta[] {
   const dir = join(skillsRoot, 'brain')
   if (!existsSync(dir)) return []
@@ -65,7 +83,7 @@ function listBrain(skillsRoot: string): SkillMeta[] {
   for (const ent of readdirSync(dir, { withFileTypes: true })) {
     if (!ent.isFile()) continue
     if (!ent.name.endsWith('.md')) continue
-    if (ent.name.includes('.bak')) continue
+    if (isJunkSkillName(ent.name)) continue
     const file = join(dir, ent.name)
     const name = basename(ent.name, '.md')
     let description: string | undefined
@@ -86,6 +104,7 @@ function listCli(skillsRoot: string): SkillMeta[] {
   const out: SkillMeta[] = []
   for (const ent of readdirSync(dir, { withFileTypes: true })) {
     if (!ent.isDirectory()) continue
+    if (isJunkSkillName(ent.name) || ent.name === '_backups' || ent.name === '__pycache__') continue
     const file = join(dir, ent.name, 'SKILL.md')
     if (!existsSync(file)) continue
     let description: string | undefined
@@ -105,36 +124,62 @@ function resolveSkillsRoot(deps: SkillsDeps): string {
   return deps.skillsRoot
 }
 
-export function runListSkills(_args: unknown, deps: SkillsDeps): string {
-  const root = resolveSkillsRoot(deps)
-  const skills = listBrain(root)
+function parseScope(args: unknown): 'own' | 'cli' | 'all' {
+  if (!args || typeof args !== 'object') return 'all'
+  const scope = (args as { scope?: unknown }).scope
+  if (scope === 'own' || scope === 'cli' || scope === 'all') return scope
+  return 'all'
+}
+
+function formatList(root: string, skills: SkillMeta[], scope: string): string {
   if (skills.length === 0) {
-    return JSON.stringify({ skills: [], skillsRoot: root, hint: 'No brain/*.md skills found' }, null, 2)
+    return JSON.stringify(
+      {
+        skills: [],
+        skillsRoot: root,
+        scope,
+        hint:
+          scope === 'cli'
+            ? 'No cli/*/SKILL.md found'
+            : scope === 'own'
+              ? 'No brain/*.md skills found'
+              : 'No skills found',
+      },
+      null,
+      2,
+    )
   }
   return JSON.stringify(
     {
       skillsRoot: root,
-      skills: skills.map((s) => ({ name: s.name, description: s.description, file: `${s.name}.md` })),
+      scope,
+      skills: skills.map((s) =>
+        s.kind === 'brain'
+          ? { kind: 'own', name: s.name, description: s.description, file: `${s.name}.md` }
+          : { kind: 'cli', id: s.name, name: s.name, description: s.description },
+      ),
     },
     null,
     2,
   )
 }
 
-export function runListCliSkills(_args: unknown, deps: SkillsDeps): string {
+/**
+ * List skills. Prefer scope: own | cli | all (default all).
+ * Previously listed only brain/*.md — callers that need CLI packages must pass scope.
+ */
+export function runListSkills(args: unknown, deps: SkillsDeps): string {
   const root = resolveSkillsRoot(deps)
-  const skills = listCli(root)
-  if (skills.length === 0) {
-    return JSON.stringify({ skills: [], skillsRoot: root, hint: 'No cli/*/SKILL.md found' }, null, 2)
-  }
-  return JSON.stringify(
-    {
-      skillsRoot: root,
-      skills: skills.map((s) => ({ id: s.name, name: s.name, description: s.description })),
-    },
-    null,
-    2,
-  )
+  const scope = parseScope(args)
+  const skills: SkillMeta[] = []
+  if (scope === 'own' || scope === 'all') skills.push(...listBrain(root))
+  if (scope === 'cli' || scope === 'all') skills.push(...listCli(root))
+  return formatList(root, skills, scope)
+}
+
+/** @deprecated Prefer list_skills({ scope: 'cli' }). Kept for backward compatibility. */
+export function runListCliSkills(_args: unknown, deps: SkillsDeps): string {
+  return runListSkills({ scope: 'cli' }, deps)
 }
 
 export function runGetSkill(args: unknown, deps: SkillsDeps): string {

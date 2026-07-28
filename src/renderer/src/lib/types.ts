@@ -18,12 +18,32 @@ export interface VaultStatus {
   snapshots: number
   /** Library docs waiting for embedded brain indexing. */
   pendingLibraryIndex?: number
-  /** brain/*.md + cli/.../SKILL.md under vault/skills (or legacy). */
+  /** Total brain/*.md + cli/.../SKILL.md (legacy single counter). */
   skillsCount?: number
+  /** Own workflow skills: vault/skills/brain/*.md */
+  skillsOwnCount?: number
+  /** Imported CLI packages: vault/skills/cli/*/SKILL.md */
+  skillsImportedCount?: number
   /** .md files under vault/distilled (excludes `_review`). */
   distilledNotes?: number
   /** Plaintext knowledge root (USER.md, distilled/) when vault is open. */
   knowledgePath?: string
+}
+
+export interface LocalSkillEntry {
+  kind: 'own' | 'imported'
+  name: string
+  description: string
+  path: string
+  folderPath: string
+  sizeBytes: number
+  mtimeMs: number
+}
+
+export interface SkillsListResult {
+  skillsRoot: string | null
+  own: LocalSkillEntry[]
+  imported: LocalSkillEntry[]
 }
 
 export interface BackupProgressEvent {

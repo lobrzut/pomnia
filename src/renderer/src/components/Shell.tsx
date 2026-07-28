@@ -16,7 +16,8 @@ const NAV_ICONS: Record<Route, typeof LayoutDashboard> = {
   brain: BrainCircuit,
   connect: Plug,
   settings: Cog,
-  guide: Map
+  guide: Map,
+  skills: LayoutDashboard,
 }
 
 function navItems(): { id: Route; label: string; icon: typeof LayoutDashboard }[] {

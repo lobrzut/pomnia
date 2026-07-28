@@ -26,7 +26,8 @@ import type {
   Snippet,
   SourceId,
   TextHit,
-  VaultStatus
+  VaultStatus,
+  SkillsListResult,
 } from './types'
 
 export type ProfilePreviewStatus = 'ok' | 'vault_locked' | 'brain_down' | 'no_knowledge'
@@ -68,6 +69,8 @@ export interface PomniaBridge {
   docOcr(docId: string, ollamaUrl?: string): Promise<DocOcrResult>
   brainExport(snapshotId: string, outDir: string): Promise<{ count: number; dir: string }>
   revealPath(p: string): Promise<void>
+  skillsList(): Promise<SkillsListResult>
+  skillsReveal(target: string, mode?: 'file' | 'folder'): Promise<{ ok: boolean; error: string | null }>
   /** Open the app install folder (optional AV last-resort paths). */
   revealInstallDir(): Promise<{ ok: boolean; path: string; error: string | null }>
   brainStatus(ollamaUrl?: string): Promise<BrainStatus>
@@ -262,6 +265,8 @@ function mockBridge(): PomniaBridge {
     open: false,
     snapshots: 0,
     skillsCount: 0,
+    skillsOwnCount: 0,
+    skillsImportedCount: 0,
     distilledNotes: 0,
   }
   let snaps: Snapshot[] = []
@@ -301,6 +306,8 @@ function mockBridge(): PomniaBridge {
         name,
         snapshots: 0,
         skillsCount: 3,
+        skillsOwnCount: 2,
+        skillsImportedCount: 1,
         distilledNotes: 12,
         knowledgePath: path,
       }
@@ -314,13 +321,22 @@ function mockBridge(): PomniaBridge {
         name: 'Demo Vault',
         snapshots: snaps.length,
         skillsCount: 5,
+        skillsOwnCount: 2,
+        skillsImportedCount: 3,
         distilledNotes: 24,
         knowledgePath: path,
       }
       return status
     },
     async lockVault() {
-      status = { open: false, snapshots: 0, skillsCount: 0, distilledNotes: 0 }
+      status = {
+        open: false,
+        snapshots: 0,
+        skillsCount: 0,
+        skillsOwnCount: 0,
+        skillsImportedCount: 0,
+        distilledNotes: 0,
+      }
       snaps = []
     },
     async listSnapshots() {
@@ -428,6 +444,45 @@ function mockBridge(): PomniaBridge {
       return { count: 38, dir }
     },
     async revealPath() {},
+    async skillsList() {
+      return {
+        skillsRoot: 'C:/Vault/skills',
+        own: [
+          {
+            kind: 'own' as const,
+            name: 'think-for-me',
+            description: 'Structured decision helper when the user is stuck.',
+            path: 'C:/Vault/skills/brain/think-for-me.md',
+            folderPath: 'C:/Vault/skills/brain',
+            sizeBytes: 3452,
+            mtimeMs: Date.now() - 86400e3,
+          },
+          {
+            kind: 'own' as const,
+            name: 'inbox-process',
+            description: 'Triage vault inbox notes.',
+            path: 'C:/Vault/skills/brain/inbox-process.md',
+            folderPath: 'C:/Vault/skills/brain',
+            sizeBytes: 671,
+            mtimeMs: Date.now() - 172800e3,
+          },
+        ],
+        imported: [
+          {
+            kind: 'imported' as const,
+            name: '09-web-security',
+            description: 'Web hacking / bug bounty expertise',
+            path: 'C:/Vault/skills/cli/09-web-security/SKILL.md',
+            folderPath: 'C:/Vault/skills/cli/09-web-security',
+            sizeBytes: 4200,
+            mtimeMs: Date.now() - 3600e3,
+          },
+        ],
+      }
+    },
+    async skillsReveal() {
+      return { ok: true, error: null }
+    },
     async revealInstallDir() {
       return { ok: true, path: '%LOCALAPPDATA%\\Programs\\Pomnia', error: null }
     },
