@@ -3,6 +3,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   destinationForQuality,
+  destinationForQualityContent,
+  hasContentlessStubMarker,
+  hasThinSearchableSections,
   parseFrontmatterQuality,
   parseFrontmatterScore,
   qualityFromScoreAsymmetric,
@@ -19,6 +22,50 @@ describe('qualityGate destination', () => {
     expect(destinationForQuality('solid')).toBe('keep')
     expect(destinationForQuality('good')).toBe('keep')
     expect(destinationForQuality('unrated')).toBe('keep')
+  })
+})
+
+describe('qualityGate stub/garbage content routing', () => {
+  const emptyStub = `---
+quality: stub
+---
+
+## Summary
+## _Stub_
+Distillation didn't extract durable knowledge.
+`
+
+  const thinWithSolution = `---
+quality: stub
+---
+
+## Decisions
+- keep indicator inputs as strings
+
+## Solutions
+- Declare var string SimpleBuy = "Buy" to fix syntax error
+
+## Facts
+- Pine Script v5 requires typed vars
+`
+
+  it('detects contentless markers and thin sections', () => {
+    expect(hasContentlessStubMarker(emptyStub)).toBe(true)
+    expect(hasThinSearchableSections(emptyStub)).toBe(false)
+    expect(hasContentlessStubMarker(thinWithSolution)).toBe(false)
+    expect(hasThinSearchableSections(thinWithSolution)).toBe(true)
+  })
+
+  it('quarantines only contentless stub/garbage; thin content → _weak', () => {
+    expect(destinationForQualityContent('stub', emptyStub)).toBe('review')
+    expect(destinationForQualityContent('garbage', emptyStub)).toBe('review')
+    expect(destinationForQualityContent('stub', thinWithSolution)).toBe('weak')
+    expect(destinationForQualityContent('garbage', thinWithSolution)).toBe('weak')
+  })
+
+  it('leaves quality=weak unchanged (always _weak)', () => {
+    expect(destinationForQualityContent('weak', thinWithSolution)).toBe('weak')
+    expect(destinationForQualityContent('weak', emptyStub)).toBe('weak')
   })
 })
 

@@ -21,7 +21,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import {
-  destinationForQuality,
+  destinationForQualityContent,
   destDir,
   parseFrontmatterQuality,
   parseFrontmatterScore,
@@ -43,6 +43,8 @@ export interface PlanItem {
   action: 'move' | 'rate+move' | 'rate' | 'skip'
   /** True when note already had a quality: label (label trusted). */
   labeled: boolean
+  /** Why action=skip (already at destination). */
+  skipReason?: string
   preview: string
 }
 
@@ -110,10 +112,23 @@ function shuffleInPlace<T>(arr: T[], seed: number): void {
   }
 }
 
+/** One-line skip reason for dry-run (notes already sitting at destination). */
+export function skipReasonFor(dest: QualityDestination, quality: string): string {
+  const q = quality.toLowerCase()
+  if (dest === 'review') {
+    return `already in _review/ (contentless stub/garbage quarantine; label=${q})`
+  }
+  if (dest === 'weak') {
+    if (q === 'weak') return `already in _weak/ (quality=weak; indexed with ranking penalty)`
+    return `already in _weak/ (stub/garbage with Facts/Solutions/Decisions; thin but searchable; label=${q})`
+  }
+  return `already in distilled/ root (keep; label=${q}; no move needed)`
+}
+
 /**
  * Plan one file.
- * HAS quality: → trust label, ignore score, maybe move.
- * NO quality:  → scoreFields + asymmetric label + quality_score_ts.
+ * HAS quality: → trust label (+ content override for stub|garbage), ignore score, maybe move.
+ * NO quality:  → scoreFields + asymmetric label + quality_score_ts (+ same content override).
  */
 export function planForFile(distilled: string, filePath: string): PlanItem | null {
   const norm = filePath.replace(/\\/g, '/')
@@ -124,7 +139,7 @@ export function planForFile(distilled: string, filePath: string): PlanItem | nul
   const oldScore = parseFrontmatterScore(md)
 
   if (existingQuality) {
-    const dest = destinationForQuality(existingQuality)
+    const dest = destinationForQualityContent(existingQuality, md)
     if (pathMatchesDestination(filePath, dest)) {
       return {
         from: filePath,
@@ -135,6 +150,7 @@ export function planForFile(distilled: string, filePath: string): PlanItem | nul
         scoreTs: null,
         action: 'skip',
         labeled: true,
+        skipReason: skipReasonFor(dest, existingQuality),
         preview: previewBody(md),
       }
     }
@@ -154,14 +170,9 @@ export function planForFile(distilled: string, filePath: string): PlanItem | nul
 
   // Unrated: recompute via TS scoreFields — never compare legacy scores.
   const rated = rateUnratedMarkdown(md)
-  const dest = destinationForQuality(rated.quality)
+  const dest = destinationForQualityContent(rated.quality, md)
   const to = join(destDir(distilled, dest), basename(filePath))
   const alreadyHome = pathMatchesDestination(filePath, dest)
-  const action: PlanItem['action'] = alreadyHome
-    ? dest === 'keep'
-      ? 'rate'
-      : 'rate'
-    : 'rate+move'
 
   return {
     from: filePath,
@@ -189,6 +200,25 @@ function printSample(label: string, items: PlanItem[], n: number, seed: number):
       `  quality=${it.quality} score_ts=${it.scoreTs ?? 'n/a'} old_score=${it.oldScore ?? 'n/a'} labeled=${it.labeled} action=${it.action}`,
     )
     console.log(`  preview: ${it.preview}`)
+  }
+}
+
+/** Dry-run: one line per skip category with count + reason. */
+export function printSkipBreakdown(plans: PlanItem[]): void {
+  const skips = plans.filter((p) => p.action === 'skip')
+  const byReason = new Map<string, number>()
+  for (const p of skips) {
+    const reason = p.skipReason ?? skipReasonFor(p.dest, p.quality)
+    byReason.set(reason, (byReason.get(reason) ?? 0) + 1)
+  }
+  console.log(`\n=== Skip breakdown (skip=${skips.length}) — already at destination ===`)
+  if (skips.length === 0) {
+    console.log('(none)')
+    return
+  }
+  const rows = [...byReason.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  for (const [reason, n] of rows) {
+    console.log(`${n}\t${reason}`)
   }
 }
 
@@ -229,7 +259,7 @@ export function printOldScoreDistribution(plans: PlanItem[]): void {
   const unlabeled = plans.filter((p) => !p.labeled).length
   console.log(`unlabeled (no quality:) | ${unlabeled} — scored via scoreFields → quality_score_ts`)
   console.log(
-    'Note: n>10 proves a 0–100 scale coexists with 0–10; routing uses labels only.',
+    'Note: n>10 proves a 0–100 scale coexists with 0–10; routing uses labels (+ content for stub|garbage).',
   )
 }
 
@@ -275,8 +305,11 @@ export function runMigration(argv: string[] = process.argv.slice(2)): {
   --seed      RNG seed for sample selection
 
 Rules:
-  quality: present → trust label, ignore quality_score
-  no label        → scoreFields (TS) → quality + quality_score_ts
+  quality: present → trust label (+ content override for stub|garbage), ignore quality_score
+  stub|garbage + ## _Stub_ / "Distillation didn't extract" → _review/
+  stub|garbage + non-empty Facts/Solutions/Decisions → _weak/
+  quality: weak → _weak/ (unchanged)
+  no label → scoreFields (TS) → quality + quality_score_ts
   never overwrite existing quality_score`)
     return { plans: [], apply: false, vault: opts.vault }
   }
@@ -316,6 +349,7 @@ Rules:
     `Destinations (pending): _review=${counts.toReview} _weak=${counts.toWeak} stay=${counts.stay}`,
   )
 
+  printSkipBreakdown(plans)
   printOldScoreDistribution(plans)
 
   const toWeak = plans.filter((p) => p.dest === 'weak' && p.action !== 'skip')
