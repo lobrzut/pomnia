@@ -89,15 +89,15 @@ On Import: when the text layer is sparse → **Run OCR** (`tesseract.js`, eng+po
 | Cursor 0 chats after backup | Large `state.vscdb` — use **Import** instead of live backup |
 | SmartScreen / Gatekeeper | Unsigned open-source build — “Run anyway” / Gatekeeper bypass (expected) |
 | Symantec / Defender on unsigned build | **Do not turn off AV.** Trusting the file once / SmartScreen override is normal for a new hash. Authenticode removes this long-term: [docs/CODE-SIGNING.md](docs/CODE-SIGNING.md). Folder exclusions only if AV keeps quarantining (Settings → Windows / antivirus) |
-| Installer “cannot be closed” | Tray → **Quit**, close setup, try again (NSIS closes `Pomnia.exe` + `pomnia-brain.exe`) |
+| Installer “cannot be closed” | Tray → **Quit**, close setup, try again (NSIS closes `Pomnia.exe`) |
 
 ### Windows AV — unsigned builds will warn
 
 **Today (unsigned):** SmartScreen and some AVs warn on each new `setup.exe` hash. That is reputation, not a signal to disable protection. “Run anyway” / “I trust this file” once is expected.
 
-**Goal:** Authenticode (OV/EV or Azure Trusted Signing) so Windows installs are quiet — details: [docs/CODE-SIGNING.md](docs/CODE-SIGNING.md). Exclusions ≠ product strategy; use only if AV repeatedly quarantines `pomnia-brain.exe` / the install folder (in-app: **Settings → Windows / antivirus**).
+**Goal:** Authenticode (OV/EV or Azure Trusted Signing) so Windows installs are quiet — details: [docs/CODE-SIGNING.md](docs/CODE-SIGNING.md). Exclusions ≠ product strategy; use only if AV repeatedly quarantines the install folder or vault (in-app: **Settings → Windows / antivirus**).
 
-Unsigned builds can trip heuristics (Electron + `pomnia-brain.exe` + vault). Never disable AV.
+Unsigned builds can trip heuristics (Electron + vault I/O). Never disable AV.
 
 **Installers** (Win `.exe` / Mac `.dmg`) are built locally (`npm run pack:win` / `pack:mac`). Releases: [GitHub Releases](https://github.com/lobrzut/pomnia/releases).
 

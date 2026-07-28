@@ -67,7 +67,7 @@ asarUnpack:
   - "**/*.wasm"
   - "**/node_modules/@napi-rs/canvas/**/*"
   - "**/node_modules/tesseract.js-core/**/*"
-# brain-core forked child (embedded MCP) — outside asar; includes pomnia-brain.exe helper
+# brain-core utilityProcess entry (embedded MCP) — JS + Electron-ABI natives; no second Electron EXE
 extraResources:
   - from: build/brain-core-runtime-v2
     to: brain-core

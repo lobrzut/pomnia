@@ -301,7 +301,7 @@ Szyfrowanie dokumentów jest płacone **tylko podczas importu** — nie w pętli
 | IPC `brain:run` | ✅ distill + index + deploy |
 | IPC `doc:import` | 🔲 brak |
 | `Import.tsx` | tylko eksporty czatów |
-| `brainCore.ts` | fork embedded, reindex distilled dir |
+| `brainCore.ts` | utilityProcess/fork embedded, reindex distilled dir |
 
 ### 6.5 Brain homelab (`reliqua-brain-hub`)
 
@@ -456,7 +456,7 @@ src/core/import/archives.ts   chat export import
 src/core/brain/distill.ts     chat → md
 src/core/brain/localIndex.ts  JSON parallel index
 src/core/brain/deploy.ts      push to homelab
-src/main/brainCore.ts         fork lifecycle
+src/main/brainCore.ts         utilityProcess / fork lifecycle
 src/main/index.ts             IPC handlers
 src/renderer/pages/Import.tsx UI import (czaty only)
 docs/PDF-LOCAL.md             parser deep-dive

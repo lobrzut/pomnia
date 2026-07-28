@@ -695,7 +695,7 @@ const PL_LABELS: UiLabels = {
   antivirusLead:
     'Obecne buildy open-source są niepodpisane — SmartScreen i Symantec/Defender mogą ostrzegać przy każdym nowym setup.exe. To normalne (nowy hash = zerowa reputacja), nie wirus.',
   antivirusWhy:
-    'SmartScreen: „Więcej info → Uruchom mimo to”. Symantec: „ufam temu plikowi” raz jest OK. Folder instalacji wykluczaj tylko gdy AV dalej kwarantannuje helper (pomnia-brain.exe) albo vault — to obejście, nie docelowy UX.',
+    'SmartScreen: „Więcej info → Uruchom mimo to”. Symantec: „ufam temu plikowi” raz jest OK. Folder instalacji wykluczaj tylko gdy AV dalej kwarantannuje instalację albo vault — to obejście, nie docelowy UX.',
   antivirusSigningNote:
     'Cel: Authenticode (OV/EV lub Azure Trusted Signing), żeby instalator „po prostu działał” bez ostrzeżeń. Do tego czasu nie wyłączaj AV i nie budujemy produktu na liście wyjątków.',
   antivirusOpenInstallFolder: 'Otwórz folder instalacji',
@@ -1078,7 +1078,7 @@ const EN_LABELS: Partial<UiLabels> = {
   antivirusLead:
     'Current open-source builds are unsigned — SmartScreen and Symantec/Defender may warn on every new setup.exe. That is normal (new hash = zero reputation), not malware.',
   antivirusWhy:
-    'SmartScreen: More info → Run anyway. Symantec: trusting the file once is fine. Only exclude the install folder if AV keeps quarantining the helper (pomnia-brain.exe) or vault — a workaround, not the long-term UX.',
+    'SmartScreen: More info → Run anyway. Symantec: trusting the file once is fine. Only exclude the install folder if AV keeps quarantining the install or vault — a workaround, not the long-term UX.',
   antivirusSigningNote:
     'Goal: Authenticode (OV/EV or Azure Trusted Signing) so the installer just works without warnings. Until then: do not turn off AV, and we do not build the product around exclusion lists.',
   antivirusOpenInstallFolder: 'Open install folder',

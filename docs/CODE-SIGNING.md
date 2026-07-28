@@ -63,8 +63,7 @@ See [MAC-BUILD.md](./MAC-BUILD.md) §6 (`CSC_LINK`, Apple Developer ID, notariza
 
 ## Related reliability work (not a substitute for signing)
 
-- Clean quit + `taskkill /T` of brain helper (`pomnia-brain.exe`)
+- Clean quit + `taskkill /T` of `Pomnia.exe` (Brain MCP is an Electron `utilityProcess` under the main tree; legacy `pomnia-brain.exe` kill kept only for upgrades from ≤0.1.35)
 - NSIS `installer.nsh` closes Pomnia before upgrade
-- Dedicated child process name + Electron sidecars (ICU/DLLs) beside `pomnia-brain.exe`
 - Honest metadata (`appId`, `productName`, `copyright`, `publisherName`)
 - Brain start: spawn/path/timeout/healthz — fix reliability in code, do not “tell user to whitelist”
