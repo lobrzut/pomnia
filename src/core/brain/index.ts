@@ -14,8 +14,25 @@ export {
   cosine
 } from './localIndex.js'
 export type { LocalIndex, IndexEntry, SearchHit, NoteForIndex } from './localIndex.js'
-export { deployFilesystem, deployDashboard, triggerReindex, noteFilename, dashboardUrlFromBrainUrl, deployDistilledToBrain } from './deploy.js'
+export {
+  deployFilesystem,
+  deployDashboard,
+  triggerReindex,
+  noteFilename,
+  dashboardUrlFromBrainUrl,
+  deployDistilledToBrain,
+  deployDistilledFiles,
+  copyNoteThroughQualityGate,
+} from './deploy.js'
 export type { DeployDistilledResult } from './deploy.js'
+export {
+  destinationForQuality,
+  qualityFromScoreAsymmetric,
+  rateUnratedMarkdown,
+  parseFrontmatterQuality,
+  upsertQualityFrontmatter,
+} from './qualityGate.js'
+export type { QualityLabel, QualityDestination } from './qualityGate.js'
 export { listAllSkills, syncSkills, readLocalIndex } from './skills.js'
 export type { SkillKind, SkillListEntry, SkillSyncResult } from './skills.js'
 export {

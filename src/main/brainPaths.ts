@@ -3,6 +3,7 @@
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
+import { countSkillsSplitAt } from './skillsScan.js'
 
 /**
  * Embedded brain-core data root.
@@ -103,33 +104,19 @@ export function portableKnowledgePresent(encryptedVaultPath: string): boolean {
 
 /**
  * Count brain/*.md + cli/.../SKILL.md under the active skills root.
- * Uses name checks (not Dirent.isFile) so Windows/network FS quirks cannot zero the Dashboard tile.
+ * Skips `*.bak*`, dotfiles, `_backups`. Prefer {@link countSkillsSplit} for UI.
  */
 export function countLocalSkills(encryptedVaultPath?: string | null): number {
-  const root = brainSkillsDir(encryptedVaultPath)
-  let n = 0
-  const brain = join(root, 'brain')
-  if (existsSync(brain)) {
-    try {
-      for (const name of readdirSync(brain)) {
-        if (!name.endsWith('.md') || name.includes('.bak')) continue
-        n++
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-  const cli = join(root, 'cli')
-  if (existsSync(cli)) {
-    try {
-      for (const name of readdirSync(cli)) {
-        if (existsSync(join(cli, name, 'SKILL.md'))) n++
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-  return n
+  return countSkillsSplit(encryptedVaultPath).total
+}
+
+/** Split own (brain/*.md) vs imported (cli/.../SKILL.md) for Dashboard. */
+export function countSkillsSplit(encryptedVaultPath?: string | null): {
+  own: number
+  imported: number
+  total: number
+} {
+  return countSkillsSplitAt(brainSkillsDir(encryptedVaultPath))
 }
 
 /** Count .md notes under distilled/ (skips `_review`). */

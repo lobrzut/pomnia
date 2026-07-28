@@ -16,6 +16,12 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import type { Conversation } from '../model.js'
 import type { DistilledNote } from './distill.js'
+import {
+  destinationForQuality,
+  destDir,
+  parseFrontmatterQuality,
+  type QualityDestination,
+} from './qualityGate.js'
 import { log } from '../log.js'
 
 function slug(s: string): string {
@@ -33,39 +39,76 @@ export function noteFilename(n: DistilledNote): string {
   return `${n.date}_${n.source}_${slug(n.title)}_${n.sessionId.slice(0, 8)}.md`
 }
 
+function destForNote(n: DistilledNote): QualityDestination {
+  return destinationForQuality(n.quality)
+}
+
 /** Write distilled notes into a target directory (e.g. .../brain/data/vault/distilled).
- *  Notes that failed the quality gate (stub/garbage) go into a `_review/`
- *  subfolder instead of the main dir — kept for manual review, not lost, but
- *  out of the searchable vault by default so they don't pollute RAG results. */
+ *  Quality gate (both vocabularies):
+ *    stub|garbage → `_review/` (not indexed)
+ *    weak         → `_weak/`   (indexed, ranking penalty)
+ *    ok|solid|good → main dir
+ */
 export async function deployFilesystem(notes: DistilledNote[], targetDir: string): Promise<string[]> {
   await fs.mkdir(targetDir, { recursive: true })
-  const reviewDir = path.join(targetDir, '_review')
-  let reviewMade = false
+  const made = new Set<string>()
   const written: string[] = []
   for (const n of notes) {
-    const lowQuality = n.quality === 'stub' || n.quality === 'garbage'
-    if (lowQuality && !reviewMade) {
-      await fs.mkdir(reviewDir, { recursive: true })
-      reviewMade = true
+    const dest = destForNote(n)
+    const dir = destDir(targetDir, dest)
+    if (dest !== 'keep' && !made.has(dest)) {
+      await fs.mkdir(dir, { recursive: true })
+      made.add(dest)
     }
     const name = noteFilename(n)
-    const file = path.join(lowQuality ? reviewDir : targetDir, name)
+    const file = path.join(dir, name)
     await fs.writeFile(file, n.markdown, 'utf8')
     written.push(file)
-    // Successful re-distill: drop any prior stub/garbage twin so _review doesn't
-    // keep a ghost next to the canonical vault note.
-    if (!lowQuality) {
-      try {
-        await fs.unlink(path.join(reviewDir, name))
-      } catch {
-        /* no prior stub */
+    // Successful re-distill: drop any prior twin in other buckets so ghosts
+    // don't linger next to the canonical note.
+    if (dest === 'keep') {
+      for (const other of ['_review', '_weak'] as const) {
+        try {
+          await fs.unlink(path.join(targetDir, other, name))
+        } catch {
+          /* no prior twin */
+        }
       }
     }
   }
-  const reviewed = written.length - notes.filter((n) => n.quality === 'ok').length
-  log.info('deployed', notes.filter((n) => n.quality === 'ok').length, 'notes →', targetDir,
-    reviewed ? `(${reviewed} low-quality → _review/)` : '')
+  const ok = notes.filter((n) => destForNote(n) === 'keep').length
+  const reviewed = notes.filter((n) => destForNote(n) === 'review').length
+  const weak = notes.filter((n) => destForNote(n) === 'weak').length
+  log.info(
+    'deployed',
+    ok,
+    'notes →',
+    targetDir,
+    reviewed ? `(${reviewed} → _review/)` : '',
+    weak ? `(${weak} → _weak/)` : '',
+  )
   return written
+}
+
+/**
+ * Copy a single .md note into distilled/ honoring frontmatter quality.
+ * Used by deployDistilledFiles and manual vault sync so no write path bypasses
+ * the gate.
+ */
+export async function copyNoteThroughQualityGate(
+  srcPath: string,
+  distilledRoot: string,
+  markdown?: string,
+): Promise<{ dest: QualityDestination; path: string }> {
+  const text = markdown ?? (await fs.readFile(srcPath, 'utf8'))
+  const quality = parseFrontmatterQuality(text)
+  const dest = destinationForQuality(quality)
+  const dir = destDir(distilledRoot, dest)
+  await fs.mkdir(dir, { recursive: true })
+  const name = path.basename(srcPath)
+  const out = path.join(dir, name)
+  await fs.writeFile(out, text, 'utf8')
+  return { dest, path: out }
 }
 
 /** Push raw conversations to Brain's dashboard; Brain distills + stores them. */
@@ -126,27 +169,34 @@ export function dashboardUrlFromBrainUrl(brainUrl: string): string {
   }
 }
 
-/** Copy finished .md notes from a local staging dir into Brain's vault/distilled tree. */
+/**
+ * Copy finished .md notes from a local staging dir into Brain's vault/distilled
+ * tree — every file goes through the quality gate (frontmatter → _review/_weak/).
+ * Also mirrors existing `_review/` and `_weak/` subdirs from staging.
+ */
 export async function deployDistilledFiles(notesDir: string, targetDir: string): Promise<number> {
   await fs.mkdir(targetDir, { recursive: true })
   let copied = 0
   for (const name of await fs.readdir(notesDir)) {
     if (!name.endsWith('.md') || name.startsWith('.')) continue
-    await fs.copyFile(path.join(notesDir, name), path.join(targetDir, name))
+    await copyNoteThroughQualityGate(path.join(notesDir, name), targetDir)
     copied++
   }
-  const reviewSrc = path.join(notesDir, '_review')
-  if (
-    await fs
-      .access(reviewSrc)
-      .then(() => true)
-      .catch(() => false)
-  ) {
-    const reviewDst = path.join(targetDir, '_review')
-    await fs.mkdir(reviewDst, { recursive: true })
-    for (const name of await fs.readdir(reviewSrc)) {
+  for (const sub of ['_review', '_weak'] as const) {
+    const src = path.join(notesDir, sub)
+    if (
+      !(await fs
+        .access(src)
+        .then(() => true)
+        .catch(() => false))
+    ) {
+      continue
+    }
+    const dst = path.join(targetDir, sub)
+    await fs.mkdir(dst, { recursive: true })
+    for (const name of await fs.readdir(src)) {
       if (!name.endsWith('.md')) continue
-      await fs.copyFile(path.join(reviewSrc, name), path.join(reviewDst, name))
+      await fs.copyFile(path.join(src, name), path.join(dst, name))
       copied++
     }
   }
