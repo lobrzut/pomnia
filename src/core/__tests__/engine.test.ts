@@ -154,4 +154,84 @@ describe('vault — encrypted, content-addressed', () => {
     expect(reopened.getPendingIndexDocuments()).toHaveLength(0)
     expect(reopened.getLibraryDocument('abc_note.txt')?.indexedAt).toBeTruthy()
   })
+
+  it('removes library documents and only their unreferenced blobs', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'continuum-rmlib-'))
+    tmpDirs.push(dir)
+    const vaultDir = path.join(dir, 'v.rmlib')
+
+    const vault = await Vault.create(vaultDir, 'RmLib', 'pw-rm')
+    const chatPayload = Buffer.from('chat blob must survive')
+    const files: FileSource[] = [
+      {
+        item: { relPath: 'chat.txt', absRoot: '/src', pathSensitive: false },
+        read: async () => chatPayload,
+      },
+    ]
+    const meta: Snapshot = {
+      id: 'snap-keep',
+      createdAt: new Date().toISOString(),
+      source: { id: 'generic', label: 'Test', strategy: 'snapshot', root: '/src', os: 'linux' },
+      origin: { host: 'h', user: 'u', home: '/home/u' },
+      stats: { conversations: 0, messages: 0, files: 0, bytes: 0 },
+    }
+    await vault.addSnapshot(meta, [], files)
+
+    const source = Buffer.from('%PDF-1.4 book to delete')
+    const extracted = Buffer.from('---\nformat: pdf\n---\n\nBook text')
+    const shared = Buffer.from('shared identical body')
+    await vault.addLibraryDocument(
+      {
+        id: 'book_a.pdf',
+        originalName: 'a.pdf',
+        format: 'pdf',
+        contentSha: sha256(source),
+        pages: 1,
+        sparse: false,
+        extractionPath: 'unpdf',
+        importedAt: new Date().toISOString(),
+        pendingIndex: true,
+      },
+      source,
+      extracted,
+    )
+    // Second doc reuses identical extracted content → same extracted blob sha (dedup).
+    await vault.addLibraryDocument(
+      {
+        id: 'book_b.pdf',
+        originalName: 'b.pdf',
+        format: 'pdf',
+        contentSha: sha256(shared),
+        pages: 1,
+        sparse: false,
+        extractionPath: 'unpdf',
+        importedAt: new Date().toISOString(),
+        pendingIndex: true,
+      },
+      shared,
+      extracted,
+    )
+
+    const before = await fs.readdir(path.join(vaultDir, 'blobs'))
+    expect(before.length).toBeGreaterThanOrEqual(3)
+
+    const docA = vault.getLibraryDocument('book_a.pdf')!
+    const r = await vault.removeLibraryDocument('book_a.pdf')
+    expect(r.id).toBe('book_a.pdf')
+    expect(vault.getLibraryDocument('book_a.pdf')).toBeUndefined()
+    expect(vault.getLibraryManifest().documents).toHaveLength(1)
+    expect(r.removedBlobs).toContain(docA.sourceBlobSha)
+    // extracted still referenced by book_b → kept
+    expect(r.keptBlobs).toContain(docA.extractedBlobSha)
+    expect(r.removedBlobs).not.toContain(docA.extractedBlobSha)
+
+    // Chat snapshot blob still present
+    const chatSha = sha256(chatPayload)
+    await expect(fs.access(path.join(vaultDir, 'blobs', `${chatSha}.cvb`))).resolves.toBeUndefined()
+
+    const reopened = await Vault.open(vaultDir, 'pw-rm')
+    expect(reopened.getLibraryManifest().documents).toHaveLength(1)
+    expect(reopened.getLibraryDocument('book_b.pdf')?.originalName).toBe('b.pdf')
+    await expect(reopened.readLibraryExtracted('book_b.pdf')).resolves.toEqual(extracted)
+  })
 })

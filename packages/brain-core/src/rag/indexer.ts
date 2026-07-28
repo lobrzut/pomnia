@@ -102,6 +102,28 @@ function deleteFileMeta(db: Database.Database, path: string): void {
   db.prepare('DELETE FROM indexed_files WHERE pdf_path = ?').run(path)
 }
 
+/**
+ * Drop all chunks + vec rows + fingerprint for one logical document path
+ * (e.g. `{vault}/library/{docId}`). Safe when the path was never indexed (0).
+ */
+export function removeDocumentChunks(db: Database.Database, pdfPath: string): number {
+  const selIds = db.prepare('SELECT id FROM chunks WHERE pdf_path = ?')
+  const delVec = db.prepare('DELETE FROM chunks_vec WHERE rowid = ?')
+  const delChunks = db.prepare('DELETE FROM chunks WHERE pdf_path = ?')
+  const ids = (selIds.all(pdfPath) as { id: number }[]).map((r) => r.id)
+  if (ids.length === 0) {
+    deleteFileMeta(db, pdfPath)
+    return 0
+  }
+  const wipe = db.transaction((rowIds: number[]) => {
+    for (const id of rowIds) delVec.run(BigInt(id))
+    delChunks.run(pdfPath)
+    deleteFileMeta(db, pdfPath)
+  })
+  wipe(ids)
+  return ids.length
+}
+
 function fileStatMeta(path: string): { mtimeMs: number; size: number } | null {
   try {
     const st = statSync(path)

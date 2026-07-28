@@ -1,15 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle2, FileText, FileUp, Import as ImportIcon, Upload } from 'lucide-react'
+import { CheckCircle2, FileText, FileUp, Import as ImportIcon, Trash2, Upload } from 'lucide-react'
 import { Badge, Button, GlassCard, SourceTile, Spinner } from '../components/ui'
 import { sourceMeta } from '../lib/format'
 import { pathFromDroppedFile } from '../lib/dropFile'
 import { uiLabels } from '../lib/labels'
 import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
-import type { DocImportProgressEvent, DocImportResult, DocOcrResult } from '../lib/types'
+import type {
+  DocImportProgressEvent,
+  DocImportResult,
+  DocOcrResult,
+  LibraryDocListItem,
+} from '../lib/types'
 
 const DOC_DROP_EXTENSIONS = new Set(['pdf', 'docx', 'md', 'txt', 'epub'])
 
@@ -36,11 +41,29 @@ export default function Import() {
   const [docDragOver, setDocDragOver] = useState(false)
   const [docProgress, setDocProgress] = useState<DocImportProgressEvent | null>(null)
   const [docResult, setDocResult] = useState<DocImportResult | DocOcrResult | null>(null)
+  const [libraryDocs, setLibraryDocs] = useState<LibraryDocListItem[]>([])
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const refreshLibraryDocs = useCallback(async () => {
+    if (!vault.open) {
+      setLibraryDocs([])
+      return
+    }
+    try {
+      setLibraryDocs(await api.docList())
+    } catch {
+      setLibraryDocs([])
+    }
+  }, [vault.open])
 
   useEffect(() => {
     const off = api.onDocImportProgress((e) => setDocProgress(e))
     return off
   }, [])
+
+  useEffect(() => {
+    void refreshLibraryDocs()
+  }, [refreshLibraryDocs, vault.pendingLibraryIndex])
 
   async function pickAndImport() {
     if (!vault.open || busy) return
@@ -96,6 +119,7 @@ export default function Import() {
         toast({ kind: 'warn', title: labels.importDocQueuedToast, detail })
       }
       await refreshVault()
+      await refreshLibraryDocs()
     } catch (e) {
       toast({ kind: 'error', title: labels.importDocFailedToast, detail: (e as Error).message })
     } finally {
@@ -118,11 +142,36 @@ export default function Import() {
         detail: `${r.extractionPath} · ${labels.importDocIndexedBadge(r.chunks)}`,
       })
       await refreshVault()
+      await refreshLibraryDocs()
     } catch (e) {
       toast({ kind: 'error', title: labels.importDocOcrFailedToast, detail: (e as Error).message })
     } finally {
       setOcrBusy(false)
       setDocProgress(null)
+    }
+  }
+
+  async function deleteLibraryDoc(doc: LibraryDocListItem) {
+    if (!vault.open || deletingId) return
+    if (!window.confirm(labels.importDocDeleteConfirm(doc.originalName))) return
+    setDeletingId(doc.id)
+    try {
+      const r = await api.docRemove(doc.id)
+      toast({
+        kind: 'success',
+        title: labels.importDocDeletedToast(r.originalName),
+        detail:
+          r.chunksRemoved > 0
+            ? `${r.removedBlobs.length} blob(s) · ${r.chunksRemoved} chunk(s)`
+            : `${r.removedBlobs.length} blob(s)`,
+      })
+      if (docResult?.docId === doc.id) setDocResult(null)
+      await refreshVault()
+      await refreshLibraryDocs()
+    } catch (e) {
+      toast({ kind: 'error', title: labels.importDocDeleteFailedToast, detail: (e as Error).message })
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -172,7 +221,6 @@ export default function Import() {
 
       <div className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-faint">{labels.importChatSection}</div>
 
-      {/* Drop / pick zone — plain glass panel (not motion-animated) so it stays visible under route transitions */}
       <div
         role="button"
         tabIndex={vault.open && !busy ? 0 : -1}
@@ -321,6 +369,51 @@ export default function Import() {
             )}
           </GlassCard>
         </motion.div>
+      )}
+
+      {vault.open && (
+        <div className="mb-5">
+          <div className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-faint">
+            {labels.importDocLibraryTitle}
+          </div>
+          {libraryDocs.length === 0 ? (
+            <p className="text-xs text-ink-faint">{labels.importDocLibraryEmpty}</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {libraryDocs.map((doc) => (
+                <GlassCard key={doc.id} className="flex items-center gap-3 p-3">
+                  <FileText className="h-4 w-4 shrink-0 text-iris" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-ink">{doc.originalName}</div>
+                    <div className="mt-0.5 flex flex-wrap gap-1.5 text-[11px] text-ink-dim">
+                      <Badge color="iris">{doc.format.toUpperCase()}</Badge>
+                      <Badge color="mint">{labels.importDocPagesBadge(doc.pages)}</Badge>
+                      {doc.pendingIndex ? (
+                        <Badge color="rose">{labels.importDocLibraryPending}</Badge>
+                      ) : doc.indexedAt ? (
+                        <Badge color="mint">{labels.importDocLibraryIndexed}</Badge>
+                      ) : (
+                        <Badge color="amber">{labels.importDocNotIndexedBadge}</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => void deleteLibraryDoc(doc)}
+                    disabled={!!deletingId || docBusy || ocrBusy}
+                    className="shrink-0"
+                  >
+                    {deletingId === doc.id ? (
+                      <Spinner className="h-4 w-4" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}{' '}
+                    {labels.importDocDelete}
+                  </Button>
+                </GlassCard>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       <div className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-faint">{labels.importProviders}</div>

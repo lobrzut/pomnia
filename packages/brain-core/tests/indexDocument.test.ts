@@ -55,4 +55,34 @@ describe('indexDocument', () => {
     expect(pageNums).toContain(2)
     db.close()
   })
+
+  it('removeDocumentChunks deletes rows for one path only', async () => {
+    const { removeDocumentChunks } = await import('../src/rag/indexer.js')
+    dbDir = mkdtempSync(join(tmpdir(), 'pomnia-brain-rmdoc-'))
+    dbPath = join(dbDir, 'library.db')
+    const db = openDb({ dbPath })
+
+    await indexDocument(db, mockEmbedder(), {
+      path: '/vault/library/doc-a',
+      name: 'a.pdf',
+      pages: [{ page: 1, text: 'Document A has enough characters to form at least one embedding chunk.' }],
+    })
+    await indexDocument(db, mockEmbedder(), {
+      path: '/vault/library/doc-b',
+      name: 'b.pdf',
+      pages: [{ page: 1, text: 'Document B also needs enough characters to form at least one embedding chunk.' }],
+    })
+
+    const removed = removeDocumentChunks(db, '/vault/library/doc-a')
+    expect(removed).toBeGreaterThan(0)
+    expect(
+      (db.prepare('SELECT COUNT(*) AS n FROM chunks WHERE pdf_path = ?').get('/vault/library/doc-a') as { n: number })
+        .n,
+    ).toBe(0)
+    expect(
+      (db.prepare('SELECT COUNT(*) AS n FROM chunks WHERE pdf_path = ?').get('/vault/library/doc-b') as { n: number })
+        .n,
+    ).toBeGreaterThan(0)
+    db.close()
+  })
 })

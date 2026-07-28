@@ -264,6 +264,47 @@ export class Vault {
     return this.readBlob(doc.extractedBlobSha)
   }
 
+  /**
+   * Remove one library document from the manifest and delete its blobs when
+   * nothing else references them (other docs / snapshot files).
+   * Does not touch conversation/snapshot blobs that are still referenced.
+   */
+  async removeLibraryDocument(docId: string): Promise<{
+    id: string
+    removedBlobs: string[]
+    keptBlobs: string[]
+  }> {
+    const doc = this.getLibraryDocument(docId)
+    if (!doc) throw new Error(`Library document not found: ${docId}`)
+
+    const candidates = [...new Set([doc.sourceBlobSha, doc.extractedBlobSha])]
+    this.library.documents = this.library.documents.filter((d) => d.id !== docId)
+    await this.saveLibrary()
+
+    const referenced = new Set<string>()
+    for (const d of this.library.documents) {
+      referenced.add(d.sourceBlobSha)
+      referenced.add(d.extractedBlobSha)
+    }
+    for (const s of this.manifest.snapshots) {
+      const payload = await this.getSnapshotPayload(s.id).catch(() => null)
+      payload?.files.forEach((f) => referenced.add(f.sha256))
+    }
+
+    const removedBlobs: string[] = []
+    const keptBlobs: string[] = []
+    for (const sha of candidates) {
+      if (referenced.has(sha)) {
+        keptBlobs.push(sha)
+        continue
+      }
+      await fs.rm(this.blobPath(sha), { force: true })
+      removedBlobs.push(sha)
+    }
+    log.info('library document removed', docId, `${removedBlobs.length} blob(s) deleted`)
+    return { id: docId, removedBlobs, keptBlobs }
+  }
+
   async writeBlob(data: Buffer): Promise<{ sha256: string; bytes: number }> {
     const sha = sha256(data)
     const p = this.blobPath(sha)
