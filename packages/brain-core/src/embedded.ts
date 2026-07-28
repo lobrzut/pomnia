@@ -50,13 +50,22 @@ type ParentMsg =
   | { type: 'library-stats' }
   | { type: 'stop' }
 
+type ParentPortLike = {
+  postMessage: (msg: unknown) => void
+  on: (event: 'message', handler: (e: { data: unknown }) => void) => void
+}
+
+function parentPort(): ParentPortLike | undefined {
+  return (process as NodeJS.Process & { parentPort?: ParentPortLike }).parentPort
+}
+
 /** Node fork uses process.send; Electron utilityProcess uses parentPort. */
 function send(msg: unknown): void {
   if (typeof process.send === 'function') {
     process.send(msg)
     return
   }
-  process.parentPort?.postMessage(msg)
+  parentPort()?.postMessage(msg)
 }
 
 function onParentMessage(handler: (msg: ParentMsg) => void): void {
@@ -64,7 +73,7 @@ function onParentMessage(handler: (msg: ParentMsg) => void): void {
     process.on('message', (msg) => handler(msg as ParentMsg))
     return
   }
-  process.parentPort?.on('message', (e) => handler(e.data as ParentMsg))
+  parentPort()?.on('message', (e) => handler(e.data as ParentMsg))
 }
 
 function isAbortError(err: unknown): boolean {
