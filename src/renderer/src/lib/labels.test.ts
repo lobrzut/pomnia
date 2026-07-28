@@ -76,7 +76,7 @@ describe('uiLabels', () => {
     )
     expect(labels.connectPartialTitle).toContain('vault/library')
     expect(labels.connectChecklistTitle).toContain('4 kroki')
-    expect(labels.connectMacNoAppHint).toContain('cursor-mcp.html')
+    expect(labels.connectMacNoAppHint).toContain('docs/CURSOR-MCP.md')
   })
 
   it('exposes guide and status strip labels in Polish', () => {
