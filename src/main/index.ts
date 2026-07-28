@@ -52,6 +52,7 @@ import { brainCore, killLeftoverBrainHelpers } from './brainCore.js'
 import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused } from './mcpActivityPoll.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { runDocumentOcr } from './docOcr.js'
+import { removeLibraryDocumentWithIndex } from './libraryDocRemove.js'
 import { indexPendingLibraryDocuments, type PendingIndexResult } from './libraryIndex.js'
 import {
   applyLoginItemSettings,
@@ -627,6 +628,37 @@ function registerIpc(): void {
     }
     try {
       return await importDocument(v, vaultPath!, p, emitDocImportProgress, url)
+    } finally {
+      activity.idle(['doc-import', 'indexing', 'brain-start'])
+    }
+  })
+
+  ipcMain.handle('doc:list', () => {
+    const v = requireVault()
+    return v.getLibraryManifest().documents.map((d) => ({
+      id: d.id,
+      originalName: d.originalName,
+      format: d.format,
+      pages: d.pages,
+      importedAt: d.importedAt,
+      pendingIndex: !!d.pendingIndex,
+      indexedAt: d.indexedAt ?? null,
+      sourceBytes: d.sourceBytes,
+      extractedBytes: d.extractedBytes,
+    }))
+  })
+
+  ipcMain.handle('doc:remove', async (_e, docId: string) => {
+    const v = requireVault()
+    if (!docId || typeof docId !== 'string') throw new Error('docId required')
+    return removeLibraryDocumentWithIndex(v, vaultPath!, docId)
+  })
+
+  ipcMain.handle('doc:ocr', async (_e, docId: string, ollamaUrl?: string) => {
+    const v = requireVault()
+    const url = resolveOllamaUrl(ollamaUrl)
+    try {
+      return await runDocumentOcr(v, vaultPath!, docId, emitDocImportProgress, url)
     } finally {
       activity.idle(['doc-import', 'indexing', 'brain-start'])
     }

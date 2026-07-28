@@ -136,6 +136,27 @@ export interface DocImportProgressEvent {
   label?: string
 }
 
+export interface LibraryDocListItem {
+  id: string
+  originalName: string
+  format: string
+  pages: number
+  importedAt: string
+  pendingIndex: boolean
+  indexedAt: string | null
+  sourceBytes: number
+  extractedBytes: number
+}
+
+export interface LibraryDocRemoveResult {
+  id: string
+  originalName: string
+  removedBlobs: string[]
+  keptBlobs: string[]
+  chunksRemoved: number
+  indexError?: string
+}
+
 export interface BrainHit {
   score: number
   source: string

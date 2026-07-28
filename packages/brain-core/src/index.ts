@@ -24,7 +24,7 @@ export { vecToBlob, blobToVec } from './rag/vec.js'
 export { search } from './rag/search.js'
 export type { SearchOptions, SearchSource } from './rag/search.js'
 export type { RagIndex, SearchHit } from './rag/types.js'
-export { indexFiles, indexDir, indexDocument, contentHash } from './rag/indexer.js'
+export { indexFiles, indexDir, indexDocument, contentHash, removeDocumentChunks } from './rag/indexer.js'
 export type { IndexStats, IndexProgressEvent, IndexFileInput, IndexDocumentInput } from './rag/indexer.js'
 
 // Storage (sqlite-vec + vault filesystem)

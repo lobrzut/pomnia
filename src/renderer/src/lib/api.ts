@@ -11,6 +11,8 @@ import type {
   DocImportProgressEvent,
   DocImportResult,
   DocOcrResult,
+  LibraryDocListItem,
+  LibraryDocRemoveResult,
   BrainStateInfo,
   BrainStatus,
   ClientId,
@@ -67,6 +69,8 @@ export interface PomniaBridge {
   importToVault(path: string): Promise<{ sealed: number; sources: { source: string; count: number }[] }>
   docImport(path?: string, ollamaUrl?: string): Promise<DocImportResult | null>
   docOcr(docId: string, ollamaUrl?: string): Promise<DocOcrResult>
+  docList(): Promise<LibraryDocListItem[]>
+  docRemove(docId: string): Promise<LibraryDocRemoveResult>
   brainExport(snapshotId: string, outDir: string): Promise<{ count: number; dir: string }>
   revealPath(p: string): Promise<void>
   skillsList(): Promise<SkillsListResult>
@@ -431,7 +435,31 @@ function mockBridge(): PomniaBridge {
         brainAutoStarted: false,
         encrypted: true,
         ocrMethod: 'tesseract' as const,
-        ocrPages: 2,
+        ocrPages: 3,
+      }
+    },
+    async docList() {
+      return [
+        {
+          id: 'abc_report.pdf',
+          originalName: 'report.pdf',
+          format: 'pdf',
+          pages: 12,
+          importedAt: new Date().toISOString(),
+          pendingIndex: false,
+          indexedAt: new Date().toISOString(),
+          sourceBytes: 12000,
+          extractedBytes: 4000,
+        },
+      ]
+    },
+    async docRemove(docId: string) {
+      return {
+        id: docId,
+        originalName: 'report.pdf',
+        removedBlobs: ['aaa', 'bbb'],
+        keptBlobs: [],
+        chunksRemoved: 0,
       }
     },
     async vaultSearchText(query) {

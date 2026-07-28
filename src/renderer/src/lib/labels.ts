@@ -341,6 +341,14 @@ export interface UiLabels {
   importDocProgressIndex: string
   importDocProgressBrainStart: string
   importDocProgressEncrypt: string
+  importDocLibraryTitle: string
+  importDocLibraryEmpty: string
+  importDocLibraryPending: string
+  importDocLibraryIndexed: string
+  importDocDelete: string
+  importDocDeleteConfirm: (name: string) => string
+  importDocDeletedToast: (name: string) => string
+  importDocDeleteFailedToast: string
   importProviders: string
   importLegalNote: string
   brainStateTitle: string
@@ -764,6 +772,15 @@ const PL_LABELS: UiLabels = {
   importDocProgressIndex: 'Indeksowanie',
   importDocProgressBrainStart: 'Uruchamianie wyszukiwarki',
   importDocProgressEncrypt: 'Szyfrowanie w vault',
+  importDocLibraryTitle: 'Dokumenty w vault',
+  importDocLibraryEmpty: 'Brak zaimportowanych dokumentów w library.cvb.',
+  importDocLibraryPending: 'czeka na indeks',
+  importDocLibraryIndexed: 'zindeksowany',
+  importDocDelete: 'Usuń',
+  importDocDeleteConfirm: (name) =>
+    `Usunąć „${name}”? Usuniemy tylko bloby tego dokumentu (nie czaty/snapshoty).`,
+  importDocDeletedToast: (name) => `Usunięto ${name}`,
+  importDocDeleteFailedToast: 'Nie udało się usunąć dokumentu',
   importProviders: 'Skąd pobrać eksport',
   importLegalNote:
     'Pomnia importuje tylko oficjalne eksporty — bez logowania do kont. Claude Desktop / Gemini wymagają eksportu z wersji webowej.',
@@ -1277,6 +1294,15 @@ const EN_LABELS: Partial<UiLabels> = {
   importDocOcrFailedToast: 'OCR failed',
   importDocProgressOcr: 'OCR',
   importDocProgressBrainStart: 'Starting search',
+  importDocLibraryTitle: 'Documents in vault',
+  importDocLibraryEmpty: 'No imported documents in library.cvb.',
+  importDocLibraryPending: 'pending index',
+  importDocLibraryIndexed: 'indexed',
+  importDocDelete: 'Delete',
+  importDocDeleteConfirm: (name) =>
+    `Delete “${name}”? Only this document’s blobs are removed (not chats/snapshots).`,
+  importDocDeletedToast: (name) => `Deleted ${name}`,
+  importDocDeleteFailedToast: 'Could not delete document',
   guideTitle: 'Pomnia map',
   guideSubtitle: 'How it works',
   guideFlowReplay: 'Replay demo',

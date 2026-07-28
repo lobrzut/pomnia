@@ -211,6 +211,8 @@ interface ChildMsg {
   total?: number
   tool?: string
   detail?: string
+  path?: string
+  chunks?: number
 }
 
 export interface IndexDocumentPayload {
@@ -730,6 +732,31 @@ export class BrainCoreManager {
     } finally {
       this.indexing = false
     }
+  }
+
+  /** Remove chunks for one logical document path from library.db (best-effort). */
+  async removeDocument(pdfPath: string): Promise<{ path: string; chunks: number }> {
+    const child = this.child
+    if (!child || !this.url) throw new Error('embedded brain is not running')
+    return await new Promise((resolve, reject) => {
+      const t = setTimeout(() => {
+        child.offMessage(h)
+        reject(new Error('remove-document timeout'))
+      }, 30_000)
+      const h = (m: ChildMsg): void => {
+        if (m.type === 'removed-document') {
+          clearTimeout(t)
+          child.offMessage(h)
+          resolve({ path: m.path ?? pdfPath, chunks: typeof m.chunks === 'number' ? m.chunks : 0 })
+        } else if (m.type === 'error') {
+          clearTimeout(t)
+          child.offMessage(h)
+          reject(new Error(m.message ?? 'remove-document failed'))
+        }
+      }
+      child.onMessage(h)
+      child.send({ type: 'remove-document', path: pdfPath })
+    })
   }
 
   /** Point MCP list_skills / get_skill at a new root (portable vault sidecar). */

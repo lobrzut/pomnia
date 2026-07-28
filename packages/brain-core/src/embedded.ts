@@ -34,7 +34,7 @@ import process from 'node:process'
 
 import { defaultConfig, type BrainConfig } from './config/index.js'
 import { EmbedClient } from './rag/embed.js'
-import { indexDir, indexDocument, indexFiles, type IndexDocumentInput } from './rag/indexer.js'
+import { indexDir, indexDocument, indexFiles, removeDocumentChunks, type IndexDocumentInput } from './rag/indexer.js'
 import { createBrainServer, type BrainServer } from './mcp/server.js'
 import { openDb } from './storage/db.js'
 
@@ -48,6 +48,7 @@ type ParentMsg =
   | { type: 'set-handshake'; phrase: string; enabled: boolean }
   | { type: 'set-auto-checkpoint'; enabled: boolean }
   | { type: 'library-stats' }
+  | { type: 'remove-document'; path: string }
   | { type: 'stop' }
 
 type ParentPortLike = {
@@ -112,6 +113,31 @@ async function handleLibraryStats(): Promise<void> {
         db.prepare('SELECT COUNT(DISTINCT pdf_path) AS n FROM chunks').get() as { n: number }
       ).n
       send({ type: 'library-stats', stats: { files, chunks } })
+    } finally {
+      db.close()
+    }
+  } catch (err) {
+    send({
+      type: 'error',
+      message: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
+async function handleRemoveDocument(pdfPath: string): Promise<void> {
+  if (!config) {
+    send({ type: 'error', message: 'remove-document before start' })
+    return
+  }
+  if (!pdfPath) {
+    send({ type: 'error', message: 'remove-document: missing path' })
+    return
+  }
+  try {
+    const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
+    try {
+      const chunks = removeDocumentChunks(db, pdfPath)
+      send({ type: 'removed-document', path: pdfPath, chunks })
     } finally {
       db.close()
     }
@@ -310,6 +336,9 @@ onParentMessage((msg: ParentMsg) => {
       break
     case 'library-stats':
       void handleLibraryStats()
+      break
+    case 'remove-document':
+      void handleRemoveDocument(msg.path)
       break
     case 'stop':
       void handleStop()

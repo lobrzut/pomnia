@@ -9,6 +9,7 @@
  *   pomnia scan
  *   pomnia backup  --vault <dir> [--create] [--name N] [--sources all|a,b] [--note "…"]
  *   pomnia list    --vault <dir>
+ *   pomnia dump-library --vault <dir>
  *   pomnia verify  --vault <dir>
  *   pomnia brain-export --out <dir> [--vault <dir> --snapshot <id>] [--sources all]
  */
@@ -461,6 +462,35 @@ async function cmdList(p: Parsed): Promise<void> {
   console.log()
 }
 
+async function cmdDumpLibrary(p: Parsed): Promise<void> {
+  const dir = String(p.flags.vault || '')
+  if (!dir) throw new Error('--vault <dir> required')
+  const vault = await Vault.open(dir, await getPass(p.flags))
+  const docs = vault.getLibraryManifest().documents
+  console.log(C.bold(`\n  Library — ${docs.length} document(s)\n`))
+  for (const d of docs) {
+    const sourcePath = path.join(dir, 'blobs', `${d.sourceBlobSha}.cvb`)
+    const extractedPath = path.join(dir, 'blobs', `${d.extractedBlobSha}.cvb`)
+    const sourceOk = await fs
+      .access(sourcePath)
+      .then(() => true)
+      .catch(() => false)
+    const extractedOk = await fs
+      .access(extractedPath)
+      .then(() => true)
+      .catch(() => false)
+    console.log(
+      `  ${C.cyan(d.id)}\n` +
+        `    name=${d.originalName}  format=${d.format}  pages=${d.pages}\n` +
+        `    pendingIndex=${!!d.pendingIndex}  indexedAt=${d.indexedAt ?? '—'}\n` +
+        `    sourceBlob=${d.sourceBlobSha.slice(0, 12)}… ${sourceOk ? C.green('ok') : C.red('MISSING')}\n` +
+        `    extractedBlob=${d.extractedBlobSha.slice(0, 12)}… ${extractedOk ? C.green('ok') : C.red('MISSING')}`,
+    )
+  }
+  if (docs.length === 0) console.log(C.dim('  (empty library.cvb manifest)\n'))
+  else console.log()
+}
+
 async function cmdVerify(p: Parsed): Promise<void> {
   const dir = String(p.flags.vault || '')
   if (!dir) throw new Error('--vault <dir> required')
@@ -514,6 +544,7 @@ ${C.bold('Pomnia')} — encrypted, cross-platform backup for AI assistant chats
   ${C.cyan('scan')}                                   detect installed assistants
   ${C.cyan('backup')}  --vault DIR [--create] [--name N] [--sources all|a,b] [--note "…"]
   ${C.cyan('list')}    --vault DIR
+  ${C.cyan('dump-library')} --vault DIR                 list library.cvb docs + blob presence
   ${C.cyan('verify')}  --vault DIR
   ${C.cyan('brain-export')} --out DIR [--vault DIR --snapshot ID | --sources all]
   ${C.cyan('import')} --in FILE|DIR [--out DIR]            parse Claude.ai/ChatGPT/Grok/Gemini exports
@@ -531,6 +562,7 @@ async function main(): Promise<void> {
       case 'scan': return await cmdScan()
       case 'backup': return await cmdBackup(p)
       case 'list': return await cmdList(p)
+      case 'dump-library': return await cmdDumpLibrary(p)
       case 'verify': return await cmdVerify(p)
       case 'brain-export': return await cmdBrainExport(p)
       case 'brain': return await cmdBrain(p)
