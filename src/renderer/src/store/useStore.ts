@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Pomnia
 import { create } from 'zustand'
 import { VRAM_PROFILES } from '@core/brain/profiles'
+import { EMBEDDED_BRAIN_DEFAULT_URL } from '@core/brain/snippet'
 import {
   DEFAULT_HANDSHAKE_PHRASE,
   displayHandshakePhrase,
@@ -10,11 +11,23 @@ import {
 import { api } from '../lib/api'
 import { loadBool, loadStr, migrateLegacyStorage, saveBool, saveStr } from '../lib/persist'
 import { applyColorScheme, isColorScheme, type ColorScheme } from '../lib/theme'
-import type { ClientId, DetectedSource, Snapshot, SourceId, VaultStatus, BrainRunResult, BrainStateInfo, ActivityState } from '../lib/types'
+import type {
+  ClientId,
+  ClientStatus,
+  DetectedSource,
+  Snapshot,
+  SourceId,
+  VaultStatus,
+  BrainRunResult,
+  BrainStateInfo,
+  ActivityState,
+} from '../lib/types'
 import { formatBrainProgressLabel, invalidateUiLabelsCache, uiLabels } from '../lib/labels'
 import { isUiLocale, setUiLocaleCache, type UiLocale } from '../lib/uiLocale'
 
 migrateLegacyStorage()
+
+const EMBEDDED_URL = EMBEDDED_BRAIN_DEFAULT_URL
 
 /** Same distillable set as Brain tab — live assistant sources with JSONL/DB chats. */
 const DISTILLABLE_SOURCES = new Set<SourceId>(['claude-code', 'cursor', 'claude-desktop'])
@@ -217,6 +230,9 @@ interface State {
   /** Backup selected → distill (same pipeline as Brain tab). */
   backupAndDistill: (note?: string) => Promise<void>
 
+  /** Shared MCP client detection (connectStatus) — Settings + Dashboard cards. */
+  mcpClients: ClientStatus[]
+  loadMcpClients: () => Promise<void>
   connectClientOverride: Partial<Record<ClientId, boolean>>
   setConnectClientVisible: (id: ClientId, visible: boolean) => void
   resetConnectClient: (id: ClientId) => void
@@ -493,6 +509,21 @@ export const useStore = create<State>((set, get) => ({
     })
   },
 
+  mcpClients: [],
+  loadMcpClients: async () => {
+    const s = get()
+    const url = (s.simpleMode ? 'embedded' : s.brainTarget) === 'embedded' ? EMBEDDED_URL : s.remoteBrainUrl
+    try {
+      const r = await api.connectStatus(
+        url,
+        !s.simpleMode && s.brainTarget === 'remote' ? s.connectToken || undefined : undefined,
+        s.simpleMode ? 'embedded' : s.brainTarget,
+      )
+      set({ mcpClients: r.clients })
+    } catch {
+      /* keep previous */
+    }
+  },
   connectClientOverride: loadClientOverride(),
   setConnectClientVisible: (id, visible) =>
     set((s) => {
