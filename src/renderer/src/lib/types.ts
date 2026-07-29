@@ -81,11 +81,23 @@ export interface EmbeddedBrainStatus {
 }
 
 /** Honest distill-pipeline state — live source counts vs the distill ledger. */
+export interface BrainStatePerSource {
+  source: SourceId
+  label: string
+  total: number
+  /** null = cannot match ledger IDs honestly (never a fake “all pending”). */
+  pending: number | null
+  /** Shown when pending is null, e.g. Cursor DB > 256 MB without transcript IDs. */
+  uncountableHint?: string
+}
+
 export interface BrainStateInfo {
   total: number
   distilled: number
   pending: number
-  perSource: { source: SourceId; label: string; total: number; pending: number }[]
+  /** At least one source could not compute pending against the registry. */
+  pendingPartial?: boolean
+  perSource: BrainStatePerSource[]
   lastRun: string | null
 }
 

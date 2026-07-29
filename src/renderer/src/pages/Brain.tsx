@@ -251,7 +251,8 @@ export default function Brain() {
 
   const distillable = sources.filter((s) => ['claude-code', 'cursor', 'claude-desktop'].includes(s.id))
 
-  function run(pendingOnly = false) {
+  /** Default pending-only — omitting the arg must never silently re-distill everything. */
+  function run(pendingOnly = true) {
     const sel = [...selected].filter((id) => distillable.some((d) => d.id === id))
     void runBrainPipeline({
       sources: sel.length ? sel : distillable.map((d) => d.id),
@@ -260,6 +261,12 @@ export default function Brain() {
       importPath: importPath || undefined,
       pendingOnly
     })
+  }
+
+  function runFullRedistill() {
+    const n = brainState?.total ?? 0
+    if (!window.confirm(labels.redistillEverythingConfirm(n))) return
+    run(false)
   }
 
   async function search() {
@@ -377,19 +384,37 @@ export default function Brain() {
                 </div>
                 <div className="mt-1 flex items-baseline gap-1.5 text-2xl font-bold text-ink">
                   {brainState.distilled}
-                  {brainState.pending === 0 && brainState.total > 0 && <Check className="h-4 w-4 text-mint" />}
+                  {brainState.pending === 0 &&
+                    !brainState.pendingPartial &&
+                    brainState.total > 0 && <Check className="h-4 w-4 text-mint" />}
+                </div>
+                <div className="mt-0.5 text-[10px] leading-snug text-ink-faint">
+                  {labels.brainStateDistilledHint}
+                  {typeof vault.distilledNotes === 'number' && vault.distilledNotes > 0
+                    ? ` · ${labels.brainStateVaultNotes(vault.distilledNotes)}`
+                    : ''}
                 </div>
               </div>
               <div
                 className={`rounded-2xl border p-3.5 ${
-                  brainState.pending > 0 ? 'border-amber/30 bg-amber/8' : 'border-white/8 bg-black/20'
+                  brainState.pending > 0 || brainState.pendingPartial
+                    ? 'border-amber/30 bg-amber/8'
+                    : 'border-white/8 bg-black/20'
                 }`}
               >
                 <div className="text-[10px] font-medium uppercase tracking-wider text-ink-faint">
                   {labels.brainStateBacklog}
                 </div>
-                <div className={`mt-1 text-2xl font-bold ${brainState.pending > 0 ? 'text-amber' : 'text-ink'}`}>
-                  {brainState.pending}
+                <div
+                  className={`mt-1 text-2xl font-bold ${
+                    brainState.pending > 0 || brainState.pendingPartial ? 'text-amber' : 'text-ink'
+                  }`}
+                >
+                  {brainState.pendingPartial && brainState.pending === 0
+                    ? '—'
+                    : brainState.pendingPartial
+                      ? `${brainState.pending}+`
+                      : brainState.pending}
                 </div>
               </div>
             </div>
@@ -403,9 +428,16 @@ export default function Brain() {
                   >
                     <span style={{ color: m.color }}>{p.label}</span>
                     <span className="text-ink-faint">
-                      {p.total - p.pending}/{p.total}
+                      {p.pending == null
+                        ? `—/${p.total || '—'}`
+                        : `${p.total - p.pending}/${p.total}`}
                     </span>
-                    {p.pending > 0 && (
+                    {p.pending == null && (
+                      <span className="text-amber/90" title={labels.brainStateUncountable}>
+                        {labels.brainStateUncountable}
+                      </span>
+                    )}
+                    {p.pending != null && p.pending > 0 && (
                       <span className="font-medium text-amber">{labels.brainStatePendingNew(p.pending)}</span>
                     )}
                   </span>
@@ -738,7 +770,7 @@ export default function Brain() {
           </p>
         )}
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button onClick={() => run()} disabled={brainRunning || !status?.reachable}>
+          <Button onClick={runFullRedistill} disabled={brainRunning || !status?.reachable} variant="soft">
             {brainRunning ? <Spinner className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
             {labels.runPipeline}
           </Button>
