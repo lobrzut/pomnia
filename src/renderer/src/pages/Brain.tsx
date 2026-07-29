@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowRight,
@@ -899,19 +899,48 @@ export default function Brain() {
   )
 }
 
+function noteKey(bucket: QuarantineBucket, name: string): string {
+  return `${bucket}:${name}`
+}
+
+/** Pull gate-rejection fields from YAML frontmatter (first --- block). */
+function parseQuarantineFrontmatter(content: string): { quality: string | null; msgCount: string | null } {
+  if (!content.startsWith('---')) return { quality: null, msgCount: null }
+  const end = content.indexOf('\n---', 3)
+  if (end < 0) return { quality: null, msgCount: null }
+  const fm = content.slice(4, end)
+  return {
+    quality: fm.match(/^quality:\s*(\S+)/m)?.[1] ?? null,
+    msgCount: fm.match(/^msg_count:\s*(\S+)/m)?.[1] ?? null
+  }
+}
+
 function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
   const labels = uiLabels()
   const toast = useStore((s) => s.toast)
   const [review, setReview] = useState<QuarantineNoteMeta[]>([])
   const [weak, setWeak] = useState<QuarantineNoteMeta[]>([])
   const [loading, setLoading] = useState(false)
-  const [viewing, setViewing] = useState<{ bucket: QuarantineBucket; name: string; content: string } | null>(null)
+  const [viewing, setViewing] = useState<{ bucket: QuarantineBucket; name: string; content: string } | null>(
+    null
+  )
   const [busyName, setBusyName] = useState<string | null>(null)
+  const [weakOpen, setWeakOpen] = useState(false)
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [loadingView, setLoadingView] = useState(false)
+
+  const navItems = useMemo(() => {
+    const items: QuarantineNoteMeta[] = [...review]
+    if (weakOpen) items.push(...weak)
+    return items
+  }, [review, weak, weakOpen])
 
   async function refresh() {
     if (!vaultOpen) {
       setReview([])
       setWeak([])
+      setViewing(null)
+      setSelectedKey(null)
       return
     }
     setLoading(true)
@@ -919,6 +948,18 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
       const r = await api.distilledQuarantineList()
       setReview(r.review)
       setWeak(r.weak)
+      setSelectedKey((prev) => {
+        if (!prev) return null
+        const stillThere = [...r.review, ...r.weak].some((n) => noteKey(n.bucket, n.name) === prev)
+        return stillThere ? prev : null
+      })
+      setViewing((prev) => {
+        if (!prev) return null
+        const stillThere = [...r.review, ...r.weak].some(
+          (n) => n.bucket === prev.bucket && n.name === prev.name
+        )
+        return stillThere ? prev : null
+      })
     } catch {
       setReview([])
       setWeak([])
@@ -931,12 +972,17 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
     void refresh()
   }, [vaultOpen])
 
-  async function view(bucket: QuarantineBucket, name: string) {
+  async function selectNote(bucket: QuarantineBucket, name: string) {
+    setSelectedKey(noteKey(bucket, name))
+    setLoadingView(true)
     try {
       const { content } = await api.distilledQuarantineRead(bucket, name)
       setViewing({ bucket, name, content })
     } catch (e) {
       toast({ kind: 'error', title: labels.quarantinePromoteFailed, detail: (e as Error).message })
+      setViewing(null)
+    } finally {
+      setLoadingView(false)
     }
   }
 
@@ -945,7 +991,10 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
     try {
       await api.distilledQuarantinePromote(bucket, name)
       toast({ kind: 'success', title: labels.quarantinePromotedToast(name) })
-      if (viewing?.name === name) setViewing(null)
+      if (viewing?.name === name && viewing.bucket === bucket) {
+        setViewing(null)
+        setSelectedKey(null)
+      }
       await refresh()
     } catch (e) {
       toast({ kind: 'error', title: labels.quarantinePromoteFailed, detail: (e as Error).message })
@@ -954,46 +1003,52 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
     }
   }
 
-  function renderList(bucket: QuarantineBucket, items: QuarantineNoteMeta[], heading: string) {
+  function onListKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (navItems.length === 0) return
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Enter') return
+    e.preventDefault()
+    const idx = navItems.findIndex((n) => noteKey(n.bucket, n.name) === selectedKey)
+    if (e.key === 'Enter') {
+      const cur = idx >= 0 ? navItems[idx] : navItems[0]
+      if (cur) void selectNote(cur.bucket, cur.name)
+      return
+    }
+    const nextIdx =
+      e.key === 'ArrowDown'
+        ? Math.min((idx < 0 ? -1 : idx) + 1, navItems.length - 1)
+        : Math.max((idx < 0 ? navItems.length : idx) - 1, 0)
+    const next = navItems[nextIdx]
+    if (next) void selectNote(next.bucket, next.name)
+  }
+
+  function renderRow(n: QuarantineNoteMeta) {
+    const key = noteKey(n.bucket, n.name)
+    const sel = selectedKey === key
     return (
-      <div className="min-w-0 flex-1">
-        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-          {heading} · {items.length}
-        </div>
-        {items.length === 0 ? (
-          <p className="text-[11px] text-ink-faint">{labels.quarantineEmpty}</p>
-        ) : (
-          <ul className="space-y-1">
-            {items.map((n) => (
-              <li key={`${n.bucket}-${n.name}`} className="flex items-center gap-2 rounded-lg border border-white/8 bg-black/20 px-2.5 py-1.5">
-                <span className="min-w-0 flex-1 truncate text-xs text-ink">{n.name}</span>
-                <button
-                  type="button"
-                  className="no-drag shrink-0 text-[11px] font-medium text-iris hover:text-cyan"
-                  onClick={() => void view(bucket, n.name)}
-                >
-                  {labels.quarantineView}
-                </button>
-                <Button
-                  variant="ghost"
-                  className="!px-2 !py-1 !text-[11px]"
-                  disabled={busyName === n.name}
-                  onClick={() => void promote(bucket, n.name)}
-                >
-                  {busyName === n.name ? <Spinner className="h-3 w-3" /> : null}
-                  {labels.quarantinePromote}
-                </Button>
-              </li>
-            ))}
-          </ul>
+      <button
+        key={key}
+        id={`quarantine-row-${key}`}
+        type="button"
+        role="option"
+        aria-selected={sel}
+        onClick={() => void selectNote(n.bucket, n.name)}
+        className={clsx(
+          'no-drag block w-full rounded-lg border px-2.5 py-1.5 text-left transition-colors',
+          sel ? 'border-iris/40 bg-iris/10' : 'border-white/8 bg-black/20 hover:bg-white/8'
         )}
-      </div>
+      >
+        <span className="block truncate text-xs text-ink">{n.name}</span>
+      </button>
     )
   }
 
+  const meta = viewing ? parseQuarantineFrontmatter(viewing.content) : null
+
   return (
     <GlassCard className="mb-5 p-5">
-      <div className="mb-1 text-sm font-semibold text-ink">{labels.quarantineTitle}</div>
+      <div className="mb-1 text-sm font-semibold text-ink">
+        {vaultOpen && !loading ? labels.quarantineHeader(review.length) : labels.quarantineTitle}
+      </div>
       <p className="mb-3 text-[12px] leading-relaxed text-ink-dim">{labels.quarantineLead}</p>
       {!vaultOpen ? (
         <p className="text-xs text-ink-faint">{labels.quarantineVaultClosed}</p>
@@ -1002,32 +1057,91 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
           <Spinner className="h-3.5 w-3.5" /> {labels.statusChecking}
         </div>
       ) : (
-        <div className="flex flex-col gap-4 sm:flex-row">
-          {renderList('review', review, labels.quarantineReview)}
-          {renderList('weak', weak, labels.quarantineWeak)}
-        </div>
-      )}
-      {viewing && (
-        <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <code className="truncate text-xs text-cyan">{viewing.name}</code>
-            <div className="flex shrink-0 gap-2">
-              <Button
-                variant="soft"
-                className="!px-2.5 !py-1 !text-[11px]"
-                disabled={busyName === viewing.name}
-                onClick={() => void promote(viewing.bucket, viewing.name)}
-              >
-                {labels.quarantinePromote}
-              </Button>
-              <Button variant="ghost" className="!px-2.5 !py-1 !text-[11px]" onClick={() => setViewing(null)}>
-                {labels.quarantineClose}
-              </Button>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)]">
+          {/* List — quarantine first; _weak behind disclosure */}
+          <div className="min-w-0">
+            <div
+              className="max-h-[60vh] space-y-1 overflow-y-auto pr-1"
+              role="listbox"
+              tabIndex={0}
+              aria-label={labels.quarantineHeader(review.length)}
+              aria-activedescendant={selectedKey ? `quarantine-row-${selectedKey}` : undefined}
+              onKeyDown={onListKeyDown}
+            >
+              {review.length === 0 ? (
+                <p className="px-1 py-2 text-[11px] text-ink-faint">{labels.quarantineEmpty}</p>
+              ) : (
+                review.map(renderRow)
+              )}
+              {weak.length > 0 ? (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    className="no-drag flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-ink-faint hover:bg-white/6 hover:text-ink-dim"
+                    aria-expanded={weakOpen}
+                    onClick={() => setWeakOpen((o) => !o)}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{labels.quarantineWeakToggle(weak.length)}</span>
+                    <span aria-hidden="true">{weakOpen ? '▴' : '▾'}</span>
+                  </button>
+                  {weakOpen ? <div className="mt-1 space-y-1">{weak.map(renderRow)}</div> : null}
+                </div>
+              ) : null}
             </div>
           </div>
-          <pre className="max-h-56 overflow-auto whitespace-pre-wrap text-[11px] leading-relaxed text-ink-dim">
-            {viewing.content}
-          </pre>
+
+          {/* Reader */}
+          <div
+            className="min-w-0 rounded-xl border border-white/10 bg-black/40"
+            aria-live="polite"
+            aria-busy={loadingView}
+          >
+            {!viewing && !loadingView ? (
+              <div className="flex min-h-[12rem] items-center justify-center p-4 text-center text-xs text-ink-faint">
+                {labels.quarantineSelectToRead}
+              </div>
+            ) : loadingView && !viewing ? (
+              <div className="flex min-h-[12rem] items-center justify-center p-4">
+                <Spinner className="h-4 w-4 text-ink-dim" />
+              </div>
+            ) : viewing ? (
+              <div className="flex max-h-[60vh] flex-col">
+                <div className="shrink-0 border-b border-white/8 p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <code className="min-w-0 truncate text-xs text-cyan">{viewing.name}</code>
+                    <Button
+                      variant="soft"
+                      className="!px-2.5 !py-1 !text-[11px]"
+                      disabled={busyName === viewing.name}
+                      onClick={() => void promote(viewing.bucket, viewing.name)}
+                    >
+                      {busyName === viewing.name ? <Spinner className="h-3 w-3" /> : null}
+                      {labels.quarantinePromote}
+                    </Button>
+                  </div>
+                  {(meta?.quality || meta?.msgCount) && (
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ink-faint">
+                      {meta.quality ? (
+                        <span>
+                          {labels.quarantineMetaQuality}:{' '}
+                          <span className="font-medium text-ink-dim">{meta.quality}</span>
+                        </span>
+                      ) : null}
+                      {meta.msgCount ? (
+                        <span>
+                          {labels.quarantineMetaMsgCount}:{' '}
+                          <span className="font-medium text-ink-dim">{meta.msgCount}</span>
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+                <pre className="overflow-auto whitespace-pre-wrap p-3 text-[11px] leading-relaxed text-ink-dim">
+                  {viewing.content}
+                </pre>
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
     </GlassCard>
