@@ -12,6 +12,7 @@
  *
  * Identity: source + sessionId (FS key = trailing `_${sessionId8}.md` across
  * distilled/, distilled/_weak/, distilled/_review/).
+ * Keep: basket beats mtime (distilled > _weak > _review; same basket → newest).
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
