@@ -312,7 +312,7 @@ export interface UiLabels {
   importSelect: string
   importChatSection: string
   importChatDrop: string
-  importChatSealedToast: (added: number, skipped: number) => string
+  importChatSealedToast: (added: number, updated: number, skipped: number) => string
   importChatAllDuplicatesDetail: string
   importChatNothingRecognized: string
   importChatFailedToast: string
@@ -760,8 +760,13 @@ const PL_LABELS: UiLabels = {
   importSelect: 'Wybierz plik…',
   importChatSection: 'Eksporty czatów',
   importChatDrop: 'Upuść eksport tutaj',
-  importChatSealedToast: (added, skipped) =>
-    `Zapieczętowano ${added} nowych · pominięto ${skipped}${skipped ? ' (już w vaulcie)' : ''}`,
+  importChatSealedToast: (added, updated, skipped) => {
+    const parts: string[] = []
+    if (added) parts.push(`Zapieczętowano ${added} nowe`)
+    if (updated) parts.push(`zaktualizowano ${updated}`)
+    if (skipped) parts.push(`pominięto ${skipped}`)
+    return parts.join(' · ')
+  },
   importChatAllDuplicatesDetail: 'Wszystkie rozmowy były już w vaulcie.',
   importChatNothingRecognized: 'Nic rozpoznawalnego w tym pliku',
   importChatFailedToast: 'Import czatów nie powiódł się',
@@ -1322,8 +1327,13 @@ const EN_LABELS: Partial<UiLabels> = {
   importDropNoPath: 'Pick a file from disk (browser preview has no path).',
   importPick: 'Choose an export file or drop it here',
   importChatDrop: 'Drop export here',
-  importChatSealedToast: (added, skipped) =>
-    `Sealed ${added} new · skipped ${skipped}${skipped ? ' (already in vault)' : ''}`,
+  importChatSealedToast: (added, updated, skipped) => {
+    const parts: string[] = []
+    if (added) parts.push(`Sealed ${added} new`)
+    if (updated) parts.push(`updated ${updated}`)
+    if (skipped) parts.push(`skipped ${skipped}`)
+    return parts.join(' · ')
+  },
   importChatAllDuplicatesDetail: 'Every conversation was already in the vault.',
   importChatNothingRecognized: 'Nothing recognized in that file',
   importChatFailedToast: 'Chat import failed',

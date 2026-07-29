@@ -13,8 +13,14 @@ export { log, setLogSink, addLogSink } from './log.js'
 export { initFileLog } from './logFile.js'
 export { SOURCES, descriptorFor } from './locations.js'
 export * from './brain/index.js'
-export { parseExportBuffer, parseExportFile, parseExportPath } from './import/archives.js'
-export type { ImportResult } from './import/archives.js'
+export {
+  parseExportBuffer,
+  parseExportFile,
+  parseExportPath,
+  conversationFingerprint,
+  classifyImportConversations,
+} from './import/archives.js'
+export type { ImportResult, ClassifyImportResult } from './import/archives.js'
 export {
   PIPELINE_PHASE_LABELS,
   formatPipelineProgressLabel,

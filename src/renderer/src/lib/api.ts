@@ -69,6 +69,7 @@ export interface PomniaBridge {
   importToVault(path: string): Promise<{
     sealed: number
     added?: number
+    updated?: number
     skipped?: number
     sources: { source: string; count: number }[]
   }>
@@ -404,6 +405,7 @@ function mockBridge(): PomniaBridge {
       return {
         sealed: 42,
         added: 42,
+        updated: 0,
         skipped: 0,
         sources: [
           { source: 'claude-ai', count: 38 },

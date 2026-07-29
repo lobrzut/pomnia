@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { zipSync, strToU8 } from 'fflate'
-import { parseExportBuffer, parseGeminiActivity } from '../import/archives.js'
+import {
+  classifyImportConversations,
+  conversationFingerprint,
+  parseExportBuffer,
+  parseGeminiActivity,
+} from '../import/archives.js'
+import type { Conversation } from '../model.js'
 
 describe('import/archives', () => {
   it('parses a Claude.ai export zip (conversations.json)', () => {
@@ -164,5 +170,101 @@ describe('import/archives', () => {
     expect(out).toHaveLength(1)
     expect(out[0].id).toBe('ui1')
     expect(out[0].messages.map((m) => m.text)).toEqual(['hello gemini', 'hi there'])
+  })
+
+  it('same export parsed twice yields identical ids including .md/.txt/.jsonl', () => {
+    const claude = [
+      {
+        uuid: 'stable-uuid',
+        name: 'Chat',
+        chat_messages: [
+          { sender: 'human', text: 'hi' },
+          { sender: 'assistant', text: 'hello' },
+        ],
+      },
+    ]
+    const jsonl = [
+      JSON.stringify({ role: 'user', text: 'q1' }),
+      JSON.stringify({ role: 'assistant', text: 'a1' }),
+    ].join('\n')
+    const md = '# note\ncontent here'
+    const txt = 'plain text body'
+
+    const a = [
+      ...parseExportBuffer(strToU8(JSON.stringify(claude)), 'claude.json').conversations,
+      ...parseExportBuffer(strToU8(jsonl), 'session.jsonl').conversations,
+      ...parseExportBuffer(strToU8(md), 'note.md').conversations,
+      ...parseExportBuffer(strToU8(txt), 'note.txt').conversations,
+    ]
+    const b = [
+      ...parseExportBuffer(strToU8(JSON.stringify(claude)), 'claude.json').conversations,
+      ...parseExportBuffer(strToU8(jsonl), 'session.jsonl').conversations,
+      ...parseExportBuffer(strToU8(md), 'note.md').conversations,
+      ...parseExportBuffer(strToU8(txt), 'note.txt').conversations,
+    ]
+    expect(a.map((c) => c.id)).toEqual(b.map((c) => c.id))
+    expect(a.every((c) => c.id.length > 0)).toBe(true)
+    expect(a.find((c) => c.source === 'generic' && c.title === 'note.md')!.id).toMatch(/^imp-[0-9a-f]{32}$/)
+    expect(a.find((c) => c.title === 'session.jsonl')!.id).toMatch(/^imp-[0-9a-f]{32}$/)
+  })
+
+  it('.md with added message gets a different contentId', () => {
+    const v1 = parseExportBuffer(strToU8('hello'), 'note.md').conversations[0]
+    const v2 = parseExportBuffer(strToU8('hello\n\nmore'), 'note.md').conversations[0]
+    expect(v1.id).not.toBe(v2.id)
+    expect(v1.id).toMatch(/^imp-/)
+    expect(v2.id).toMatch(/^imp-/)
+  })
+
+  it('classify: same set twice → added 0, updated 0, skipped N', () => {
+    const data = [
+      {
+        uuid: 'c1',
+        name: 'One',
+        chat_messages: [
+          { sender: 'human', text: 'a' },
+          { sender: 'assistant', text: 'b' },
+        ],
+      },
+      {
+        uuid: 'c2',
+        name: 'Two',
+        chat_messages: [
+          { sender: 'human', text: 'c' },
+          { sender: 'assistant', text: 'd' },
+        ],
+      },
+    ]
+    const convs = parseExportBuffer(strToU8(JSON.stringify(data)), 'claude.json').conversations
+    const existing = new Map(convs.map((c) => [c.id, conversationFingerprint(c)]))
+    const r = classifyImportConversations(convs, existing)
+    expect(r).toEqual({ toWrite: [], added: 0, updated: 0, skipped: 2 })
+  })
+
+  it('classify: grown chat → updated 1 and toWrite has new message text', () => {
+    const base: Conversation = {
+      id: 'uuid-grow',
+      source: 'claude-ai',
+      title: 'Growing',
+      messages: [
+        { role: 'user', text: 'first' },
+        { role: 'assistant', text: 'reply' },
+      ],
+    }
+    const grown: Conversation = {
+      ...base,
+      messages: [
+        ...base.messages,
+        { role: 'user', text: 'follow-up with NEW_MARKER_TEXT' },
+        { role: 'assistant', text: 'more' },
+      ],
+    }
+    const existing = new Map([[base.id, conversationFingerprint(base)]])
+    const r = classifyImportConversations([grown], existing)
+    expect(r.added).toBe(0)
+    expect(r.updated).toBe(1)
+    expect(r.skipped).toBe(0)
+    expect(r.toWrite).toHaveLength(1)
+    expect(r.toWrite[0].messages.some((m) => m.text.includes('NEW_MARKER_TEXT'))).toBe(true)
   })
 })

@@ -37,6 +37,7 @@ type DocSortKey = 'date' | 'name' | 'size'
 type ChatImportResult = {
   sealed: number
   added?: number
+  updated?: number
   skipped?: number
   sources: { source: string; count: number }[]
 }
@@ -97,16 +98,18 @@ export default function Import() {
   )
 
   function toastChatImport(r: ChatImportResult) {
-    const added = r.added ?? r.sealed
+    const added = r.added ?? 0
+    const updated = r.updated ?? 0
     const skipped = r.skipped ?? 0
-    if (added > 0 || skipped > 0) {
+    const sealed = r.sealed ?? added + updated
+    if (sealed > 0 || skipped > 0) {
       toast({
-        kind: added > 0 ? 'success' : 'warn',
-        title: labels.importChatSealedToast(added, skipped),
+        kind: sealed > 0 ? 'success' : 'warn',
+        title: labels.importChatSealedToast(added, updated, skipped),
         detail:
           r.sources.length > 0
             ? r.sources.map((s) => `${sourceMeta(s.source).label}: ${s.count}`).join(' · ')
-            : skipped > 0
+            : sealed === 0 && skipped > 0
               ? labels.importChatAllDuplicatesDetail
               : undefined,
       })
@@ -124,8 +127,8 @@ export default function Import() {
       if (!file) return
       const r = await api.importToVault(file)
       setResult(r)
-      const added = r.added ?? r.sealed
-      if (added > 0) await refreshVault()
+      const sealed = r.sealed ?? (r.added ?? 0) + (r.updated ?? 0)
+      if (sealed > 0) await refreshVault()
       toastChatImport(r)
     } catch (e) {
       toast({ kind: 'error', title: labels.importChatFailedToast, detail: (e as Error).message })
@@ -296,8 +299,10 @@ export default function Import() {
     { id: 'grok', how: labels.importProviderGrok },
   ]
 
-  const addedCount = result ? (result.added ?? result.sealed) : 0
+  const addedCount = result?.added ?? 0
+  const updatedCount = result?.updated ?? 0
   const skippedCount = result?.skipped ?? 0
+  const sealedCount = result ? (result.sealed ?? addedCount + updatedCount) : 0
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -355,11 +360,13 @@ export default function Import() {
         </div>
       </div>
 
-      {result && (addedCount > 0 || skippedCount > 0) && (
+      {result && (sealedCount > 0 || skippedCount > 0) && (
         <motion.div initial={{ y: 8 }} animate={{ y: 0 }}>
           <GlassCard className="mb-5 flex items-center gap-3 p-4">
-            <CheckCircle2 className={`h-5 w-5 ${addedCount > 0 ? 'text-mint' : 'text-amber-300'}`} />
-            <div className="flex-1 text-sm text-ink">{labels.importChatSealedToast(addedCount, skippedCount)}</div>
+            <CheckCircle2 className={`h-5 w-5 ${sealedCount > 0 ? 'text-mint' : 'text-amber-300'}`} />
+            <div className="flex-1 text-sm text-ink">
+              {labels.importChatSealedToast(addedCount, updatedCount, skippedCount)}
+            </div>
             <div className="flex gap-1.5">
               {result.sources.map((s) => (
                 <Badge key={s.source} color={sourceMeta(s.source).color}>
