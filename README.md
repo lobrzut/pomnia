@@ -4,7 +4,7 @@
 
 Pomnia Desktop (Windows / macOS) collects chats from assistants (Claude Code, Cursor, Claude Desktop, Antigravity, VS Code, Continue) **and** imports from exports (Claude.ai, ChatGPT, Gemini, Grok) plus documents (PDF, DOCX, EPUB) into one vault — with search (**Chats**), distill via Ollama, and Brain on `127.0.0.1:7862`.
 
-> **Desktop app** — version in [`package.json`](package.json) (**0.1.40**; **0.1.39 was skipped intentionally**). Start: [docs/START-HERE.md](docs/START-HERE.md).  
+> **Desktop app** — version in [`package.json`](package.json). Windows installer: **only** via `npm run release:win` (see below). Start: [docs/START-HERE.md](docs/START-HERE.md).  
 > **Repo:** [github.com/lobrzut/pomnia](https://github.com/lobrzut/pomnia) · **Site:** [pomnia.ai](https://pomnia.ai)
 
 ---
@@ -99,7 +99,7 @@ On Import: when the text layer is sparse → **Run OCR** (`tesseract.js`, eng+po
 
 Unsigned builds can trip heuristics (Electron + vault I/O). Never disable AV.
 
-**Installers** (Win `.exe` / Mac `.dmg`) are built locally (`npm run pack:win` / `pack:mac`). Releases: [GitHub Releases](https://github.com/lobrzut/pomnia/releases).
+**Installers** — Windows: **`npm run release:win` is the only allowed path** to a shippable `.exe` (clean tree → typecheck → tests → patch bump + `Release X.Y.Z` commit → `build:win` with injected build identity). Do not bump version by hand and run `pack:win` / `build:win` alone for a release. Mac: `npm run pack:mac` (local). Releases: [GitHub Releases](https://github.com/lobrzut/pomnia/releases).
 
 Logs: `%AppData%/Pomnia/logs/` (Windows).
 
@@ -109,12 +109,16 @@ Logs: `%AppData%/Pomnia/logs/` (Windows).
 
 ```bash
 npm install
-npm run dev          # Electron + hot reload
+npm run generate:build-info   # writes src/buildInfo.ts (version · git sha · timestamp)
+npm run dev          # Electron + hot reload (regenerates buildInfo first)
 npm test             # vitest
-npm run build        # bundle → out/
-npm run pack:win     # Windows installer
+npm run build        # bundle → out/ (regenerates buildInfo)
+npm run release:win  # ONLY path to Windows installer (see above)
+npm run build:win    # pack only — used by release:win after the Release commit
 npm run pack:mac     # DMG / macOS app
 ```
+
+Build identity (Settings → Bezpieczeństwo / Security, and `pomnia --version`): `0.1.45 · 7ff41c7 · 2026-07-30 01:12` — dirty tree at generate time appends `+dirty` to the sha.
 
 ### Windows: never run vitest from a UNC path
 

@@ -49,6 +49,7 @@ import {
   type SourceId,
   localizePipelineProgress,
 } from '@core/index'
+import { formatBuildIdentity } from '../buildInfo.js'
 
 import { brainCore, killLeftoverBrainHelpers } from './brainCore.js'
 import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused } from './mcpActivityPoll.js'
@@ -1187,7 +1188,10 @@ function registerIpc(): void {
   })
   ipcMain.handle('vault:health', async () => runVaultHealthCheck({ silentOk: true }))
   ipcMain.handle('app:settings', () => getAppSettings())
-  ipcMain.handle('app:version', () => ({ version: app.getVersion() }))
+  ipcMain.handle('app:version', () => ({
+    version: app.getVersion(),
+    identity: formatBuildIdentity(),
+  }))
   ipcMain.handle('app:openLogs', async () => {
     const dir = join(app.getPath('userData'), 'logs')
     await fs.mkdir(dir, { recursive: true })

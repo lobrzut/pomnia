@@ -438,8 +438,8 @@ export interface UiLabels {
   securityAbout: string
   /** Settings → Bezpieczeństwo: portable unit = whole vault folder, not AppData / vague `.pomnia`. */
   securityPortability: string
-  /** Footer under Settings → Bezpieczeństwo; `version` from app.getVersion(). */
-  securityAboutCli: (version: string) => string
+  /** Footer under Settings → Bezpieczeństwo; `identity` = `0.1.44 · sha · YYYY-MM-DD HH:mm`. */
+  securityAboutCli: (identity: string) => string
   /** Settings → Windows AV — OOB + signing framing; no exclusion checklist in UI. */
   antivirusTitle: string
   antivirusLead: string
@@ -1087,8 +1087,8 @@ const PL_LABELS: UiLabels = {
   securityAbout: 'Bezpieczeństwo i informacje',
   securityPortability:
     'Skopiuj cały folder vaultu (np. C:\\Vault) na inny komputer → Otwórz vault → hasło.',
-  securityAboutCli: (version) =>
-    `Pomnia v${version} · ten sam silnik działa też w trybie CLI (bez okna).`,
+  securityAboutCli: (identity) =>
+    `${identity} · ten sam silnik działa też w trybie CLI (bez okna).`,
   antivirusTitle: 'Windows / antywirus',
   antivirusLead:
     'Obecne buildy open-source są niepodpisane — SmartScreen i Symantec/Defender mogą ostrzegać przy każdym nowym setup.exe. To normalne (nowy hash = zerowa reputacja), nie wirus.',
@@ -1736,7 +1736,7 @@ const EN_LABELS: Partial<UiLabels> = {
   moreSnapshots: (n) => `…and ${n} more`,
   securityAbout: 'Security',
   securityPortability: 'Portable unit = the whole vault folder (not AppData).',
-  securityAboutCli: (version) => `Pomnia ${version}`,
+  securityAboutCli: (identity) => identity,
   antivirusTitle: 'Windows / antivirus',
   antivirusLead:
     'Current open-source builds are unsigned — SmartScreen and Symantec/Defender may warn on every new setup.exe. That is normal (new hash = zero reputation), not malware.',

@@ -16,5 +16,5 @@
       "@core/*": ["src/core/*"]
     }
   },
-  "include": ["src/core", "src/cli", "src/main", "src/preload"]
+  "include": ["src/buildInfo.ts", "src/core", "src/cli", "src/main", "src/preload"]
 }

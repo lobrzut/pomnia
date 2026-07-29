@@ -121,7 +121,8 @@ const bridge = {
   connectMcpTokenCreate: (brainUrl: string, name: string, adminToken?: string) =>
     ipcRenderer.invoke('connect:mcpTokenCreate', brainUrl, name, adminToken),
   appSettings: () => ipcRenderer.invoke('app:settings'),
-  appVersion: () => ipcRenderer.invoke('app:version') as Promise<{ version: string }>,
+  appVersion: () =>
+    ipcRenderer.invoke('app:version') as Promise<{ version: string; identity: string }>,
   appSettingsSet: (patch: {
     minimizeToTray?: boolean
     closeToTray?: boolean
