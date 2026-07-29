@@ -35,8 +35,59 @@ function slug(s: string): string {
   )
 }
 
+/**
+ * Logical note identity is source + sessionId.
+ * On disk the stable key is the 8-char sessionId suffix in the filename
+ * (`…_${sessionId.slice(0,8)}.md`) — date/title may change on re-distill.
+ */
+export function sessionIdFileSuffix(sessionId: string): string {
+  return sessionId.slice(0, 8)
+}
+
 export function noteFilename(n: DistilledNote): string {
-  return `${n.date}_${n.source}_${slug(n.title)}_${n.sessionId.slice(0, 8)}.md`
+  // Readable name may include date/title; identity key is the trailing sessionId8.
+  return `${n.date}_${n.source}_${slug(n.title)}_${sessionIdFileSuffix(n.sessionId)}.md`
+}
+
+/** Filename ends with `_${sessionId8}.md` (existing vault convention). */
+export function matchesSessionNote(filename: string, sessionId: string): boolean {
+  const base = path.basename(filename)
+  return base.endsWith(`_${sessionIdFileSuffix(sessionId)}.md`)
+}
+
+function basketDirs(targetDir: string): string[] {
+  return [targetDir, path.join(targetDir, '_weak'), path.join(targetDir, '_review')]
+}
+
+/**
+ * Delete every prior note for this session across distilled/_weak/_review,
+ * regardless of date/title in the filename. Call before writing the new note.
+ */
+export async function removePriorSessionNotes(
+  targetDir: string,
+  sessionId: string,
+): Promise<string[]> {
+  const removed: string[] = []
+  const suffix = `_${sessionIdFileSuffix(sessionId)}.md`
+  for (const dir of basketDirs(targetDir)) {
+    let names: string[]
+    try {
+      names = await fs.readdir(dir)
+    } catch {
+      continue
+    }
+    for (const name of names) {
+      if (!name.endsWith(suffix)) continue
+      const file = path.join(dir, name)
+      try {
+        await fs.unlink(file)
+        removed.push(file)
+      } catch {
+        /* raced / already gone */
+      }
+    }
+  }
+  return removed
 }
 
 function destForNote(n: DistilledNote): QualityDestination {
@@ -60,21 +111,12 @@ export async function deployFilesystem(notes: DistilledNote[], targetDir: string
       await fs.mkdir(dir, { recursive: true })
       made.add(dest)
     }
+    // Identity = source + sessionId; FS key = 8-char sessionId suffix across all baskets.
+    await removePriorSessionNotes(targetDir, n.sessionId)
     const name = noteFilename(n)
     const file = path.join(dir, name)
     await fs.writeFile(file, n.markdown, 'utf8')
     written.push(file)
-    // Successful re-distill: drop any prior twin in other buckets so ghosts
-    // don't linger next to the canonical note.
-    if (dest === 'keep') {
-      for (const other of ['_review', '_weak'] as const) {
-        try {
-          await fs.unlink(path.join(targetDir, other, name))
-        } catch {
-          /* no prior twin */
-        }
-      }
-    }
   }
   const ok = notes.filter((n) => destForNote(n) === 'keep').length
   const reviewed = notes.filter((n) => destForNote(n) === 'review').length

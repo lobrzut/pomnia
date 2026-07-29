@@ -155,6 +155,80 @@ describe('brain/deploy distill dedup (re-distill overwrite)', () => {
     const body = await readFile(first[0], 'utf8')
     expect(body).toContain('second distill overwrite')
   })
+
+  it('redeploy with changed title and date keeps one file; content is newer', async () => {
+    const { readdir } = await import('node:fs/promises')
+    const dir = await mkdtemp(join(tmpdir(), 'pomnia-distill-dedup-title-'))
+    const sessionId = 'cafebabe11223344'
+    const first = note({
+      quality: 'ok',
+      title: 'Old title',
+      date: '2026-01-01',
+      sessionId,
+      markdown: '---\nquality: ok\n---\n\nversion one\n',
+    })
+    await deployFilesystem([first], dir)
+    expect((await readdir(dir)).filter((f) => f.endsWith('.md'))).toHaveLength(1)
+    expect(noteFilename(first)).toContain('2026-01-01')
+    expect(noteFilename(first)).toContain('Old_title')
+
+    const second = note({
+      quality: 'ok',
+      title: 'Brand new title',
+      date: '2026-07-29',
+      sessionId,
+      markdown: '---\nquality: ok\n---\n\nversion two after retitle\n',
+    })
+    const written = await deployFilesystem([second], dir)
+    expect(written).toHaveLength(1)
+    expect(written[0]).toContain('2026-07-29')
+    expect(written[0]).toContain('Brand_new_title')
+    expect(written[0]).toContain('cafebabe')
+
+    const mdFiles = (await readdir(dir)).filter((f) => f.endsWith('.md'))
+    expect(mdFiles).toHaveLength(1)
+    expect(mdFiles[0]).toBe(noteFilename(second))
+    expect(await readFile(written[0]!, 'utf8')).toContain('version two after retitle')
+  })
+
+  it('redeploy ok from _weak clears weak twin and lands only in distilled/', async () => {
+    const { readdir, access } = await import('node:fs/promises')
+    const dir = await mkdtemp(join(tmpdir(), 'pomnia-distill-dedup-basket-'))
+    const sessionId = 'feedface99887766'
+    const weakNote = note({
+      quality: 'weak' as DistilledNote['quality'],
+      title: 'Thin note',
+      date: '2026-03-10',
+      sessionId,
+      markdown: '---\nquality: weak\n---\n\nweak body date A\n',
+    })
+    await deployFilesystem([weakNote], dir)
+    const weakName = noteFilename(weakNote)
+    expect((await readdir(join(dir, '_weak'))).filter((f) => f.endsWith('.md'))).toContain(weakName)
+
+    const okNote = note({
+      quality: 'ok',
+      title: 'Promoted note',
+      date: '2026-07-29',
+      sessionId,
+      markdown: '---\nquality: ok\n---\n\nok body date B\n',
+    })
+    const written = await deployFilesystem([okNote], dir)
+    expect(written).toHaveLength(1)
+    expect(written[0]).not.toContain('_weak')
+    expect(written[0]).not.toContain('_review')
+    expect(await readFile(written[0]!, 'utf8')).toContain('ok body date B')
+
+    const keep = (await readdir(dir)).filter((f) => f.endsWith('.md'))
+    expect(keep).toHaveLength(1)
+    expect(keep[0]).toBe(noteFilename(okNote))
+
+    const weakLeft = (await readdir(join(dir, '_weak')).catch(() => [] as string[])).filter((f) =>
+      f.endsWith('.md'),
+    )
+    expect(weakLeft).toHaveLength(0)
+    await expect(access(join(dir, '_weak', weakName))).rejects.toThrow()
+  })
 })
 
 describe('brain/deploy deployDistilledHttp', () => {
