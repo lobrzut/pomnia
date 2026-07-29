@@ -4,10 +4,14 @@
  * Core dedupe-vault-session-notes logic (run via scripts/dedupe-vault-session-notes.mjs).
  *
  * Group notes by 8-char sessionId filename suffix across distilled/_weak/_review.
- * Keep ONE file per session — newest by mtime — with an asymmetric safety rule:
- * if the newest is in _review/ and an older keep (distilled/) note has content,
- * keep the distilled one and report for manual decision (do not hide content
- * behind automation).
+ * Keep ONE file per session — basket priority beats mtime:
+ *   1. distilled/ (keep) always wins
+ *   2. _weak/ beats _review/
+ *   3. same basket → newest mtime
+ *
+ * Contested: basket-winner is older than a discarded twin (newer distill scored
+ * the session into a worse basket) — report for quality-score instability;
+ * still delete by basket rule (never drop an indexed note for a non-indexed one).
  *
  * After --apply, reindex is required (library.db still lists deleted paths).
  */
@@ -28,6 +32,13 @@ import {
 
 export type Basket = 'keep' | 'weak' | 'review'
 
+/** Higher = preferred. distilled > _weak > _review. */
+export const BASKET_RANK: Record<Basket, number> = {
+  keep: 3,
+  weak: 2,
+  review: 1,
+}
+
 export interface NoteFile {
   path: string
   name: string
@@ -41,8 +52,11 @@ export interface DedupePlan {
   session8: string
   keep: NoteFile
   delete: NoteFile[]
-  /** Newest was _review/ but contentful distilled/ was preferred — review manually. */
-  manualReview: boolean
+  /**
+   * Basket-winner is older than at least one discarded twin — signal that a
+   * newer distill scored the session into a worse basket (quality instability).
+   */
+  contested: boolean
   reason: string
 }
 
@@ -128,30 +142,37 @@ function listBasketMd(distilled: string): NoteFile[] {
 }
 
 /**
- * Prefer newest by mtime; asymmetric: newest in _review/ + older keep with
- * content → keep the distilled note (manual review).
+ * Basket priority beats mtime: keep > weak > review; same basket → newest.
+ * Contested when the basket-winner is older than a discarded twin.
  */
-export function pickKeeper(files: NoteFile[]): { keep: NoteFile; manualReview: boolean; reason: string } {
-  const sorted = [...files].sort((a, b) => b.mtimeMs - a.mtimeMs)
-  const newest = sorted[0]!
-  if (newest.basket === 'review') {
-    const contentfulKeep = sorted
-      .filter((f) => f.basket === 'keep' && f.hasContent && f.path !== newest.path)
-      .sort((a, b) => b.mtimeMs - a.mtimeMs)[0]
-    if (contentfulKeep) {
-      return {
-        keep: contentfulKeep,
-        manualReview: true,
-        reason:
-          'newest in _review/ but older distilled/ has content — kept distilled; decide manually',
-      }
-    }
+export function pickKeeper(files: NoteFile[]): {
+  keep: NoteFile
+  contested: boolean
+  reason: string
+} {
+  if (files.length === 0) {
+    throw new Error('pickKeeper: empty group')
   }
-  return {
-    keep: newest,
-    manualReview: false,
-    reason: 'newest by mtime',
+  const sorted = [...files].sort((a, b) => {
+    const rank = BASKET_RANK[b.basket] - BASKET_RANK[a.basket]
+    if (rank !== 0) return rank
+    return b.mtimeMs - a.mtimeMs
+  })
+  const keep = sorted[0]!
+  const discarded = files.filter((f) => f.path !== keep.path)
+  const contested = discarded.some((d) => d.mtimeMs > keep.mtimeMs)
+
+  const sameBasket = discarded.every((d) => d.basket === keep.basket)
+  let reason: string
+  if (sameBasket) {
+    reason = 'newest by mtime (same basket)'
+  } else if (contested) {
+    reason = `basket priority (${keep.basket} > discarded) — winner older than discarded twin (contested)`
+  } else {
+    reason = `basket priority (${keep.basket})`
   }
+
+  return { keep, contested, reason }
 }
 
 export function planDedupe(files: NoteFile[]): DedupePlan[] {
@@ -164,9 +185,9 @@ export function planDedupe(files: NoteFile[]): DedupePlan[] {
   const plans: DedupePlan[] = []
   for (const [session8, group] of bySession) {
     if (group.length < 2) continue
-    const { keep, manualReview, reason } = pickKeeper(group)
+    const { keep, contested, reason } = pickKeeper(group)
     const del = group.filter((f) => f.path !== keep.path)
-    plans.push({ session8, keep, delete: del, manualReview, reason })
+    plans.push({ session8, keep, delete: del, contested, reason })
   }
   plans.sort((a, b) => a.session8.localeCompare(b.session8))
   return plans
@@ -188,8 +209,14 @@ export function runDedupe(argv: string[] = process.argv.slice(2)): {
 Identity: source + sessionId; FS key = trailing _XXXXXXXX.md across
   distilled/, distilled/_weak/, distilled/_review/
 
-Keep rule: newest mtime wins — EXCEPT when newest is in _review/ and an
-  older distilled/ note has content → keep distilled and flag for manual review.
+Keep rule (basket beats mtime):
+  1. distilled/ always wins
+  2. _weak/ beats _review/
+  3. same basket → newest mtime
+
+Contested: basket-winner older than a discarded twin → reported (quality-score
+  instability); still apply basket rule so indexed notes are never dropped for
+  non-indexed ones.
 
 After --apply: reindex the library (deleted files leave library.db stale).`)
     return { plans: [], apply: false, vault: opts.vault }
@@ -212,30 +239,37 @@ After --apply: reindex the library (deleted files leave library.db stale).`)
   )
   console.log(`Duplicate groups: ${plans.length}`)
 
-  const manual = plans.filter((p) => p.manualReview)
-  if (manual.length) {
-    console.log(`\nManual review (${manual.length}) — newest was _review/, kept contentful distilled/:`)
-    for (const p of manual) {
+  const contested = plans.filter((p) => p.contested)
+  if (contested.length) {
+    console.log(
+      `\nContested (${contested.length}) — basket-winner older than discarded twin (quality-score instability):`,
+    )
+    for (const p of contested) {
       console.log(`  session=${p.session8}`)
-      console.log(`    KEEP  [${p.keep.basket}] ${p.keep.path}`)
+      console.log(`    KEEP  [${p.keep.basket}] mtime=${new Date(p.keep.mtimeMs).toISOString()} ${p.keep.path}`)
       for (const d of p.delete) {
-        console.log(`    DROP  [${d.basket}] ${d.path}`)
+        console.log(
+          `    DROP  [${d.basket}] mtime=${new Date(d.mtimeMs).toISOString()} ${d.path}`,
+        )
       }
     }
   }
 
-  const auto = plans.filter((p) => !p.manualReview)
-  console.log(`\nAuto dedupe (${auto.length}):`)
-  for (const p of auto.slice(0, 40)) {
+  const normal = plans.filter((p) => !p.contested)
+  console.log(`\nAuto dedupe (${normal.length}):`)
+  for (const p of normal.slice(0, 40)) {
     console.log(`  session=${p.session8} keep=[${p.keep.basket}] ${basename(p.keep.path)}`)
     for (const d of p.delete) {
       console.log(`    drop=[${d.basket}] ${basename(d.path)}`)
     }
   }
-  if (auto.length > 40) console.log(`  … +${auto.length - 40} more groups`)
+  if (normal.length > 40) console.log(`  … +${normal.length - 40} more groups`)
 
   const toDelete = plans.reduce((n, p) => n + p.delete.length, 0)
   console.log(`\nWould delete: ${toDelete} files (keep ${plans.length} winners)`)
+  if (contested.length) {
+    console.log(`Contested groups (reported above): ${contested.length}`)
+  }
 
   if (!opts.apply) {
     console.log('\nNo changes written. Re-run with --apply after reviewing.')
