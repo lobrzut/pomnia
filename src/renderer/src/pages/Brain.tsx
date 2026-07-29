@@ -915,6 +915,11 @@ function parseQuarantineFrontmatter(content: string): { quality: string | null; 
   }
 }
 
+function noteMatchesFilter(n: QuarantineNoteMeta, q: string): boolean {
+  if (!q) return true
+  return n.name.toLowerCase().includes(q)
+}
+
 function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
   const labels = uiLabels()
   const toast = useStore((s) => s.toast)
@@ -928,12 +933,27 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
   const [weakOpen, setWeakOpen] = useState(false)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [loadingView, setLoadingView] = useState(false)
+  const [listFilter, setListFilter] = useState('')
+
+  const filterQ = listFilter.trim().toLowerCase()
+  const filteredReview = useMemo(() => review.filter((n) => noteMatchesFilter(n, filterQ)), [review, filterQ])
+  const filteredWeak = useMemo(() => weak.filter((n) => noteMatchesFilter(n, filterQ)), [weak, filterQ])
 
   const navItems = useMemo(() => {
-    const items: QuarantineNoteMeta[] = [...review]
-    if (weakOpen) items.push(...weak)
+    const items: QuarantineNoteMeta[] = [...filteredReview]
+    if (weakOpen) items.push(...filteredWeak)
     return items
-  }, [review, weak, weakOpen])
+  }, [filteredReview, filteredWeak, weakOpen])
+
+  // Clear master-detail selection when the selected note is filtered out.
+  useEffect(() => {
+    if (!selectedKey) return
+    const stillVisible = navItems.some((n) => noteKey(n.bucket, n.name) === selectedKey)
+    if (!stillVisible) {
+      setSelectedKey(null)
+      setViewing(null)
+    }
+  }, [navItems, selectedKey])
 
   async function refresh() {
     if (!vaultOpen) {
@@ -941,6 +961,7 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
       setWeak([])
       setViewing(null)
       setSelectedKey(null)
+      setListFilter('')
       return
     }
     setLoading(true)
@@ -1060,6 +1081,16 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)]">
           {/* List — quarantine first; _weak behind disclosure */}
           <div className="min-w-0">
+            <div className="relative mb-2">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint" />
+              <Input
+                value={listFilter}
+                onChange={(e) => setListFilter(e.target.value)}
+                placeholder={labels.quarantineSearchPlaceholder}
+                className="!py-1.5 !pl-8 !text-xs"
+                aria-label={labels.quarantineSearchPlaceholder}
+              />
+            </div>
             <div
               className="max-h-[60vh] space-y-1 overflow-y-auto pr-1"
               role="listbox"
@@ -1070,8 +1101,10 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
             >
               {review.length === 0 ? (
                 <p className="px-1 py-2 text-[11px] text-ink-faint">{labels.quarantineEmpty}</p>
+              ) : filteredReview.length === 0 ? (
+                <p className="px-1 py-2 text-[11px] text-ink-faint">{labels.quarantineNoMatches}</p>
               ) : (
-                review.map(renderRow)
+                filteredReview.map(renderRow)
               )}
               {weak.length > 0 ? (
                 <div className="pt-1">
@@ -1084,7 +1117,15 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
                     <span className="min-w-0 flex-1 truncate">{labels.quarantineWeakToggle(weak.length)}</span>
                     <span aria-hidden="true">{weakOpen ? '▴' : '▾'}</span>
                   </button>
-                  {weakOpen ? <div className="mt-1 space-y-1">{weak.map(renderRow)}</div> : null}
+                  {weakOpen ? (
+                    <div className="mt-1 space-y-1">
+                      {filteredWeak.length === 0 ? (
+                        <p className="px-1 py-1 text-[11px] text-ink-faint">{labels.quarantineNoMatches}</p>
+                      ) : (
+                        filteredWeak.map(renderRow)
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>

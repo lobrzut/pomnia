@@ -120,6 +120,8 @@ describe('uiLabels', () => {
     expect(labels.quarantinePromote).toContain('distilled')
     expect(labels.quarantineHeader(50)).toBe('Kwarantanna · 50')
     expect(labels.quarantineWeakToggle(235)).toContain('235')
+    expect(labels.quarantineSearchPlaceholder).toMatch(/filtruj/i)
+    expect(labels.quarantineNoMatches).toMatch(/filtra/)
     expect(labels.quarantineSelectToRead).toMatch(/kwarantanny/)
     expect(labels.guideStep1Title).toBe('Krok 1 — Zbieranie')
     expect(labels.guideDocsTitle).toBe('Dokumenty (PDF / EPUB)')
