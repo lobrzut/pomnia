@@ -194,7 +194,7 @@ export default function Dashboard() {
           </button>
           <Button variant="soft" onClick={() => scan()} disabled={scanning} className="!px-2.5 !py-1.5 !text-xs">
             {scanning ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            Rescan
+            {labels.dashboardRescan}
           </Button>
         </div>
       </div>
