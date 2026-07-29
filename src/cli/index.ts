@@ -44,6 +44,7 @@ import {
   type Conversation,
   type SourceId
 } from '../core/index.js'
+import { formatBuildIdentity } from '../buildInfo.js'
 
 const C = {
   dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
@@ -549,14 +550,24 @@ ${C.bold('Pomnia')} — encrypted, cross-platform backup for AI assistant chats
   ${C.cyan('brain-export')} --out DIR [--vault DIR --snapshot ID | --sources all]
   ${C.cyan('import')} --in FILE|DIR [--out DIR]            parse Claude.ai/ChatGPT/Grok/Gemini exports
   ${C.cyan('brain')} <status|distill|index|search|pipeline|deploy> [--import PATH]   host-side distill → Brain
+  ${C.cyan('--version')} / ${C.cyan('-V')} / ${C.cyan('version')}   print build identity
 
   Passphrase: --pass, or $POMNIA_PASS (legacy: $RELIQUA_PASS), or interactive prompt.
   Ollama:     --ollama URL or $POMNIA_OLLAMA (legacy: $RELIQUA_OLLAMA, default http://localhost:11434).
 `)
 }
 
+function printVersion(): void {
+  console.log(formatBuildIdentity())
+}
+
 async function main(): Promise<void> {
-  const p = parse(process.argv.slice(2))
+  const argv = process.argv.slice(2)
+  if (argv.includes('--version') || argv.includes('-V')) {
+    printVersion()
+    return
+  }
+  const p = parse(argv)
   try {
     switch (p.cmd) {
       case 'scan': return await cmdScan()
@@ -567,6 +578,10 @@ async function main(): Promise<void> {
       case 'brain-export': return await cmdBrainExport(p)
       case 'brain': return await cmdBrain(p)
       case 'import': return await cmdImport(p)
+      case 'version':
+      case '--version':
+      case '-V':
+        return printVersion()
       default: return help()
     }
   } catch (e) {

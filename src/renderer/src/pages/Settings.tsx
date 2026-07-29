@@ -273,7 +273,7 @@ export default function Settings() {
   useEffect(() => {
     void api
       .appVersion()
-      .then((r) => setAppVersion(r.version))
+      .then((r) => setAppVersion(r.identity || r.version))
       .catch(() => {})
   }, [])
 

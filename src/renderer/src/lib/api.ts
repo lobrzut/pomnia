@@ -226,7 +226,7 @@ export interface PomniaBridge {
   onColorScheme(cb: (scheme: 'mint' | 'iris' | 'glass') => void): () => void
   onUiLocale(cb: (locale: 'pl' | 'en') => void): () => void
   openLogs(): Promise<string>
-  appVersion(): Promise<{ version: string }>
+  appVersion(): Promise<{ version: string; identity: string }>
   floatingMonitorShow(): Promise<{ visible: boolean }>
   floatingMonitorHide(): Promise<{ visible: boolean }>
   floatingMonitorToggle(): Promise<{ visible: boolean }>
@@ -809,7 +809,7 @@ function mockBridge(): PomniaBridge {
       return '/mock/logs'
     },
     async appVersion() {
-      return { version: '0.1.8' }
+      return { version: '0.1.8', identity: '0.1.8 · mock · 1970-01-01 00:00' }
     },
     async floatingMonitorShow() {
       return { visible: true }
