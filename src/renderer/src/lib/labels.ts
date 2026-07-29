@@ -159,6 +159,8 @@ export interface UiLabels {
   quarantineWeak: string
   quarantineWeakToggle: (count: number) => string
   quarantineEmpty: string
+  quarantineSearchPlaceholder: string
+  quarantineNoMatches: string
   quarantineSelectToRead: string
   quarantineMetaQuality: string
   quarantineMetaMsgCount: string
@@ -760,6 +762,8 @@ const PL_LABELS: UiLabels = {
   quarantineWeak: '_weak (słabe)',
   quarantineWeakToggle: (count) => `${count} słabych (już w indeksie)`,
   quarantineEmpty: 'Brak notatek w kwarantannie.',
+  quarantineSearchPlaceholder: 'filtruj po nazwie…',
+  quarantineNoMatches: 'Brak notatek pasujących do filtra.',
   quarantineSelectToRead: 'Wybierz notatkę, żeby zobaczyć, dlaczego trafiła do kwarantanny',
   quarantineMetaQuality: 'quality',
   quarantineMetaMsgCount: 'msg_count',
@@ -1429,6 +1433,8 @@ const EN_LABELS: Partial<UiLabels> = {
   quarantineWeak: '_weak (weak)',
   quarantineWeakToggle: (count) => `${count} weak (already indexed)`,
   quarantineEmpty: 'No notes in quarantine.',
+  quarantineSearchPlaceholder: 'filter by name…',
+  quarantineNoMatches: 'No notes match the filter.',
   quarantineSelectToRead: 'Select a note to see why it landed in quarantine',
   quarantineMetaQuality: 'quality',
   quarantineMetaMsgCount: 'msg_count',
