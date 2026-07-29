@@ -259,6 +259,28 @@ export interface UiLabels {
   embeddedBrainStart: string
   embeddedBrainStop: string
   embeddedBrainStoppedToast: string
+  toastModelReady: string
+  toastPullFailed: string
+  toastLocalIndexRefreshed: string
+  toastReindexFailed: string
+  toastSearchFailed: string
+  toastDeployed: string
+  toastDeployFailed: string
+  brainSearchPlaceholder: string
+  brainSearchButton: string
+  brainSearchEmpty: string
+  brainAdvancedDistillTitle: string
+  brainAdvancedOllamaNeed: string
+  brainEmbeddedProcessHint: string
+  vaultGateTitle: string
+  vaultGateLead: string
+  vaultGateUnlockTab: string
+  vaultGateCreateTab: string
+  vaultGateName: string
+  vaultGateDefaultName: string
+  vaultGateCreateSubmit: string
+  vaultGateUnlockSubmit: string
+  vaultPathPlaceholder: string
   brainServer: string
   searchKnowledge: string
   advanced: string
@@ -848,6 +870,30 @@ const PL_LABELS: UiLabels = {
   embeddedBrainStart: 'Start',
   embeddedBrainStop: 'Stop',
   embeddedBrainStoppedToast: 'Lokalna wyszukiwarka zatrzymana',
+  toastModelReady: 'Model gotowy',
+  toastPullFailed: 'Pobieranie nieudane',
+  toastLocalIndexRefreshed: 'Lokalny indeks odświeżony',
+  toastReindexFailed: 'Reindeksacja nieudana',
+  toastSearchFailed: 'Wyszukiwanie nieudane',
+  toastDeployed: 'Wysłano',
+  toastDeployFailed: 'Deploy nieudany',
+  brainSearchPlaceholder: 'zapytaj o coś, o czym już rozmawiałeś…',
+  brainSearchButton: 'Szukaj',
+  brainSearchEmpty:
+    'Brak trafień. Indeks obejmuje tylko zdestylowane notatki — najpierw uruchom pipeline powyżej.',
+  brainAdvancedDistillTitle: 'Zaawansowane · destylacja na tym hoście',
+  brainAdvancedOllamaNeed: 'opcjonalne — wymaga lokalnej Ollamy',
+  brainEmbeddedProcessHint:
+    'Uruchamia brain-core jako proces potomny — klienci MCP na tej maszynie (Claude Code, Cursor, Antigravity…) dostają search_library / save_conversation z 127.0.0.1 bez serwera. Destylacja odświeża indeks automatycznie.',
+  vaultGateTitle: 'Pomnia Vault',
+  vaultGateLead: 'Pamięć AI w folderze vaultu — zaszyfrowana, przenośna, Twoja.',
+  vaultGateUnlockTab: 'Odblokuj',
+  vaultGateCreateTab: 'Utwórz',
+  vaultGateName: 'Nazwa vaultu',
+  vaultGateDefaultName: 'Mój vault',
+  vaultGateCreateSubmit: 'Utwórz zaszyfrowany vault',
+  vaultGateUnlockSubmit: 'Odblokuj vault',
+  vaultPathPlaceholder: 'C:\\Vault',
   brainServer: 'Serwer Brain',
   searchKnowledge: 'Szukaj w swojej pamięci',
   advanced: 'Zaawansowane',
@@ -1487,6 +1533,30 @@ const EN_LABELS: Partial<UiLabels> = {
   embeddedBrainStart: 'Start',
   embeddedBrainStop: 'Stop',
   embeddedBrainStoppedToast: 'Local search stopped',
+  toastModelReady: 'Model ready',
+  toastPullFailed: 'Pull failed',
+  toastLocalIndexRefreshed: 'Local index refreshed',
+  toastReindexFailed: 'Reindex failed',
+  toastSearchFailed: 'Search failed',
+  toastDeployed: 'Deployed',
+  toastDeployFailed: 'Deploy failed',
+  brainSearchPlaceholder: "ask anything you've discussed before…",
+  brainSearchButton: 'Search',
+  brainSearchEmpty:
+    "No matches. The index only covers distilled notes — run the pipeline above first if you haven't yet.",
+  brainAdvancedDistillTitle: 'Advanced · distill on this host',
+  brainAdvancedOllamaNeed: 'optional — needs local Ollama',
+  brainEmbeddedProcessHint:
+    'Runs brain-core as a child process — MCP clients on this machine (Claude Code, Cursor, Antigravity…) get search_library / save_conversation from 127.0.0.1 without any server. Distill runs refresh its index automatically.',
+  vaultGateTitle: 'Pomnia Vault',
+  vaultGateLead: 'AI memory in a vault folder — encrypted, portable, yours.',
+  vaultGateUnlockTab: 'Unlock',
+  vaultGateCreateTab: 'Create',
+  vaultGateName: 'Vault name',
+  vaultGateDefaultName: 'My Vault',
+  vaultGateCreateSubmit: 'Create encrypted vault',
+  vaultGateUnlockSubmit: 'Unlock vault',
+  vaultPathPlaceholder: 'C:\\Vault',
   brainServer: 'Brain server',
   searchKnowledge: 'Search your memory',
   advanced: 'Advanced',

@@ -6,13 +6,15 @@ import { FolderOpen, KeyRound, ShieldCheck, Sparkles } from 'lucide-react'
 import { AppLogo } from '../components/AppLogo'
 import { Button, Field, Input } from '../components/ui'
 import { api } from '../lib/api'
+import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
 
 export default function VaultGate() {
+  const labels = uiLabels()
   const { createVault, openVault, vaultLastPath, setVaultLastPath } = useStore()
   const [mode, setMode] = useState<'unlock' | 'create'>('unlock')
   const [path, setPath] = useState(vaultLastPath)
-  const [name, setName] = useState('My Vault')
+  const [name, setName] = useState(labels.vaultGateDefaultName)
   const [pass, setPass] = useState('')
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
@@ -60,10 +62,8 @@ export default function VaultGate() {
         <div className="mb-5 flex items-center gap-3">
           <AppLogo size="lg" glow />
           <div className="min-w-0 leading-none">
-            <h1 className="text-lg font-bold leading-tight tracking-tight text-grad">Pomnia Vault</h1>
-            <p className="mt-1.5 text-xs leading-snug text-ink-dim">
-              Pamięć AI w folderze vaultu — zaszyfrowana, przenośna, Twoja.
-            </p>
+            <h1 className="text-lg font-bold leading-tight tracking-tight text-grad">{labels.vaultGateTitle}</h1>
+            <p className="mt-1.5 text-xs leading-snug text-ink-dim">{labels.vaultGateLead}</p>
           </div>
         </div>
 
@@ -81,14 +81,14 @@ export default function VaultGate() {
               )}
               <span className="relative flex items-center justify-center gap-1.5">
                 {m === 'unlock' ? <KeyRound className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
-                {m === 'unlock' ? 'Unlock' : 'Create'}
+                {m === 'unlock' ? labels.vaultGateUnlockTab : labels.vaultGateCreateTab}
               </span>
             </button>
           ))}
         </div>
 
         <div className="space-y-4">
-          <Field label={mode === 'create' ? 'Nowy folder vaultu' : 'Folder vaultu'}>
+          <Field label={mode === 'create' ? labels.onboardingVaultNewFolder : labels.onboardingVaultFolder}>
             <div className="flex gap-2">
               <Input
                 value={path}
@@ -97,7 +97,7 @@ export default function VaultGate() {
                   setVaultLastPath(e.target.value)
                 }}
                 onKeyDown={onEnter}
-                placeholder="C:\Vault"
+                placeholder={labels.vaultPathPlaceholder}
               />
               <Button variant="soft" onClick={pick}>
                 <FolderOpen className="h-4 w-4" />
@@ -106,17 +106,17 @@ export default function VaultGate() {
           </Field>
 
           {mode === 'create' && (
-            <Field label="Vault name">
+            <Field label={labels.vaultGateName}>
               <Input value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
           )}
 
-          <Field label="Passphrase">
+          <Field label={labels.onboardingPassphrase}>
             <Input type="password" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={onEnter} placeholder="••••••••••" />
           </Field>
 
           {mode === 'create' && (
-            <Field label="Confirm passphrase">
+            <Field label={labels.onboardingConfirmPass}>
               <Input
                 type="password"
                 value={confirm}
@@ -128,17 +128,21 @@ export default function VaultGate() {
           )}
 
           {mode === 'create' && pass && confirm && pass !== confirm && (
-            <p className="text-xs text-rose">Passphrases don't match.</p>
+            <p className="text-xs text-rose">{labels.onboardingPassMismatch}</p>
           )}
 
           <Button onClick={submit} disabled={busy || !path || !pass} className="w-full">
             <ShieldCheck className="h-4 w-4" />
-            {busy ? 'Working…' : mode === 'create' ? 'Create encrypted vault' : 'Unlock vault'}
+            {busy
+              ? labels.dashboardWorking
+              : mode === 'create'
+                ? labels.vaultGateCreateSubmit
+                : labels.vaultGateUnlockSubmit}
           </Button>
 
           <p className="flex items-center gap-1.5 text-[11px] leading-relaxed text-ink-faint">
             <ShieldCheck className="h-3 w-3 shrink-0" />
-            AES-256-GCM · scrypt key derivation · passphrase never stored. Lose it and the vault is unrecoverable.
+            {labels.onboardingVaultCryptoHint}
           </p>
         </div>
       </motion.div>
