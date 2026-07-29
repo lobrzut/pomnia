@@ -66,7 +66,12 @@ export interface PomniaBridge {
   vaultConversations(): Promise<ConversationMeta[]>
   vaultConversation(snapshotId: string, id: string): Promise<Conversation | null>
   vaultSearchText(query: string): Promise<TextHit[]>
-  importToVault(path: string): Promise<{ sealed: number; sources: { source: string; count: number }[] }>
+  importToVault(path: string): Promise<{
+    sealed: number
+    added?: number
+    skipped?: number
+    sources: { source: string; count: number }[]
+  }>
   docImport(path?: string, ollamaUrl?: string): Promise<DocImportResult | null>
   docOcr(docId: string, ollamaUrl?: string): Promise<DocOcrResult>
   docList(): Promise<LibraryDocListItem[]>
@@ -396,7 +401,15 @@ function mockBridge(): PomniaBridge {
     },
     async importToVault() {
       await new Promise((r) => setTimeout(r, 700))
-      return { sealed: 42, sources: [{ source: 'claude-ai', count: 38 }, { source: 'chatgpt', count: 4 }] }
+      return {
+        sealed: 42,
+        added: 42,
+        skipped: 0,
+        sources: [
+          { source: 'claude-ai', count: 38 },
+          { source: 'chatgpt', count: 4 },
+        ],
+      }
     },
     async docImport() {
       await new Promise((r) => setTimeout(r, 900))

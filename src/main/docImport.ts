@@ -48,6 +48,30 @@ export async function importDocument(
   const baseName = basename(filePath)
   const docId = `${sha16}_${baseName}`
 
+  const already =
+    vault.getLibraryDocument(docId) ??
+    vault.getLibraryManifest().documents.find((d) => d.contentSha === contentSha)
+  if (already) {
+    const logicalPath = libraryDocLogicalPath(vaultDir, already.id)
+    return {
+      docId: already.id,
+      sourcePath: logicalPath,
+      extractedPath: `${logicalPath}/extracted.md`,
+      format: already.format,
+      pages: already.pages,
+      chunks: 0,
+      sparse: !!already.sparse,
+      extractionPath: already.extractionPath,
+      suggestOcr: false,
+      indexed: !!already.indexedAt && !already.pendingIndex,
+      pendingIndex: !!already.pendingIndex,
+      brainRunning: brainCore.status().running,
+      brainAutoStarted: false,
+      encrypted: true,
+      skipped: true,
+    }
+  }
+
   onProgress?.({ phase: 'parse', done: 0, total: 1, detail: baseName })
   const parsed = await parseDocument(filePath)
   onProgress?.({ phase: 'parse', done: 1, total: 1, detail: extractionPathLabel(parsed) })

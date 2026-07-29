@@ -121,6 +121,8 @@ export interface DocImportResult {
   brainAutoStarted: boolean
   indexError?: string
   encrypted: boolean
+  /** True when content already in library — import was a no-op. */
+  skipped?: boolean
 }
 
 export interface DocOcrResult extends DocImportResult {

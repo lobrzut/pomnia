@@ -7,6 +7,7 @@ import {
   deployDistilledFiles,
   deployDistilledHttp,
   deployFilesystem,
+  noteFilename,
   triggerReindex,
 } from './deploy.js'
 import type { DistilledNote } from './distill.js'
@@ -111,6 +112,48 @@ describe('brain/deploy quality gate paths', () => {
     expect(okBody).toContain('quality: ok')
     const rev = await readFile(join(target, '_review', 'old.md'), 'utf8')
     expect(rev).toContain('garbage')
+  })
+})
+
+describe('brain/deploy distill dedup (re-distill overwrite)', () => {
+  it('noteFilename includes session id so re-deploy overwrites the same path', () => {
+    const n = note({ quality: 'ok', title: 'WireGuard tips', sessionId: 'deadbeef01234567' })
+    const name = noteFilename(n)
+    expect(name).toMatch(/deadbeef/)
+    expect(name.endsWith('.md')).toBe(true)
+    // Same session → identical filename (stable across re-distill).
+    expect(noteFilename({ ...n, markdown: '---\nquality: ok\n---\n\nupdated body\n' })).toBe(name)
+  })
+
+  it('second deployFilesystem of same session does not grow note count', async () => {
+    const { readdir } = await import('node:fs/promises')
+    const dir = await mkdtemp(join(tmpdir(), 'pomnia-distill-dedup-'))
+    const n = note({
+      quality: 'ok',
+      title: 'Cyclical backup note',
+      sessionId: 'session99abcdef',
+      markdown: '---\nquality: ok\n---\n\nfirst distill\n',
+    })
+
+    const first = await deployFilesystem([n], dir)
+    expect(first).toHaveLength(1)
+    const afterFirst = (await readdir(dir)).filter((f) => f.endsWith('.md'))
+    expect(afterFirst).toHaveLength(1)
+
+    const n2 = {
+      ...n,
+      markdown: '---\nquality: ok\n---\n\nsecond distill overwrite\n',
+    }
+    const second = await deployFilesystem([n2], dir)
+    expect(second).toHaveLength(1)
+    expect(second[0]).toBe(first[0])
+
+    const afterSecond = (await readdir(dir)).filter((f) => f.endsWith('.md'))
+    expect(afterSecond).toHaveLength(1)
+    expect(afterSecond[0]).toBe(afterFirst[0])
+
+    const body = await readFile(first[0], 'utf8')
+    expect(body).toContain('second distill overwrite')
   })
 })
 
