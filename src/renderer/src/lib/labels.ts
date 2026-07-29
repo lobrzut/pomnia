@@ -168,6 +168,14 @@ export interface UiLabels {
   quarantinePromote: string
   quarantinePromotedToast: (name: string) => string
   quarantinePromoteFailed: string
+  quarantineDelete: string
+  quarantineDeleteConfirm: (name: string) => string
+  quarantineDeletedToast: (name: string) => string
+  quarantineDeleteFailed: string
+  quarantineDeleteAll: string
+  quarantineDeleteAllConfirm: (count: number) => string
+  quarantineDeletedAllToast: (count: number) => string
+  quarantineDeleteAllFailed: string
   quarantineClose: string
   quarantineVaultClosed: string
   onboardingFirstRun: string
@@ -771,6 +779,17 @@ const PL_LABELS: UiLabels = {
   quarantinePromote: 'Przywróć do distilled/',
   quarantinePromotedToast: (name) => `Przywrócono ${name} do distilled/`,
   quarantinePromoteFailed: 'Nie udało się przywrócić notatki',
+  quarantineDelete: 'Kasuj',
+  quarantineDeleteConfirm: (name) =>
+    `Trwale usunąć „${name}” z kwarantanny? Tej operacji nie da się cofnąć.`,
+  quarantineDeletedToast: (name) => `Usunięto ${name}`,
+  quarantineDeleteFailed: 'Nie udało się usunąć notatki',
+  quarantineDeleteAll: 'Kasuj wszystkie',
+  quarantineDeleteAllConfirm: (count) =>
+    `Trwale usunąć ${count} ${count === 1 ? 'notatkę' : count < 5 ? 'notatki' : 'notatek'} z _review/ (kwarantanna)? Usuwane są tylko widoczne na liście (filtr). _weak/ pozostaje. Nie da się cofnąć.`,
+  quarantineDeletedAllToast: (count) =>
+    `Usunięto ${count} ${count === 1 ? 'notatkę' : count < 5 ? 'notatki' : 'notatek'} z _review/`,
+  quarantineDeleteAllFailed: 'Nie udało się usunąć notatek z kwarantanny',
   quarantineClose: 'Zamknij',
   quarantineVaultClosed: 'Otwórz vault, żeby zobaczyć _review / _weak.',
   onboardingFirstRun: 'pierwszy start',
@@ -1442,6 +1461,17 @@ const EN_LABELS: Partial<UiLabels> = {
   quarantinePromote: 'Restore to distilled/',
   quarantinePromotedToast: (name) => `Restored ${name} to distilled/`,
   quarantinePromoteFailed: 'Could not restore note',
+  quarantineDelete: 'Delete',
+  quarantineDeleteConfirm: (name) =>
+    `Permanently delete “${name}” from quarantine? This cannot be undone.`,
+  quarantineDeletedToast: (name) => `Deleted ${name}`,
+  quarantineDeleteFailed: 'Could not delete note',
+  quarantineDeleteAll: 'Delete all',
+  quarantineDeleteAllConfirm: (count) =>
+    `Permanently delete ${count} note${count === 1 ? '' : 's'} from _review/ (quarantine)? Only notes currently listed (filter applied). _weak/ is left untouched. This cannot be undone.`,
+  quarantineDeletedAllToast: (count) =>
+    `Deleted ${count} note${count === 1 ? '' : 's'} from _review/`,
+  quarantineDeleteAllFailed: 'Could not delete quarantine notes',
   quarantineClose: 'Close',
   quarantineVaultClosed: 'Open a vault to see _review / _weak.',
   onboardingFirstRun: 'first run',

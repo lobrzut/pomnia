@@ -81,6 +81,11 @@ export interface PomniaBridge {
   distilledQuarantineList(): Promise<{ review: QuarantineNoteMeta[]; weak: QuarantineNoteMeta[] }>
   distilledQuarantineRead(bucket: QuarantineBucket, name: string): Promise<{ content: string }>
   distilledQuarantinePromote(bucket: QuarantineBucket, name: string): Promise<{ name: string; path: string }>
+  distilledQuarantineDelete(
+    bucket: QuarantineBucket,
+    name: string,
+  ): Promise<{ name: string; bucket: QuarantineBucket }>
+  distilledQuarantineDeleteReview(names: string[]): Promise<{ deleted: string[]; failed: string[] }>
   docImport(path?: string, ollamaUrl?: string): Promise<DocImportResult | null>
   docOcr(docId: string, ollamaUrl?: string): Promise<DocOcrResult>
   docList(): Promise<LibraryDocListItem[]>
@@ -450,6 +455,12 @@ function mockBridge(): PomniaBridge {
     },
     async distilledQuarantinePromote(bucket, name) {
       return { name, path: `C:/Vault/distilled/${name}` }
+    },
+    async distilledQuarantineDelete(bucket, name) {
+      return { name, bucket }
+    },
+    async distilledQuarantineDeleteReview(names) {
+      return { deleted: [...names], failed: [] }
     },
     async docImport() {
       await new Promise((r) => setTimeout(r, 900))
