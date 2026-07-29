@@ -972,7 +972,9 @@ function registerIpc(): void {
         let convs = opts.importPath
           ? (await parseExportPath(opts.importPath)).conversations.slice(0, opts.limit || undefined)
           : await collectLive(opts.sources, opts.limit)
-        if (opts.pendingOnly) {
+        // Default pending-only: omitting the flag must not silently re-distill everything.
+        // Pass pendingOnly: false only for an intentional full re-grind.
+        if (opts.pendingOnly !== false) {
           const l = await readLedger()
           convs = convs.filter((c) => !l.processed[c.id])
         }
@@ -1365,25 +1367,63 @@ function registerIpc(): void {
     const os = currentOS()
     const home = homeDir()
     const l = await readLedger()
-    const perSource: { source: SourceId; label: string; total: number; pending: number }[] = []
+    const perSource: {
+      source: SourceId
+      label: string
+      total: number
+      pending: number | null
+      uncountableHint?: string
+    }[] = []
     for (const s of await detectAll()) {
       const a = getAdapter(s.id)
       if (!s.installed || !a?.collectConversations) continue
       const root = a.resolveRoot(os, home)
       if (!root) continue
       if (s.id === 'cursor' && (await isCursorDbTooLarge(root))) {
-        const total = s.conversations ?? 0
-        perSource.push({ source: s.id, label: s.label, total, pending: total })
+        // Large state.vscdb skips sql.js, but agent-transcripts still yield real IDs.
+        // Never report pending=total without checking the ledger — that freezes the counter.
+        const convs = await a.collectConversations(root)
+        if (convs.length > 0) {
+          const pending = convs.filter((c) => !l.processed[c.id]).length
+          perSource.push({ source: s.id, label: s.label, total: convs.length, pending })
+        } else {
+          const total = s.conversations ?? 0
+          perSource.push({
+            source: s.id,
+            label: s.label,
+            total,
+            pending: null,
+            uncountableHint: 'cursor-db-too-large',
+          })
+        }
         continue
       }
       const convs = await a.collectConversations(root)
       const pending = convs.filter((c) => !l.processed[c.id]).length
       perSource.push({ source: s.id, label: s.label, total: convs.length, pending })
     }
-    const total = perSource.reduce((n, p) => n + p.total, 0)
-    const pending = perSource.reduce((n, p) => n + p.pending, 0)
+    let total = 0
+    let pending = 0
+    let distilled = 0
+    let pendingPartial = false
+    for (const p of perSource) {
+      total += p.total
+      if (p.pending == null) {
+        pendingPartial = true
+      } else {
+        pending += p.pending
+        distilled += p.total - p.pending
+      }
+    }
     const stamps = Object.values(l.processed).sort()
-    return { total, distilled: total - pending, pending, perSource, lastRun: stamps.at(-1) ?? null }
+    return {
+      total,
+      distilled,
+      pending,
+      pendingPartial,
+      perSource,
+      lastRun: stamps.at(-1) ?? null,
+    }
   })
 
   ipcMain.handle('distilled:quarantineList', async () => {

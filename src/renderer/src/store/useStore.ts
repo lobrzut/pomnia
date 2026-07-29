@@ -838,7 +838,8 @@ export const useStore = create<State>((set, get) => ({
         model: opts.model,
         ollamaUrl: opts.ollamaUrl,
         importPath: opts.importPath,
-        pendingOnly: opts.pendingOnly,
+        // Default pending-only — omit must not silently full-grind.
+        pendingOnly: opts.pendingOnly !== false,
         autoDeploy,
         deployUrl: s.brainDeployUrl || dashboardUrlFromBrainUrl(s.remoteBrainUrl),
         deployTarget: s.brainDeployTarget || undefined,

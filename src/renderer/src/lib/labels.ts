@@ -140,7 +140,9 @@ function formatFlowFocusBannerEn(state: ActivityState): string {
 export interface UiLabels {
   distill: string
   distillBacklog: (n: number) => string
+  /** Full re-distill — must NEVER share distillBacklog / distill wording. */
   runPipeline: string
+  redistillEverythingConfirm: (conversationCount: number) => string
   deployToBrain: string
   remoteDeployLead: string
   embedded: string
@@ -525,8 +527,12 @@ export interface UiLabels {
   brainStateLoading: string
   brainStateChatsInTools: string
   brainStateDistilled: string
+  /** Clarifies the tile counts tool-scan matches, not vault notes. */
+  brainStateDistilledHint: string
+  brainStateVaultNotes: (n: number) => string
   brainStateBacklog: string
   brainStatePendingNew: (n: number) => string
+  brainStateUncountable: string
   brainPipeCollect: string
   brainPipeCollectNote: string
   brainPipeDistill: string
@@ -747,7 +753,9 @@ export interface UiLabels {
 const PL_LABELS: UiLabels = {
   distill: 'Przygotuj pamięć',
   distillBacklog: (n) => `Przygotuj pamięć (${n} nowych)`,
-  runPipeline: 'Przygotuj pamięć',
+  runPipeline: 'Przemiel wszystko od nowa…',
+  redistillEverythingConfirm: (n) =>
+    `Przemielisz od nowa ${n} rozmów. Istniejące notatki zostaną nadpisane — to kosztowne i trudne do cofnięcia. Kontynuować?`,
   deployToBrain: 'Wyślij do wyszukiwarki',
   remoteDeployLead: 'To jest dla Brain na serwerze / KVM — lokalnie nie wypełniaj.',
   embedded: 'Lokalnie',
@@ -1186,8 +1194,11 @@ const PL_LABELS: UiLabels = {
   brainStateLoading: 'Wczytywanie stanu pipeline…',
   brainStateChatsInTools: 'Czaty w narzędziach',
   brainStateDistilled: 'Zdestylowane',
+  brainStateDistilledHint: 'z bieżącego skanu narzędzi',
+  brainStateVaultNotes: (n) => `vault: ${n} notatek`,
   brainStateBacklog: 'Kolejka',
   brainStatePendingNew: (n) => `+${n} nowych`,
+  brainStateUncountable: 'nie do policzenia (DB > 256 MB)',
   brainPipeCollect: 'Zbieraj',
   brainPipeCollectNote: 'z asystentów',
   brainPipeDistill: 'Destyluj',
@@ -1430,7 +1441,9 @@ const PL_LABELS: UiLabels = {
 const EN_LABELS: Partial<UiLabels> = {
   distill: 'Prepare memory',
   distillBacklog: (n) => `Prepare memory (${n} new)`,
-  runPipeline: 'Prepare memory',
+  runPipeline: 'Re-distill everything…',
+  redistillEverythingConfirm: (n) =>
+    `Re-distill all ${n} conversations? Existing notes will be overwritten — costly and hard to reverse.`,
   deployToBrain: 'Send to search',
   remoteDeployLead: 'For Brain on a server / KVM — leave empty for local.',
   embedded: 'Local',
@@ -1873,8 +1886,11 @@ const EN_LABELS: Partial<UiLabels> = {
   brainStateLoading: 'Loading…',
   brainStateChatsInTools: 'Chats in tools',
   brainStateDistilled: 'Distilled',
+  brainStateDistilledHint: 'from current tools scan',
+  brainStateVaultNotes: (n) => `vault: ${n} notes`,
   brainStateBacklog: 'Queue',
   brainStatePendingNew: (n) => `+${n} new`,
+  brainStateUncountable: 'uncountable (DB > 256 MB)',
   brainPipeCollect: 'Collect',
   brainPipeCollectNote: 'from assistants',
   brainPipeDistill: 'Distill',
