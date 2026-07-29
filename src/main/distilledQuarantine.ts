@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
 /**
- * List / read / promote notes under distilled/_review and distilled/_weak.
- * Promote is user-driven only — never auto.
+ * List / read / promote / delete notes under distilled/_review and distilled/_weak.
+ * Promote is user-driven only — never auto. Delete never touches distilled/ root.
  */
 import { promises as fs } from 'node:fs'
 import { basename, join } from 'node:path'
@@ -85,4 +85,40 @@ export async function promoteQuarantineNote(
   await fs.writeFile(dest, md, 'utf8')
   await fs.unlink(src)
   return { name: base, path: dest }
+}
+
+/** Permanently delete a note from _review or _weak (never distilled/ root). */
+export async function deleteQuarantineNote(
+  bucket: QuarantineBucket,
+  name: string,
+): Promise<{ name: string; bucket: QuarantineBucket }> {
+  const base = safeName(name)
+  const src = join(bucketDir(bucket), base)
+  try {
+    await fs.access(src)
+  } catch {
+    throw new Error('note not found')
+  }
+  await fs.unlink(src)
+  return { name: base, bucket }
+}
+
+/**
+ * Permanently delete notes from `_review/` only (quarantine).
+ * Caller passes the names currently listed/filtered in the UI.
+ */
+export async function deleteQuarantineReviewNotes(
+  names: string[],
+): Promise<{ deleted: string[]; failed: string[] }> {
+  const deleted: string[] = []
+  const failed: string[] = []
+  for (const name of names) {
+    try {
+      const r = await deleteQuarantineNote('review', name)
+      deleted.push(r.name)
+    } catch {
+      failed.push(typeof name === 'string' ? name : String(name))
+    }
+  }
+  return { deleted, failed }
 }

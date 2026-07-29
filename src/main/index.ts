@@ -56,6 +56,8 @@ import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImp
 import { runDocumentOcr } from './docOcr.js'
 import { removeLibraryDocumentWithIndex } from './libraryDocRemove.js'
 import {
+  deleteQuarantineNote,
+  deleteQuarantineReviewNotes,
   listQuarantineNotes,
   promoteQuarantineNote,
   readQuarantineNote,
@@ -1395,6 +1397,15 @@ function registerIpc(): void {
   ipcMain.handle('distilled:quarantinePromote', async (_e, bucket: QuarantineBucket, name: string) => {
     requireVault()
     return promoteQuarantineNote(bucket, name)
+  })
+  ipcMain.handle('distilled:quarantineDelete', async (_e, bucket: QuarantineBucket, name: string) => {
+    requireVault()
+    return deleteQuarantineNote(bucket, name)
+  })
+  ipcMain.handle('distilled:quarantineDeleteReview', async (_e, names: string[]) => {
+    requireVault()
+    if (!Array.isArray(names)) throw new Error('names required')
+    return deleteQuarantineReviewNotes(names)
   })
 
   ipcMain.handle('brain:search', async (_e, query: string, url?: string) => {

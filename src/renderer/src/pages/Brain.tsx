@@ -930,6 +930,8 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
     null
   )
   const [busyName, setBusyName] = useState<string | null>(null)
+  const [busyKind, setBusyKind] = useState<'promote' | 'delete' | null>(null)
+  const [busyDeleteAll, setBusyDeleteAll] = useState(false)
   const [weakOpen, setWeakOpen] = useState(false)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [loadingView, setLoadingView] = useState(false)
@@ -1009,6 +1011,7 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
 
   async function promote(bucket: QuarantineBucket, name: string) {
     setBusyName(name)
+    setBusyKind('promote')
     try {
       await api.distilledQuarantinePromote(bucket, name)
       toast({ kind: 'success', title: labels.quarantinePromotedToast(name) })
@@ -1021,6 +1024,54 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
       toast({ kind: 'error', title: labels.quarantinePromoteFailed, detail: (e as Error).message })
     } finally {
       setBusyName(null)
+      setBusyKind(null)
+    }
+  }
+
+  async function removeNote(bucket: QuarantineBucket, name: string) {
+    if (!window.confirm(labels.quarantineDeleteConfirm(name))) return
+    setBusyName(name)
+    setBusyKind('delete')
+    try {
+      await api.distilledQuarantineDelete(bucket, name)
+      toast({ kind: 'success', title: labels.quarantineDeletedToast(name) })
+      if (viewing?.name === name && viewing.bucket === bucket) {
+        setViewing(null)
+        setSelectedKey(null)
+      }
+      await refresh()
+    } catch (e) {
+      toast({ kind: 'error', title: labels.quarantineDeleteFailed, detail: (e as Error).message })
+    } finally {
+      setBusyName(null)
+      setBusyKind(null)
+    }
+  }
+
+  async function removeAllListedReview() {
+    const names = filteredReview.map((n) => n.name)
+    if (names.length === 0) return
+    if (!window.confirm(labels.quarantineDeleteAllConfirm(names.length))) return
+    setBusyDeleteAll(true)
+    try {
+      const r = await api.distilledQuarantineDeleteReview(names)
+      if (r.deleted.length > 0) {
+        toast({ kind: 'success', title: labels.quarantineDeletedAllToast(r.deleted.length) })
+      }
+      if (r.failed.length > 0) {
+        toast({
+          kind: 'error',
+          title: labels.quarantineDeleteAllFailed,
+          detail: r.failed.slice(0, 5).join(', '),
+        })
+      }
+      setViewing(null)
+      setSelectedKey(null)
+      await refresh()
+    } catch (e) {
+      toast({ kind: 'error', title: labels.quarantineDeleteAllFailed, detail: (e as Error).message })
+    } finally {
+      setBusyDeleteAll(false)
     }
   }
 
@@ -1091,6 +1142,19 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
                 aria-label={labels.quarantineSearchPlaceholder}
               />
             </div>
+            {filteredReview.length > 0 ? (
+              <div className="mb-2 flex justify-end">
+                <Button
+                  variant="danger"
+                  className="!px-2.5 !py-1 !text-[11px]"
+                  disabled={busyDeleteAll || busyName != null}
+                  onClick={() => void removeAllListedReview()}
+                >
+                  {busyDeleteAll ? <Spinner className="h-3 w-3" /> : null}
+                  {labels.quarantineDeleteAll}
+                </Button>
+              </div>
+            ) : null}
             <div
               className="max-h-[60vh] space-y-1 overflow-y-auto pr-1"
               role="listbox"
@@ -1150,15 +1214,30 @@ function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
                 <div className="shrink-0 border-b border-white/8 p-3">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <code className="min-w-0 truncate text-xs text-cyan">{viewing.name}</code>
-                    <Button
-                      variant="soft"
-                      className="!px-2.5 !py-1 !text-[11px]"
-                      disabled={busyName === viewing.name}
-                      onClick={() => void promote(viewing.bucket, viewing.name)}
-                    >
-                      {busyName === viewing.name ? <Spinner className="h-3 w-3" /> : null}
-                      {labels.quarantinePromote}
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Button
+                        variant="soft"
+                        className="!px-2.5 !py-1 !text-[11px]"
+                        disabled={busyName === viewing.name || busyDeleteAll}
+                        onClick={() => void promote(viewing.bucket, viewing.name)}
+                      >
+                        {busyName === viewing.name && busyKind === 'promote' ? (
+                          <Spinner className="h-3 w-3" />
+                        ) : null}
+                        {labels.quarantinePromote}
+                      </Button>
+                      <Button
+                        variant="danger"
+                        className="!px-2.5 !py-1 !text-[11px]"
+                        disabled={busyName === viewing.name || busyDeleteAll}
+                        onClick={() => void removeNote(viewing.bucket, viewing.name)}
+                      >
+                        {busyName === viewing.name && busyKind === 'delete' ? (
+                          <Spinner className="h-3 w-3" />
+                        ) : null}
+                        {labels.quarantineDelete}
+                      </Button>
+                    </div>
                   </div>
                   {(meta?.quality || meta?.msgCount) && (
                     <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ink-faint">

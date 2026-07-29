@@ -32,6 +32,10 @@ const bridge = {
     ipcRenderer.invoke('distilled:quarantineRead', bucket, name),
   distilledQuarantinePromote: (bucket: 'review' | 'weak', name: string) =>
     ipcRenderer.invoke('distilled:quarantinePromote', bucket, name),
+  distilledQuarantineDelete: (bucket: 'review' | 'weak', name: string) =>
+    ipcRenderer.invoke('distilled:quarantineDelete', bucket, name),
+  distilledQuarantineDeleteReview: (names: string[]) =>
+    ipcRenderer.invoke('distilled:quarantineDeleteReview', names),
   docImport: (p?: string, ollamaUrl?: string) => ipcRenderer.invoke('doc:import', p, ollamaUrl),
   docOcr: (docId: string, ollamaUrl?: string) => ipcRenderer.invoke('doc:ocr', docId, ollamaUrl),
   docList: () => ipcRenderer.invoke('doc:list'),
