@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle2, FileText, FileUp, Import as ImportIcon, Trash2, Upload } from 'lucide-react'
 import { Badge, Button, GlassCard, SourceTile, Spinner } from '../components/ui'
-import { sourceMeta } from '../lib/format'
+import { humanBytes, sourceMeta } from '../lib/format'
 import { pathFromDroppedFile } from '../lib/dropFile'
 import { uiLabels } from '../lib/labels'
 import { api } from '../lib/api'
@@ -17,25 +17,36 @@ import type {
 } from '../lib/types'
 
 const DOC_DROP_EXTENSIONS = new Set(['pdf', 'docx', 'md', 'txt', 'epub'])
+const CHAT_DROP_EXTENSIONS = new Set(['zip', 'json', 'jsonl', 'md', 'txt'])
 
-function isDocDropFile(file: File): boolean {
+function fileExt(file: File): string {
   const name = file.name.toLowerCase()
-  const ext = name.includes('.') ? name.split('.').pop() ?? '' : ''
-  return DOC_DROP_EXTENSIONS.has(ext)
+  return name.includes('.') ? name.split('.').pop() ?? '' : ''
 }
 
-const PROVIDERS: { id: string; how: string }[] = [
-  { id: 'claude-ai', how: 'Settings → Privacy → Export data → conversations.json (ZIP)' },
-  { id: 'chatgpt', how: 'Settings → Data controls → Export data → conversations.json (ZIP)' },
-  { id: 'gemini', how: 'Google Takeout → Gemini Apps activity → JSON' },
-  { id: 'grok', how: 'Account → export conversations → ZIP/JSON' }
-]
+function isDocDropFile(file: File): boolean {
+  return DOC_DROP_EXTENSIONS.has(fileExt(file))
+}
+
+function isChatDropFile(file: File): boolean {
+  return CHAT_DROP_EXTENSIONS.has(fileExt(file))
+}
+
+type DocSortKey = 'date' | 'name' | 'size'
+
+type ChatImportResult = {
+  sealed: number
+  added?: number
+  skipped?: number
+  sources: { source: string; count: number }[]
+}
 
 export default function Import() {
   const { vault, refreshVault, toast, simpleMode, ollamaUrl } = useStore()
   const labels = uiLabels()
   const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<{ sealed: number; sources: { source: string; count: number }[] } | null>(null)
+  const [result, setResult] = useState<ChatImportResult | null>(null)
+  const [chatDragOver, setChatDragOver] = useState(false)
   const [docBusy, setDocBusy] = useState(false)
   const [ocrBusy, setOcrBusy] = useState(false)
   const [docDragOver, setDocDragOver] = useState(false)
@@ -43,6 +54,8 @@ export default function Import() {
   const [docResult, setDocResult] = useState<DocImportResult | DocOcrResult | null>(null)
   const [libraryDocs, setLibraryDocs] = useState<LibraryDocListItem[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [docFilter, setDocFilter] = useState('')
+  const [docSort, setDocSort] = useState<DocSortKey>('date')
 
   const refreshLibraryDocs = useCallback(async () => {
     if (!vault.open) {
@@ -65,29 +78,60 @@ export default function Import() {
     void refreshLibraryDocs()
   }, [refreshLibraryDocs, vault.pendingLibraryIndex])
 
-  async function pickAndImport() {
+  const filteredLibraryDocs = useMemo(() => {
+    const q = docFilter.trim().toLowerCase()
+    let list = libraryDocs
+    if (q) list = list.filter((d) => d.originalName.toLowerCase().includes(q))
+    const sorted = [...list]
+    sorted.sort((a, b) => {
+      if (docSort === 'name') return a.originalName.localeCompare(b.originalName, undefined, { sensitivity: 'base' })
+      if (docSort === 'size') return (b.sourceBytes || 0) - (a.sourceBytes || 0)
+      return (b.importedAt || '').localeCompare(a.importedAt || '')
+    })
+    return sorted
+  }, [libraryDocs, docFilter, docSort])
+
+  const libraryTotalBytes = useMemo(
+    () => libraryDocs.reduce((n, d) => n + (d.sourceBytes || 0), 0),
+    [libraryDocs],
+  )
+
+  function toastChatImport(r: ChatImportResult) {
+    const added = r.added ?? r.sealed
+    const skipped = r.skipped ?? 0
+    if (added > 0 || skipped > 0) {
+      toast({
+        kind: added > 0 ? 'success' : 'warn',
+        title: labels.importChatSealedToast(added, skipped),
+        detail:
+          r.sources.length > 0
+            ? r.sources.map((s) => `${sourceMeta(s.source).label}: ${s.count}`).join(' · ')
+            : skipped > 0
+              ? labels.importChatAllDuplicatesDetail
+              : undefined,
+      })
+      return
+    }
+    toast({ kind: 'warn', title: labels.importChatNothingRecognized })
+  }
+
+  async function importChatFile(filePath?: string) {
     if (!vault.open || busy) return
     setBusy(true)
     setResult(null)
     try {
-      const file = await api.pickFile()
+      const file = filePath ?? (await api.pickFile())
       if (!file) return
       const r = await api.importToVault(file)
       setResult(r)
-      if (r.sealed > 0) {
-        await refreshVault()
-        toast({
-          kind: 'success',
-          title: `Imported ${r.sealed} conversations`,
-          detail: r.sources.map((s) => `${sourceMeta(s.source).label}: ${s.count}`).join(' · ')
-        })
-      } else {
-        toast({ kind: 'warn', title: 'Nothing recognized in that file' })
-      }
+      const added = r.added ?? r.sealed
+      if (added > 0) await refreshVault()
+      toastChatImport(r)
     } catch (e) {
-      toast({ kind: 'error', title: 'Import failed', detail: (e as Error).message })
+      toast({ kind: 'error', title: labels.importChatFailedToast, detail: (e as Error).message })
     } finally {
       setBusy(false)
+      setChatDragOver(false)
     }
   }
 
@@ -102,6 +146,11 @@ export default function Import() {
       const r = await api.docImport(file, ollamaUrl || undefined)
       if (!r) return
       setDocResult(r)
+      if (r.skipped) {
+        toast({ kind: 'warn', title: labels.importDocDuplicateToast })
+        await refreshLibraryDocs()
+        return
+      }
       const detail = `${r.format.toUpperCase()} · ${labels.importDocPagesBadge(r.pages)} · ${r.extractionPath}${r.suggestOcr ? ' · OCR' : ''}`
       if (r.indexed) {
         toast({
@@ -175,9 +224,42 @@ export default function Import() {
     }
   }
 
+  function handleChatDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'copy'
+    if (vault.open && !busy) setChatDragOver(true)
+  }
+
+  function handleChatDragLeave(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setChatDragOver(false)
+  }
+
+  function handleChatDrop(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setChatDragOver(false)
+    if (!vault.open || busy) return
+    const dropped = e.dataTransfer.files[0]
+    if (!dropped) return
+    if (!isChatDropFile(dropped)) {
+      toast({ kind: 'warn', title: labels.importUnsupportedFormat, detail: labels.importFormats })
+      return
+    }
+    const path = pathFromDroppedFile(dropped)
+    if (!path) {
+      toast({ kind: 'error', title: labels.importDropFailed, detail: labels.importDropNoPath })
+      return
+    }
+    void importChatFile(path)
+  }
+
   function handleDocDragOver(e: React.DragEvent) {
     e.preventDefault()
     e.stopPropagation()
+    e.dataTransfer.dropEffect = 'copy'
     if (vault.open && !docBusy && !ocrBusy) setDocDragOver(true)
   }
 
@@ -207,6 +289,16 @@ export default function Import() {
     void importDocFile(path)
   }
 
+  const providers: { id: string; how: string }[] = [
+    { id: 'claude-ai', how: labels.importProviderClaude },
+    { id: 'chatgpt', how: labels.importProviderChatgpt },
+    { id: 'gemini', how: labels.importProviderGemini },
+    { id: 'grok', how: labels.importProviderGrok },
+  ]
+
+  const addedCount = result ? (result.added ?? result.sealed) : 0
+  const skippedCount = result?.skipped ?? 0
+
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-6 flex items-center gap-3">
@@ -224,37 +316,50 @@ export default function Import() {
       <div
         role="button"
         tabIndex={vault.open && !busy ? 0 : -1}
-        onClick={vault.open && !busy ? pickAndImport : undefined}
+        onClick={vault.open && !busy ? () => void importChatFile() : undefined}
         onKeyDown={(e) => {
           if (vault.open && !busy && (e.key === 'Enter' || e.key === ' ')) {
             e.preventDefault()
-            void pickAndImport()
+            void importChatFile()
           }
         }}
-        className={`glass glass-hover mb-5 flex flex-col items-center justify-center gap-3 rounded-[var(--radius-xl)] border border-dashed p-10 text-center ${
-          vault.open && !busy ? 'no-drag cursor-pointer' : ''
-        }`}
+        onDragEnter={handleChatDragOver}
+        onDragOver={handleChatDragOver}
+        onDragLeave={handleChatDragLeave}
+        onDrop={handleChatDrop}
+        className={`glass glass-hover mb-5 flex flex-col items-center justify-center gap-3 rounded-[var(--radius-xl)] border border-dashed p-10 text-center transition-colors ${
+          chatDragOver ? 'border-iris bg-iris/10 ring-1 ring-iris/40' : 'border-white/10'
+        } ${vault.open && !busy ? 'no-drag cursor-pointer' : ''}`}
       >
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/6">
           {busy ? <Spinner className="h-6 w-6 text-iris" /> : <FileUp className="h-6 w-6 text-iris" />}
         </div>
         <div className="text-sm font-semibold text-ink">
-          {busy ? labels.importPickBusy : vault.open ? labels.importPick : labels.importVaultClosed}
+          {busy
+            ? labels.importPickBusy
+            : chatDragOver
+              ? labels.importChatDrop
+              : vault.open
+                ? labels.importPick
+                : labels.importVaultClosed}
         </div>
         <div className="text-xs text-ink-faint">{labels.importFormats}</div>
-        <Button onClick={pickAndImport} disabled={busy || !vault.open} className="mt-1">
-          <Upload className="h-4 w-4" /> {labels.importSelect}
-        </Button>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          role="presentation"
+        >
+          <Button onClick={() => void importChatFile()} disabled={busy || !vault.open} className="mt-1">
+            <Upload className="h-4 w-4" /> {labels.importSelect}
+          </Button>
+        </div>
       </div>
 
-      {result && result.sealed > 0 && (
+      {result && (addedCount > 0 || skippedCount > 0) && (
         <motion.div initial={{ y: 8 }} animate={{ y: 0 }}>
           <GlassCard className="mb-5 flex items-center gap-3 p-4">
-            <CheckCircle2 className="h-5 w-5 text-mint" />
-            <div className="flex-1 text-sm text-ink">
-              Sealed <span className="font-semibold">{result.sealed}</span> conversations into the vault — browse and
-              search them in <span className="text-iris">Chats</span>.
-            </div>
+            <CheckCircle2 className={`h-5 w-5 ${addedCount > 0 ? 'text-mint' : 'text-amber-300'}`} />
+            <div className="flex-1 text-sm text-ink">{labels.importChatSealedToast(addedCount, skippedCount)}</div>
             <div className="flex gap-1.5">
               {result.sources.map((s) => (
                 <Badge key={s.source} color={sourceMeta(s.source).color}>
@@ -278,6 +383,7 @@ export default function Import() {
             void importDocFile()
           }
         }}
+        onDragEnter={handleDocDragOver}
         onDragOver={handleDocDragOver}
         onDragLeave={handleDocDragLeave}
         onDrop={handleDocDrop}
@@ -318,12 +424,22 @@ export default function Import() {
         {(docBusy || ocrBusy) && !docProgress && ocrBusy && (
           <div className="text-xs text-ink-dim">{labels.importDocOcrBusy}</div>
         )}
-        <Button onClick={() => void importDocFile()} disabled={docBusy || ocrBusy || !vault.open} className="mt-1">
-          <Upload className="h-4 w-4" /> {labels.importDocSelect}
-        </Button>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          role="presentation"
+        >
+          <Button
+            onClick={() => void importDocFile()}
+            disabled={docBusy || ocrBusy || !vault.open}
+            className="mt-1"
+          >
+            <Upload className="h-4 w-4" /> {labels.importDocSelect}
+          </Button>
+        </div>
       </div>
 
-      {docResult && (
+      {docResult && !docResult.skipped && (
         <motion.div initial={{ y: 8 }} animate={{ y: 0 }}>
           <GlassCard className="mb-5 flex flex-col gap-2 p-4 text-sm text-ink">
             <div className="flex items-center gap-2">
@@ -373,52 +489,87 @@ export default function Import() {
 
       {vault.open && (
         <div className="mb-5">
-          <div className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-faint">
-            {labels.importDocLibraryTitle}
+          <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-wider text-ink-faint">
+                {labels.importDocLibraryTitle}
+              </div>
+              {libraryDocs.length > 0 && (
+                <div className="mt-0.5 text-xs text-ink-dim">
+                  {labels.importDocLibraryStats(libraryDocs.length, humanBytes(libraryTotalBytes))}
+                </div>
+              )}
+            </div>
           </div>
           {libraryDocs.length === 0 ? (
             <p className="text-xs text-ink-faint">{labels.importDocLibraryEmpty}</p>
           ) : (
-            <div className="flex flex-col gap-2">
-              {libraryDocs.map((doc) => (
-                <GlassCard key={doc.id} className="flex items-center gap-3 p-3">
-                  <FileText className="h-4 w-4 shrink-0 text-iris" />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-ink">{doc.originalName}</div>
-                    <div className="mt-0.5 flex flex-wrap gap-1.5 text-[11px] text-ink-dim">
-                      <Badge color="iris">{doc.format.toUpperCase()}</Badge>
-                      <Badge color="mint">{labels.importDocPagesBadge(doc.pages)}</Badge>
-                      {doc.pendingIndex ? (
-                        <Badge color="rose">{labels.importDocLibraryPending}</Badge>
-                      ) : doc.indexedAt ? (
-                        <Badge color="mint">{labels.importDocLibraryIndexed}</Badge>
-                      ) : (
-                        <Badge color="amber">{labels.importDocNotIndexedBadge}</Badge>
-                      )}
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => void deleteLibraryDoc(doc)}
-                    disabled={!!deletingId || docBusy || ocrBusy}
-                    className="shrink-0"
-                  >
-                    {deletingId === doc.id ? (
-                      <Spinner className="h-4 w-4" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}{' '}
-                    {labels.importDocDelete}
-                  </Button>
-                </GlassCard>
-              ))}
-            </div>
+            <>
+              <div className="mb-2 flex flex-wrap gap-2">
+                <input
+                  type="search"
+                  value={docFilter}
+                  onChange={(e) => setDocFilter(e.target.value)}
+                  placeholder={labels.importDocLibraryFilter}
+                  className="min-w-[12rem] flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-ink outline-none placeholder:text-ink-faint focus:border-iris/50"
+                />
+                <select
+                  value={docSort}
+                  onChange={(e) => setDocSort(e.target.value as DocSortKey)}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-ink outline-none focus:border-iris/50"
+                  aria-label={labels.importDocLibrarySort}
+                >
+                  <option value="date">{labels.importDocLibrarySortDate}</option>
+                  <option value="name">{labels.importDocLibrarySortName}</option>
+                  <option value="size">{labels.importDocLibrarySortSize}</option>
+                </select>
+              </div>
+              {filteredLibraryDocs.length === 0 ? (
+                <p className="text-xs text-ink-faint">{labels.importDocLibraryFilterEmpty}</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {filteredLibraryDocs.map((doc) => (
+                    <GlassCard key={doc.id} className="flex items-center gap-3 p-3">
+                      <FileText className="h-4 w-4 shrink-0 text-iris" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-ink">{doc.originalName}</div>
+                        <div className="mt-0.5 flex flex-wrap gap-1.5 text-[11px] text-ink-dim">
+                          <Badge color="iris">{doc.format.toUpperCase()}</Badge>
+                          <Badge color="mint">{labels.importDocPagesBadge(doc.pages)}</Badge>
+                          <Badge color="amber">{humanBytes(doc.sourceBytes || 0)}</Badge>
+                          {doc.pendingIndex ? (
+                            <Badge color="rose">{labels.importDocLibraryPending}</Badge>
+                          ) : doc.indexedAt ? (
+                            <Badge color="mint">{labels.importDocLibraryIndexed}</Badge>
+                          ) : (
+                            <Badge color="amber">{labels.importDocNotIndexedBadge}</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => void deleteLibraryDoc(doc)}
+                        disabled={!!deletingId || docBusy || ocrBusy}
+                        className="shrink-0"
+                      >
+                        {deletingId === doc.id ? (
+                          <Spinner className="h-4 w-4" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}{' '}
+                        {labels.importDocDelete}
+                      </Button>
+                    </GlassCard>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
 
       <div className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-faint">{labels.importProviders}</div>
       <div className="grid grid-cols-2 gap-3">
-        {PROVIDERS.map((p) => {
+        {providers.map((p) => {
           const m = sourceMeta(p.id)
           return (
             <GlassCard key={p.id} className="flex items-start gap-3 p-4">

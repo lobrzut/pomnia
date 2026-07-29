@@ -16,6 +16,8 @@ export interface DocImportResult {
   brainAutoStarted: boolean
   indexError?: string
   encrypted: boolean
+  /** True when contentSha already present in library — import was a no-op. */
+  skipped?: boolean
 }
 
 /** Result of on-demand OCR + optional single-doc re-index. */

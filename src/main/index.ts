@@ -803,10 +803,27 @@ function registerIpc(): void {
 
   // Import an export archive (Claude.ai/ChatGPT/Gemini/Grok/…) → seal its
   // conversations into the open vault as snapshot(s), one per detected source.
+  // Dedup by conversation id across existing snapshots — return added vs skipped.
   ipcMain.handle('import:toVault', async (_e, p: string) => {
     const v = requireVault()
     const { conversations } = await parseExportPath(p)
-    if (!conversations.length) return { sealed: 0, sources: [] as { source: string; count: number }[] }
+    if (!conversations.length) {
+      return { sealed: 0, added: 0, skipped: 0, sources: [] as { source: string; count: number }[] }
+    }
+
+    const existingIds = new Set<string>()
+    for (const s of v.getManifest().snapshots) {
+      const payload = await v.getSnapshotPayload(s.id).catch(() => null)
+      if (!payload) continue
+      for (const c of payload.conversations) existingIds.add(c.id)
+    }
+
+    const fresh = conversations.filter((c) => !existingIds.has(c.id))
+    const skipped = conversations.length - fresh.length
+    if (!fresh.length) {
+      return { sealed: 0, added: 0, skipped, sources: [] as { source: string; count: number }[] }
+    }
+
     const labels: Record<string, string> = {
       'claude-ai': 'Claude.ai',
       chatgpt: 'ChatGPT',
@@ -815,7 +832,7 @@ function registerIpc(): void {
       generic: 'Imported'
     }
     const groups = new Map<string, Conversation[]>()
-    for (const c of conversations) {
+    for (const c of fresh) {
       const arr = groups.get(c.source) ?? []
       arr.push(c)
       groups.set(c.source, arr)
@@ -834,7 +851,7 @@ function registerIpc(): void {
       await v.addSnapshot(meta, convs, [])
       sources.push({ source: src, count: convs.length })
     }
-    return { sealed: conversations.length, sources }
+    return { sealed: fresh.length, added: fresh.length, skipped, sources }
   })
 
   ipcMain.handle('reveal', (_e, p: string) => shell.openPath(p))

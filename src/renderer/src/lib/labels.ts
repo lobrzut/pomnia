@@ -311,6 +311,11 @@ export interface UiLabels {
   importFormats: string
   importSelect: string
   importChatSection: string
+  importChatDrop: string
+  importChatSealedToast: (added: number, skipped: number) => string
+  importChatAllDuplicatesDetail: string
+  importChatNothingRecognized: string
+  importChatFailedToast: string
   importDocSection: string
   importDocPick: string
   importDocBusy: string
@@ -320,6 +325,7 @@ export interface UiLabels {
   importDropFailed: string
   importDropNoPath: string
   importUnsupportedFormat: string
+  importDocDuplicateToast: string
   importDocDone: string
   importDocOcrHint: string
   importDocOcrRun: string
@@ -343,6 +349,13 @@ export interface UiLabels {
   importDocProgressEncrypt: string
   importDocLibraryTitle: string
   importDocLibraryEmpty: string
+  importDocLibraryStats: (count: number, size: string) => string
+  importDocLibraryFilter: string
+  importDocLibraryFilterEmpty: string
+  importDocLibrarySort: string
+  importDocLibrarySortDate: string
+  importDocLibrarySortName: string
+  importDocLibrarySortSize: string
   importDocLibraryPending: string
   importDocLibraryIndexed: string
   importDocDelete: string
@@ -350,6 +363,10 @@ export interface UiLabels {
   importDocDeletedToast: (name: string) => string
   importDocDeleteFailedToast: string
   importProviders: string
+  importProviderClaude: string
+  importProviderChatgpt: string
+  importProviderGemini: string
+  importProviderGrok: string
   importLegalNote: string
   brainStateTitle: string
   brainStateLastDistill: (rel: string) => string
@@ -736,14 +753,20 @@ const PL_LABELS: UiLabels = {
   previewMode: 'Tryb podglądu (bez backendu Electron) — dane są przykładowe.',
   importTitle: 'Importuj',
   importLead: 'Wgraj eksport z Claude.ai, ChatGPT, Gemini albo Grok — trafi do vaultu.',
-  importPick: 'Wybierz plik eksportu',
+  importPick: 'Wybierz plik eksportu lub upuść tutaj',
   importPickBusy: 'Importuję…',
   importVaultClosed: 'Najpierw odblokuj vault',
   importFormats: 'ZIP · JSON · JSONL · MD — rozpoznaje źródło automatycznie',
   importSelect: 'Wybierz plik…',
   importChatSection: 'Eksporty czatów',
+  importChatDrop: 'Upuść eksport tutaj',
+  importChatSealedToast: (added, skipped) =>
+    `Zapieczętowano ${added} nowych · pominięto ${skipped}${skipped ? ' (już w vaulcie)' : ''}`,
+  importChatAllDuplicatesDetail: 'Wszystkie rozmowy były już w vaulcie.',
+  importChatNothingRecognized: 'Nic rozpoznawalnego w tym pliku',
+  importChatFailedToast: 'Import czatów nie powiódł się',
   importDocSection: 'Dokumenty',
-  importDocPick: 'Wybierz PDF, DOCX lub EPUB',
+  importDocPick: 'Wybierz PDF, DOCX lub EPUB — albo upuść tutaj',
   importDocBusy: 'Importuję dokument…',
   importDocFormats: 'PDF · DOCX · EPUB · MD · TXT — zaszyfrowane w vault, indeks w wyszukiwarce',
   importDocSelect: 'Wybierz dokument…',
@@ -751,6 +774,7 @@ const PL_LABELS: UiLabels = {
   importDropFailed: 'Upuszczenie nie powiodło się',
   importDropNoPath: 'Nie udało się odczytać ścieżki pliku. Użyj „Wybierz plik…”.',
   importUnsupportedFormat: 'Nieobsługiwany format',
+  importDocDuplicateToast: 'Dokument już jest w vaulcie — pominięto',
   importDocDone: 'Dokument zaimportowany',
   importDocOcrHint: 'Mało tekstu — prawdopodobnie skan. Uruchom OCR, potem zindeksujemy ten dokument.',
   importDocOcrRun: 'Uruchom OCR',
@@ -774,6 +798,13 @@ const PL_LABELS: UiLabels = {
   importDocProgressEncrypt: 'Szyfrowanie w vault',
   importDocLibraryTitle: 'Dokumenty w vault',
   importDocLibraryEmpty: 'Brak zaimportowanych dokumentów w library.cvb.',
+  importDocLibraryStats: (count, size) => `${count} dok. · ${size}`,
+  importDocLibraryFilter: 'Filtruj po nazwie…',
+  importDocLibraryFilterEmpty: 'Brak dokumentów pasujących do filtra.',
+  importDocLibrarySort: 'Sortuj dokumenty',
+  importDocLibrarySortDate: 'Data dodania',
+  importDocLibrarySortName: 'Nazwa',
+  importDocLibrarySortSize: 'Rozmiar',
   importDocLibraryPending: 'czeka na indeks',
   importDocLibraryIndexed: 'zindeksowany',
   importDocDelete: 'Usuń',
@@ -782,6 +813,11 @@ const PL_LABELS: UiLabels = {
   importDocDeletedToast: (name) => `Usunięto ${name}`,
   importDocDeleteFailedToast: 'Nie udało się usunąć dokumentu',
   importProviders: 'Skąd pobrać eksport',
+  importProviderClaude: 'Settings → Privacy → Export data → conversations.json (ZIP)',
+  importProviderChatgpt: 'Settings → Data controls → Export data → conversations.json (ZIP)',
+  importProviderGemini:
+    'Takeout → My Activity → tylko Gemini Apps → Multiple formats → JSON (nie HTML / nie Gems)',
+  importProviderGrok: 'Account → export conversations → ZIP/JSON',
   importLegalNote:
     'Pomnia importuje tylko oficjalne eksporty — bez logowania do kont. Claude Desktop / Gemini wymagają eksportu z wersji webowej.',
   brainStateTitle: 'Stan Brain',
@@ -1284,6 +1320,15 @@ const EN_LABELS: Partial<UiLabels> = {
   brainPipeDeployNote: 'to Brain',
   importDropFailed: 'Drop failed',
   importDropNoPath: 'Pick a file from disk (browser preview has no path).',
+  importPick: 'Choose an export file or drop it here',
+  importChatDrop: 'Drop export here',
+  importChatSealedToast: (added, skipped) =>
+    `Sealed ${added} new · skipped ${skipped}${skipped ? ' (already in vault)' : ''}`,
+  importChatAllDuplicatesDetail: 'Every conversation was already in the vault.',
+  importChatNothingRecognized: 'Nothing recognized in that file',
+  importChatFailedToast: 'Chat import failed',
+  importDocPick: 'Choose PDF, DOCX, or EPUB — or drop it here',
+  importDocDuplicateToast: 'Document already in the vault — skipped',
   importDocIndexedToast: (chunks) => `Indexed ${chunks} chunk(s)`,
   importDocQueuedToast: 'Saved — index after Brain starts',
   importDocNotIndexedBadge: 'no index',
@@ -1296,6 +1341,13 @@ const EN_LABELS: Partial<UiLabels> = {
   importDocProgressBrainStart: 'Starting search',
   importDocLibraryTitle: 'Documents in vault',
   importDocLibraryEmpty: 'No imported documents in library.cvb.',
+  importDocLibraryStats: (count, size) => `${count} doc(s) · ${size}`,
+  importDocLibraryFilter: 'Filter by name…',
+  importDocLibraryFilterEmpty: 'No documents match the filter.',
+  importDocLibrarySort: 'Sort documents',
+  importDocLibrarySortDate: 'Date added',
+  importDocLibrarySortName: 'Name',
+  importDocLibrarySortSize: 'Size',
   importDocLibraryPending: 'pending index',
   importDocLibraryIndexed: 'indexed',
   importDocDelete: 'Delete',
@@ -1303,6 +1355,11 @@ const EN_LABELS: Partial<UiLabels> = {
     `Delete “${name}”? Only this document’s blobs are removed (not chats/snapshots).`,
   importDocDeletedToast: (name) => `Deleted ${name}`,
   importDocDeleteFailedToast: 'Could not delete document',
+  importProviderClaude: 'Settings → Privacy → Export data → conversations.json (ZIP)',
+  importProviderChatgpt: 'Settings → Data controls → Export data → conversations.json (ZIP)',
+  importProviderGemini:
+    'Takeout → My Activity → Gemini Apps only → Multiple formats → JSON (not HTML / not Gems)',
+  importProviderGrok: 'Account → export conversations → ZIP/JSON',
   guideTitle: 'Pomnia map',
   guideSubtitle: 'How it works',
   guideFlowReplay: 'Replay demo',

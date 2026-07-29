@@ -9,7 +9,8 @@
  * Supported:
  *   - Claude.ai export   (conversations.json: [{uuid,name,chat_messages:[{sender,text|content}]}])
  *   - ChatGPT export     (conversations.json: [{title,mapping:{id:{message:{author,content.parts}}}}])
- *   - Grok / Gemini      (best-effort generic conversation extraction)
+ *   - Gemini Takeout     (My Activity/Gemini Apps/MyActivity.json — activity log → group by chat id)
+ *   - Grok / generic     (best-effort conversation extraction)
  *   - generic JSON/JSONL/MD/TXT
  *
  * ZIP archives are unpacked in-memory with fflate (pure JS, no native deps).
@@ -29,12 +30,35 @@ export interface ImportResult {
 let counter = 0
 const rid = () => `imp-${Date.now().toString(36)}-${(counter++).toString(36)}`
 
+/** Sidecar / metadata files in Claude.ai (and similar) zips — not conversations. */
+const SKIP_ZIP_BASENAMES = new Set([
+  'users.json',
+  'projects.json',
+  'memories.json',
+  'memory.json',
+  'billing.json',
+  'account.json',
+  'profile.json',
+])
+
+function basenameLower(entryPath: string): string {
+  const norm = entryPath.replace(/\\/g, '/')
+  const base = norm.includes('/') ? norm.slice(norm.lastIndexOf('/') + 1) : norm
+  return base.toLowerCase()
+}
+
 function txt(v: unknown): string {
   if (v == null) return ''
   if (typeof v === 'string') return sanitizeUnicode(v)
   if (Array.isArray(v))
     return v
-      .map((p) => (typeof p === 'string' ? p : (p as { text?: string })?.text ?? ''))
+      .map((p) => {
+        if (typeof p === 'string') return p
+        const o = p as { text?: string; thinking?: string; type?: string }
+        if (typeof o.text === 'string') return o.text
+        if (o.type === 'thinking' && typeof o.thinking === 'string') return o.thinking
+        return ''
+      })
       .filter(Boolean)
       .join('\n')
   if (typeof v === 'object') {
@@ -43,6 +67,13 @@ function txt(v: unknown): string {
     if (o.parts || o.content) return txt(o.parts ?? o.content)
   }
   return ''
+}
+
+/** Prefer non-empty text; Claude often ships `text: ""` with real body in `content[]`. */
+function messageBody(m: Record<string, unknown>): string {
+  const direct = typeof m.text === 'string' ? m.text : ''
+  if (direct.trim()) return sanitizeUnicode(direct)
+  return txt(m.content ?? m.parts ?? m.message)
 }
 
 function isoFrom(v: unknown): string | undefined {
@@ -78,16 +109,24 @@ function parseClaudeAi(arr: Record<string, unknown>[]): Conversation[] {
     if (!Array.isArray(raw)) continue
     const messages: Message[] = raw.map((m) => ({
       role: (m.sender === 'human' || m.role === 'user' ? 'user' : 'assistant') as Role,
-      text: txt(m.text ?? m.content),
+      text: messageBody(m),
       ts: isoFrom(m.created_at)
     }))
+    const project =
+      typeof c.project_uuid === 'string' && c.project_uuid
+        ? c.project_uuid
+        : typeof c.project === 'string'
+          ? c.project
+          : undefined
     const conv = finalize({
       id: String(c.uuid || c.id || rid()),
       source: 'claude-ai',
       title: String(c.name || c.title || ''),
       createdAt: isoFrom(c.created_at),
       updatedAt: isoFrom(c.updated_at),
-      messages
+      project,
+      messages,
+      meta: project ? { project_uuid: project } : undefined
     })
     if (conv) out.push(conv)
   }
@@ -134,7 +173,7 @@ function parseGeneric(arr: Record<string, unknown>[], source: SourceId): Convers
       const role = (m.role || m.sender || (m.author as { role?: string })?.role || (m.from as string)) as string
       return {
         role: (role === 'user' || role === 'human' ? 'user' : role === 'system' ? 'system' : 'assistant') as Role,
-        text: txt(m.text ?? m.content ?? m.message ?? m.parts),
+        text: messageBody(m),
         ts: isoFrom(m.created_at ?? m.create_time ?? m.timestamp)
       }
     })
@@ -158,7 +197,7 @@ function parseJsonl(text: string, source: SourceId, name: string): Conversation[
     try {
       const o = JSON.parse(t) as Record<string, unknown>
       const role = (o.role || o.sender || (o.author as { role?: string })?.role) as string
-      const text = txt(o.text ?? o.content ?? o.message)
+      const text = messageBody(o)
       if (text.trim()) messages.push({ role: (role === 'user' || role === 'human' ? 'user' : 'assistant') as Role, text })
     } catch {
       /* skip */
@@ -168,10 +207,159 @@ function parseJsonl(text: string, source: SourceId, name: string): Conversation[
   return conv ? [conv] : []
 }
 
+/** Pull plain text out of Gemini Takeout request/response JSON blobs. */
+function geminiBlobText(raw: unknown): string {
+  if (raw == null) return ''
+  if (typeof raw === 'string') {
+    const s = raw.trim()
+    if (!s) return ''
+    if (s.startsWith('[') || s.startsWith('{')) {
+      try {
+        return geminiBlobText(JSON.parse(s))
+      } catch {
+        return sanitizeUnicode(s)
+      }
+    }
+    return sanitizeUnicode(s)
+  }
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => {
+        if (typeof item === 'string') return geminiBlobText(item)
+        if (item && typeof item === 'object') {
+          const o = item as Record<string, unknown>
+          if (typeof o.text === 'string') return o.text
+          if (Array.isArray(o.parts)) return geminiBlobText(o.parts)
+          if (o.text !== undefined) return geminiBlobText(o.text)
+        }
+        return ''
+      })
+      .filter(Boolean)
+      .join('\n')
+  }
+  if (typeof raw === 'object') {
+    const o = raw as Record<string, unknown>
+    if (typeof o.text === 'string') return sanitizeUnicode(o.text)
+    if (o.parts) return geminiBlobText(o.parts)
+    if (o.request || o.response) return geminiBlobText(o.request ?? o.response)
+  }
+  return ''
+}
+
+function geminiConversationId(titleUrl: unknown, fallback: string): string {
+  if (typeof titleUrl !== 'string' || !titleUrl) return fallback
+  const m =
+    titleUrl.match(/\/app\/(?:c\/)?([^/?#]+)/i) ||
+    titleUrl.match(/[?&]c(?:onversation)?=([^&#]+)/i) ||
+    titleUrl.match(/\/chat\/([^/?#]+)/i)
+  return m?.[1] ? decodeURIComponent(m[1]) : fallback
+}
+
+function isGeminiActivityEntry(item: Record<string, unknown>): boolean {
+  const products = item.products
+  if (Array.isArray(products) && products.some((p) => /gemini/i.test(String(p)))) return true
+  if (typeof item.header === 'string' && /gemini/i.test(item.header)) return true
+  if (typeof item.titleUrl === 'string' && /gemini\.google\.com/i.test(item.titleUrl)) return true
+  return false
+}
+
+/**
+ * Google Takeout → My Activity → Gemini Apps → MyActivity.json
+ * Activity log (not threaded chats): group by conversation id from titleUrl.
+ */
+export function parseGeminiActivity(arr: Record<string, unknown>[]): Conversation[] {
+  type Bucket = { id: string; title: string; createdAt?: string; updatedAt?: string; messages: Message[] }
+  const buckets = new Map<string, Bucket>()
+
+  for (let i = 0; i < arr.length; i++) {
+    const item = arr[i]
+    if (!item || typeof item !== 'object') continue
+    if (!isGeminiActivityEntry(item) && !item.details && !item.userInteractions && !item.titleUrl) {
+      // Allow plain Takeout rows that still have details/interactions.
+      if (!item.time && !item.title) continue
+    }
+
+    const id = geminiConversationId(item.titleUrl, `gemini-${i}`)
+    let bucket = buckets.get(id)
+    if (!bucket) {
+      bucket = { id, title: '', createdAt: undefined, updatedAt: undefined, messages: [] }
+      buckets.set(id, bucket)
+    }
+
+    const ts = isoFrom(item.time)
+    if (ts) {
+      if (!bucket.createdAt || ts < bucket.createdAt) bucket.createdAt = ts
+      if (!bucket.updatedAt || ts > bucket.updatedAt) bucket.updatedAt = ts
+    }
+
+    const details = item.details as { name?: string; value?: string }[] | undefined
+    if (Array.isArray(details)) {
+      for (const d of details) {
+        const name = String(d?.name || '')
+        const value = typeof d?.value === 'string' ? sanitizeUnicode(d.value) : ''
+        if (!value.trim()) continue
+        if (/^request$/i.test(name) || /^prompt$/i.test(name)) {
+          bucket.messages.push({ role: 'user', text: value, ts })
+        } else if (/^response$/i.test(name)) {
+          bucket.messages.push({ role: 'assistant', text: value, ts })
+        }
+      }
+    }
+
+    const interactions = item.userInteractions as Record<string, unknown>[] | undefined
+    if (Array.isArray(interactions)) {
+      for (const row of interactions) {
+        const ui = (row?.userInteraction ?? row) as Record<string, unknown>
+        const req = geminiBlobText(ui?.request)
+        const res = geminiBlobText(ui?.response)
+        if (req.trim()) bucket.messages.push({ role: 'user', text: req, ts })
+        if (res.trim()) bucket.messages.push({ role: 'assistant', text: res, ts })
+      }
+    }
+
+    // Fallback: title often holds the user prompt when details are missing.
+    if (!details?.length && !interactions?.length) {
+      const title = typeof item.title === 'string' ? item.title.trim() : ''
+      if (title && !/^used gemini/i.test(title) && !/^gemini apps$/i.test(title)) {
+        bucket.messages.push({ role: 'user', text: sanitizeUnicode(title), ts })
+      }
+    }
+
+    if (!bucket.title) {
+      const t = typeof item.title === 'string' ? item.title.trim() : ''
+      if (t && !/^used gemini/i.test(t)) bucket.title = t.slice(0, 80)
+    }
+  }
+
+  const out: Conversation[] = []
+  for (const b of buckets.values()) {
+    // Keep chronological order within a conversation.
+    b.messages.sort((a, c) => (a.ts || '').localeCompare(c.ts || ''))
+    const conv = finalize({
+      id: b.id,
+      source: 'gemini',
+      title: b.title,
+      createdAt: b.createdAt,
+      updatedAt: b.updatedAt,
+      messages: b.messages
+    })
+    if (conv) out.push(conv)
+  }
+  return out
+}
+
+function looksLikeGeminiActivity(json: unknown, name: string): boolean {
+  const n = name.toLowerCase().replace(/\\/g, '/')
+  if (/myactivity\.json$/.test(n) || /gemini apps/.test(n) || /my activity/.test(n)) return true
+  if (!Array.isArray(json) || json.length === 0) return false
+  const sample = json.slice(0, 8) as Record<string, unknown>[]
+  return sample.some((x) => x && typeof x === 'object' && isGeminiActivityEntry(x))
+}
+
 function detectSource(name: string, json: unknown): SourceId {
-  const n = name.toLowerCase()
+  const n = name.toLowerCase().replace(/\\/g, '/')
   if (/grok/.test(n)) return 'grok'
-  if (/gemini|takeout/.test(n)) return 'gemini'
+  if (looksLikeGeminiActivity(json, n) || /gemini|takeout/.test(n)) return 'gemini'
   const arr = asConvArray(json)
   if (arr.some((x) => x?.mapping)) return 'chatgpt'
   if (arr.some((x) => x?.chat_messages)) return 'claude-ai'
@@ -181,11 +369,27 @@ function detectSource(name: string, json: unknown): SourceId {
 }
 
 function routeJson(json: unknown, name: string): Conversation[] {
+  if (looksLikeGeminiActivity(json, name)) {
+    return parseGeminiActivity(asConvArray(json))
+  }
   const source = detectSource(name, json)
   const arr = asConvArray(json)
   if (source === 'chatgpt' || arr.some((x) => x?.mapping)) return parseChatGPT(arr)
   if (source === 'claude-ai' || arr.some((x) => x?.chat_messages)) return parseClaudeAi(arr)
+  if (source === 'gemini') return parseGeminiActivity(arr)
   return parseGeneric(arr, source)
+}
+
+/** Which zip entries look like conversation payloads (skip Claude sidecars). */
+function zipJsonEntries(names: string[]): string[] {
+  const jsonish = names.filter((n) => /\.jsonl?$/i.test(n) && !SKIP_ZIP_BASENAMES.has(basenameLower(n)))
+  const preferred = jsonish.filter((n) => {
+    const b = basenameLower(n)
+    return b === 'conversations.json' || b === 'conversation.json' || b === 'myactivity.json'
+  })
+  if (preferred.length) return preferred
+  // No canonical file — keep remaining json/jsonl (Gemini nested paths, Grok, etc.)
+  return jsonish
 }
 
 /** Parse a single file's bytes (zip / json / jsonl / md) into conversations. */
@@ -195,16 +399,17 @@ export function parseExportBuffer(buf: Uint8Array, filename: string): ImportResu
 
   if (isZip) {
     const files = unzipSync(buf)
-    // Prefer conversations.json; otherwise any *.json.
-    const names = Object.keys(files).sort((a, b) =>
-      (/conversations?\.json$/i.test(b) ? 1 : 0) - (/conversations?\.json$/i.test(a) ? 1 : 0)
-    )
+    const names = zipJsonEntries(Object.keys(files))
     for (const n of names) {
-      if (!/\.jsonl?$/i.test(n)) continue
       const text = strFromU8(files[n])
       try {
-        if (n.toLowerCase().endsWith('.jsonl')) conversations.push(...parseJsonl(text, detectSource(filename, null), n))
-        else conversations.push(...routeJson(JSON.parse(text), filename || n))
+        // Detect from entry path AND archive name (Claude zip often named data-….zip).
+        const detectName = `${filename} ${n}`
+        if (n.toLowerCase().endsWith('.jsonl')) {
+          conversations.push(...parseJsonl(text, detectSource(detectName, null), n))
+        } else {
+          conversations.push(...routeJson(JSON.parse(text), detectName))
+        }
       } catch {
         /* skip malformed entry */
       }
@@ -214,7 +419,12 @@ export function parseExportBuffer(buf: Uint8Array, filename: string): ImportResu
     const lower = filename.toLowerCase()
     if (lower.endsWith('.jsonl')) conversations.push(...parseJsonl(text, detectSource(filename, null), filename))
     else if (lower.endsWith('.md') || lower.endsWith('.txt')) {
-      const conv = finalize({ id: rid(), source: 'generic', title: path.basename(filename), messages: [{ role: 'user', text: sanitizeUnicode(text) }] })
+      const conv = finalize({
+        id: rid(),
+        source: 'generic',
+        title: path.basename(filename),
+        messages: [{ role: 'user', text: sanitizeUnicode(text) }]
+      })
       if (conv) conversations.push(conv)
     } else {
       try {
