@@ -6,10 +6,12 @@ import { MessagesSquare, Search } from 'lucide-react'
 import { GlassCard, Input, SourceTile, Spinner } from '../components/ui'
 import { relativeTime, sourceMeta } from '../lib/format'
 import { api } from '../lib/api'
+import { uiLabels } from '../lib/labels'
 import type { Conversation, ConversationMeta, SourceId, TextHit } from '../lib/types'
 import { useStore } from '../store/useStore'
 
 export default function Browse() {
+  const labels = uiLabels()
   const { vault } = useStore()
   const [list, setList] = useState<ConversationMeta[]>([])
   const [loading, setLoading] = useState(false)
@@ -61,8 +63,8 @@ export default function Browse() {
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl glass">
           <MessagesSquare className="h-7 w-7 text-ink-faint" />
         </div>
-        <h2 className="text-lg font-semibold text-ink">No vault open</h2>
-        <p className="mt-1 text-sm text-ink-dim">Unlock a vault to browse and search your aggregated chats.</p>
+        <h2 className="text-lg font-semibold text-ink">{labels.dashboardNoVaultTitle}</h2>
+        <p className="mt-1 text-sm text-ink-dim">{labels.browseNoVaultLead}</p>
       </div>
     )
 
@@ -71,35 +73,35 @@ export default function Browse() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-5">
-        <h1 className="text-[26px] font-bold tracking-tight text-grad">Chats</h1>
+        <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.navBrowse}</h1>
         <p className="mt-1 text-sm text-ink-dim">
           {loading
-            ? 'Loading conversations from your vault…'
+            ? labels.browseLeadLoading
             : list.length === 0
-              ? 'No conversations in this vault yet — import some from the Import tab.'
-              : `${list.length} conversations aggregated from every source — searched locally, no GPU.`}
+              ? labels.browseLeadEmpty
+              : labels.browseLeadCount(list.length)}
         </p>
       </div>
 
-      <div className="mb-4 flex items-center gap-3">
-        <div className="relative flex-1">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[12rem] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="search across all chat content…"
+            placeholder={labels.browseSearchPlaceholder}
             className="pl-9"
           />
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {['all', ...sources].map((s) => {
             const active = sourceFilter === s
-            const label = s === 'all' ? 'All' : sourceMeta(s).label
+            const label = s === 'all' ? labels.browseFilterAll : sourceMeta(s).label
             return (
               <button
                 key={s}
                 onClick={() => setSourceFilter(s as SourceId | 'all')}
-                className={`no-drag rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`no-drag shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                   active ? 'bg-white/14 text-ink border border-white/15' : 'text-ink-faint hover:text-ink-dim'
                 }`}
               >
@@ -115,11 +117,11 @@ export default function Browse() {
         <div className="max-h-[64vh] space-y-2 overflow-y-auto pr-1">
           {loading ? (
             <div className="flex items-center gap-2 p-4 text-sm text-ink-dim">
-              <Spinner className="h-4 w-4" /> loading…
+              <Spinner className="h-4 w-4" /> {labels.browseLoading}
             </div>
           ) : showingHits ? (
             hits!.length === 0 ? (
-              <p className="p-4 text-sm text-ink-faint">No content matches.</p>
+              <p className="p-4 text-sm text-ink-faint">{labels.browseNoMatches}</p>
             ) : (
               hits!.map((h) => {
                 const m = sourceMeta(h.source)
@@ -131,7 +133,9 @@ export default function Browse() {
                   >
                     <div className="flex items-center gap-2 text-xs">
                       <span style={{ color: m.color }}>{m.label}</span>
-                      {h.matches > 0 && <span className="text-ink-faint">· {h.matches} hits</span>}
+                      {h.matches > 0 && (
+                        <span className="text-ink-faint">· {labels.browseHits(h.matches)}</span>
+                      )}
                     </div>
                     <div className="mt-0.5 truncate text-sm font-medium text-ink">{h.title}</div>
                     <div className="mt-1 line-clamp-2 text-xs text-ink-dim">{h.snippet}</div>
@@ -143,12 +147,10 @@ export default function Browse() {
             <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-white/10 px-4 py-8 text-center">
               <MessagesSquare className="h-6 w-6 text-ink-faint" />
               <p className="text-sm text-ink-dim">
-                {list.length === 0 ? 'Nothing here yet.' : 'No chats from this source.'}
+                {list.length === 0 ? labels.browseEmptyYet : labels.browseEmptySource}
               </p>
               <p className="text-[11px] text-ink-faint">
-                {list.length === 0
-                  ? 'Run a backup from the Dashboard or bring exports in via Import.'
-                  : 'Pick another source filter above.'}
+                {list.length === 0 ? labels.browseEmptyYetHint : labels.browseEmptySourceHint}
               </p>
             </div>
           ) : (
@@ -168,7 +170,7 @@ export default function Browse() {
                     <div className="truncate text-sm font-medium text-ink">{c.title}</div>
                     <div className="flex items-center gap-2 text-[11px] text-ink-faint">
                       <span style={{ color: m.color }}>{m.label}</span>
-                      <span>· {c.messages} msgs</span>
+                      <span>· {labels.browseMsgs(c.messages)}</span>
                       <span>· {relativeTime(c.updatedAt)}</span>
                     </div>
                   </div>
@@ -182,7 +184,7 @@ export default function Browse() {
         <GlassCard className="max-h-[64vh] overflow-hidden p-0">
           {!open ? (
             <div className="flex h-full min-h-[40vh] items-center justify-center p-6 text-center text-sm text-ink-faint">
-              Select a conversation to read it.
+              {labels.browseSelectToRead}
             </div>
           ) : loadingConv || !open.conv ? (
             <div className="flex h-full items-center justify-center p-6">
@@ -193,7 +195,7 @@ export default function Browse() {
               <div className="border-b border-white/8 p-4">
                 <div className="truncate font-semibold text-ink">{open.conv.title}</div>
                 <div className="mt-0.5 text-xs text-ink-faint">
-                  {sourceMeta(open.conv.source).label} · {open.conv.messages.length} messages
+                  {sourceMeta(open.conv.source).label} · {labels.browseMessages(open.conv.messages.length)}
                   {open.conv.project ? ` · ${open.conv.project}` : ''}
                 </div>
               </div>

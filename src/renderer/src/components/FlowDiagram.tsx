@@ -668,6 +668,13 @@ export function FlowDiagram({
     }
   }, [replayKey, replaySnapshot])
 
+  const focusMode = visual.focusMode && !demoActive
+  const showFocusBanner = focusMode && !pip
+  const showLegend = !mini && !flowLive
+  const showWaitingCaption = !flowLive && !hoverId && !isFinale
+
+  // Title/detail lives only in the focus strip (truncated) — never raw chat titles in the caption
+  // (screenshots / PiP chrome must not leak conversation content twice).
   const hint =
     hoverId != null
       ? (nodes.find((n) => n.id === hoverId)?.hint ?? labels.flowIdleHoverCaption)
@@ -675,16 +682,11 @@ export function FlowDiagram({
         ? labels.flowFinaleCaption
         : demoActive
           ? (nodes.find((n) => n.step === demoStep)?.hint ?? labels.flowIdleHoverCaption)
-          : (isBusy || replayActive) &&
-              displayActivity.kind !== 'finale' &&
-              displayActivity.detail
-            ? displayActivity.detail
-            : labels.flowIdleHoverCaption
-
-  const focusMode = visual.focusMode && !demoActive
-  const showFocusBanner = focusMode && !pip
-  const showLegend = !mini && !flowLive
-  const showWaitingCaption = !flowLive && !hoverId && !isFinale
+          : showFocusBanner
+            ? labels.flowIdleHoverCaption
+            : (isBusy || replayActive) && displayActivity.kind !== 'finale'
+              ? labels.flowLiveBadge(displayActivity)
+              : labels.flowIdleHoverCaption
 
   function isNodeActive(nodeId: string): boolean {
     if (!focusMode) return true
@@ -750,32 +752,6 @@ export function FlowDiagram({
         >
           <Plug className="h-3 w-3 text-iris" aria-hidden />
           <span className="font-medium text-iris/90">{labels.flowLastMcpBadge(lastMcpTool)}</span>
-        </div>
-      )}
-
-      {showFocusBanner && (
-        <div
-          className={clsx(
-            'absolute left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border shadow-xl backdrop-blur-md',
-            mini
-              ? 'top-2 max-w-[92%] border-emerald/40 bg-[#06070d]/94 px-2.5 py-1 text-[9px]'
-              : 'top-4 max-w-[90%] border-emerald/45 bg-[#06070d]/92 px-4 py-2.5 text-sm',
-            isFinale && 'border-iris/45',
-            isMcpQuery && !isFinale && 'border-iris/40',
-          )}
-          role="status"
-          aria-live="polite"
-        >
-          <span className={clsx('flow-live-dot shrink-0', mini && 'h-1.5 w-1.5')} aria-hidden />
-          <span
-            className={clsx(
-              'font-semibold leading-snug',
-              isFinale || isMcpQuery ? 'text-iris' : 'text-emerald',
-              mini && 'text-[9px]',
-            )}
-          >
-            {labels.flowFocusBanner(displayActivity)}
-          </span>
         </div>
       )}
 
@@ -949,7 +925,33 @@ export function FlowDiagram({
         </div>
       </div>
 
-      {mini && !pip && (
+      {/* Narrow strip BELOW the drawing area — never overlays library.db / MCP nodes */}
+      {showFocusBanner && (
+        <div
+          className={clsx(
+            'flex min-w-0 items-center justify-center gap-2 border-t px-3 py-1.5',
+            mini
+              ? 'border-emerald/30 bg-[#06070d]/90 text-[9px]'
+              : 'border-emerald/35 bg-black/40 text-xs',
+            isFinale && 'border-iris/40',
+            isMcpQuery && !isFinale && 'border-iris/35',
+          )}
+          role="status"
+          aria-live="polite"
+        >
+          <span className={clsx('flow-live-dot shrink-0', mini && 'h-1.5 w-1.5')} aria-hidden />
+          <span
+            className={clsx(
+              'min-w-0 truncate font-semibold leading-snug',
+              isFinale || isMcpQuery ? 'text-iris' : 'text-emerald',
+            )}
+          >
+            {labels.flowFocusBanner(displayActivity)}
+          </span>
+        </div>
+      )}
+
+      {mini && !pip && !showFocusBanner && (
         <p className="border-t border-white/6 bg-black/25 px-3 py-1.5 text-center text-[10px] text-ink-dim">
           {labels.flowMiniStatus(globalActivity)}
         </p>

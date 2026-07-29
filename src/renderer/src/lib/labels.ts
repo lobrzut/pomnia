@@ -26,7 +26,7 @@ const ACTIVITY_KIND_EN: Record<Exclude<ActivityState['kind'], 'idle'>, string> =
   finale: 'index ready',
 }
 
-function truncateDetail(s: string, max = 48): string {
+function truncateDetail(s: string, max = 60): string {
   const t = s.trim()
   if (t.length <= max) return t
   return `${t.slice(0, max - 1)}…`
@@ -114,7 +114,7 @@ export function formatFlowFocusBanner(state: ActivityState): string {
   const kind = ACTIVITY_KIND_PL[state.kind]
   const progress =
     state.done != null && state.total != null && state.total > 0 ? ` ${state.done}/${state.total}` : ''
-  const detail = state.detail ? ` · ${truncateDetail(state.detail, 40)}` : ''
+  const detail = state.detail ? ` · ${truncateDetail(state.detail, 60)}` : ''
   return `Teraz: ${kind}${progress}${detail}`
 }
 
@@ -133,7 +133,7 @@ function formatFlowFocusBannerEn(state: ActivityState): string {
   const kind = ACTIVITY_KIND_EN[state.kind]
   const progress =
     state.done != null && state.total != null && state.total > 0 ? ` ${state.done}/${state.total}` : ''
-  const detail = state.detail ? ` · ${truncateDetail(state.detail, 40)}` : ''
+  const detail = state.detail ? ` · ${truncateDetail(state.detail, 60)}` : ''
   return `Now: ${kind}${progress}${detail}`
 }
 
@@ -536,6 +536,23 @@ export interface UiLabels {
   navSettings: string
   navGuide: string
   navNavigate: string
+  /** Browse tab — aggregated chats */
+  browseLeadLoading: string
+  browseLeadEmpty: string
+  browseLeadCount: (n: number) => string
+  browseSearchPlaceholder: string
+  browseFilterAll: string
+  browseNoVaultLead: string
+  browseLoading: string
+  browseNoMatches: string
+  browseEmptyYet: string
+  browseEmptySource: string
+  browseEmptyYetHint: string
+  browseEmptySourceHint: string
+  browseSelectToRead: string
+  browseHits: (n: number) => string
+  browseMsgs: (n: number) => string
+  browseMessages: (n: number) => string
   sidebarBusyDistill: string
   sidebarBusyImport: string
   sidebarBusyGeneric: string
@@ -635,6 +652,7 @@ export interface UiLabels {
   statusDocuments: string
   dashboardTitle: string
   dashboardLead: string
+  dashboardRescan: string
   dashboardStatSources: string
   dashboardStatSourcesSub: string
   dashboardStatChats: string
@@ -1130,6 +1148,23 @@ const PL_LABELS: UiLabels = {
   navSettings: 'Ustawienia',
   navGuide: 'Jak to działa',
   navNavigate: 'Nawigacja',
+  browseLeadLoading: 'Ładowanie rozmów z vaultu…',
+  browseLeadEmpty: 'Brak rozmów w tym vaulcie — zaimportuj je z zakładki Import.',
+  browseLeadCount: (n) =>
+    `${n} rozmów ze wszystkich źródeł — wyszukiwanie lokalne, bez GPU.`,
+  browseSearchPlaceholder: 'szukaj w treści wszystkich czatów…',
+  browseFilterAll: 'Wszystkie',
+  browseNoVaultLead: 'Odblokuj vault, żeby przeglądać i szukać w zagregowanych czatach.',
+  browseLoading: 'ładowanie…',
+  browseNoMatches: 'Brak trafień w treści.',
+  browseEmptyYet: 'Tu jeszcze nic nie ma.',
+  browseEmptySource: 'Brak czatów z tego źródła.',
+  browseEmptyYetHint: 'Uruchom backup z Dashboardu albo wgraj eksporty przez Import.',
+  browseEmptySourceHint: 'Wybierz inny filtr źródła powyżej.',
+  browseSelectToRead: 'Wybierz rozmowę, żeby ją przeczytać.',
+  browseHits: (n) => `${n} trafień`,
+  browseMsgs: (n) => `${n} wiad.`,
+  browseMessages: (n) => `${n} wiadomości`,
   sidebarBusyDistill: 'destylacja…',
   sidebarBusyImport: 'import…',
   sidebarBusyGeneric: 'praca w tle…',
@@ -1211,7 +1246,7 @@ const PL_LABELS: UiLabels = {
   flowFinaleCaption: 'Indeks gotowy — pamięć dostępna dla agenta',
   flowWaitingCaption: 'Gdy coś się dzieje, podświetli się tylko aktywna ścieżka',
   flowMiniStatus: (state) => (state.kind === 'idle' ? 'Bezczynnie' : formatFlowFocusBanner(state)),
-  dashboardActivityNow: (state) => formatFlowFocusBanner(state),
+  dashboardActivityNow: (state) => formatFlowLiveBadge(state),
   dashboardActivityLast: (relative) => `Ostatnia aktywność: destylacja ${relative}`,
   dashboardActivityNone: 'Brak ostatniej destylacji — uruchom Brain, aby przygotować pamięć',
   flowIllustrationCaption:
@@ -1245,6 +1280,7 @@ const PL_LABELS: UiLabels = {
   dashboardTitle: 'Centrum dowodzenia',
   dashboardLead:
     'Rozmowy z twoich asystentów w jednym zaszyfrowanym vaulcie — czyta je każdy agent mówiący MCP.',
+  dashboardRescan: 'Rescan',
   dashboardStatSources: 'Źródła',
   dashboardStatSourcesSub: 'zainstalowane',
   dashboardStatChats: 'Czaty',
@@ -1609,6 +1645,23 @@ const EN_LABELS: Partial<UiLabels> = {
   navSettings: 'Settings',
   navGuide: 'How it works',
   navNavigate: 'Navigate',
+  browseLeadLoading: 'Loading conversations from your vault…',
+  browseLeadEmpty: 'No conversations in this vault yet — import some from the Import tab.',
+  browseLeadCount: (n) =>
+    `${n} conversations aggregated from every source — searched locally, no GPU.`,
+  browseSearchPlaceholder: 'search across all chat content…',
+  browseFilterAll: 'All',
+  browseNoVaultLead: 'Unlock a vault to browse and search your aggregated chats.',
+  browseLoading: 'loading…',
+  browseNoMatches: 'No content matches.',
+  browseEmptyYet: 'Nothing here yet.',
+  browseEmptySource: 'No chats from this source.',
+  browseEmptyYetHint: 'Run a backup from the Dashboard or bring exports in via Import.',
+  browseEmptySourceHint: 'Pick another source filter above.',
+  browseSelectToRead: 'Select a conversation to read it.',
+  browseHits: (n) => `${n} hits`,
+  browseMsgs: (n) => `${n} msgs`,
+  browseMessages: (n) => `${n} messages`,
   sidebarBusyDistill: 'distilling…',
   sidebarBusyImport: 'import…',
   sidebarBusyGeneric: 'working…',
@@ -1634,6 +1687,7 @@ const EN_LABELS: Partial<UiLabels> = {
   dashboardTitle: 'Command center',
   dashboardLead:
     'Chats from your assistants in one encrypted vault — every MCP-speaking agent can read them.',
+  dashboardRescan: 'Rescan',
   dashboardStatSources: 'Sources',
   dashboardStatSourcesSub: 'installed',
   dashboardStatChats: 'Chats',

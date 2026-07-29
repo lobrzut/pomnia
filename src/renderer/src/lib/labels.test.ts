@@ -53,6 +53,26 @@ describe('uiLabels', () => {
     ).toBe('Trwa: destylacja (3/7) · Sesja o vault backup')
     expect(labels.flowLiveBadge({ kind: 'distill', done: 3, total: 7 })).toBe('Na żywo: destylacja 3/7')
     expect(labels.flowFocusBanner({ kind: 'distill', done: 3, total: 7 })).toBe('Teraz: destylacja 3/7')
+    expect(
+      labels.flowFocusBanner({
+        kind: 'distill',
+        done: 10,
+        total: 132,
+        detail: 'https://example.com/very/long/path/that-should-be-hard-truncated-for-screenshots-and-chrome',
+      }),
+    ).toMatch(/^Teraz: destylacja 10\/132 · .{1,60}$/)
+    expect(
+      labels.flowFocusBanner({
+        kind: 'distill',
+        done: 1,
+        total: 2,
+        detail: 'https://example.com/very/long/path/that-should-be-hard-truncated-for-screenshots-and-chrome',
+      }).length,
+    ).toBeLessThanOrEqual('Teraz: destylacja 1/2 · '.length + 60)
+    expect(labels.browseFilterAll).toBe('Wszystkie')
+    expect(labels.browseLeadCount(12)).toContain('12')
+    expect(labels.browseSearchPlaceholder).toContain('szukaj')
+    expect(labels.dashboardRescan).toBe('Rescan')
     expect(labels.flowLiveBadge({ kind: 'mcp-query', phase: 'search_library', detail: 'vault' })).toBe(
       'Na żywo: wyszukiwanie w Brain',
     )
