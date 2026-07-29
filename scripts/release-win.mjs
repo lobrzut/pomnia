@@ -5,11 +5,15 @@
  * Strict Windows release pipeline — only allowed path to the installer.
  *
  * Order (abort on first failure):
- * 1. refuse uncommitted / untracked changes
- * 2. typecheck
- * 3. tests
+ * 1. refuse uncommitted / untracked changes (ignored files e.g. src/buildInfo.ts do not count)
+ * 2. typecheck (regenerates buildInfo first)
+ * 3. tests (regenerates buildInfo first)
  * 4. npm version patch --no-git-tag-version + commit "Release X.Y.Z"
  * 5. npm run build:win  (generates buildInfo from the Release commit, then packs)
+ *
+ * Flags:
+ *   --check-clean  only step 1 (exit 0 if clean)
+ *   --dry-run      steps 1–3 only (no version bump / pack)
  */
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -17,6 +21,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const args = new Set(process.argv.slice(2))
+const checkCleanOnly = args.has('--check-clean')
+const dryRun = args.has('--dry-run')
 
 function run(cmd) {
   console.log(`\n→ ${cmd}\n`)
@@ -27,25 +34,44 @@ function gitOut(cmd) {
   return execSync(cmd, { cwd: root, encoding: 'utf8' }).trim()
 }
 
-const porcelain = gitOut('git status --porcelain')
-if (porcelain) {
-  console.error('release:win refused: working tree is not clean.\n')
-  console.error(porcelain)
-  console.error('\nCommit or stash everything first (including untracked files).')
-  process.exit(1)
+/** Step 1: clean tracked/untracked tree. Ignored paths (src/buildInfo.ts) never appear in porcelain. */
+function assertCleanTree() {
+  const porcelain = gitOut('git status --porcelain')
+  if (porcelain) {
+    console.error('release:win refused: working tree is not clean.\n')
+    console.error(porcelain)
+    console.error('\nCommit or stash everything first (including untracked files).')
+    console.error('Ignored files (e.g. src/buildInfo.ts) are fine and do not block.')
+    process.exit(1)
+  }
+
+  // Belt-and-suspenders: staged + unstaged diffs must also be empty
+  try {
+    execSync('git diff --quiet', { cwd: root, stdio: 'pipe' })
+    execSync('git diff --cached --quiet', { cwd: root, stdio: 'pipe' })
+  } catch {
+    console.error('release:win refused: git diff / git diff --cached is not empty.')
+    process.exit(1)
+  }
 }
 
-// Belt-and-suspenders: staged + unstaged diffs must also be empty
-try {
-  execSync('git diff --quiet', { cwd: root, stdio: 'pipe' })
-  execSync('git diff --cached --quiet', { cwd: root, stdio: 'pipe' })
-} catch {
-  console.error('release:win refused: git diff / git diff --cached is not empty.')
-  process.exit(1)
+assertCleanTree()
+if (checkCleanOnly) {
+  console.log('✔ release:win --check-clean: working tree is clean')
+  process.exit(0)
 }
 
 run('npm run typecheck')
 run('npm test')
+
+// After generate:build-info (via typecheck/test), ignored buildInfo must not dirty porcelain
+assertCleanTree()
+console.log('✔ tree still clean after generate:build-info')
+
+if (dryRun) {
+  console.log('\n✔ release:win --dry-run complete (skipped version bump + pack)')
+  process.exit(0)
+}
 
 run('npm version patch --no-git-tag-version')
 const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version
