@@ -154,9 +154,14 @@ export interface UiLabels {
   brainAttachExportHint: string
   quarantineTitle: string
   quarantineLead: string
+  quarantineHeader: (count: number) => string
   quarantineReview: string
   quarantineWeak: string
+  quarantineWeakToggle: (count: number) => string
   quarantineEmpty: string
+  quarantineSelectToRead: string
+  quarantineMetaQuality: string
+  quarantineMetaMsgCount: string
   quarantineView: string
   quarantinePromote: string
   quarantinePromotedToast: (name: string) => string
@@ -750,9 +755,14 @@ const PL_LABELS: UiLabels = {
   quarantineTitle: 'Notatki do przeglądu',
   quarantineLead:
     'Po destylacji słabe notatki lądują w _weak/ (indeksowane) lub _review/ (kwarantanna). Tylko Ty możesz przywrócić do distilled/.',
+  quarantineHeader: (count) => `Kwarantanna · ${count}`,
   quarantineReview: '_review (kwarantanna)',
   quarantineWeak: '_weak (słabe)',
-  quarantineEmpty: 'Brak notatek w tej kategorii.',
+  quarantineWeakToggle: (count) => `${count} słabych (już w indeksie)`,
+  quarantineEmpty: 'Brak notatek w kwarantannie.',
+  quarantineSelectToRead: 'Wybierz notatkę, żeby zobaczyć, dlaczego trafiła do kwarantanny',
+  quarantineMetaQuality: 'quality',
+  quarantineMetaMsgCount: 'msg_count',
   quarantineView: 'Podgląd',
   quarantinePromote: 'Przywróć do distilled/',
   quarantinePromotedToast: (name) => `Przywrócono ${name} do distilled/`,
@@ -1414,9 +1424,14 @@ const EN_LABELS: Partial<UiLabels> = {
   quarantineTitle: 'Notes for review',
   quarantineLead:
     'After distill, weak notes go to _weak/ (indexed) or _review/ (quarantine). Only you can move them back to distilled/.',
+  quarantineHeader: (count) => `Quarantine · ${count}`,
   quarantineReview: '_review (quarantine)',
   quarantineWeak: '_weak (weak)',
-  quarantineEmpty: 'No notes in this category.',
+  quarantineWeakToggle: (count) => `${count} weak (already indexed)`,
+  quarantineEmpty: 'No notes in quarantine.',
+  quarantineSelectToRead: 'Select a note to see why it landed in quarantine',
+  quarantineMetaQuality: 'quality',
+  quarantineMetaMsgCount: 'msg_count',
   quarantineView: 'View',
   quarantinePromote: 'Restore to distilled/',
   quarantinePromotedToast: (name) => `Restored ${name} to distilled/`,
