@@ -6,6 +6,10 @@ release/
 .DS_Store
 .env
 .env.local
+
+# Generated at generate:build-info / dev / typecheck / test / pack — never commit
+src/buildInfo.ts
+
 # never commit a real vault or extracted chat data
 *.continuum
 *.reliqua
