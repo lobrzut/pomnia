@@ -31,6 +31,8 @@ import {
   noteFilename,
   chunkText,
   parseExportPath,
+  classifyImportConversations,
+  conversationFingerprint,
   pingBrain,
   runBackup,
   saveIndex,
@@ -803,25 +805,30 @@ function registerIpc(): void {
 
   // Import an export archive (Claude.ai/ChatGPT/Gemini/Grok/…) → seal its
   // conversations into the open vault as snapshot(s), one per detected source.
-  // Dedup by conversation id across existing snapshots — return added vs skipped.
+  // Dedup by id + content fingerprint: unknown → added, same id different content → updated.
   ipcMain.handle('import:toVault', async (_e, p: string) => {
     const v = requireVault()
     const { conversations } = await parseExportPath(p)
     if (!conversations.length) {
-      return { sealed: 0, added: 0, skipped: 0, sources: [] as { source: string; count: number }[] }
+      return { sealed: 0, added: 0, updated: 0, skipped: 0, sources: [] as { source: string; count: number }[] }
     }
 
-    const existingIds = new Set<string>()
+    const existingFingerprints = new Map<string, string>()
     for (const s of v.getManifest().snapshots) {
       const payload = await v.getSnapshotPayload(s.id).catch(() => null)
       if (!payload) continue
-      for (const c of payload.conversations) existingIds.add(c.id)
+      for (const c of payload.conversations) {
+        existingFingerprints.set(c.id, conversationFingerprint(c))
+      }
     }
 
-    const fresh = conversations.filter((c) => !existingIds.has(c.id))
-    const skipped = conversations.length - fresh.length
-    if (!fresh.length) {
-      return { sealed: 0, added: 0, skipped, sources: [] as { source: string; count: number }[] }
+    const { toWrite, added, updated, skipped } = classifyImportConversations(
+      conversations,
+      existingFingerprints,
+    )
+    const sealed = added + updated
+    if (!toWrite.length) {
+      return { sealed: 0, added: 0, updated: 0, skipped, sources: [] as { source: string; count: number }[] }
     }
 
     const labels: Record<string, string> = {
@@ -832,7 +839,7 @@ function registerIpc(): void {
       generic: 'Imported'
     }
     const groups = new Map<string, Conversation[]>()
-    for (const c of fresh) {
+    for (const c of toWrite) {
       const arr = groups.get(c.source) ?? []
       arr.push(c)
       groups.set(c.source, arr)
@@ -851,7 +858,7 @@ function registerIpc(): void {
       await v.addSnapshot(meta, convs, [])
       sources.push({ source: src, count: convs.length })
     }
-    return { sealed: fresh.length, added: fresh.length, skipped, sources }
+    return { sealed, added, updated, skipped, sources }
   })
 
   ipcMain.handle('reveal', (_e, p: string) => shell.openPath(p))

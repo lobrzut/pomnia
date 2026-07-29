@@ -15,6 +15,7 @@
  *
  * ZIP archives are unpacked in-memory with fflate (pure JS, no native deps).
  */
+import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { strFromU8, unzipSync } from 'fflate'
@@ -27,8 +28,52 @@ export interface ImportResult {
   perSource: Record<string, number>
 }
 
-let counter = 0
-const rid = () => `imp-${Date.now().toString(36)}-${(counter++).toString(36)}`
+function contentId(source: string, title: string, messages: Message[]): string {
+  const h = createHash('sha256')
+  h.update(source).update('\0').update(title).update('\0')
+  for (const m of messages) h.update(m.role).update('\0').update(m.text).update('\0')
+  return `imp-${h.digest('hex').slice(0, 32)}`
+}
+
+/** Content fingerprint for import dedup (source + title + role/text — not ts/meta). */
+export function conversationFingerprint(c: Conversation): string {
+  const h = createHash('sha256')
+  h.update(c.source).update('\0').update(c.title).update('\0')
+  for (const m of c.messages) h.update(m.role).update('\0').update(m.text).update('\0')
+  return h.digest('hex').slice(0, 32)
+}
+
+export interface ClassifyImportResult {
+  toWrite: Conversation[]
+  added: number
+  updated: number
+  skipped: number
+}
+
+/** Classify conversations against existing id→fingerprint map (from vault snapshots). */
+export function classifyImportConversations(
+  conversations: Conversation[],
+  existingFingerprints: Map<string, string>,
+): ClassifyImportResult {
+  const toWrite: Conversation[] = []
+  let added = 0
+  let updated = 0
+  let skipped = 0
+  for (const c of conversations) {
+    const fp = conversationFingerprint(c)
+    const prev = existingFingerprints.get(c.id)
+    if (prev === undefined) {
+      added++
+      toWrite.push(c)
+    } else if (prev !== fp) {
+      updated++
+      toWrite.push(c)
+    } else {
+      skipped++
+    }
+  }
+  return { toWrite, added, updated, skipped }
+}
 
 /** Sidecar / metadata files in Claude.ai (and similar) zips — not conversations. */
 const SKIP_ZIP_BASENAMES = new Set([
@@ -118,10 +163,11 @@ function parseClaudeAi(arr: Record<string, unknown>[]): Conversation[] {
         : typeof c.project === 'string'
           ? c.project
           : undefined
+    const title = String(c.name || c.title || '')
     const conv = finalize({
-      id: String(c.uuid || c.id || rid()),
+      id: String(c.uuid || c.id || contentId('claude-ai', title, messages)),
       source: 'claude-ai',
-      title: String(c.name || c.title || ''),
+      title,
       createdAt: isoFrom(c.created_at),
       updatedAt: isoFrom(c.updated_at),
       project,
@@ -148,10 +194,11 @@ function parseChatGPT(arr: Record<string, unknown>[]): Conversation[] {
       const text = txt(n.message.content?.parts ?? n.message.content)
       if (text.trim()) messages.push({ role: role === 'user' ? 'user' : 'assistant', text, ts: isoFrom(n.message.create_time) })
     }
+    const title = String(c.title || '')
     const conv = finalize({
-      id: String(c.id || c.conversation_id || rid()),
+      id: String(c.id || c.conversation_id || contentId('chatgpt', title, messages)),
       source: 'chatgpt',
-      title: String(c.title || ''),
+      title,
       createdAt: isoFrom(c.create_time),
       updatedAt: isoFrom(c.update_time),
       messages
@@ -177,10 +224,11 @@ function parseGeneric(arr: Record<string, unknown>[], source: SourceId): Convers
         ts: isoFrom(m.created_at ?? m.create_time ?? m.timestamp)
       }
     })
+    const title = String(item.title || item.name || '')
     const conv = finalize({
-      id: String(item.id || item.uuid || rid()),
+      id: String(item.id || item.uuid || contentId(source, title, messages)),
       source,
-      title: String(item.title || item.name || ''),
+      title,
       createdAt: isoFrom(item.created_at ?? item.create_time),
       messages
     })
@@ -203,7 +251,9 @@ function parseJsonl(text: string, source: SourceId, name: string): Conversation[
       /* skip */
     }
   }
-  const conv = finalize({ id: rid(), source, title: path.basename(name), messages })
+  const title = path.basename(name)
+  const id = contentId(source, title, messages)
+  const conv = finalize({ id, source, title, messages })
   return conv ? [conv] : []
 }
 
@@ -419,11 +469,13 @@ export function parseExportBuffer(buf: Uint8Array, filename: string): ImportResu
     const lower = filename.toLowerCase()
     if (lower.endsWith('.jsonl')) conversations.push(...parseJsonl(text, detectSource(filename, null), filename))
     else if (lower.endsWith('.md') || lower.endsWith('.txt')) {
+      const title = path.basename(filename)
+      const messages: Message[] = [{ role: 'user', text: sanitizeUnicode(text) }]
       const conv = finalize({
-        id: rid(),
+        id: contentId('generic', title, messages),
         source: 'generic',
-        title: path.basename(filename),
-        messages: [{ role: 'user', text: sanitizeUnicode(text) }]
+        title,
+        messages
       })
       if (conv) conversations.push(conv)
     } else {
