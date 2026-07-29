@@ -1,6 +1,6 @@
 {
   "name": "pomnia",
-  "version": "0.1.43",
+  "version": "0.1.44",
   "description": "Pomnia — one encrypted memory your AI agents share. Local-first, MCP-native: encrypted vault, distill pipeline, embedded Brain.",
   "homepage": "https://pomnia.ai",
   "author": {
