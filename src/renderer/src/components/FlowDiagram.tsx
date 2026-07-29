@@ -24,7 +24,7 @@ const VIEWBOX_H = 360
 const FLOW_MAIN_Y = 92
 /** PiP: vertical center of node+label mass in strip layout (labels hang below icons). */
 const PIP_MAIN_Y = 168
-const FLOW_RETURN_Y = 134
+const FLOW_RETURN_Y = 150
 /** Horizontal corridor for docs/optional connectors — below main subtitles, above docs icons. */
 const FLOW_ROUTE_Y = 218
 const FLOW_DOCS_Y = 300
@@ -32,7 +32,7 @@ const FLOW_DEPLOY_Y = 316
 /** Horizontal corridor for agent query path — below memory return label. */
 const FLOW_AGENT_JUNCTION_Y = 168
 /** Pill on return path — below node subtitles, above agent junction. */
-const FLOW_MEMORY_LABEL_Y = 134
+const FLOW_MEMORY_LABEL_Y = 150
 /** Main-row x positions (%). Wider gap library ↔ MCP reduces label overlap. */
 const FLOW_LIBRARY_X = 65
 /** Keep ≤90 so MCP card (w-[124px], centered) clears the right gutter at ~900px cards. */
@@ -670,16 +670,16 @@ export function FlowDiagram({
 
   const hint =
     hoverId != null
-      ? (nodes.find((n) => n.id === hoverId)?.hint ?? labels.guideLead)
+      ? (nodes.find((n) => n.id === hoverId)?.hint ?? labels.flowIdleHoverCaption)
       : isFinale
         ? labels.flowFinaleCaption
         : demoActive
-          ? (nodes.find((n) => n.step === demoStep)?.hint ?? labels.guideLead)
+          ? (nodes.find((n) => n.step === demoStep)?.hint ?? labels.flowIdleHoverCaption)
           : (isBusy || replayActive) &&
               displayActivity.kind !== 'finale' &&
               displayActivity.detail
             ? displayActivity.detail
-            : labels.guideLead
+            : labels.flowIdleHoverCaption
 
   const focusMode = visual.focusMode && !demoActive
   const showFocusBanner = focusMode && !pip

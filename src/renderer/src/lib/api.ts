@@ -6,6 +6,7 @@ import type {
   LastActivityReplay,
   BackupProgressEvent,
   BrainHit,
+  BrainRunResult,
   BrainPing,
   BrainProgressEvent,
   DocImportProgressEvent,
@@ -13,6 +14,9 @@ import type {
   DocOcrResult,
   LibraryDocListItem,
   LibraryDocRemoveResult,
+  ImportChatPreview,
+  QuarantineBucket,
+  QuarantineNoteMeta,
   BrainStateInfo,
   BrainStatus,
   ClientId,
@@ -73,6 +77,10 @@ export interface PomniaBridge {
     skipped?: number
     sources: { source: string; count: number }[]
   }>
+  importPreview(path: string): Promise<ImportChatPreview>
+  distilledQuarantineList(): Promise<{ review: QuarantineNoteMeta[]; weak: QuarantineNoteMeta[] }>
+  distilledQuarantineRead(bucket: QuarantineBucket, name: string): Promise<{ content: string }>
+  distilledQuarantinePromote(bucket: QuarantineBucket, name: string): Promise<{ name: string; path: string }>
   docImport(path?: string, ollamaUrl?: string): Promise<DocImportResult | null>
   docOcr(docId: string, ollamaUrl?: string): Promise<DocOcrResult>
   docList(): Promise<LibraryDocListItem[]>
@@ -412,6 +420,36 @@ function mockBridge(): PomniaBridge {
           { source: 'chatgpt', count: 4 },
         ],
       }
+    },
+    async importPreview(path: string) {
+      await new Promise((r) => setTimeout(r, 400))
+      return {
+        path,
+        fileName: path.split(/[\\/]/).pop() ?? 'export.zip',
+        conversationCount: 42,
+        messageCount: 860,
+        sources: [
+          { source: 'claude-ai', count: 38 },
+          { source: 'chatgpt', count: 4 },
+        ],
+        titles: ['Designing the vault', 'MCP handshake', 'Import confirm', 'Skills sync', 'Distill backlog'],
+        hasGeneric: false,
+        added: 42,
+        updated: 0,
+        skipped: 0,
+      }
+    },
+    async distilledQuarantineList() {
+      return {
+        review: [{ bucket: 'review' as const, name: 'stub-note.md', mtimeMs: Date.now(), sizeBytes: 120 }],
+        weak: [{ bucket: 'weak' as const, name: 'thin-note.md', mtimeMs: Date.now() - 1e6, sizeBytes: 400 }],
+      }
+    },
+    async distilledQuarantineRead(_bucket, name) {
+      return { content: `---\nquality: garbage\n---\n\n# ${name}\n\nSample quarantine note body.\n` }
+    },
+    async distilledQuarantinePromote(bucket, name) {
+      return { name, path: `C:/Vault/distilled/${name}` }
     },
     async docImport() {
       await new Promise((r) => setTimeout(r, 900))

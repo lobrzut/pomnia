@@ -14,6 +14,7 @@ const ICONS: Record<Exclude<ActivityKind, 'idle'>, LucideIcon> = {
   indexing: Layers,
   embed: Loader2,
   'mcp-query': Plug,
+  finale: Sparkles,
 }
 
 function pct(state: ActivityState): number | undefined {

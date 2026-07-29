@@ -18,11 +18,11 @@ export interface VaultStatus {
   snapshots: number
   /** Library docs waiting for embedded brain indexing. */
   pendingLibraryIndex?: number
-  /** Total brain/*.md + cli/.../SKILL.md (legacy single counter). */
+  /** Total brain/.../*.md + cli/.../SKILL.md (legacy single counter). */
   skillsCount?: number
   /** Own workflow skills: vault/skills/brain/*.md */
   skillsOwnCount?: number
-  /** Imported CLI packages: vault/skills/cli/*/SKILL.md */
+  /** Imported CLI packages: vault/skills/cli/.../SKILL.md */
   skillsImportedCount?: number
   /** .md files under vault/distilled (excludes `_review`). */
   distilledNotes?: number
@@ -148,6 +148,29 @@ export interface LibraryDocListItem {
   indexedAt: string | null
   sourceBytes: number
   extractedBytes: number
+}
+
+/** Preview of a chat export before sealing into the vault. */
+export interface ImportChatPreview {
+  path: string
+  fileName: string
+  conversationCount: number
+  messageCount: number
+  sources: { source: string; count: number }[]
+  titles: string[]
+  hasGeneric: boolean
+  added: number
+  updated: number
+  skipped: number
+}
+
+export type QuarantineBucket = 'review' | 'weak'
+
+export interface QuarantineNoteMeta {
+  bucket: QuarantineBucket
+  name: string
+  mtimeMs: number
+  sizeBytes: number
 }
 
 export interface LibraryDocRemoveResult {
