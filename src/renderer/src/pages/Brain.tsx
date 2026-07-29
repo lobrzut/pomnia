@@ -122,10 +122,10 @@ export default function Brain() {
     try {
       await api.ollamaPull(model, ollamaUrl || undefined)
       setJustPulled((s) => new Set(s).add(model))
-      toast({ kind: 'success', title: 'Model ready', detail: model })
+      toast({ kind: 'success', title: labels.toastModelReady, detail: model })
       void check() // refresh the installed list
     } catch (e) {
-      toast({ kind: 'error', title: 'Pull failed', detail: (e as Error).message })
+      toast({ kind: 'error', title: labels.toastPullFailed, detail: (e as Error).message })
     } finally {
       setPull(null)
     }
@@ -170,7 +170,7 @@ export default function Brain() {
     try {
       setEmbedded(await api.brainCoreStart(ollamaUrl || undefined))
     } catch (e) {
-      useStore.getState().toast({ kind: 'error', title: 'Embedded brain', detail: (e as Error).message })
+      useStore.getState().toast({ kind: 'error', title: labels.embeddedBrain, detail: (e as Error).message })
       void refreshEmbedded()
     } finally {
       setEmbeddedBusy(false)
@@ -184,7 +184,7 @@ export default function Brain() {
       setEmbedded(await api.brainCoreStop())
       useStore.getState().toast({ kind: 'info', title: labels.embeddedBrainStoppedToast })
     } catch (e) {
-      useStore.getState().toast({ kind: 'error', title: 'Embedded brain', detail: (e as Error).message })
+      useStore.getState().toast({ kind: 'error', title: labels.embeddedBrain, detail: (e as Error).message })
       void refreshEmbedded()
     } finally {
       setEmbeddedStopping(false)
@@ -198,15 +198,14 @@ export default function Brain() {
       const r = await api.brainCoreReindex()
       useStore.getState().toast({
         kind: 'success',
-        title: 'Local index refreshed',
-        detail: `${r.stats.files} notes · ${r.stats.chunks} chunks${r.stats.prunedFiles ? ` · ${r.stats.prunedFiles} pruned` : ''}`
+        title: labels.toastLocalIndexRefreshed,        detail: `${r.stats.files} notes · ${r.stats.chunks} chunks${r.stats.prunedFiles ? ` · ${r.stats.prunedFiles} pruned` : ''}`
       })
     } catch (e) {
       const msg = (e as Error).message
       if (/abort|stopped/i.test(msg)) {
         useStore.getState().toast({ kind: 'info', title: labels.embeddedBrainStoppedToast, detail: msg })
       } else {
-        useStore.getState().toast({ kind: 'error', title: 'Reindex failed', detail: msg })
+        useStore.getState().toast({ kind: 'error', title: labels.toastReindexFailed, detail: msg })
       }
     } finally {
       setEmbeddedBusy(false)
@@ -270,7 +269,7 @@ export default function Brain() {
       setHits(await api.brainSearch(query, ollamaUrl))
       setSearched(true)
     } catch (e) {
-      useStore.getState().toast({ kind: 'error', title: 'Search failed', detail: (e as Error).message })
+      useStore.getState().toast({ kind: 'error', title: labels.toastSearchFailed, detail: (e as Error).message })
     } finally {
       setSearching(false)
     }
@@ -293,9 +292,9 @@ export default function Brain() {
         sources: distillable.map((d) => d.id)
       })
       setDeployMsg(r.detail)
-      useStore.getState().toast({ kind: 'success', title: 'Deployed', detail: r.detail })
+      useStore.getState().toast({ kind: 'success', title: labels.toastDeployed, detail: r.detail })
     } catch (e) {
-      useStore.getState().toast({ kind: 'error', title: 'Deploy failed', detail: (e as Error).message })
+      useStore.getState().toast({ kind: 'error', title: labels.toastDeployFailed, detail: (e as Error).message })
     } finally {
       setDeploying(false)
     }
@@ -682,9 +681,7 @@ export default function Brain() {
           </div>
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-          Runs brain-core as a child process — MCP clients on this machine (Claude Code, Cursor, Antigravity…) get{' '}
-          <code className="text-cyan">search_library</code> / <code className="text-cyan">save_conversation</code> from{' '}
-          <code className="text-cyan">127.0.0.1</code> without any server. Distill runs refresh its index automatically.
+          {labels.brainEmbeddedProcessHint}
         </p>
       </GlassCard>
 
@@ -692,9 +689,9 @@ export default function Brain() {
       <GlassCard className="mb-5 p-5">
         <div className="mb-3 flex items-center justify-between">
           <span className="text-sm font-semibold text-ink">
-            {showAdvanced ? 'Advanced · distill on this host' : labels.distill}
+            {showAdvanced ? labels.brainAdvancedDistillTitle : labels.distill}
           </span>
-          {showAdvanced && <span className="text-xs text-ink-faint">optional — needs local Ollama</span>}
+          {showAdvanced && <span className="text-xs text-ink-faint">{labels.brainAdvancedOllamaNeed}</span>}
         </div>
         <div className="mb-4 flex flex-wrap gap-2">
           {distillable.map((s) => {
@@ -790,17 +787,17 @@ export default function Brain() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && search()}
-            placeholder="ask anything you've discussed before…"
+            placeholder={labels.brainSearchPlaceholder}
           />
           <Button onClick={search} disabled={searching || !query}>
             {searching ? <Spinner className="h-4 w-4" /> : <Search className="h-4 w-4" />}
-            Search
+            {labels.brainSearchButton}
           </Button>
         </div>
         <div className="mt-3 space-y-2">
           {searched && hits.length === 0 && !searching && (
             <p className="rounded-xl border border-dashed border-white/10 px-4 py-4 text-center text-xs text-ink-faint">
-              No matches. The index only covers distilled notes — run the pipeline above first if you haven't yet.
+              {labels.brainSearchEmpty}
             </p>
           )}
           {hits.map((h, i) => {

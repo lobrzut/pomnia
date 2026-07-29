@@ -673,8 +673,12 @@ export function FlowDiagram({
   const showLegend = !mini && !flowLive
   const showWaitingCaption = !flowLive && !hoverId && !isFinale
 
-  // Title/detail lives only in the focus strip (truncated) — never raw chat titles in the caption
-  // (screenshots / PiP chrome must not leak conversation content twice).
+  // Conversation title/detail → focus banner only (truncated). Under-diagram caption during
+  // activity = pipeline step description (node hint / live badge), never chat title content.
+  const activityStepCaption =
+    progressStep != null
+      ? (nodes.find((n) => n.step === progressStep)?.hint ?? labels.flowLiveBadge(displayActivity))
+      : labels.flowLiveBadge(displayActivity)
   const hint =
     hoverId != null
       ? (nodes.find((n) => n.id === hoverId)?.hint ?? labels.flowIdleHoverCaption)
@@ -682,11 +686,9 @@ export function FlowDiagram({
         ? labels.flowFinaleCaption
         : demoActive
           ? (nodes.find((n) => n.step === demoStep)?.hint ?? labels.flowIdleHoverCaption)
-          : showFocusBanner
-            ? labels.flowIdleHoverCaption
-            : (isBusy || replayActive) && displayActivity.kind !== 'finale'
-              ? labels.flowLiveBadge(displayActivity)
-              : labels.flowIdleHoverCaption
+          : (isBusy || replayActive) && displayActivity.kind !== 'finale'
+            ? activityStepCaption || labels.flowIdleHoverCaption
+            : labels.flowIdleHoverCaption
 
   function isNodeActive(nodeId: string): boolean {
     if (!focusMode) return true
