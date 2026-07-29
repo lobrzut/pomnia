@@ -4,7 +4,7 @@
 
 Pomnia Desktop (Windows / macOS) collects chats from assistants (Claude Code, Cursor, Claude Desktop, Antigravity, VS Code, Continue) **and** imports from exports (Claude.ai, ChatGPT, Gemini, Grok) plus documents (PDF, DOCX, EPUB) into one vault — with search (**Chats**), distill via Ollama, and Brain on `127.0.0.1:7862`.
 
-> **Desktop app** — version in [`package.json`](package.json). Start: [docs/START-HERE.md](docs/START-HERE.md).  
+> **Desktop app** — version in [`package.json`](package.json) (**0.1.40**; **0.1.39 was skipped intentionally**). Start: [docs/START-HERE.md](docs/START-HERE.md).  
 > **Repo:** [github.com/lobrzut/pomnia](https://github.com/lobrzut/pomnia) · **Site:** [pomnia.ai](https://pomnia.ai)
 
 ---
@@ -115,6 +115,10 @@ npm run build        # bundle → out/
 npm run pack:win     # Windows installer
 npm run pack:mac     # DMG / macOS app
 ```
+
+### Windows: never run vitest from a UNC path
+
+If the repo is opened over SMB (`\\server\share\…`), `npm test` / `vitest` can start under `C:\Windows` and **exit 0 without running any tests** (silent failure). Always run install/tests from a **local disk mirror**, e.g. `C:\Users\<you>\pomnia-build-*` (robocopy/sync from the share, then `npm install` + `npx vitest run …` there).
 
 ### CLI (no GUI)
 

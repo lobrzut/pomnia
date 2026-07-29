@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
-import { useMemo, useEffect } from 'react'
+import { useMemo, useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   Check,
   Database,
+  FileText,
   HelpCircle,
   MessageSquare,
   RefreshCw,
@@ -17,12 +18,12 @@ import {
 import { Badge, Button, GlassCard, Input, ProgressBar, SourceTile, Spinner } from '../components/ui'
 import { ActivityBanner } from '../components/ActivityBanner'
 import { StatusStrip } from '../components/StatusStrip'
-import { humanBytes, relativeTime, shortPath, sourceMeta } from '../lib/format'
+import { humanBytes, relativeTime, sourceMeta } from '../lib/format'
 import { uiLabels } from '../lib/labels'
 import { isMcpClientActive } from '../lib/mcpClientVisibility'
 import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
-import type { ClientId } from '../lib/types'
+import type { ClientId, LibraryDocListItem } from '../lib/types'
 
 function Stat({
   icon: Icon,
@@ -120,9 +121,6 @@ export default function Dashboard() {
   const skillsImported = vault.skillsImportedCount ?? 0
   const skillsCount = vault.skillsCount ?? skillsOwn + skillsImported
   const distilledNotes = vault.distilledNotes ?? brainState?.distilled ?? 0
-  const knowledgeSub = vault.open
-    ? shortPath(vault.knowledgePath ?? vault.path ?? vault.name ?? '', 22)
-    : labels.dashboardStatKnowledgeClosed
   const skillsValue =
     vault.open && (skillsOwn > 0 || skillsImported > 0 || skillsCount > 0)
       ? skillsCount
@@ -131,15 +129,39 @@ export default function Dashboard() {
     ? labels.dashboardStatSkillsSub(skillsOwn, skillsImported)
     : labels.dashboardStatSnapshotsClosed
 
+  const [libraryDocs, setLibraryDocs] = useState<LibraryDocListItem[]>([])
+  const refreshLibraryDocs = useCallback(async () => {
+    if (!vault.open) {
+      setLibraryDocs([])
+      return
+    }
+    try {
+      setLibraryDocs(await api.docList())
+    } catch {
+      setLibraryDocs([])
+    }
+  }, [vault.open])
+
+  const docsValue = vault.open ? libraryDocs.length : '—'
+  const docsPending = libraryDocs.filter((d) => d.pendingIndex).length
+  const docsIndexed = libraryDocs.filter((d) => d.indexedAt && !d.pendingIndex).length
+  const docsTotalBytes = libraryDocs.reduce((n, d) => n + (d.sourceBytes || 0), 0)
+  const docsSub = !vault.open
+    ? labels.dashboardStatDocsClosed
+    : docsPending > 0
+      ? labels.dashboardStatDocsPending(docsPending)
+      : labels.dashboardStatDocsSub(humanBytes(docsTotalBytes), docsIndexed)
+
   useEffect(() => {
     void api.mcpActivityWatch(true)
     void loadBrainState()
     void refreshVault()
     void loadMcpClients()
+    void refreshLibraryDocs()
     return () => {
       void api.mcpActivityWatch(false)
     }
-  }, [loadBrainState, refreshVault, loadMcpClients])
+  }, [loadBrainState, refreshVault, loadMcpClients, refreshLibraryDocs, vault.pendingLibraryIndex])
 
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col overflow-hidden">
@@ -215,11 +237,12 @@ export default function Dashboard() {
           delay={0.1}
         />
         <Stat
-          icon={Database}
-          label={labels.dashboardStatKnowledge}
-          value={vault.open ? labels.dashboardStatKnowledgeOpen : labels.dashboardStatKnowledgeClosed}
-          sub={knowledgeSub}
+          icon={FileText}
+          label={labels.dashboardStatDocs}
+          value={docsValue}
+          sub={docsSub}
           delay={0.12}
+          onClick={vault.open ? () => setRoute('import') : undefined}
         />
       </div>
 

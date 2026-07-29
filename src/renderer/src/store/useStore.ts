@@ -856,11 +856,12 @@ export const useStore = create<State>((set, get) => ({
         return
       }
       const fail = r.failed ?? 0
+      const deployed = r.deployed ?? 0
       const deploy =
-        r.deployed > 0
+        deployed > 0
           ? s.brainTarget === 'embedded'
-            ? ` · ${r.deployed} → vault/distilled`
-            : ` · ${r.deployed} deployed to Brain`
+            ? ` · ${deployed} → vault/distilled`
+            : ` · ${deployed} deployed to Brain`
           : ''
       const reidx = r.reindexed
         ? ' · reindexed'

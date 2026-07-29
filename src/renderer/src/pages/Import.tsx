@@ -13,6 +13,7 @@ import type {
   DocImportProgressEvent,
   DocImportResult,
   DocOcrResult,
+  ImportChatPreview,
   LibraryDocListItem,
 } from '../lib/types'
 
@@ -57,6 +58,8 @@ export default function Import() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [docFilter, setDocFilter] = useState('')
   const [docSort, setDocSort] = useState<DocSortKey>('date')
+  const [chatPreview, setChatPreview] = useState<ImportChatPreview | null>(null)
+  const [sealing, setSealing] = useState(false)
 
   const refreshLibraryDocs = useCallback(async () => {
     if (!vault.open) {
@@ -119,23 +122,46 @@ export default function Import() {
   }
 
   async function importChatFile(filePath?: string) {
-    if (!vault.open || busy) return
+    if (!vault.open || busy || sealing || chatPreview) return
     setBusy(true)
     setResult(null)
     try {
       const file = filePath ?? (await api.pickFile())
       if (!file) return
-      const r = await api.importToVault(file)
-      setResult(r)
-      const sealed = r.sealed ?? (r.added ?? 0) + (r.updated ?? 0)
-      if (sealed > 0) await refreshVault()
-      toastChatImport(r)
+      const preview = await api.importPreview(file)
+      if (preview.conversationCount === 0) {
+        toast({ kind: 'warn', title: labels.importChatNothingRecognized })
+        return
+      }
+      setChatPreview(preview)
     } catch (e) {
       toast({ kind: 'error', title: labels.importChatFailedToast, detail: (e as Error).message })
     } finally {
       setBusy(false)
       setChatDragOver(false)
     }
+  }
+
+  async function confirmSealPreview() {
+    if (!chatPreview || sealing) return
+    setSealing(true)
+    try {
+      const r = await api.importToVault(chatPreview.path)
+      setResult(r)
+      setChatPreview(null)
+      const sealed = r.sealed ?? (r.added ?? 0) + (r.updated ?? 0)
+      if (sealed > 0) await refreshVault()
+      toastChatImport(r)
+    } catch (e) {
+      toast({ kind: 'error', title: labels.importChatFailedToast, detail: (e as Error).message })
+    } finally {
+      setSealing(false)
+    }
+  }
+
+  function cancelSealPreview() {
+    if (sealing) return
+    setChatPreview(null)
   }
 
   async function importDocFile(filePath?: string) {
@@ -231,7 +257,7 @@ export default function Import() {
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = 'copy'
-    if (vault.open && !busy) setChatDragOver(true)
+    if (vault.open && !busy && !sealing && !chatPreview) setChatDragOver(true)
   }
 
   function handleChatDragLeave(e: React.DragEvent) {
@@ -244,7 +270,7 @@ export default function Import() {
     e.preventDefault()
     e.stopPropagation()
     setChatDragOver(false)
-    if (!vault.open || busy) return
+    if (!vault.open || busy || sealing || chatPreview) return
     const dropped = e.dataTransfer.files[0]
     if (!dropped) return
     if (!isChatDropFile(dropped)) {
@@ -320,10 +346,10 @@ export default function Import() {
 
       <div
         role="button"
-        tabIndex={vault.open && !busy ? 0 : -1}
-        onClick={vault.open && !busy ? () => void importChatFile() : undefined}
+        tabIndex={vault.open && !busy && !sealing && !chatPreview ? 0 : -1}
+        onClick={vault.open && !busy && !sealing && !chatPreview ? () => void importChatFile() : undefined}
         onKeyDown={(e) => {
-          if (vault.open && !busy && (e.key === 'Enter' || e.key === ' ')) {
+          if (vault.open && !busy && !sealing && !chatPreview && (e.key === 'Enter' || e.key === ' ')) {
             e.preventDefault()
             void importChatFile()
           }
@@ -334,7 +360,7 @@ export default function Import() {
         onDrop={handleChatDrop}
         className={`glass glass-hover mb-5 flex flex-col items-center justify-center gap-3 rounded-[var(--radius-xl)] border border-dashed p-10 text-center transition-colors ${
           chatDragOver ? 'border-iris bg-iris/10 ring-1 ring-iris/40' : 'border-white/10'
-        } ${vault.open && !busy ? 'no-drag cursor-pointer' : ''}`}
+        } ${vault.open && !busy && !sealing && !chatPreview ? 'no-drag cursor-pointer' : ''}`}
       >
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/6">
           {busy ? <Spinner className="h-6 w-6 text-iris" /> : <FileUp className="h-6 w-6 text-iris" />}
@@ -354,11 +380,69 @@ export default function Import() {
           onKeyDown={(e) => e.stopPropagation()}
           role="presentation"
         >
-          <Button onClick={() => void importChatFile()} disabled={busy || !vault.open} className="mt-1">
+          <Button
+            onClick={() => void importChatFile()}
+            disabled={busy || sealing || !!chatPreview || !vault.open}
+            className="mt-1"
+          >
             <Upload className="h-4 w-4" /> {labels.importSelect}
           </Button>
         </div>
       </div>
+
+      {chatPreview && (
+        <motion.div initial={{ y: 8 }} animate={{ y: 0 }}>
+          <GlassCard className="mb-5 flex flex-col gap-3 p-4">
+            <div className="text-sm font-semibold text-ink">{labels.importChatConfirmTitle}</div>
+            <div className="text-xs text-ink-dim">
+              <div className="truncate font-medium text-ink">{chatPreview.fileName}</div>
+              <div className="mt-1">
+                {chatPreview.sources.length > 0
+                  ? chatPreview.sources
+                      .map((s) => labels.importChatConfirmSource(sourceMeta(s.source).label))
+                      .join(' · ')
+                  : labels.importChatConfirmSource('—')}
+              </div>
+              <div className="mt-0.5">
+                {labels.importChatConfirmStats(chatPreview.conversationCount, chatPreview.messageCount)}
+              </div>
+              {(chatPreview.added > 0 || chatPreview.updated > 0 || chatPreview.skipped > 0) && (
+                <div className="mt-0.5 text-ink-faint">
+                  {labels.importChatConfirmDedup(chatPreview.added, chatPreview.updated, chatPreview.skipped)}
+                </div>
+              )}
+            </div>
+            {chatPreview.hasGeneric && (
+              <p className="rounded-lg border border-amber/30 bg-amber/10 px-3 py-2 text-xs text-amber-200">
+                {labels.importChatConfirmGenericWarn}
+              </p>
+            )}
+            {chatPreview.titles.length > 0 && (
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-faint">
+                  {labels.importChatConfirmTitles}
+                </div>
+                <ul className="list-inside list-disc text-xs text-ink-dim">
+                  {chatPreview.titles.map((t) => (
+                    <li key={t} className="truncate">
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={() => void confirmSealPreview()} disabled={sealing}>
+                {sealing ? <Spinner className="h-4 w-4" /> : null}
+                {labels.importChatConfirmSeal}
+              </Button>
+              <Button variant="ghost" onClick={cancelSealPreview} disabled={sealing}>
+                {labels.importChatConfirmCancel}
+              </Button>
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
 
       {result && (sealedCount > 0 || skippedCount > 0) && (
         <motion.div initial={{ y: 8 }} animate={{ y: 0 }}>
@@ -534,39 +618,48 @@ export default function Import() {
               {filteredLibraryDocs.length === 0 ? (
                 <p className="text-xs text-ink-faint">{labels.importDocLibraryFilterEmpty}</p>
               ) : (
-                <div className="flex flex-col gap-2">
-                  {filteredLibraryDocs.map((doc) => (
-                    <GlassCard key={doc.id} className="flex items-center gap-3 p-3">
-                      <FileText className="h-4 w-4 shrink-0 text-iris" />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-ink">{doc.originalName}</div>
-                        <div className="mt-0.5 flex flex-wrap gap-1.5 text-[11px] text-ink-dim">
-                          <Badge color="iris">{doc.format.toUpperCase()}</Badge>
-                          <Badge color="mint">{labels.importDocPagesBadge(doc.pages)}</Badge>
-                          <Badge color="amber">{humanBytes(doc.sourceBytes || 0)}</Badge>
-                          {doc.pendingIndex ? (
+                <div className="flex flex-col gap-1.5">
+                  {filteredLibraryDocs.map((doc) => {
+                    const indexPlain = doc.indexedAt
+                      ? labels.importDocLibraryIndexed
+                      : labels.importDocNotIndexedBadge
+                    const metaLine = [
+                      doc.format.toUpperCase(),
+                      labels.importDocPagesBadge(doc.pages),
+                      humanBytes(doc.sourceBytes || 0),
+                      ...(doc.pendingIndex ? [] : [indexPlain]),
+                    ].join(' · ')
+                    return (
+                      <GlassCard
+                        key={doc.id}
+                        className="group flex items-center gap-3 px-3 py-2"
+                      >
+                        <FileText className="h-4 w-4 shrink-0 text-iris" />
+                        <div className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
+                          {doc.originalName}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2 text-[11px] text-ink-dim">
+                          <span className="max-w-[14rem] truncate text-right sm:max-w-none">{metaLine}</span>
+                          {doc.pendingIndex && (
                             <Badge color="rose">{labels.importDocLibraryPending}</Badge>
-                          ) : doc.indexedAt ? (
-                            <Badge color="mint">{labels.importDocLibraryIndexed}</Badge>
-                          ) : (
-                            <Badge color="amber">{labels.importDocNotIndexedBadge}</Badge>
                           )}
                         </div>
-                      </div>
-                      <Button
-                        onClick={() => void deleteLibraryDoc(doc)}
-                        disabled={!!deletingId || docBusy || ocrBusy}
-                        className="shrink-0"
-                      >
-                        {deletingId === doc.id ? (
-                          <Spinner className="h-4 w-4" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}{' '}
-                        {labels.importDocDelete}
-                      </Button>
-                    </GlassCard>
-                  ))}
+                        <button
+                          type="button"
+                          onClick={() => void deleteLibraryDoc(doc)}
+                          disabled={!!deletingId || docBusy || ocrBusy}
+                          aria-label={labels.importDocDeleteAria(doc.originalName)}
+                          className="no-drag shrink-0 rounded-lg p-1.5 text-ink-faint opacity-0 transition-opacity hover:bg-white/6 hover:text-ink focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris group-hover:opacity-100 disabled:pointer-events-none disabled:opacity-30"
+                        >
+                          {deletingId === doc.id ? (
+                            <Spinner className="h-4 w-4" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      </GlassCard>
+                    )
+                  })}
                 </div>
               )}
             </>

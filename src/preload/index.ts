@@ -26,6 +26,12 @@ const bridge = {
   vaultConversation: (snapshotId: string, id: string) => ipcRenderer.invoke('vault:conversation', snapshotId, id),
   vaultSearchText: (query: string) => ipcRenderer.invoke('vault:searchText', query),
   importToVault: (p: string) => ipcRenderer.invoke('import:toVault', p),
+  importPreview: (p: string) => ipcRenderer.invoke('import:preview', p),
+  distilledQuarantineList: () => ipcRenderer.invoke('distilled:quarantineList'),
+  distilledQuarantineRead: (bucket: 'review' | 'weak', name: string) =>
+    ipcRenderer.invoke('distilled:quarantineRead', bucket, name),
+  distilledQuarantinePromote: (bucket: 'review' | 'weak', name: string) =>
+    ipcRenderer.invoke('distilled:quarantinePromote', bucket, name),
   docImport: (p?: string, ollamaUrl?: string) => ipcRenderer.invoke('doc:import', p, ollamaUrl),
   docOcr: (docId: string, ollamaUrl?: string) => ipcRenderer.invoke('doc:ocr', docId, ollamaUrl),
   docList: () => ipcRenderer.invoke('doc:list'),

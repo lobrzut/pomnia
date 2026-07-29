@@ -55,6 +55,12 @@ import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused 
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { runDocumentOcr } from './docOcr.js'
 import { removeLibraryDocumentWithIndex } from './libraryDocRemove.js'
+import {
+  listQuarantineNotes,
+  promoteQuarantineNote,
+  readQuarantineNote,
+  type QuarantineBucket,
+} from './distilledQuarantine.js'
 import { indexPendingLibraryDocuments, reconcileLibraryIndexWithBrain, type PendingIndexResult } from './libraryIndex.js'
 import {
   applyLoginItemSettings,
@@ -806,13 +812,9 @@ function registerIpc(): void {
   // Import an export archive (Claude.ai/ChatGPT/Gemini/Grok/…) → seal its
   // conversations into the open vault as snapshot(s), one per detected source.
   // Dedup by id + content fingerprint: unknown → added, same id different content → updated.
-  ipcMain.handle('import:toVault', async (_e, p: string) => {
+  // Two-step: import:preview (parse only) → user confirms → import:toVault (seal).
+  async function buildImportFingerprints() {
     const v = requireVault()
-    const { conversations } = await parseExportPath(p)
-    if (!conversations.length) {
-      return { sealed: 0, added: 0, updated: 0, skipped: 0, sources: [] as { source: string; count: number }[] }
-    }
-
     const existingFingerprints = new Map<string, string>()
     for (const s of v.getManifest().snapshots) {
       const payload = await v.getSnapshotPayload(s.id).catch(() => null)
@@ -821,7 +823,43 @@ function registerIpc(): void {
         existingFingerprints.set(c.id, conversationFingerprint(c))
       }
     }
+    return existingFingerprints
+  }
 
+  ipcMain.handle('import:preview', async (_e, p: string) => {
+    requireVault()
+    const { conversations } = await parseExportPath(p)
+    const existingFingerprints = await buildImportFingerprints()
+    const { added, updated, skipped } = classifyImportConversations(conversations, existingFingerprints)
+    const sourceCounts = new Map<string, number>()
+    let messageCount = 0
+    for (const c of conversations) {
+      sourceCounts.set(c.source, (sourceCounts.get(c.source) ?? 0) + 1)
+      messageCount += c.messages.length
+    }
+    const sources = [...sourceCounts.entries()].map(([source, count]) => ({ source, count }))
+    return {
+      path: p,
+      fileName: basename(p),
+      conversationCount: conversations.length,
+      messageCount,
+      sources,
+      titles: conversations.slice(0, 5).map((c) => c.title || '(untitled)'),
+      hasGeneric: conversations.some((c) => c.source === 'generic'),
+      added,
+      updated,
+      skipped,
+    }
+  })
+
+  ipcMain.handle('import:toVault', async (_e, p: string) => {
+    const v = requireVault()
+    const { conversations } = await parseExportPath(p)
+    if (!conversations.length) {
+      return { sealed: 0, added: 0, updated: 0, skipped: 0, sources: [] as { source: string; count: number }[] }
+    }
+
+    const existingFingerprints = await buildImportFingerprints()
     const { toWrite, added, updated, skipped } = classifyImportConversations(
       conversations,
       existingFingerprints,
@@ -1344,6 +1382,19 @@ function registerIpc(): void {
     const pending = perSource.reduce((n, p) => n + p.pending, 0)
     const stamps = Object.values(l.processed).sort()
     return { total, distilled: total - pending, pending, perSource, lastRun: stamps.at(-1) ?? null }
+  })
+
+  ipcMain.handle('distilled:quarantineList', async () => {
+    requireVault()
+    return listQuarantineNotes()
+  })
+  ipcMain.handle('distilled:quarantineRead', async (_e, bucket: QuarantineBucket, name: string) => {
+    requireVault()
+    return { content: await readQuarantineNote(bucket, name) }
+  })
+  ipcMain.handle('distilled:quarantinePromote', async (_e, bucket: QuarantineBucket, name: string) => {
+    requireVault()
+    return promoteQuarantineNote(bucket, name)
   })
 
   ipcMain.handle('brain:search', async (_e, query: string, url?: string) => {

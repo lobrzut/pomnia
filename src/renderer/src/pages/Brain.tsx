@@ -25,7 +25,7 @@ import { Badge, Button, GlassCard, Input, ProgressBar, Spinner } from '../compon
 import { relativeTime, sourceMeta } from '../lib/format'
 import { api } from '../lib/api'
 import { VRAM_PROFILES, PROFILE_EMBED_MODEL, PROFILE_EMBED_SIZE } from '@core/brain/profiles'
-import type { BrainHit, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent } from '../lib/types'
+import type { BrainHit, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent, QuarantineBucket, QuarantineNoteMeta } from '../lib/types'
 import { uiLabels } from '../lib/labels'
 import { useStore, ollamaUrlFromBrainUrl, dashboardUrlFromBrainUrl } from '../store/useStore'
 import { ActivityBanner } from '../components/ActivityBanner'
@@ -654,7 +654,6 @@ export default function Brain() {
               variant="soft"
               className="!px-2.5 !py-1.5 !text-[11px]"
               onClick={() => void api.profilePreviewShow()}
-              title={labels.profilePreview}
             >
               <User className="h-3.5 w-3.5" />
               {labels.profilePreview}
@@ -738,8 +737,7 @@ export default function Brain() {
           </div>
         ) : (
           <p className="text-xs text-ink-faint">
-            Distills selected sources with <code className="text-cyan">{activeProfile.chatModel}</code> ({activeProfile.label}{' '}
-            profile) and builds a searchable index.
+            {labels.brainDistillSelectedHint(activeProfile.chatModel, activeProfile.label)}
           </p>
         )}
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -749,7 +747,7 @@ export default function Brain() {
           </Button>
           {brainRunning && (
             <Button variant="soft" onClick={cancelBrainPipeline}>
-              Cancel
+              {labels.cancel}
             </Button>
           )}
           <Button
@@ -760,7 +758,7 @@ export default function Brain() {
               if (f) setImportPath(f)
             }}
           >
-            <Upload className="h-4 w-4" /> Import export…
+            <Upload className="h-4 w-4" /> {labels.brainAttachExport}
           </Button>
           {importPath && (
             <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-ink-dim">
@@ -774,10 +772,13 @@ export default function Brain() {
         </div>
         {importPath && (
           <p className="mt-2 text-[11px] text-ink-faint">
-            Run will distill the imported archive (Claude.ai / ChatGPT / Grok / Gemini) instead of live sources.
+            {labels.brainAttachExportHint}
           </p>
         )}
       </GlassCard>
+
+      {/* Quarantine / weak notes — user promote only */}
+      <QuarantinePanel vaultOpen={!!vault.open} />
 
       {/* Search */}
       <GlassCard className="mb-5 p-5">
@@ -898,5 +899,140 @@ export default function Brain() {
       </GlassCard>
       )}
     </div>
+  )
+}
+
+function QuarantinePanel({ vaultOpen }: { vaultOpen: boolean }) {
+  const labels = uiLabels()
+  const toast = useStore((s) => s.toast)
+  const [review, setReview] = useState<QuarantineNoteMeta[]>([])
+  const [weak, setWeak] = useState<QuarantineNoteMeta[]>([])
+  const [loading, setLoading] = useState(false)
+  const [viewing, setViewing] = useState<{ bucket: QuarantineBucket; name: string; content: string } | null>(null)
+  const [busyName, setBusyName] = useState<string | null>(null)
+
+  async function refresh() {
+    if (!vaultOpen) {
+      setReview([])
+      setWeak([])
+      return
+    }
+    setLoading(true)
+    try {
+      const r = await api.distilledQuarantineList()
+      setReview(r.review)
+      setWeak(r.weak)
+    } catch {
+      setReview([])
+      setWeak([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void refresh()
+  }, [vaultOpen])
+
+  async function view(bucket: QuarantineBucket, name: string) {
+    try {
+      const { content } = await api.distilledQuarantineRead(bucket, name)
+      setViewing({ bucket, name, content })
+    } catch (e) {
+      toast({ kind: 'error', title: labels.quarantinePromoteFailed, detail: (e as Error).message })
+    }
+  }
+
+  async function promote(bucket: QuarantineBucket, name: string) {
+    setBusyName(name)
+    try {
+      await api.distilledQuarantinePromote(bucket, name)
+      toast({ kind: 'success', title: labels.quarantinePromotedToast(name) })
+      if (viewing?.name === name) setViewing(null)
+      await refresh()
+    } catch (e) {
+      toast({ kind: 'error', title: labels.quarantinePromoteFailed, detail: (e as Error).message })
+    } finally {
+      setBusyName(null)
+    }
+  }
+
+  function renderList(bucket: QuarantineBucket, items: QuarantineNoteMeta[], heading: string) {
+    return (
+      <div className="min-w-0 flex-1">
+        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+          {heading} · {items.length}
+        </div>
+        {items.length === 0 ? (
+          <p className="text-[11px] text-ink-faint">{labels.quarantineEmpty}</p>
+        ) : (
+          <ul className="space-y-1">
+            {items.map((n) => (
+              <li key={`${n.bucket}-${n.name}`} className="flex items-center gap-2 rounded-lg border border-white/8 bg-black/20 px-2.5 py-1.5">
+                <span className="min-w-0 flex-1 truncate text-xs text-ink">{n.name}</span>
+                <button
+                  type="button"
+                  className="no-drag shrink-0 text-[11px] font-medium text-iris hover:text-cyan"
+                  onClick={() => void view(bucket, n.name)}
+                >
+                  {labels.quarantineView}
+                </button>
+                <Button
+                  variant="ghost"
+                  className="!px-2 !py-1 !text-[11px]"
+                  disabled={busyName === n.name}
+                  onClick={() => void promote(bucket, n.name)}
+                >
+                  {busyName === n.name ? <Spinner className="h-3 w-3" /> : null}
+                  {labels.quarantinePromote}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <GlassCard className="mb-5 p-5">
+      <div className="mb-1 text-sm font-semibold text-ink">{labels.quarantineTitle}</div>
+      <p className="mb-3 text-[12px] leading-relaxed text-ink-dim">{labels.quarantineLead}</p>
+      {!vaultOpen ? (
+        <p className="text-xs text-ink-faint">{labels.quarantineVaultClosed}</p>
+      ) : loading ? (
+        <div className="flex items-center gap-2 text-xs text-ink-dim">
+          <Spinner className="h-3.5 w-3.5" /> {labels.statusChecking}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4 sm:flex-row">
+          {renderList('review', review, labels.quarantineReview)}
+          {renderList('weak', weak, labels.quarantineWeak)}
+        </div>
+      )}
+      {viewing && (
+        <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <code className="truncate text-xs text-cyan">{viewing.name}</code>
+            <div className="flex shrink-0 gap-2">
+              <Button
+                variant="soft"
+                className="!px-2.5 !py-1 !text-[11px]"
+                disabled={busyName === viewing.name}
+                onClick={() => void promote(viewing.bucket, viewing.name)}
+              >
+                {labels.quarantinePromote}
+              </Button>
+              <Button variant="ghost" className="!px-2.5 !py-1 !text-[11px]" onClick={() => setViewing(null)}>
+                {labels.quarantineClose}
+              </Button>
+            </div>
+          </div>
+          <pre className="max-h-56 overflow-auto whitespace-pre-wrap text-[11px] leading-relaxed text-ink-dim">
+            {viewing.content}
+          </pre>
+        </div>
+      )}
+    </GlassCard>
   )
 }

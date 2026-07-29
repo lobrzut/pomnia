@@ -149,6 +149,112 @@ export interface UiLabels {
   mcpConnect: string
   brainPageTitle: string
   brainPageLead: string
+  brainDistillSelectedHint: (model: string, profile: string) => string
+  brainAttachExport: string
+  brainAttachExportHint: string
+  quarantineTitle: string
+  quarantineLead: string
+  quarantineReview: string
+  quarantineWeak: string
+  quarantineEmpty: string
+  quarantineView: string
+  quarantinePromote: string
+  quarantinePromotedToast: (name: string) => string
+  quarantinePromoteFailed: string
+  quarantineClose: string
+  quarantineVaultClosed: string
+  onboardingFirstRun: string
+  onboardingSidebarFooter: string
+  onboardingStepWelcome: string
+  onboardingStepStart: string
+  onboardingStepVault: string
+  onboardingStepBackup: string
+  onboardingStepEngine: string
+  onboardingStepMemory: string
+  onboardingStepConnect: string
+  onboardingStepReady: string
+  onboardingWelcomeTitle: string
+  onboardingWelcomeLeadSimple: string
+  onboardingWelcomeLeadFull: string
+  onboardingWelcomeCtaSimple: string
+  onboardingWelcomeCtaFull: string
+  onboardingValueCollectTitle: string
+  onboardingValueCollectText: string
+  onboardingValueEncryptTitle: string
+  onboardingValueEncryptText: string
+  onboardingValueRecallTitle: string
+  onboardingValueRecallText: string
+  onboardingVaultTitle: string
+  onboardingVaultLead: string
+  onboardingVaultCreateTab: string
+  onboardingVaultOpenTab: string
+  onboardingVaultNewFolder: string
+  onboardingVaultFolder: string
+  onboardingVaultCreateContinue: string
+  onboardingVaultUnlockContinue: string
+  onboardingPassphrase: string
+  onboardingConfirmPass: string
+  onboardingPassMismatch: string
+  onboardingVaultCryptoHint: string
+  onboardingEnterApp: string
+  onboardingBackupTitle: string
+  onboardingBackupLead: string
+  onboardingBackupScanning: string
+  onboardingBackupNone: string
+  onboardingBackupChats: (n: number) => string
+  onboardingBackupBackingUp: string
+  onboardingBackupSkip: string
+  onboardingBackupNow: string
+  onboardingEngineTitle: string
+  onboardingEngineLead: string
+  onboardingEngineLocal: string
+  onboardingEngineLocalHint: (url: string) => string
+  onboardingEngineRemote: string
+  onboardingEngineRemoteHint: string
+  onboardingEngineMasterUrl: string
+  onboardingEngineTestConn: string
+  onboardingEngineRemoteOk: string
+  onboardingEngineRemoteFail: string
+  onboardingEngineLooking: string
+  onboardingEngineRunning: string
+  onboardingEngineMoreModels: (n: number) => string
+  onboardingEngineEmbedHint: (model: string) => string
+  onboardingEngineDistillHint: (model: string) => string
+  onboardingEngineModelsNeeded: string
+  onboardingEngineEmbedMissing: (cmd: string) => string
+  onboardingEngineDistillMissing: (cmd: string, size: string) => string
+  onboardingEngineNotFound: string
+  onboardingEngineInstall1: string
+  onboardingEngineInstall2: string
+  onboardingEngineInstall3: string
+  onboardingEngineRecheck: string
+  onboardingEngineRemoteOllamaOptional: string
+  onboardingEngineSkip: string
+  onboardingContinue: string
+  onboardingSimpleBrainTitle: string
+  onboardingSimpleBrainLead: string
+  onboardingSimpleBrainChecking: string
+  onboardingSimpleBrainRunning: string
+  onboardingSimpleBrainReady: string
+  onboardingSimpleBrainReadyDetail: (url: string) => string
+  onboardingSimpleBrainSkip: string
+  onboardingSimpleBrainStart: string
+  onboardingConnectTitle: string
+  onboardingConnectLead: string
+  onboardingConnectCopied: string
+  onboardingConnectCopy: string
+  onboardingConnectSkip: string
+  onboardingReadyTitle: string
+  onboardingReadyLeadDone: string
+  onboardingReadyLeadPartial: string
+  onboardingReadyVault: string
+  onboardingReadyBackup: string
+  onboardingReadySearch: string
+  onboardingReadyRemote: string
+  onboardingReadyMcp: string
+  onboardingReadyMcpFirst: string
+  onboardingSkipForNow: string
+  onboardingBack: string
   embeddedBrain: string
   embeddedBrainStart: string
   embeddedBrainStop: string
@@ -316,6 +422,14 @@ export interface UiLabels {
   importChatAllDuplicatesDetail: string
   importChatNothingRecognized: string
   importChatFailedToast: string
+  importChatConfirmTitle: string
+  importChatConfirmSource: (source: string) => string
+  importChatConfirmStats: (conversations: number, messages: number) => string
+  importChatConfirmTitles: string
+  importChatConfirmGenericWarn: string
+  importChatConfirmSeal: string
+  importChatConfirmCancel: string
+  importChatConfirmDedup: (added: number, updated: number, skipped: number) => string
   importDocSection: string
   importDocPick: string
   importDocBusy: string
@@ -359,6 +473,7 @@ export interface UiLabels {
   importDocLibraryPending: string
   importDocLibraryIndexed: string
   importDocDelete: string
+  importDocDeleteAria: (name: string) => string
   importDocDeleteConfirm: (name: string) => string
   importDocDeletedToast: (name: string) => string
   importDocDeleteFailedToast: string
@@ -429,6 +544,8 @@ export interface UiLabels {
   guideTitle: string
   guideSubtitle: string
   guideLead: string
+  /** Idle FlowDiagram caption — hover hint; not the page lead. */
+  flowIdleHoverCaption: string
   guideStep1Title: string
   guideStep1Body: string
   guideStep1Where: string
@@ -528,9 +645,10 @@ export interface UiLabels {
   dashboardStatSkillsSub: (own: number, imported: number) => string
   dashboardStatDistilled: string
   dashboardStatDistilledSub: string
-  dashboardStatKnowledge: string
-  dashboardStatKnowledgeOpen: string
-  dashboardStatKnowledgeClosed: string
+  dashboardStatDocs: string
+  dashboardStatDocsSub: (size: string, indexed: number) => string
+  dashboardStatDocsPending: (n: number) => string
+  dashboardStatDocsClosed: string
   skillsPageTitle: string
   skillsPageLead: string
   skillsSectionOwn: string
@@ -584,6 +702,130 @@ const PL_LABELS: UiLabels = {
   brainPageTitle: 'Pamięć i wyszukiwarka',
   brainPageLead:
     'Przygotuj rozmowy do wyszukiwania i uruchom lokalną wyszukiwarkę — bez serwera w chmurze.',
+  brainDistillSelectedHint: (model, profile) =>
+    `Destyluje wybrane źródła modelem ${model} (profil ${profile}) i buduje indeks wyszukiwania.`,
+  brainAttachExport: 'Dołącz eksport do tego przebiegu…',
+  brainAttachExportHint:
+    'Przebieg zdestyluje dołączone archiwum (Claude.ai / ChatGPT / Grok / Gemini) zamiast żywych źródeł.',
+  quarantineTitle: 'Notatki do przeglądu',
+  quarantineLead:
+    'Po destylacji słabe notatki lądują w _weak/ (indeksowane) lub _review/ (kwarantanna). Tylko Ty możesz przywrócić do distilled/.',
+  quarantineReview: '_review (kwarantanna)',
+  quarantineWeak: '_weak (słabe)',
+  quarantineEmpty: 'Brak notatek w tej kategorii.',
+  quarantineView: 'Podgląd',
+  quarantinePromote: 'Przywróć do distilled/',
+  quarantinePromotedToast: (name) => `Przywrócono ${name} do distilled/`,
+  quarantinePromoteFailed: 'Nie udało się przywrócić notatki',
+  quarantineClose: 'Zamknij',
+  quarantineVaultClosed: 'Otwórz vault, żeby zobaczyć _review / _weak.',
+  onboardingFirstRun: 'pierwszy start',
+  onboardingSidebarFooter: 'Local-first. Zaszyfrowane. Nic nie wychodzi z dysku bez Twojej zgody.',
+  onboardingStepWelcome: 'Witaj',
+  onboardingStepStart: 'Start',
+  onboardingStepVault: 'Vault',
+  onboardingStepBackup: 'Backup',
+  onboardingStepEngine: 'Silnik',
+  onboardingStepMemory: 'Pamięć',
+  onboardingStepConnect: 'Connect',
+  onboardingStepReady: 'Gotowe',
+  onboardingWelcomeTitle: 'Twoja pamięć AI\nw jednym miejscu',
+  onboardingWelcomeLeadSimple:
+    'Vault → backup rozmów → lokalna wyszukiwarka → agent. Bez żargonu, bez serwera w chmurze.',
+  onboardingWelcomeLeadFull:
+    'Pomnia zamienia rozproszone rozmowy z asystentami w jedną zaszyfrowaną, przeszukiwalną pamięć — i oddaje ją każdemu AI, z którym pracujesz.',
+  onboardingWelcomeCtaSimple: 'Zaczynamy',
+  onboardingWelcomeCtaFull: 'Konfiguracja w 2 minuty',
+  onboardingValueCollectTitle: 'Zbieraj',
+  onboardingValueCollectText:
+    'Każdy czat z Claude Code, Cursor, Antigravity i innych — w jednym miejscu.',
+  onboardingValueEncryptTitle: 'Szyfruj',
+  onboardingValueEncryptText: 'Vault AES-256-GCM na Twoim dysku. Twoje prompty należą tylko do Ciebie.',
+  onboardingValueRecallTitle: 'Przywołuj',
+  onboardingValueRecallText: 'Oddaj kontekst dowolnemu AI przez MCP — agenci, którzy Cię pamiętają.',
+  onboardingVaultTitle: 'Utwórz vault',
+  onboardingVaultLead:
+    'Jeden folder vaultu trzyma wszystko (np. C:\\Vault — nazwa dowolna, też *.pomnia). Wybierz lokalizację i hasło, którego nie zgubisz. Przenośność = skopiuj cały ten folder → Otwórz vault → hasło.',
+  onboardingVaultCreateTab: 'Nowy vault',
+  onboardingVaultOpenTab: 'Mam już folder',
+  onboardingVaultNewFolder: 'Nowy folder vaultu',
+  onboardingVaultFolder: 'Folder vaultu',
+  onboardingVaultCreateContinue: 'Utwórz i dalej',
+  onboardingVaultUnlockContinue: 'Odblokuj i dalej',
+  onboardingPassphrase: 'Hasło',
+  onboardingConfirmPass: 'Potwierdź',
+  onboardingPassMismatch: 'Hasła się nie zgadzają.',
+  onboardingVaultCryptoHint:
+    'AES-256-GCM · scrypt · hasło nigdy nie jest zapisywane. Utrata hasła = brak odzyskania vaultu.',
+  onboardingEnterApp: 'Wejdź do Pomnia',
+  onboardingBackupTitle: 'Zrób backup czatów',
+  onboardingBackupLead:
+    'Automatycznie zaznaczamy asystentów znalezionych na tym komputerze. Jeden klik zapisuje je do vaultu.',
+  onboardingBackupScanning: 'Szukam Claude Code, Cursor, Antigravity…',
+  onboardingBackupNone:
+    'Nie wykryto asystentów. Zainstaluj Cursor lub Claude Code, potem zrób backup z Dashboardu — albo pomiń na razie.',
+  onboardingBackupChats: (n) => `${n} czatów`,
+  onboardingBackupBackingUp: 'Backupuję…',
+  onboardingBackupSkip: 'Pomiń — backup później z Dashboardu',
+  onboardingBackupNow: 'Backup teraz',
+  onboardingEngineTitle: 'Jak ma działać Brain?',
+  onboardingEngineLead:
+    'Wybierz lokalną wyszukiwarkę (wbudowaną w Pomnia) albo opcjonalny zdalny serwer Brain. Ollama na tym PC: embeddingi (nomic-embed-text, ~0,3 GB) i destylacja (qwen2.5:14b, ~9 GB).',
+  onboardingEngineLocal: 'Lokalnie (embedded)',
+  onboardingEngineLocalHint: (url) => `Jeden .exe, MCP na ${url} — bez zdalnego serwera, bez tokena.`,
+  onboardingEngineRemote: 'Zdalny master',
+  onboardingEngineRemoteHint: 'Twój serwer Brain w LAN — trzy serwery MCP + Bearer token.',
+  onboardingEngineMasterUrl: 'URL Master MCP',
+  onboardingEngineTestConn: 'Test połączenia',
+  onboardingEngineRemoteOk: 'Serwer Brain odpowiada',
+  onboardingEngineRemoteFail: 'Brak połączenia — sprawdź URL i sieć',
+  onboardingEngineLooking: 'Szukam Ollama na tym komputerze…',
+  onboardingEngineRunning: 'Ollama działa',
+  onboardingEngineMoreModels: (n) => `+${n} więcej`,
+  onboardingEngineEmbedHint: (model) =>
+    `Model embeddingów: ${model} (~0,3 GB) — lokalne wyszukiwanie semantyczne.`,
+  onboardingEngineDistillHint: (model) =>
+    `Model destylacji: ${model} (~9 GB) — skraca rozmowy do notatek.`,
+  onboardingEngineModelsNeeded: 'Potrzebne modele Ollama',
+  onboardingEngineEmbedMissing: (cmd) => `Brak modelu embeddingów — uruchom: ${cmd}`,
+  onboardingEngineDistillMissing: (cmd, size) =>
+    `Brak modelu destylacji — uruchom: ${cmd} (ok. ${size}; nie blokuje dalszej konfiguracji).`,
+  onboardingEngineNotFound: 'Nie znaleziono Ollama',
+  onboardingEngineInstall1: 'Pobierz z ollama.com/download i zainstaluj (~2 min).',
+  onboardingEngineInstall2:
+    'Pobierz modele: ollama pull nomic-embed-text (~0,3 GB) oraz ollama pull qwen2.5:14b (~9 GB).',
+  onboardingEngineInstall3: 'Wróć i sprawdź ponownie.',
+  onboardingEngineRecheck: 'Sprawdź ponownie',
+  onboardingEngineRemoteOllamaOptional:
+    'W trybie zdalnym Ollama na tym PC jest opcjonalna — destylacja idzie na serwerze master.',
+  onboardingEngineSkip: 'Pomiń — wybierz później w Connect',
+  onboardingContinue: 'Dalej',
+  onboardingSimpleBrainTitle: 'Uruchom lokalną wyszukiwarkę',
+  onboardingSimpleBrainLead:
+    'Mała wyszukiwarka na tym komputerze — agent może pytać Twoją pamięć bez zdalnego serwera.',
+  onboardingSimpleBrainChecking: 'Sprawdzam lokalną wyszukiwarkę…',
+  onboardingSimpleBrainRunning: 'Lokalna wyszukiwarka działa',
+  onboardingSimpleBrainReady: 'Gotowe do startu',
+  onboardingSimpleBrainReadyDetail: (url) => `Jeden klik uruchamia lokalny MCP na ${url}.`,
+  onboardingSimpleBrainSkip: 'Pomiń — uruchom później w Brain',
+  onboardingSimpleBrainStart: 'Start i dalej',
+  onboardingConnectTitle: 'Podłącz agenta',
+  onboardingConnectLead:
+    'Skopiuj konfigurację MCP i wklej u klienta — Pomnia nigdy nie dotyka Twoich plików.',
+  onboardingConnectCopied: 'Skopiowano',
+  onboardingConnectCopy: 'Kopiuj config',
+  onboardingConnectSkip: 'Pomiń — podepnij klientów później w Connect',
+  onboardingReadyTitle: 'Gotowe',
+  onboardingReadyLeadDone: 'Vault, backup i wyszukiwarka są gotowe. Agent może teraz przeszukiwać Twoją pamięć.',
+  onboardingReadyLeadPartial: 'Uruchom pierwszy backup z Dashboardu — reszta jest podłączona.',
+  onboardingReadyVault: 'Zaszyfrowany vault',
+  onboardingReadyBackup: 'Pierwszy backup',
+  onboardingReadySearch: 'Lokalna wyszukiwarka',
+  onboardingReadyRemote: 'Zdalny serwer Brain',
+  onboardingReadyMcp: 'Konfiguracja MCP agenta',
+  onboardingReadyMcpFirst: 'Pierwszy klient MCP',
+  onboardingSkipForNow: 'Pomiń na razie',
+  onboardingBack: 'Wstecz',
   embeddedBrain: 'Lokalna wyszukiwarka',
   embeddedBrainStart: 'Start',
   embeddedBrainStop: 'Stop',
@@ -770,6 +1012,22 @@ const PL_LABELS: UiLabels = {
   importChatAllDuplicatesDetail: 'Wszystkie rozmowy były już w vaulcie.',
   importChatNothingRecognized: 'Nic rozpoznawalnego w tym pliku',
   importChatFailedToast: 'Import czatów nie powiódł się',
+  importChatConfirmTitle: 'Potwierdź zapis do vaultu',
+  importChatConfirmSource: (source) => `Źródło: ${source}`,
+  importChatConfirmStats: (conversations, messages) =>
+    `${conversations} rozmów · ${messages} wiadomości`,
+  importChatConfirmTitles: 'Pierwsze tytuły',
+  importChatConfirmGenericWarn:
+    'Nie rozpoznano formatu eksportu — treść zostanie zapisana jako pojedyncza rozmowa',
+  importChatConfirmSeal: 'Zapisz do vaultu',
+  importChatConfirmCancel: 'Anuluj',
+  importChatConfirmDedup: (added, updated, skipped) => {
+    const parts: string[] = []
+    if (added) parts.push(`${added} nowych`)
+    if (updated) parts.push(`${updated} zaktualizowanych`)
+    if (skipped) parts.push(`${skipped} już w vaultcie`)
+    return parts.join(' · ')
+  },
   importDocSection: 'Dokumenty',
   importDocPick: 'Wybierz PDF, DOCX lub EPUB — albo upuść tutaj',
   importDocBusy: 'Importuję dokument…',
@@ -813,6 +1071,7 @@ const PL_LABELS: UiLabels = {
   importDocLibraryPending: 'czeka na indeks',
   importDocLibraryIndexed: 'zindeksowany',
   importDocDelete: 'Usuń',
+  importDocDeleteAria: (name) => `Usuń „${name}”`,
   importDocDeleteConfirm: (name) =>
     `Usunąć „${name}”? Usuniemy tylko bloby tego dokumentu (nie czaty/snapshoty).`,
   importDocDeletedToast: (name) => `Usunięto ${name}`,
@@ -879,7 +1138,8 @@ const PL_LABELS: UiLabels = {
   guideTitle: 'Mapa Pomnia',
   guideSubtitle: 'Jak to działa',
   guideLead:
-    'Gdzie co się dzieje — od surowych logów asystentów po wyszukiwanie przez MCP. Bez chmury, dopóki sam nie włączysz deployu.',
+    'Gdzie co się dzieje — od surowych logów asystentów po wyszukiwanie przez MCP. Lokalnie domyślnie; chmura tylko gdy sam włączysz deploy LAN albo opcjonalne API destylacji.',
+  flowIdleHoverCaption: 'Najedź na element, żeby zobaczyć, co robi',
   guideStep1Title: 'Krok 1 — Zbieranie',
   guideStep1Body:
     'Cursor, Claude Code, Antigravity… — Pomnia czyta żywe logi z dysku albo importuje eksporty ZIP/JSON.',
@@ -995,9 +1255,10 @@ const PL_LABELS: UiLabels = {
   dashboardStatSkillsSub: (own, imported) => `${own} własnych · ${imported} zaimportowanych`,
   dashboardStatDistilled: 'Notatki',
   dashboardStatDistilledSub: 'distilled',
-  dashboardStatKnowledge: 'Wiedza',
-  dashboardStatKnowledgeOpen: 'otwarta',
-  dashboardStatKnowledgeClosed: 'zamknięta',
+  dashboardStatDocs: 'Dokumenty',
+  dashboardStatDocsSub: (size, indexed) => `${size} · ${indexed} zindeksowane`,
+  dashboardStatDocsPending: (n) => (n === 1 ? '1 czeka na indeks' : `${n} czeka na indeks`),
+  dashboardStatDocsClosed: 'brak vaultu',
   skillsPageTitle: 'Skills',
   skillsPageLead:
     'Skille to instrukcje, po które agent sięga sam przez `get_skill`. Nie są częścią wyszukiwania — to gotowe procedury, nie wiedza.',
@@ -1063,6 +1324,129 @@ const EN_LABELS: Partial<UiLabels> = {
   mcpConnect: 'Connect agent',
   brainPageTitle: 'Memory & search',
   brainPageLead: 'Prepare chats for search and start the local search engine — no cloud server.',
+  brainDistillSelectedHint: (model, profile) =>
+    `Distills selected sources with ${model} (${profile} profile) and builds a searchable index.`,
+  brainAttachExport: 'Add export to this run…',
+  brainAttachExportHint:
+    'Run will distill the attached archive (Claude.ai / ChatGPT / Grok / Gemini) instead of live sources.',
+  quarantineTitle: 'Notes for review',
+  quarantineLead:
+    'After distill, weak notes go to _weak/ (indexed) or _review/ (quarantine). Only you can move them back to distilled/.',
+  quarantineReview: '_review (quarantine)',
+  quarantineWeak: '_weak (weak)',
+  quarantineEmpty: 'No notes in this category.',
+  quarantineView: 'View',
+  quarantinePromote: 'Restore to distilled/',
+  quarantinePromotedToast: (name) => `Restored ${name} to distilled/`,
+  quarantinePromoteFailed: 'Could not restore note',
+  quarantineClose: 'Close',
+  quarantineVaultClosed: 'Open a vault to see _review / _weak.',
+  onboardingFirstRun: 'first run',
+  onboardingSidebarFooter: 'Local-first. Encrypted. Nothing leaves your hardware unless you say so.',
+  onboardingStepWelcome: 'Welcome',
+  onboardingStepStart: 'Start',
+  onboardingStepVault: 'Vault',
+  onboardingStepBackup: 'Backup',
+  onboardingStepEngine: 'Engine',
+  onboardingStepMemory: 'Memory',
+  onboardingStepConnect: 'Connect',
+  onboardingStepReady: 'Ready',
+  onboardingWelcomeTitle: 'Your AI memory\nin one place',
+  onboardingWelcomeLeadSimple:
+    'Vault → chat backup → local search → agent. No jargon, no cloud server.',
+  onboardingWelcomeLeadFull:
+    'Pomnia turns scattered assistant chats into one encrypted, searchable memory — and gives it to every AI you work with.',
+  onboardingWelcomeCtaSimple: 'Let’s go',
+  onboardingWelcomeCtaFull: 'Setup in 2 minutes',
+  onboardingValueCollectTitle: 'Collect',
+  onboardingValueCollectText: 'Every chat from Claude Code, Cursor, Antigravity and more — in one place.',
+  onboardingValueEncryptTitle: 'Encrypt',
+  onboardingValueEncryptText: 'AES-256-GCM vault on your disk. Your prompts stay yours.',
+  onboardingValueRecallTitle: 'Recall',
+  onboardingValueRecallText: 'Hand context to any AI via MCP — agents that remember you.',
+  onboardingVaultTitle: 'Create a vault',
+  onboardingVaultLead:
+    'One vault folder holds everything (e.g. C:\\Vault — any name, including *.pomnia). Pick a location and a passphrase you won’t lose. Portability = copy that whole folder → Open vault → passphrase.',
+  onboardingVaultCreateTab: 'New vault',
+  onboardingVaultOpenTab: 'I already have a folder',
+  onboardingVaultNewFolder: 'New vault folder',
+  onboardingVaultFolder: 'Vault folder',
+  onboardingVaultCreateContinue: 'Create & continue',
+  onboardingVaultUnlockContinue: 'Unlock & continue',
+  onboardingPassphrase: 'Passphrase',
+  onboardingConfirmPass: 'Confirm',
+  onboardingPassMismatch: "Passphrases don't match.",
+  onboardingVaultCryptoHint:
+    'AES-256-GCM · scrypt · the passphrase is never stored. Lose it and the vault is unrecoverable.',
+  onboardingEnterApp: 'Enter Pomnia',
+  onboardingBackupTitle: 'Backup your chats',
+  onboardingBackupLead:
+    'We auto-select assistants found on this machine. One click saves them into your vault.',
+  onboardingBackupScanning: 'Scanning for Claude Code, Cursor, Antigravity…',
+  onboardingBackupNone:
+    'No assistants detected yet. Install Cursor or Claude Code, then run backup from the Dashboard — or skip for now.',
+  onboardingBackupChats: (n) => `${n} chats`,
+  onboardingBackupBackingUp: 'Backing up…',
+  onboardingBackupSkip: 'Skip — backup later from Dashboard',
+  onboardingBackupNow: 'Backup now',
+  onboardingEngineTitle: 'How will Brain run?',
+  onboardingEngineLead:
+    'Pick local embedded brain (built into Pomnia) or an optional remote Brain server. Ollama on this machine: embeddings (nomic-embed-text, ~0.3GB) and distill (qwen2.5:14b, ~9GB).',
+  onboardingEngineLocal: 'Local embedded',
+  onboardingEngineLocalHint: (url) => `One .exe, MCP on ${url} — no remote server, no token.`,
+  onboardingEngineRemote: 'Remote master',
+  onboardingEngineRemoteHint: 'Your Brain server on the LAN — three MCP servers + Bearer token.',
+  onboardingEngineMasterUrl: 'Master MCP URL',
+  onboardingEngineTestConn: 'Test connection',
+  onboardingEngineRemoteOk: 'Brain server is responding',
+  onboardingEngineRemoteFail: 'Unreachable — check URL and network',
+  onboardingEngineLooking: 'Looking for Ollama on this machine…',
+  onboardingEngineRunning: 'Ollama is running',
+  onboardingEngineMoreModels: (n) => `+${n} more`,
+  onboardingEngineEmbedHint: (model) =>
+    `Embedding model: ${model} (~0.3GB) — powers local semantic search.`,
+  onboardingEngineDistillHint: (model) =>
+    `Distill model: ${model} (~9GB) — shortens chats into notes.`,
+  onboardingEngineModelsNeeded: 'Ollama models needed',
+  onboardingEngineEmbedMissing: (cmd) => `Embedding model missing — run: ${cmd}`,
+  onboardingEngineDistillMissing: (cmd, size) =>
+    `Distill model missing — run: ${cmd} (~${size}; does not block setup).`,
+  onboardingEngineNotFound: 'Ollama not found',
+  onboardingEngineInstall1: 'Download from ollama.com/download and install (2 min).',
+  onboardingEngineInstall2:
+    'Pull models: ollama pull nomic-embed-text (~0.3GB) and ollama pull qwen2.5:14b (~9GB).',
+  onboardingEngineInstall3: 'Come back and re-check.',
+  onboardingEngineRecheck: 'Re-check',
+  onboardingEngineRemoteOllamaOptional:
+    'Ollama on this PC is optional in remote mode — distillation runs on your master server.',
+  onboardingEngineSkip: 'Skip — pick later in Connect tab',
+  onboardingContinue: 'Continue',
+  onboardingSimpleBrainTitle: 'Start local search',
+  onboardingSimpleBrainLead:
+    'Runs a small search engine on this machine — an agent can query your memory without any remote server.',
+  onboardingSimpleBrainChecking: 'Checking local search engine…',
+  onboardingSimpleBrainRunning: 'Local search is running',
+  onboardingSimpleBrainReady: 'Ready to start',
+  onboardingSimpleBrainReadyDetail: (url) => `One click starts the local MCP server on ${url}.`,
+  onboardingSimpleBrainSkip: 'Skip — start later in Brain tab',
+  onboardingSimpleBrainStart: 'Start & continue',
+  onboardingConnectTitle: 'Connect an agent',
+  onboardingConnectLead:
+    'Copy the MCP config and paste it in your client — Pomnia never touches your files.',
+  onboardingConnectCopied: 'Copied',
+  onboardingConnectCopy: 'Copy config',
+  onboardingConnectSkip: 'Skip — wire clients later from the Connect tab',
+  onboardingReadyTitle: 'Ready',
+  onboardingReadyLeadDone: 'Vault, backup and search are ready. An agent can now search your memory.',
+  onboardingReadyLeadPartial: 'Run the first backup from the Dashboard — the rest is connected.',
+  onboardingReadyVault: 'Encrypted vault',
+  onboardingReadyBackup: 'First backup',
+  onboardingReadySearch: 'Local search',
+  onboardingReadyRemote: 'Remote Brain server',
+  onboardingReadyMcp: 'Agent MCP config',
+  onboardingReadyMcpFirst: 'First MCP client',
+  onboardingSkipForNow: 'Skip for now',
+  onboardingBack: 'Back',
   embeddedBrain: 'Local search',
   embeddedBrainStart: 'Start',
   embeddedBrainStop: 'Stop',
@@ -1260,9 +1644,10 @@ const EN_LABELS: Partial<UiLabels> = {
   dashboardStatSkillsSub: (own, imported) => `${own} own · ${imported} imported`,
   dashboardStatDistilled: 'Notes',
   dashboardStatDistilledSub: 'distilled',
-  dashboardStatKnowledge: 'Knowledge',
-  dashboardStatKnowledgeOpen: 'open',
-  dashboardStatKnowledgeClosed: 'closed',
+  dashboardStatDocs: 'Documents',
+  dashboardStatDocsSub: (size, indexed) => `${size} · ${indexed} indexed`,
+  dashboardStatDocsPending: (n) => (n === 1 ? '1 waiting for index' : `${n} waiting for index`),
+  dashboardStatDocsClosed: 'no vault',
   skillsPageTitle: 'Skills',
   skillsPageLead:
     'Skills are procedures the agent loads itself via `get_skill`. They are not part of search — ready-made workflows, not knowledge.',
@@ -1337,6 +1722,22 @@ const EN_LABELS: Partial<UiLabels> = {
   importChatAllDuplicatesDetail: 'Every conversation was already in the vault.',
   importChatNothingRecognized: 'Nothing recognized in that file',
   importChatFailedToast: 'Chat import failed',
+  importChatConfirmTitle: 'Confirm seal to vault',
+  importChatConfirmSource: (source) => `Source: ${source}`,
+  importChatConfirmStats: (conversations, messages) =>
+    `${conversations} conversations · ${messages} messages`,
+  importChatConfirmTitles: 'Sample titles',
+  importChatConfirmGenericWarn:
+    'Export format not recognized — content will be saved as a single conversation',
+  importChatConfirmSeal: 'Seal to vault',
+  importChatConfirmCancel: 'Cancel',
+  importChatConfirmDedup: (added, updated, skipped) => {
+    const parts: string[] = []
+    if (added) parts.push(`${added} new`)
+    if (updated) parts.push(`${updated} updated`)
+    if (skipped) parts.push(`${skipped} already in vault`)
+    return parts.join(' · ')
+  },
   importDocPick: 'Choose PDF, DOCX, or EPUB — or drop it here',
   importDocDuplicateToast: 'Document already in the vault — skipped',
   importDocIndexedToast: (chunks) => `Indexed ${chunks} chunk(s)`,
@@ -1361,6 +1762,7 @@ const EN_LABELS: Partial<UiLabels> = {
   importDocLibraryPending: 'pending index',
   importDocLibraryIndexed: 'indexed',
   importDocDelete: 'Delete',
+  importDocDeleteAria: (name) => `Delete “${name}”`,
   importDocDeleteConfirm: (name) =>
     `Delete “${name}”? Only this document’s blobs are removed (not chats/snapshots).`,
   importDocDeletedToast: (name) => `Deleted ${name}`,
@@ -1372,6 +1774,9 @@ const EN_LABELS: Partial<UiLabels> = {
   importProviderGrok: 'Account → export conversations → ZIP/JSON',
   guideTitle: 'Pomnia map',
   guideSubtitle: 'How it works',
+  guideLead:
+    'Where things live — from raw assistant logs to search via MCP. Local by default; cloud only if you enable LAN deploy or the optional distill API.',
+  flowIdleHoverCaption: 'Hover an element to see what it does',
   guideFlowReplay: 'Replay demo',
   guideFlowReplayLast: 'Replay last activity',
   connectPageLead:

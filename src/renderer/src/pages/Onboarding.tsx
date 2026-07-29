@@ -46,22 +46,13 @@ const REMOTE_URL_PLACEHOLDER = REMOTE_BRAIN_URL_PLACEHOLDER
 
 type StepId = 'welcome' | 'vault' | 'backup' | 'engine' | 'connect' | 'ready'
 
-const FULL_STEPS: { id: StepId; label: string }[] = [
-  { id: 'welcome', label: 'Welcome' },
-  { id: 'vault', label: 'Vault' },
-  { id: 'engine', label: 'Engine' },
-  { id: 'connect', label: 'Connect' },
-  { id: 'ready', label: 'Ready' }
-]
-
-const SIMPLE_STEPS: { id: StepId; label: string }[] = [
-  { id: 'welcome', label: 'Start' },
-  { id: 'vault', label: 'Vault' },
-  { id: 'backup', label: 'Backup' },
-  { id: 'engine', label: 'Memory' },
-  { id: 'connect', label: 'Connect' },
-  { id: 'ready', label: 'Ready' }
-]
+function hasOllamaModel(models: string[], want: string): boolean {
+  const w = want.toLowerCase()
+  return models.some((m) => {
+    const ml = m.toLowerCase()
+    return ml === w || ml === `${w}:latest` || ml.replace(/:latest$/, '') === w
+  })
+}
 
 interface Outcomes {
   vault: 'done' | null
@@ -74,7 +65,23 @@ interface Outcomes {
 export default function Onboarding() {
   const completeOnboarding = useStore((s) => s.completeOnboarding)
   const simpleMode = useStore((s) => s.simpleMode)
-  const STEPS = simpleMode ? SIMPLE_STEPS : FULL_STEPS
+  const labels = uiLabels()
+  const STEPS: { id: StepId; label: string }[] = simpleMode
+    ? [
+        { id: 'welcome', label: labels.onboardingStepStart },
+        { id: 'vault', label: labels.onboardingStepVault },
+        { id: 'backup', label: labels.onboardingStepBackup },
+        { id: 'engine', label: labels.onboardingStepMemory },
+        { id: 'connect', label: labels.onboardingStepConnect },
+        { id: 'ready', label: labels.onboardingStepReady },
+      ]
+    : [
+        { id: 'welcome', label: labels.onboardingStepWelcome },
+        { id: 'vault', label: labels.onboardingStepVault },
+        { id: 'engine', label: labels.onboardingStepEngine },
+        { id: 'connect', label: labels.onboardingStepConnect },
+        { id: 'ready', label: labels.onboardingStepReady },
+      ]
   const [stepIdx, setStepIdx] = useState(0)
   const [dir, setDir] = useState(1)
   const [outcomes, setOutcomes] = useState<Outcomes>({
@@ -114,7 +121,7 @@ export default function Onboarding() {
             <div className="min-w-0 leading-none">
               <div className="text-sm font-bold tracking-tight text-grad">POMNIA</div>
               <div className="mt-1.5 text-[9px] font-medium uppercase tracking-[0.22em] text-ink-faint">
-                first run
+                {labels.onboardingFirstRun}
               </div>
             </div>
           </div>
@@ -158,7 +165,7 @@ export default function Onboarding() {
         </div>
 
         <p className="text-[10px] leading-relaxed text-ink-faint">
-          Local-first. Encrypted. Nothing leaves your hardware unless you say so.
+          {labels.onboardingSidebarFooter}
         </p>
       </div>
 
@@ -214,15 +221,14 @@ export default function Onboarding() {
 
 /* ── Step 1: Welcome ────────────────────────────────────────────────────── */
 
-const VALUE_PROPS = [
-  { icon: Download, title: 'Zbieraj', text: 'Każdy czat z Claude Code, Cursor, Antigravity i innych — w jednym miejscu.' },
-  { icon: Lock, title: 'Szyfruj', text: 'Vault AES-256-GCM na Twoim dysku. Twoje prompty należą tylko do Ciebie.' },
-  { icon: Zap, title: 'Przywołuj', text: 'Oddaj kontekst dowolnemu AI przez MCP — agenci, którzy Cię pamiętają.' }
-]
-
 function WelcomeStep({ simpleMode, onNext }: { simpleMode: boolean; onNext: () => void }) {
   const labels = uiLabels()
   const [guideOpen, setGuideOpen] = useState(false)
+  const valueProps = [
+    { icon: Download, title: labels.onboardingValueCollectTitle, text: labels.onboardingValueCollectText },
+    { icon: Lock, title: labels.onboardingValueEncryptTitle, text: labels.onboardingValueEncryptText },
+    { icon: Zap, title: labels.onboardingValueRecallTitle, text: labels.onboardingValueRecallText },
+  ]
 
   return (
     <>
@@ -237,20 +243,16 @@ function WelcomeStep({ simpleMode, onNext }: { simpleMode: boolean; onNext: () =
         <AppLogo size="xl" glow className="relative" />
       </div>
 
-      <h1 className="text-[28px] font-bold leading-tight tracking-tight text-grad">
-        Twoja pamięć AI
-        <br />
-        w jednym miejscu
+      <h1 className="whitespace-pre-line text-[28px] font-bold leading-tight tracking-tight text-grad">
+        {labels.onboardingWelcomeTitle}
       </h1>
       <p className="mx-auto mt-2.5 max-w-[380px] text-sm leading-relaxed text-ink-dim">
-        {simpleMode
-          ? 'Vault → backup rozmów → lokalna wyszukiwarka → agent. Bez żargonu, bez serwera w chmurze.'
-          : 'Pomnia zamienia rozproszone rozmowy z asystentami w jedną zaszyfrowaną, przeszukiwalną pamięć — i oddaje ją każdemu AI, z którym pracujesz.'}
+        {simpleMode ? labels.onboardingWelcomeLeadSimple : labels.onboardingWelcomeLeadFull}
       </p>
 
       {!simpleMode && (
         <div className="mt-7 grid grid-cols-3 gap-3">
-          {VALUE_PROPS.map((v, i) => (
+          {valueProps.map((v, i) => (
             <motion.div
               key={v.title}
               initial={{ opacity: 0, y: 14 }}
@@ -267,7 +269,7 @@ function WelcomeStep({ simpleMode, onNext }: { simpleMode: boolean; onNext: () =
       )}
 
       <Button onClick={onNext} className="mt-8 w-full">
-        <Sparkles className="h-4 w-4" /> {simpleMode ? 'Zaczynamy' : 'Konfiguracja w 2 minuty'}
+        <Sparkles className="h-4 w-4" /> {simpleMode ? labels.onboardingWelcomeCtaSimple : labels.onboardingWelcomeCtaFull}
       </Button>
       <button
         type="button"
@@ -284,6 +286,7 @@ function WelcomeStep({ simpleMode, onNext }: { simpleMode: boolean; onNext: () =
 /* ── Step 2: Vault ──────────────────────────────────────────────────────── */
 
 function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
+  const labels = uiLabels()
   const { createVault, openVault } = useStore()
   const [mode, setMode] = useState<'create' | 'unlock'>('create')
   const [path, setPath] = useState('')
@@ -309,11 +312,7 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
   }
 
   return (
-    <StepCard
-      icon={ShieldCheck}
-      title="Utwórz vault"
-      lead="Jeden folder vaultu trzyma wszystko (np. C:\Vault — nazwa dowolna, też *.pomnia). Wybierz lokalizację i hasło, którego nie zgubisz. Przenośność = skopiuj cały ten folder → Otwórz vault → hasło."
-    >
+    <StepCard icon={ShieldCheck} title={labels.onboardingVaultTitle} lead={labels.onboardingVaultLead}>
       <div className="mb-4 flex rounded-xl border border-white/10 bg-black/20 p-1">
         {(['create', 'unlock'] as const).map((m) => (
           <button
@@ -327,14 +326,14 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
             {mode === m && <motion.div layoutId="ob-vault-tab" className="absolute inset-0 rounded-lg accent-grad opacity-90" />}
             <span className="relative flex items-center justify-center gap-1.5">
               {m === 'create' ? <Sparkles className="h-3.5 w-3.5" /> : <KeyRound className="h-3.5 w-3.5" />}
-              {m === 'create' ? 'Nowy vault' : 'Mam już folder'}
+              {m === 'create' ? labels.onboardingVaultCreateTab : labels.onboardingVaultOpenTab}
             </span>
           </button>
         ))}
       </div>
 
       <div className="space-y-3.5">
-        <Field label={mode === 'create' ? 'Nowy folder vaultu' : 'Folder vaultu'}>
+        <Field label={mode === 'create' ? labels.onboardingVaultNewFolder : labels.onboardingVaultFolder}>
           <div className="flex gap-2">
             <Input value={path} onChange={(e) => setPath(e.target.value)} placeholder="C:\Vault" />
             <Button variant="soft" onClick={pick}>
@@ -343,31 +342,31 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
           </div>
         </Field>
         {mode === 'create' && (
-          <Field label="Vault name">
+          <Field label={labels.vault}>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
         )}
         <div className={clsx('grid gap-3.5', mode === 'create' ? 'grid-cols-2' : 'grid-cols-1')}>
-          <Field label="Passphrase">
+          <Field label={labels.onboardingPassphrase}>
             <Input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••••••" />
           </Field>
           {mode === 'create' && (
-            <Field label="Confirm">
+            <Field label={labels.onboardingConfirmPass}>
               <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="••••••••••" />
             </Field>
           )}
         </div>
-        {mismatch && <p className="text-xs text-rose">Passphrases don't match.</p>}
+        {mismatch && <p className="text-xs text-rose">{labels.onboardingPassMismatch}</p>}
         <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-ink-faint">
           <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0" />
-          AES-256-GCM · scrypt key derivation · the passphrase is never stored. Lose it and the vault is unrecoverable.
+          {labels.onboardingVaultCryptoHint}
         </p>
       </div>
 
       <StepNav onBack={onBack}>
         <Button onClick={submit} disabled={!valid || busy}>
           {busy ? <Spinner className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
-          {mode === 'create' ? 'Create & continue' : 'Unlock & continue'}
+          {mode === 'create' ? labels.onboardingVaultCreateContinue : labels.onboardingVaultUnlockContinue}
         </Button>
       </StepNav>
     </StepCard>
@@ -385,6 +384,7 @@ function BackupStep({
   onSkip: () => void
   onBack: () => void
 }) {
+  const labels = uiLabels()
   const { scan, sources, selected, backup, backingUp, backupPhase } = useStore()
   const [scanned, setScanned] = useState(false)
 
@@ -401,19 +401,15 @@ function BackupStep({
   }
 
   return (
-    <StepCard
-      icon={Download}
-      title="Backup your chats"
-      lead="We auto-select assistants found on this machine. One click saves them into your vault."
-    >
+    <StepCard icon={Download} title={labels.onboardingBackupTitle} lead={labels.onboardingBackupLead}>
       {!scanned ? (
         <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-5">
           <Spinner className="h-4 w-4 text-iris" />
-          <span className="text-sm text-ink-dim">Scanning for Claude Code, Cursor, Antigravity…</span>
+          <span className="text-sm text-ink-dim">{labels.onboardingBackupScanning}</span>
         </div>
       ) : picked.length === 0 ? (
         <p className="rounded-2xl border border-white/8 bg-black/20 px-4 py-5 text-sm text-ink-dim">
-          No assistants detected yet. Install Cursor or Claude Code, then run backup from the Dashboard — or skip for now.
+          {labels.onboardingBackupNone}
         </p>
       ) : (
         <div className="space-y-2">
@@ -425,20 +421,20 @@ function BackupStep({
               <Check className="h-4 w-4 shrink-0 text-mint" />
               <span className="text-[13px] font-medium text-ink">{s.label}</span>
               {s.conversations != null && (
-                <span className="ml-auto text-[11px] text-ink-faint">{s.conversations} chats</span>
+                <span className="ml-auto text-[11px] text-ink-faint">{labels.onboardingBackupChats(s.conversations)}</span>
               )}
             </div>
           ))}
           {backingUp && (
-            <p className="text-xs text-ink-dim">{backupPhase || 'Backing up…'}</p>
+            <p className="text-xs text-ink-dim">{backupPhase || labels.onboardingBackupBackingUp}</p>
           )}
         </div>
       )}
 
-      <StepNav onBack={onBack} onSkip={onSkip} skipLabel="Skip — backup later from Dashboard">
+      <StepNav onBack={onBack} onSkip={onSkip} skipLabel={labels.onboardingBackupSkip}>
         <Button onClick={() => void runBackup()} disabled={!scanned || backingUp || picked.length === 0}>
           {backingUp ? <Spinner className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-          Backup now
+          {labels.onboardingBackupNow}
         </Button>
       </StepNav>
     </StepCard>
@@ -456,6 +452,7 @@ function EngineStep({
   onSkip: () => void
   onBack: () => void
 }) {
+  const labels = uiLabels()
   const setBrainTarget = useStore((s) => s.setBrainTarget)
   const setRemoteBrainUrl = useStore((s) => s.setRemoteBrainUrl)
   const remoteBrainUrl = useStore((s) => s.remoteBrainUrl)
@@ -477,8 +474,8 @@ function EngineStep({
       setRemoteOk(r.brain.reachable)
       setRemoteDetail(
         r.brain.reachable
-          ? 'Serwer Brain odpowiada'
-          : r.brain.error || 'Brak połączenia — sprawdź URL i sieć',
+          ? labels.onboardingEngineRemoteOk
+          : r.brain.error || labels.onboardingEngineRemoteFail,
       )
     } catch (e) {
       setRemoteOk(false)
@@ -504,6 +501,11 @@ function EngineStep({
   }, [])
 
   const found = !!status?.reachable
+  const models = status?.models ?? []
+  const embedModel = status?.embedModel ?? 'nomic-embed-text'
+  const distillModel = status?.chatModel ?? 'qwen2.5:14b'
+  const hasEmbed = hasOllamaModel(models, embedModel)
+  const hasDistill = hasOllamaModel(models, distillModel)
   const remoteUrlTrimmed = remoteUrl.trim()
   const canContinue = mode === 'embedded' ? found : remoteUrlTrimmed.length > 0
 
@@ -514,11 +516,7 @@ function EngineStep({
   }
 
   return (
-    <StepCard
-      icon={Cpu}
-      title="How will Brain run?"
-      lead="Pick local embedded brain (built into Pomnia) or an optional remote Brain server. Ollama on this machine powers embeddings for the local path."
-    >
+    <StepCard icon={Cpu} title={labels.onboardingEngineTitle} lead={labels.onboardingEngineLead}>
       <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <button
           type="button"
@@ -528,9 +526,9 @@ function EngineStep({
             mode === 'embedded' ? 'border-iris/60 bg-iris/10 ring-1 ring-iris/30' : 'border-white/8 bg-black/20 hover:bg-white/5'
           )}
         >
-          <div className="text-sm font-semibold text-ink">Local embedded</div>
+          <div className="text-sm font-semibold text-ink">{labels.onboardingEngineLocal}</div>
           <div className="mt-1 text-[11px] leading-relaxed text-ink-faint">
-            One .exe, MCP on {EMBEDDED_URL} — no remote server, no token.
+            {labels.onboardingEngineLocalHint(EMBEDDED_URL)}
           </div>
         </button>
         <button
@@ -541,16 +539,16 @@ function EngineStep({
             mode === 'remote' ? 'border-iris/60 bg-iris/10 ring-1 ring-iris/30' : 'border-white/8 bg-black/20 hover:bg-white/5'
           )}
         >
-          <div className="text-sm font-semibold text-ink">Remote master</div>
+          <div className="text-sm font-semibold text-ink">{labels.onboardingEngineRemote}</div>
           <div className="mt-1 text-[11px] leading-relaxed text-ink-faint">
-            Your Brain server on the LAN — three MCP servers + Bearer token.
+            {labels.onboardingEngineRemoteHint}
           </div>
         </button>
       </div>
 
       {mode === 'remote' && (
         <div className="mb-4 space-y-2">
-          <Field label="Master MCP URL">
+          <Field label={labels.onboardingEngineMasterUrl}>
             <Input
               value={remoteUrl}
               onChange={(e) => {
@@ -563,7 +561,7 @@ function EngineStep({
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="soft" onClick={() => void testRemote()} disabled={!remoteUrlTrimmed || remoteTesting}>
               {remoteTesting ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              Test połączenia
+              {labels.onboardingEngineTestConn}
             </Button>
             {remoteOk === true && (
               <span className="text-[11px] font-medium text-mint">{remoteDetail}</span>
@@ -579,7 +577,7 @@ function EngineStep({
         (checking ? (
           <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-5">
             <Spinner className="h-4 w-4 text-iris" />
-            <span className="text-sm text-ink-dim">Looking for Ollama on this machine…</span>
+            <span className="text-sm text-ink-dim">{labels.onboardingEngineLooking}</span>
           </div>
         ) : found ? (
           <motion.div
@@ -592,60 +590,69 @@ function EngineStep({
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
                 <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-mint" />
               </span>
-              <span className="text-sm font-semibold text-ink">Ollama is running</span>
+              <span className="text-sm font-semibold text-ink">{labels.onboardingEngineRunning}</span>
               <span className="ml-auto font-mono text-[11px] text-ink-faint">{status!.baseUrl}</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {(status?.models ?? []).slice(0, 4).map((m) => (
+              {models.slice(0, 4).map((m) => (
                 <span key={m} className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 font-mono text-[11px] text-ink-dim">
                   {m}
                 </span>
               ))}
-              {(status?.models ?? []).length > 4 && (
-                <span className="px-1.5 py-1 text-[11px] text-ink-faint">+{(status?.models ?? []).length - 4} more</span>
+              {models.length > 4 && (
+                <span className="px-1.5 py-1 text-[11px] text-ink-faint">{labels.onboardingEngineMoreModels(models.length - 4)}</span>
               )}
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
-              Embedding model: <code className="text-cyan">{status?.embedModel ?? 'nomic-embed-text'}</code> — powers local semantic search.
+              {labels.onboardingEngineEmbedHint(embedModel)}
             </p>
+            <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+              {labels.onboardingEngineDistillHint(distillModel)}
+            </p>
+            {(!hasEmbed || !hasDistill) && (
+              <div className="mt-3 space-y-1.5 rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-[11px] text-amber-100">
+                <div className="font-semibold text-ink">{labels.onboardingEngineModelsNeeded}</div>
+                {!hasEmbed && (
+                  <p>{labels.onboardingEngineEmbedMissing(`ollama pull ${embedModel}`)}</p>
+                )}
+                {!hasDistill && (
+                  <p>{labels.onboardingEngineDistillMissing(`ollama pull ${distillModel}`, '~9 GB')}</p>
+                )}
+              </div>
+            )}
           </motion.div>
         ) : (
           <div className="rounded-2xl border border-amber/20 bg-amber/5 p-4">
-            <div className="text-sm font-semibold text-ink">Ollama not found</div>
+            <div className="text-sm font-semibold text-ink">{labels.onboardingEngineNotFound}</div>
             <ol className="mt-2.5 space-y-2 text-[13px] text-ink-dim">
               <li className="flex gap-2">
                 <span className="font-bold text-amber">1.</span>
-                <span>
-                  Download from <code className="text-cyan">ollama.com/download</code> and install (2 min).
-                </span>
+                <span>{labels.onboardingEngineInstall1}</span>
               </li>
               <li className="flex gap-2">
                 <span className="font-bold text-amber">2.</span>
-                <span>
-                  Pull the embedding model:{' '}
-                  <code className="rounded bg-black/40 px-1.5 py-0.5 text-cyan">ollama pull nomic-embed-text</code>
-                </span>
+                <span>{labels.onboardingEngineInstall2}</span>
               </li>
               <li className="flex gap-2">
                 <span className="font-bold text-amber">3.</span>
-                <span>Come back and re-check.</span>
+                <span>{labels.onboardingEngineInstall3}</span>
               </li>
             </ol>
             <Button variant="soft" onClick={check} className="mt-3.5">
-              <RefreshCw className="h-3.5 w-3.5" /> Re-check
+              <RefreshCw className="h-3.5 w-3.5" /> {labels.onboardingEngineRecheck}
             </Button>
           </div>
         ))}
 
       {mode === 'remote' && (
         <p className="text-[11px] leading-relaxed text-ink-faint">
-          Ollama on this PC is optional in remote mode — distillation runs on your master server.
+          {labels.onboardingEngineRemoteOllamaOptional}
         </p>
       )}
 
-      <StepNav onBack={onBack} onSkip={onSkip} skipLabel="Skip — pick later in Connect tab">
+      <StepNav onBack={onBack} onSkip={onSkip} skipLabel={labels.onboardingEngineSkip}>
         <Button onClick={continueWithMode} disabled={!canContinue}>
-          <ArrowRight className="h-4 w-4" /> Continue
+          <ArrowRight className="h-4 w-4" /> {labels.onboardingContinue}
         </Button>
       </StepNav>
     </StepCard>
@@ -663,6 +670,7 @@ function SimpleBrainStep({
   onSkip: () => void
   onBack: () => void
 }) {
+  const labels = uiLabels()
   const setBrainTarget = useStore((s) => s.setBrainTarget)
   const [embedded, setEmbedded] = useState<EmbeddedBrainStatus | null>(null)
   const [busy, setBusy] = useState(false)
@@ -698,15 +706,11 @@ function SimpleBrainStep({
   const running = embedded?.running
 
   return (
-    <StepCard
-      icon={Cpu}
-      title="Start local search"
-      lead="Runs a small search engine on this machine — an agent can query your memory without any remote server."
-    >
+    <StepCard icon={Cpu} title={labels.onboardingSimpleBrainTitle} lead={labels.onboardingSimpleBrainLead}>
       {embedded === null ? (
         <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-5">
           <Spinner className="h-4 w-4 text-iris" />
-          <span className="text-sm text-ink-dim">Checking local search engine…</span>
+          <span className="text-sm text-ink-dim">{labels.onboardingSimpleBrainChecking}</span>
         </div>
       ) : running ? (
         <motion.div
@@ -719,23 +723,23 @@ function SimpleBrainStep({
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-mint" />
             </span>
-            <span className="text-sm font-semibold text-ink">Lokalna wyszukiwarka działa</span>
+            <span className="text-sm font-semibold text-ink">{labels.onboardingSimpleBrainRunning}</span>
             <code className="ml-auto font-mono text-[11px] text-ink-faint">{embedded.url}</code>
           </div>
         </motion.div>
       ) : (
         <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
-          <div className="text-sm font-semibold text-ink">Ready to start</div>
+          <div className="text-sm font-semibold text-ink">{labels.onboardingSimpleBrainReady}</div>
           <p className="mt-1.5 text-[13px] leading-relaxed text-ink-dim">
-            One click starts the local MCP server on <code className="text-cyan">{EMBEDDED_URL}</code>.
+            {labels.onboardingSimpleBrainReadyDetail(EMBEDDED_URL)}
           </p>
         </div>
       )}
 
-      <StepNav onBack={onBack} onSkip={onSkip} skipLabel="Skip — start later in Brain tab">
+      <StepNav onBack={onBack} onSkip={onSkip} skipLabel={labels.onboardingSimpleBrainSkip}>
         <Button onClick={() => void (running ? onDone() : startAndContinue())} disabled={busy || embedded === null}>
           {busy ? <Spinner className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
-          {running ? 'Continue' : 'Start & continue'}
+          {running ? labels.onboardingContinue : labels.onboardingSimpleBrainStart}
         </Button>
       </StepNav>
     </StepCard>
@@ -798,22 +802,20 @@ function ConnectStep({
     setTimeout(() => setCopied(false), 1800)
   }
 
-  const title = 'Podłącz agenta'
-  const lead = simpleMode
-    ? 'Skopiuj konfigurację MCP i wklej u klienta — Pomnia nigdy nie dotyka Twoich plików.'
-    : `Snippety wskazują na ${brainTarget === 'embedded' ? 'lokalną wyszukiwarkę' : 'zdalny serwer Brain'} (${brainUrl}). Wybierz klienta — wklej config, nigdy nie dotykamy ich plików.`
+  const labels = uiLabels()
+  const title = labels.onboardingConnectTitle
+  const lead = labels.onboardingConnectLead
 
   return (
     <StepCard icon={Plug} title={title} lead={lead}>
       {clients === null ? (
         <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-5">
           <Spinner className="h-4 w-4 text-iris" />
-          <span className="text-sm text-ink-dim">Detecting MCP clients…</span>
+          <span className="text-sm text-ink-dim">{labels.statusChecking}</span>
         </div>
       ) : detected.length === 0 ? (
         <p className="rounded-2xl border border-white/8 bg-black/20 px-4 py-5 text-sm text-ink-dim">
-          No MCP clients detected. Install Claude Code, Cursor, Antigravity or another MCP tool — then wire it up any time from the
-          Connect tab.
+          {labels.onboardingConnectSkip}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
@@ -847,20 +849,20 @@ function ConnectStep({
                 <code className="truncate font-mono text-[11px] text-ink-dim">{snippet.filePath}</code>
                 <Button variant="soft" onClick={copy} className="shrink-0 !px-3 !py-1.5 !text-[12px]">
                   {copied ? <Check className="h-3.5 w-3.5 text-mint" /> : <Copy className="h-3.5 w-3.5" />}
-                  {copied ? 'Copied' : 'Copy config'}
+                  {copied ? labels.onboardingConnectCopied : labels.onboardingConnectCopy}
                 </Button>
               </div>
               <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-                Paste as the file's content (or merge if it exists), then: {snippet.restartHint}
+                {snippet.restartHint}
               </p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <StepNav onBack={onBack} onSkip={onSkip} skipLabel="Skip — wire clients later from the Connect tab">
+      <StepNav onBack={onBack} onSkip={onSkip} skipLabel={labels.onboardingConnectSkip}>
         <Button onClick={onDone} disabled={!picked || !snippet}>
-          <ArrowRight className="h-4 w-4" /> Continue
+          <ArrowRight className="h-4 w-4" /> {labels.onboardingContinue}
         </Button>
       </StepNav>
     </StepCard>
@@ -878,20 +880,21 @@ function ReadyStep({
   outcomes: Outcomes
   onFinish: () => void
 }) {
+  const labels = uiLabels()
   const rows = simpleMode
     ? [
-        { label: 'Zaszyfrowany vault', state: outcomes.vault ?? 'skipped' },
-        { label: 'Pierwszy backup', state: outcomes.backup ?? 'skipped' },
-        { label: 'Lokalna wyszukiwarka', state: outcomes.engine ?? 'skipped' },
-        { label: 'Konfiguracja MCP agenta', state: outcomes.connect ?? 'skipped' }
+        { label: labels.onboardingReadyVault, state: outcomes.vault ?? 'skipped' },
+        { label: labels.onboardingReadyBackup, state: outcomes.backup ?? 'skipped' },
+        { label: labels.onboardingReadySearch, state: outcomes.engine ?? 'skipped' },
+        { label: labels.onboardingReadyMcp, state: outcomes.connect ?? 'skipped' }
       ]
     : [
-        { label: 'Zaszyfrowany vault', state: outcomes.vault ?? 'skipped' },
+        { label: labels.onboardingReadyVault, state: outcomes.vault ?? 'skipped' },
         {
-          label: outcomes.brainTarget === 'remote' ? 'Zdalny serwer Brain' : 'Lokalna wyszukiwarka',
+          label: outcomes.brainTarget === 'remote' ? labels.onboardingReadyRemote : labels.onboardingReadySearch,
           state: outcomes.engine ?? 'skipped'
         },
-        { label: 'Pierwszy klient MCP', state: outcomes.connect ?? 'skipped' }
+        { label: labels.onboardingReadyMcpFirst, state: outcomes.connect ?? 'skipped' }
       ]
   return (
     <div className="glass rounded-3xl p-9 text-center">
@@ -904,11 +907,9 @@ function ReadyStep({
         <PartyPopper className="h-7 w-7 text-mint" />
       </motion.div>
 
-      <h1 className="text-[26px] font-bold tracking-tight text-grad">Gotowe</h1>
+      <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.onboardingReadyTitle}</h1>
       <p className="mx-auto mt-2 max-w-[360px] text-sm text-ink-dim">
-        {simpleMode
-          ? 'Vault, backup i wyszukiwarka są gotowe. Agent może teraz przeszukiwać Twoją pamięć.'
-          : 'Uruchom pierwszy backup z Dashboardu — reszta jest podłączona.'}
+        {simpleMode ? labels.onboardingReadyLeadDone : labels.onboardingReadyLeadPartial}
       </p>
 
       <div className="mx-auto mt-6 max-w-[340px] space-y-2 text-left">
@@ -927,14 +928,14 @@ function ReadyStep({
             )}
             <span className="text-[13px] text-ink">{r.label}</span>
             <span className={clsx('ml-auto text-[11px]', r.state === 'done' ? 'text-mint' : 'text-ink-faint')}>
-              {r.state === 'done' ? 'gotowe' : 'później'}
+              {r.state === 'done' ? labels.healthOk : labels.onboardingSkipForNow}
             </span>
           </motion.div>
         ))}
       </div>
 
       <Button onClick={onFinish} className="mt-8 w-full">
-        <Sparkles className="h-4 w-4" /> Wejdź do Pomnia
+        <Sparkles className="h-4 w-4" /> {labels.onboardingEnterApp}
       </Button>
     </div>
   )
@@ -980,13 +981,14 @@ function StepNav({
   skipLabel?: string
   children: React.ReactNode
 }) {
+  const labels = uiLabels()
   return (
     <div className="mt-6 flex items-center gap-3">
       <button
         onClick={onBack}
         className="no-drag flex items-center gap-1 rounded-lg px-2 py-1.5 text-[12px] text-ink-faint transition-colors hover:text-ink"
       >
-        <ArrowLeft className="h-3.5 w-3.5" /> Back
+        <ArrowLeft className="h-3.5 w-3.5" /> {labels.onboardingBack}
       </button>
       {onSkip && (
         <button
@@ -994,7 +996,7 @@ function StepNav({
           className="no-drag truncate rounded-lg px-2 py-1.5 text-[12px] text-ink-faint transition-colors hover:text-ink-dim"
           title={skipLabel}
         >
-          {skipLabel ?? 'Skip for now'}
+          {skipLabel ?? labels.onboardingSkipForNow}
         </button>
       )}
       <div className="ml-auto shrink-0">{children}</div>
