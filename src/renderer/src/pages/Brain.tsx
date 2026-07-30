@@ -6,11 +6,13 @@ import {
   ArrowRight,
   BrainCircuit,
   Check,
+  Copy,
   Cpu,
   Database,
   Download,
   FileArchive,
   FolderInput,
+  FolderOpen,
   Layers,
   Rocket,
   Search,
@@ -29,8 +31,40 @@ import { VRAM_PROFILES, PROFILE_EMBED_MODEL, PROFILE_EMBED_SIZE } from '@core/br
 import { isDistillableSource } from '@core/brain/distillSources'
 import type { BrainHit, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent, QuarantineBucket, QuarantineNoteMeta } from '../lib/types'
 import { uiLabels } from '../lib/labels'
+import { saveDoctorLastResult } from '../lib/doctorLastResult'
 import { useStore, ollamaUrlFromBrainUrl, dashboardUrlFromBrainUrl } from '../store/useStore'
 import { ActivityBanner } from '../components/ActivityBanner'
+
+type DoctorCheckRow = {
+  id: string
+  level: 'OK' | 'WARN' | 'FAIL'
+  message: string
+  action?: string
+}
+
+type DoctorReportView = {
+  checks: DoctorCheckRow[]
+  ok: number
+  warn: number
+  fail: number
+  exitCode: 0 | 1
+  generatedAt: string
+}
+
+function formatDoctorReportText(report: DoctorReportView): string {
+  const lines = report.checks.map((c) => {
+    const action = c.action && c.level !== 'OK' ? ` — ${c.action}` : ''
+    return `${c.level} ${c.message}${action}`
+  })
+  lines.push(`${report.ok} OK · ${report.warn} WARN · ${report.fail} FAIL`)
+  return lines.join('\n')
+}
+
+function doctorLevelClass(level: DoctorCheckRow['level']): string {
+  if (level === 'OK') return 'border-mint/40 bg-mint/15 text-mint'
+  if (level === 'WARN') return 'border-amber/40 bg-amber/15 text-amber'
+  return 'border-rose/40 bg-rose/15 text-rose'
+}
 
 const PROFILE_KEY = 'pomnia.brain.profile'
 
@@ -137,8 +171,18 @@ export default function Brain() {
 
   const [importPath, setImportPath] = useState<string | null>(null)
   const [doctorBusy, setDoctorBusy] = useState(false)
-  const [doctorText, setDoctorText] = useState<string | null>(null)
-  const [doctorExit, setDoctorExit] = useState<0 | 1 | null>(null)
+  const [doctorReport, setDoctorReport] = useState<DoctorReportView | null>(null)
+  const [doctorCopyBusy, setDoctorCopyBusy] = useState(false)
+
+  function persistDoctorResult(report: Pick<DoctorReportView, 'ok' | 'warn' | 'fail' | 'exitCode' | 'generatedAt'>) {
+    saveDoctorLastResult({
+      ok: report.ok,
+      warn: report.warn,
+      fail: report.fail,
+      hasFail: report.fail > 0 || report.exitCode === 1,
+      at: report.generatedAt || new Date().toISOString(),
+    })
+  }
 
   async function runDoctorCheck() {
     if (doctorBusy) return
@@ -148,19 +192,55 @@ export default function Brain() {
         distillModel: activeProfile.chatModel,
         ollamaUrl: ollamaUrl || undefined,
       })
-      const lines = report.checks.map((c) => {
-        const action = c.action && c.level !== 'OK' ? ` — ${c.action}` : ''
-        return `${c.level} ${c.message}${action}`
-      })
-      lines.push(`${report.ok} OK · ${report.warn} WARN · ${report.fail} FAIL`)
-      setDoctorText(lines.join('\n'))
-      setDoctorExit(report.exitCode)
+      setDoctorReport(report)
+      persistDoctorResult(report)
     } catch (e) {
-      setDoctorText(`FAIL doctor ${(e as Error).message}`)
-      setDoctorExit(1)
+      const generatedAt = new Date().toISOString()
+      const failReport: DoctorReportView = {
+        checks: [
+          {
+            id: 'doctor-run',
+            level: 'FAIL',
+            message: `doctor ${(e as Error).message}`,
+            action: labels.brainDoctorOpenLogs,
+          },
+        ],
+        ok: 0,
+        warn: 0,
+        fail: 1,
+        exitCode: 1,
+        generatedAt,
+      }
+      setDoctorReport(failReport)
+      persistDoctorResult(failReport)
       toast({ kind: 'error', title: labels.brainDoctorTitle, detail: (e as Error).message })
     } finally {
       setDoctorBusy(false)
+    }
+  }
+
+  async function copyDoctorReport() {
+    if (!doctorReport || doctorCopyBusy) return
+    setDoctorCopyBusy(true)
+    try {
+      await navigator.clipboard.writeText(formatDoctorReportText(doctorReport))
+      toast({ kind: 'success', title: labels.brainDoctorCopied })
+    } catch (e) {
+      toast({
+        kind: 'error',
+        title: labels.brainDoctorCopyFailed,
+        detail: (e as Error).message,
+      })
+    } finally {
+      setDoctorCopyBusy(false)
+    }
+  }
+
+  async function openDoctorLogs() {
+    try {
+      await api.openLogs()
+    } catch (e) {
+      toast({ kind: 'error', title: labels.brainDoctorOpenLogs, detail: (e as Error).message })
     }
   }
 
@@ -393,6 +473,13 @@ export default function Brain() {
               {brainStateLoading ? <Spinner className="h-3.5 w-3.5" /> : <ArrowRight className="h-3.5 w-3.5 rotate-90" />}
             </Button>
             <Button
+              variant="ghost"
+              onClick={() => void openDoctorLogs()}
+              className="!px-2.5 !py-1 text-[11px]"
+            >
+              <FolderOpen className="h-3.5 w-3.5" /> {labels.brainDoctorOpenLogs}
+            </Button>
+            <Button
               variant="soft"
               onClick={() => void runDoctorCheck()}
               disabled={doctorBusy}
@@ -410,34 +497,65 @@ export default function Brain() {
             </Button>
           </div>
         </div>
-        {doctorText && (
+        {doctorReport && (
           <div className="mb-3 rounded-xl border border-white/10 bg-black/30 p-3">
-            <div className="mb-1.5 flex items-center justify-between text-[11px] font-medium text-ink-dim">
-              <span>{labels.brainDoctorTitle}</span>
-              {doctorExit != null && (
-                <span className={doctorExit === 0 ? 'text-mint' : 'text-rose'}>
-                  exit {doctorExit}
-                </span>
-              )}
-            </div>
-            <pre className="max-h-56 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-ink-dim">
-              {doctorText.split('\n').map((line, i) => (
-                <div
-                  key={i}
-                  className={
-                    line.startsWith('FAIL')
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-medium text-ink-dim">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span>{labels.brainDoctorTitle}</span>
+                <span
+                  className={clsx(
+                    'tabular-nums',
+                    doctorReport.fail > 0
                       ? 'text-rose'
-                      : line.startsWith('WARN')
+                      : doctorReport.warn > 0
                         ? 'text-amber'
-                        : line.startsWith('OK')
-                          ? 'text-mint'
-                          : 'text-ink'
-                  }
+                        : 'text-mint',
+                  )}
                 >
-                  {line}
+                  {labels.brainDoctorSummary(doctorReport.ok, doctorReport.warn, doctorReport.fail)}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={() => void copyDoctorReport()}
+                disabled={doctorCopyBusy}
+                className="!px-2 !py-0.5 text-[11px]"
+              >
+                {doctorCopyBusy ? (
+                  <Spinner className="h-3.5 w-3.5" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}{' '}
+                {labels.brainDoctorCopy}
+              </Button>
+            </div>
+            <div className="max-h-56 space-y-2 overflow-auto">
+              {doctorReport.checks.map((check) => (
+                <div
+                  key={check.id}
+                  className="rounded-lg border border-white/6 bg-black/20 px-2.5 py-2"
+                >
+                  <div className="flex items-start gap-2">
+                    <span
+                      className={clsx(
+                        'mt-0.5 shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                        doctorLevelClass(check.level),
+                      )}
+                    >
+                      {check.level}
+                    </span>
+                    <div className="min-w-0 flex-1 text-[11px] leading-relaxed text-ink">
+                      {check.message}
+                    </div>
+                  </div>
+                  {check.action && check.level !== 'OK' ? (
+                    <div className="mt-1.5 rounded-md border border-amber/25 bg-amber/10 px-2 py-1.5 text-[11px] leading-relaxed text-amber">
+                      {check.action}
+                    </div>
+                  ) : null}
                 </div>
               ))}
-            </pre>
+            </div>
           </div>
         )}
         {brainState === null ? (

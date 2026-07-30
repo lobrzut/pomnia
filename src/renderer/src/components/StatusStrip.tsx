@@ -2,11 +2,12 @@
 // Copyright (C) 2026 Pomnia
 import { useCallback, useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { BrainCircuit, Clock, Database, FileText, Sparkles } from 'lucide-react'
+import { BrainCircuit, Clock, Database, FileText, Sparkles, Stethoscope } from 'lucide-react'
 import { GlassCard, Spinner } from './ui'
 import { api } from '../lib/api'
 import { shortPath, relativeTime } from '../lib/format'
 import { uiLabels } from '../lib/labels'
+import { loadDoctorLastResult } from '../lib/doctorLastResult'
 import { useStore, type Route } from '../store/useStore'
 import type { BrainStateInfo, BrainStatus, EmbeddedBrainStatus } from '../lib/types'
 
@@ -36,9 +37,13 @@ export function StatusStrip() {
   const [localBrainState, setLocalBrainState] = useState<BrainStateInfo | null>(
     () => stripCache?.state ?? brainState
   )
+  const [doctorHasFail, setDoctorHasFail] = useState(
+    () => loadDoctorLastResult()?.hasFail === true,
+  )
 
   const refresh = useCallback(async () => {
     setChecking(true)
+    setDoctorHasFail(loadDoctorLastResult()?.hasFail === true)
     try {
       const [status, coreStatus, state] = await Promise.all([
         api.brainStatus(ollamaUrl || undefined).catch(() => null),
@@ -131,7 +136,21 @@ export function StatusStrip() {
         <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
           {labels.statusStripTitle}
         </span>
-        {checking && <Spinner className="h-3 w-3 text-ink-faint" />}
+        <div className="flex items-center gap-2">
+          {doctorHasFail ? (
+            <button
+              type="button"
+              onClick={() => setRoute('brain')}
+              className="no-drag inline-flex items-center gap-1.5 rounded-md border border-rose/40 bg-rose/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-rose transition-colors hover:bg-rose/25"
+              title={labels.brainDoctorTitle}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-rose" style={{ boxShadow: '0 0 8px #fb718588' }} />
+              <Stethoscope className="h-3 w-3" />
+              {labels.statusDoctorFail}
+            </button>
+          ) : null}
+          {checking && <Spinner className="h-3 w-3 text-ink-faint" />}
+        </div>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {items.map((item) => {
