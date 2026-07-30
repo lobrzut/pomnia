@@ -6,14 +6,15 @@
  *
  * Order (abort on first failure):
  * 1. refuse uncommitted / untracked changes (ignored files e.g. src/buildInfo.ts do not count)
- * 2. typecheck (regenerates buildInfo first)
- * 3. tests (regenerates buildInfo first)
- * 4. npm version patch --no-git-tag-version + commit "Release X.Y.Z"
- * 5. npm run build:win  (generates buildInfo from the Release commit, then packs)
+ * 2. build @pomnia/brain-core + @pomnia/doc-parser (types/dist needed by typecheck on fresh clone)
+ * 3. typecheck (regenerates buildInfo first)
+ * 4. tests (regenerates buildInfo first)
+ * 5. npm version patch --no-git-tag-version + commit "Release X.Y.Z"
+ * 6. npm run build:win  (generates buildInfo from the Release commit, then packs)
  *
  * Flags:
  *   --check-clean  only step 1 (exit 0 if clean)
- *   --dry-run      steps 1–3 only (no version bump / pack)
+ *   --dry-run      steps 1–4 only (no version bump / pack)
  */
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -61,6 +62,7 @@ if (checkCleanOnly) {
   process.exit(0)
 }
 
+run('npm run build:brain-core && npm run build:doc-parser')
 run('npm run typecheck')
 run('npm test')
 
