@@ -16,6 +16,7 @@ import {
   Search,
   Sparkles,
   Square,
+  Stethoscope,
   Upload,
   User,
   X
@@ -134,6 +135,33 @@ export default function Brain() {
   const installed = (m: string) => hasModel(status?.models ?? [], m) || justPulled.has(m)
 
   const [importPath, setImportPath] = useState<string | null>(null)
+  const [doctorBusy, setDoctorBusy] = useState(false)
+  const [doctorText, setDoctorText] = useState<string | null>(null)
+  const [doctorExit, setDoctorExit] = useState<0 | 1 | null>(null)
+
+  async function runDoctorCheck() {
+    if (doctorBusy) return
+    setDoctorBusy(true)
+    try {
+      const report = await api.doctorRun({
+        distillModel: activeProfile.chatModel,
+        ollamaUrl: ollamaUrl || undefined,
+      })
+      const lines = report.checks.map((c) => {
+        const action = c.action && c.level !== 'OK' ? ` — ${c.action}` : ''
+        return `${c.level} ${c.message}${action}`
+      })
+      lines.push(`${report.ok} OK · ${report.warn} WARN · ${report.fail} FAIL`)
+      setDoctorText(lines.join('\n'))
+      setDoctorExit(report.exitCode)
+    } catch (e) {
+      setDoctorText(`FAIL doctor ${(e as Error).message}`)
+      setDoctorExit(1)
+      toast({ kind: 'error', title: labels.brainDoctorTitle, detail: (e as Error).message })
+    } finally {
+      setDoctorBusy(false)
+    }
+  }
 
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<BrainHit[]>([])
@@ -363,8 +391,54 @@ export default function Brain() {
             <Button variant="ghost" onClick={() => void loadBrainState()} disabled={brainStateLoading} className="!px-2 !py-1">
               {brainStateLoading ? <Spinner className="h-3.5 w-3.5" /> : <ArrowRight className="h-3.5 w-3.5 rotate-90" />}
             </Button>
+            <Button
+              variant="soft"
+              onClick={() => void runDoctorCheck()}
+              disabled={doctorBusy}
+              className="!px-2.5 !py-1 text-[11px]"
+            >
+              {doctorBusy ? (
+                <>
+                  <Spinner className="h-3.5 w-3.5" /> {labels.brainDoctorRunning}
+                </>
+              ) : (
+                <>
+                  <Stethoscope className="h-3.5 w-3.5" /> {labels.brainDoctorRun}
+                </>
+              )}
+            </Button>
           </div>
         </div>
+        {doctorText && (
+          <div className="mb-3 rounded-xl border border-white/10 bg-black/30 p-3">
+            <div className="mb-1.5 flex items-center justify-between text-[11px] font-medium text-ink-dim">
+              <span>{labels.brainDoctorTitle}</span>
+              {doctorExit != null && (
+                <span className={doctorExit === 0 ? 'text-mint' : 'text-rose'}>
+                  exit {doctorExit}
+                </span>
+              )}
+            </div>
+            <pre className="max-h-56 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-ink-dim">
+              {doctorText.split('\n').map((line, i) => (
+                <div
+                  key={i}
+                  className={
+                    line.startsWith('FAIL')
+                      ? 'text-rose'
+                      : line.startsWith('WARN')
+                        ? 'text-amber'
+                        : line.startsWith('OK')
+                          ? 'text-mint'
+                          : 'text-ink'
+                  }
+                >
+                  {line}
+                </div>
+              ))}
+            </pre>
+          </div>
+        )}
         {brainState === null ? (
           <div className="flex items-center gap-2 py-1 text-sm text-ink-dim">
             <Spinner className="h-4 w-4" /> {labels.brainStateLoading}

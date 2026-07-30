@@ -126,6 +126,20 @@ export interface PomniaBridge {
     indexChunks: number | null
     action?: string
   }>
+  doctorRun(opts?: { distillModel?: string; ollamaUrl?: string }): Promise<{
+    checks: Array<{
+      id: string
+      level: 'OK' | 'WARN' | 'FAIL'
+      message: string
+      action?: string
+      data?: Record<string, unknown>
+    }>
+    ok: number
+    warn: number
+    fail: number
+    exitCode: 0 | 1
+    generatedAt: string
+  }>
   onBrainCoreEvent(cb: (e: { type: string; file?: string; done?: number; total?: number }) => void): () => void
   onBrainProgress(cb: (e: BrainProgressEvent) => void): () => void
   brainSearch(query: string, ollamaUrl?: string): Promise<BrainHit[]>
@@ -631,6 +645,23 @@ function mockBridge(): PomniaBridge {
         sessionNotes: 4,
         indexChunks: 121,
         action: 'none',
+      }
+    },
+    async doctorRun() {
+      return {
+        checks: [
+          { id: 'build', level: 'OK' as const, message: 'build 0.0.0 · mock · 1970-01-01 00:00' },
+          {
+            id: 'vault',
+            level: 'OK' as const,
+            message: 'vault mock · open · 10 files · 1 KB · distilled=8 _weak=1 _review=1',
+          },
+        ],
+        ok: 2,
+        warn: 0,
+        fail: 0,
+        exitCode: 0 as const,
+        generatedAt: new Date().toISOString(),
       }
     },
     onBrainCoreEvent() {

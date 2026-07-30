@@ -29,6 +29,7 @@ describe('uiLabels', () => {
   it('exposes Polish brain state card labels', () => {
     const labels = uiLabels()
     expect(labels.brainStateTitle).toBe('Stan Brain')
+    expect(labels.brainDoctorRun).toBe('Sprawdź stan')
     expect(labels.brainStateChatsInTools).toBe('Czaty w narzędziach')
     expect(labels.brainStateDistilled).toBe('Zdestylowane')
     expect(labels.brainStateDistilledHint).toMatch(/skanu narzędzi/i)

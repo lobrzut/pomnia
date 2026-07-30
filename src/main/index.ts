@@ -35,6 +35,7 @@ import {
   conversationFingerprint,
   pingBrain,
   runBackup,
+  runDoctor,
   saveIndex,
   searchIndex,
   setLogSink,
@@ -1187,6 +1188,17 @@ function registerIpc(): void {
     }
   })
   ipcMain.handle('vault:health', async () => runVaultHealthCheck({ silentOk: true }))
+  ipcMain.handle('doctor:run', async (_e, opts?: { distillModel?: string; ollamaUrl?: string }) => {
+    const settings = getAppSettings()
+    return runDoctor({
+      vaultPath: vaultPath ?? settings.lastIndexedVaultRoot,
+      vaultOpen: !!vault,
+      userDataDir: app.getPath('userData'),
+      ollamaUrl: opts?.ollamaUrl || settings.ollamaUrl,
+      distillModel: opts?.distillModel,
+      brainUrl: 'http://127.0.0.1:7862',
+    })
+  })
   ipcMain.handle('app:settings', () => getAppSettings())
   ipcMain.handle('app:version', () => ({
     version: app.getVersion(),

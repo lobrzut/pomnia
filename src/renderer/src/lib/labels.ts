@@ -523,6 +523,9 @@ export interface UiLabels {
   importProviderGrok: string
   importLegalNote: string
   brainStateTitle: string
+  brainDoctorRun: string
+  brainDoctorRunning: string
+  brainDoctorTitle: string
   brainStateLastDistill: (rel: string) => string
   brainStateLoading: string
   brainStateChatsInTools: string
@@ -1190,6 +1193,9 @@ const PL_LABELS: UiLabels = {
   importLegalNote:
     'Pomnia importuje tylko oficjalne eksporty — bez logowania do kont. Claude Desktop / Gemini wymagają eksportu z wersji webowej.',
   brainStateTitle: 'Stan Brain',
+  brainDoctorRun: 'Sprawdź stan',
+  brainDoctorRunning: 'Sprawdzanie…',
+  brainDoctorTitle: 'Diagnostyka (doctor)',
   brainStateLastDistill: (rel) => `Ostatnia destylacja ${rel}`,
   brainStateLoading: 'Wczytywanie stanu pipeline…',
   brainStateChatsInTools: 'Czaty w narzędziach',
@@ -1882,6 +1888,9 @@ const EN_LABELS: Partial<UiLabels> = {
   dashboardBrainStarted: 'Brain started — distilling…',
   dashboardBrainStartFailed: 'Could not start Brain',
   brainStateTitle: 'Brain status',
+  brainDoctorRun: 'Check health',
+  brainDoctorRunning: 'Checking…',
+  brainDoctorTitle: 'Diagnostics (doctor)',
   brainStateLastDistill: (rel) => `Last distill ${rel}`,
   brainStateLoading: 'Loading…',
   brainStateChatsInTools: 'Chats in tools',

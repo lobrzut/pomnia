@@ -36,6 +36,8 @@ import {
   parseExportPath,
   pingBrain,
   runBackup,
+  runDoctor,
+  formatDoctorLines,
   saveIndex,
   searchIndex,
   syncSkills,
@@ -524,6 +526,29 @@ async function cmdBrainExport(p: Parsed): Promise<void> {
   console.log(`  ${C.green('✔')} exported ${files.length} conversation note(s) → ${out}`)
 }
 
+async function cmdDoctor(p: Parsed): Promise<void> {
+  const vault = typeof p.flags.vault === 'string' ? p.flags.vault : undefined
+  const ollama = typeof p.flags.ollama === 'string' ? p.flags.ollama : undefined
+  const distillModel = typeof p.flags.model === 'string' ? p.flags.model : undefined
+  const report = await runDoctor({
+    vaultPath: vault,
+    ollamaUrl: ollama,
+    distillModel,
+  })
+  if (p.flags.json) {
+    console.log(JSON.stringify(report, null, 2))
+  } else {
+    for (const line of formatDoctorLines(report)) {
+      if (line.startsWith('OK ')) console.log(C.green(line))
+      else if (line.startsWith('WARN ')) console.log(C.yellow(line))
+      else if (line.startsWith('FAIL ')) console.log(C.red(line))
+      else console.log(C.bold(line))
+    }
+  }
+  // Prefer exitCode over process.exit so open handles (sqlite/fetch) can close cleanly on Windows.
+  process.exitCode = report.exitCode
+}
+
 async function cmdImport(p: Parsed): Promise<void> {
   const inPath = String(p.flags.in || p.flags.import || p.positional[0] || '')
   if (!inPath) throw new Error('usage: import --in <file|dir> [--out <dir>]')
@@ -550,6 +575,7 @@ ${C.bold('Pomnia')} — encrypted, cross-platform backup for AI assistant chats
   ${C.cyan('brain-export')} --out DIR [--vault DIR --snapshot ID | --sources all]
   ${C.cyan('import')} --in FILE|DIR [--out DIR]            parse Claude.ai/ChatGPT/Grok/Gemini exports
   ${C.cyan('brain')} <status|distill|index|search|pipeline|deploy> [--import PATH]   host-side distill → Brain
+  ${C.cyan('doctor')} [--json] [--vault DIR] [--ollama URL]   health diagnostics (exit 1 on FAIL)
   ${C.cyan('--version')} / ${C.cyan('-V')} / ${C.cyan('version')}   print build identity
 
   Passphrase: --pass, or $POMNIA_PASS (legacy: $RELIQUA_PASS), or interactive prompt.
@@ -577,6 +603,7 @@ async function main(): Promise<void> {
       case 'verify': return await cmdVerify(p)
       case 'brain-export': return await cmdBrainExport(p)
       case 'brain': return await cmdBrain(p)
+      case 'doctor': return await cmdDoctor(p)
       case 'import': return await cmdImport(p)
       case 'version':
       case '--version':
