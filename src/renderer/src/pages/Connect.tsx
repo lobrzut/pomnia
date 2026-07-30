@@ -199,7 +199,14 @@ export default function Connect() {
   }, [agentBrainMode])
 
   async function copy(text: string, key: string, label: string) {
-    await navigator.clipboard.writeText(text)
+    // A rejected clipboard write used to leave no trace at all — no tick, no
+    // toast, no error — so the snippet looked copied and the paste was stale.
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch (e) {
+      toast({ kind: 'error', title: 'Nie udało się skopiować', detail: (e as Error).message })
+      return
+    }
     setCopied(key)
     window.setTimeout(() => setCopied((c) => (c === key ? null : c)), 1600)
     toast({ kind: 'success', title: 'Skopiowano', detail: label })

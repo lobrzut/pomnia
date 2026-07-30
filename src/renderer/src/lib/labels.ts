@@ -279,11 +279,15 @@ export interface UiLabels {
   embeddedBrainStop: string
   embeddedBrainStoppedToast: string
   toastModelReady: string
+  /** Pull returned without error but Ollama still does not list the model. */
+  toastModelStillMissing: (model: string) => string
   toastPullFailed: string
   toastLocalIndexRefreshed: string
   toastReindexFailed: string
   toastSearchFailed: string
   toastDeployed: string
+  /** Some notes landed, some sub-step failed — the detail spells out which. */
+  toastDeployPartial: string
   toastDeployFailed: string
   brainSearchPlaceholder: string
   brainSearchButton: string
@@ -925,11 +929,14 @@ const PL_LABELS: UiLabels = {
   embeddedBrainStop: 'Stop',
   embeddedBrainStoppedToast: 'Lokalna wyszukiwarka zatrzymana',
   toastModelReady: 'Model gotowy',
+  toastModelStillMissing: (model) =>
+    `Pobieranie zakończyło się bez błędu, ale Ollama nadal nie widzi „${model}". Sprawdź: ollama list`,
   toastPullFailed: 'Pobieranie nieudane',
   toastLocalIndexRefreshed: 'Lokalny indeks odświeżony',
   toastReindexFailed: 'Reindeksacja nieudana',
   toastSearchFailed: 'Wyszukiwanie nieudane',
   toastDeployed: 'Wysłano',
+  toastDeployPartial: 'Wysłano częściowo',
   toastDeployFailed: 'Deploy nieudany',
   brainSearchPlaceholder: 'zapytaj o coś, o czym już rozmawiałeś…',
   brainSearchButton: 'Szukaj',
@@ -1621,11 +1628,14 @@ const EN_LABELS: Partial<UiLabels> = {
   embeddedBrainStop: 'Stop',
   embeddedBrainStoppedToast: 'Local search stopped',
   toastModelReady: 'Model ready',
+  toastModelStillMissing: (model) =>
+    `Pull finished without error but Ollama still does not list "${model}". Check: ollama list`,
   toastPullFailed: 'Pull failed',
   toastLocalIndexRefreshed: 'Local index refreshed',
   toastReindexFailed: 'Reindex failed',
   toastSearchFailed: 'Search failed',
   toastDeployed: 'Deployed',
+  toastDeployPartial: 'Deployed with problems',
   toastDeployFailed: 'Deploy failed',
   brainSearchPlaceholder: "ask anything you've discussed before…",
   brainSearchButton: 'Search',

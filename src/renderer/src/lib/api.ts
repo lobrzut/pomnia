@@ -162,7 +162,8 @@ export interface PomniaBridge {
     reindex?: boolean
     token?: string
     sources?: SourceId[]
-  }): Promise<{ detail: string }>
+    /** `ok` is false when any sub-step failed — deploy can partly succeed. */
+  }): Promise<{ detail: string; ok: boolean; problems: string[] }>
   connectStatus(
     brainUrl?: string,
     token?: string,
@@ -683,7 +684,7 @@ function mockBridge(): PomniaBridge {
       ]
     },
     async brainDeploy() {
-      return { detail: 'Deployed 38 notes to Brain vault; reindex triggered.' }
+      return { detail: 'Deployed 38 notes to Brain vault; reindex triggered.', ok: true, problems: [] }
     },
     async ollamaPull(model) {
       // Simulated download: ~4s of progress events, then success.

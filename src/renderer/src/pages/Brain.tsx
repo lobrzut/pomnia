@@ -153,9 +153,17 @@ export default function Brain() {
   async function pullModel(model: string) {
     try {
       await api.ollamaPull(model, ollamaUrl || undefined)
+      // Ask Ollama what it actually has rather than trusting that pull returned.
+      // Marking the model installed on the strength of "we called pull" is how a
+      // vault gets indexed with no embedder: the badge said ready, the tag list
+      // never had it, and every embed 404'd in silence.
+      const after = await check()
+      if (!hasModel(after?.models ?? [], model)) {
+        toast({ kind: 'error', title: labels.toastPullFailed, detail: labels.toastModelStillMissing(model) })
+        return
+      }
       setJustPulled((s) => new Set(s).add(model))
       toast({ kind: 'success', title: labels.toastModelReady, detail: model })
-      void check() // refresh the installed list
     } catch (e) {
       toast({ kind: 'error', title: labels.toastPullFailed, detail: (e as Error).message })
     } finally {
@@ -360,6 +368,7 @@ export default function Brain() {
     }
     setStatus(best)
     setChecking(false)
+    return best
   }
   useEffect(() => {
     void check()
@@ -416,7 +425,12 @@ export default function Brain() {
         sources: distillable.map((d) => d.id)
       })
       setDeployMsg(r.detail)
-      useStore.getState().toast({ kind: 'success', title: labels.toastDeployed, detail: r.detail })
+      useStore.getState().toast({
+        // Partial failure is not success. `detail` already spells out what broke.
+        kind: r.ok ? 'success' : 'warn',
+        title: r.ok ? labels.toastDeployed : labels.toastDeployPartial,
+        detail: r.detail,
+      })
     } catch (e) {
       useStore.getState().toast({ kind: 'error', title: labels.toastDeployFailed, detail: (e as Error).message })
     } finally {

@@ -326,7 +326,12 @@ export default function Settings() {
     if (!exportSnap || !settingsExportDir) return
     try {
       const r = await api.brainExport(exportSnap, settingsExportDir)
-      toast({ kind: 'success', title: `Wyeksportowano ${r.count} notatek`, detail: r.dir })
+      // Zero notes exported is not a success — the folder is empty either way.
+      toast(
+        r.count > 0
+          ? { kind: 'success', title: `Wyeksportowano ${r.count} notatek`, detail: r.dir }
+          : { kind: 'warn', title: 'Nie wyeksportowano żadnej notatki', detail: `Snapshot nie zawiera notatek · ${r.dir}` },
+      )
     } catch (e) {
       toast({ kind: 'error', title: 'Eksport nieudany', detail: (e as Error).message })
     }
