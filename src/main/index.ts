@@ -468,10 +468,13 @@ async function maybeHygieneReindexAfterVaultChange(): Promise<void> {
       writeLibraryStatsSidecar({ files: stats.files, chunks: stats.chunks, vaultRoot: root })
     }
     void runVaultHealthCheck({ silentOk: true })
+    // An index that came back empty is the failure this whole pass exists to
+    // prevent — reporting it green is how 1886 notes were once shown as 26.
+    const indexedFiles = stats?.files ?? 0
     sendAppToast({
-      kind: 'success',
-      title: 'Indeks dopasowany do vaultu',
-      detail: `${stats?.files ?? 0} plików · ${stats?.chunks ?? 0} chunków${
+      kind: indexedFiles > 0 ? 'success' : 'warn',
+      title: indexedFiles > 0 ? 'Indeks dopasowany do vaultu' : 'Reindeks nie zaindeksował niczego',
+      detail: `${indexedFiles} plików · ${stats?.chunks ?? 0} chunków${
         pruned ? ` · usunięto ${pruned} starych ścieżek` : ''
       }`,
     })
@@ -1533,6 +1536,10 @@ function registerIpc(): void {
       opts: { to: 'filesystem' | 'dashboard'; target?: string; url?: string; reindex?: boolean; token?: string; sources?: SourceId[] }
     ) => {
       let detail = ''
+      // Sub-steps here fail independently of the whole call. Collecting them lets
+      // the caller colour the toast honestly — this used to render green while
+      // `detail` literally read "embedded reindex failed: …".
+      const problems: string[] = []
       if (opts.to === 'filesystem') {
         if (!opts.target) throw new Error('target dir required')
         await fs.mkdir(opts.target, { recursive: true })
@@ -1554,19 +1561,23 @@ function registerIpc(): void {
             await setAppSettings({ lastIndexedVaultRoot: root })
             detail += ' · embedded reindex ok'
           } catch (e) {
-            detail += ` · embedded reindex failed: ${(e as Error).message}`
+            const msg = `embedded reindex failed: ${(e as Error).message}`
+            detail += ` · ${msg}`
+            problems.push(msg)
           }
         }
       } else {
         const convs = await collectLive(opts.sources ?? [])
         const r = await deployDashboard(convs, opts.url || 'http://localhost:7860')
         detail = `Pushed to Brain: ${r.ok} ok, ${r.failed} failed`
+        if (r.failed > 0) problems.push(`${r.failed} note(s) failed to push`)
       }
       if (opts.reindex && opts.url) {
         const ok = await triggerReindex(opts.url, opts.token)
         detail += ok ? ' · reindex triggered' : ' · reindex failed'
+        if (!ok) problems.push('remote reindex trigger failed')
       }
-      return { detail }
+      return { detail, ok: problems.length === 0, problems }
     }
   )
 

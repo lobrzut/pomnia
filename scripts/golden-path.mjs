@@ -25,6 +25,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = join(__dirname, '..')
 const require = createRequire(import.meta.url)
 
+/** Share of on-disk notes that must be present in the index. Scales with the vault. */
+const MIN_COVERAGE = Number(process.env.GOLDEN_MIN_COVERAGE || 0.9)
+/** Optional absolute floor — only enforced when GOLDEN_MIN_CHUNKS is set explicitly. */
 const MIN_CHUNKS = Number(process.env.GOLDEN_MIN_CHUNKS || 5000)
 const HISTORY_QUERY = process.env.GOLDEN_QUERY || 'WireGuard'
 const APPDATA = process.env.APPDATA || join(homedir(), 'AppData', 'Roaming')
@@ -86,7 +89,10 @@ function countSkills(skillsRoot) {
 
 console.log('═══ Pomnia golden path ═══')
 console.log(`DB: ${DB_PATH}`)
-console.log(`MIN_CHUNKS=${MIN_CHUNKS}  QUERY="${HISTORY_QUERY}"`)
+console.log(
+  `MIN_COVERAGE=${(MIN_COVERAGE * 100).toFixed(0)}%  QUERY="${HISTORY_QUERY}"` +
+    (process.env.GOLDEN_MIN_CHUNKS ? `  MIN_CHUNKS=${MIN_CHUNKS}` : ''),
+)
 
 if (process.env.GOLDEN_PATH_SKIP === '1') {
   console.log('GOLDEN_PATH_SKIP=1 — gate skipped (CI without vault).')
@@ -142,12 +148,54 @@ if (Database && existsSync(DB_PATH)) {
   boom('Cannot read chunk count (no better-sqlite3 and no library-stats.json)')
 }
 
-if (chunks != null && chunks < MIN_CHUNKS) {
-  boom(
-    `Index too thin: ${chunks} chunks < ${MIN_CHUNKS}. Refusing release — agents would search an empty brain.`,
-  )
-} else if (chunks != null) {
-  pass(`Index depth OK (${chunks} ≥ ${MIN_CHUNKS})`)
+// Coverage, not an absolute floor. The old gate demanded 5000 chunks — a number
+// taken from the Python master's 54k-chunk index. The desktop vault holds ~2800,
+// so the gate could never pass and would have been bypassed, protecting nothing.
+// What actually matters is whether the index covers the notes on disk: 26 files
+// indexed against 1898 on disk is the failure worth blocking, at any vault size.
+function countIndexableNotes() {
+  let n = 0
+  const walk = (dir) => {
+    if (!existsSync(dir)) return
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      // `_review/` is quarantine — deliberately outside the index.
+      if (entry.isDirectory()) {
+        if (entry.name !== '_review') walk(join(dir, entry.name))
+      } else if (entry.name.endsWith('.md')) {
+        n++
+      }
+    }
+  }
+  walk(join(VAULT, 'distilled'))
+  walk(join(VAULT, 'sessions'))
+  return n
+}
+
+const onDisk = countIndexableNotes()
+/** Drives the later search check — a skipped check must not look like a pass. */
+let indexHealthy = false
+
+if (files != null && onDisk > 0) {
+  const coverage = files / onDisk
+  if (coverage < MIN_COVERAGE) {
+    boom(
+      `Index covers ${files}/${onDisk} notes (${(coverage * 100).toFixed(1)}% < ${(MIN_COVERAGE * 100).toFixed(0)}%). ` +
+        `Refusing release — agents would search a brain that is mostly missing. ` +
+        `Usual cause: the embedding model was absent while indexing (ollama list).`,
+    )
+  } else {
+    indexHealthy = true
+    pass(`Index coverage OK (${files}/${onDisk} notes, ${(coverage * 100).toFixed(1)}%)`)
+  }
+} else if (onDisk === 0) {
+  pass(`No notes on disk under ${VAULT} — nothing to cover (fresh vault)`)
+} else {
+  boom(`Cannot read indexed file count — coverage unverifiable against ${onDisk} notes on disk`)
+}
+
+// Absolute floor stays available for CI pinning, but is opt-in now.
+if (process.env.GOLDEN_MIN_CHUNKS && chunks != null && chunks < MIN_CHUNKS) {
+  boom(`Index too thin: ${chunks} chunks < ${MIN_CHUNKS} (GOLDEN_MIN_CHUNKS).`)
 }
 
 // ── 2) History search hit (keyword — no Ollama required) ───────
@@ -195,7 +243,9 @@ print(row[0] if row else "")
   }
 }
 
-if (chunks != null && chunks >= MIN_CHUNKS) {
+// Gate on the coverage verdict, not a raw chunk count — otherwise a vault the
+// old threshold considered "thin" skipped this check entirely and said nothing.
+if (indexHealthy) {
   let hitName = null
   let hitVia = null
   if (sqliteOk && Database && existsSync(DB_PATH)) {
@@ -234,8 +284,8 @@ if (chunks != null && chunks >= MIN_CHUNKS) {
   } else {
     const mb = existsSync(DB_PATH) ? statSync(DB_PATH).size / (1024 * 1024) : 0
     // Rich index + large db: keyword check blocked by ABI / thin portable vault.
-    // Still gate on depth; do not soft-pass a tiny db.
-    if (mb >= 50 && chunks >= MIN_CHUNKS) {
+    // Still gate on coverage; do not soft-pass a tiny db.
+    if (mb >= 10 && indexHealthy) {
       pass(
         `history keyword unverified (ABI/FS miss) — trusting rich index (${chunks} chunks, ${mb.toFixed(0)} MB)`,
       )
