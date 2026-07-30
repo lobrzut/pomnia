@@ -51,7 +51,7 @@ export async function runDocumentOcr(
     const ocr = await runOcr(tmpPath, {
       prefer: 'tesseract',
       maxPages: 3,
-      onProgress: (ev) =>
+      onProgress: (ev: { done: number; total: number; page: number }) =>
         onProgress?.({
           phase: 'ocr',
           done: ev.done,

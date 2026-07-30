@@ -99,7 +99,7 @@ On Import: when the text layer is sparse → **Run OCR** (`tesseract.js`, eng+po
 
 Unsigned builds can trip heuristics (Electron + vault I/O). Never disable AV.
 
-**Installers** — Windows: **`npm run release:win` is the only allowed path** to a shippable `.exe` (clean tree → typecheck → tests → patch bump + `Release X.Y.Z` commit → `build:win` with injected build identity). Do not bump version by hand and run `pack:win` / `build:win` alone for a release. Mac: `npm run pack:mac` (local). Releases: [GitHub Releases](https://github.com/lobrzut/pomnia/releases).
+**Installers** — Windows: **`npm run release:win` is the only allowed path** to a shippable `.exe` (clean tree → build `brain-core` + `doc-parser` → typecheck → tests → patch bump + `Release X.Y.Z` commit → `build:win` with injected build identity). Do not bump version by hand and run `pack:win` / `build:win` alone for a release. Mac: `npm run pack:mac` (local). Releases: [GitHub Releases](https://github.com/lobrzut/pomnia/releases).
 
 Logs: `%AppData%/Pomnia/logs/` (Windows).
 
