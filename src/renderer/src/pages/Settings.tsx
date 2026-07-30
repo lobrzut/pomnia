@@ -14,15 +14,12 @@ import { COLOR_SCHEMES, type ColorScheme } from '../lib/theme'
 import { UI_LOCALES, type UiLocale } from '../lib/uiLocale'
 import { useStore } from '../store/useStore'
 import { isMcpClientActive } from '../lib/mcpClientVisibility'
+import { hasOllamaModel as hasModel } from '@core/brain/modelMatch'
 import type { ClientId } from '../lib/types'
 
 const ALL_CLIENTS: ClientId[] = ['claude-code', 'cursor', 'antigravity', 'claude-desktop', 'vscode', 'windsurf', 'hermes']
 
 const EMBEDDED_URL = 'http://127.0.0.1:7862'
-
-function hasModel(models: string[], want: string): boolean {
-  return models.some((m) => m === want || m === `${want}:latest` || m.replace(/:latest$/, '') === want)
-}
 
 type HealthRow = { id: string; label: string; ok: boolean | null; detail: string }
 

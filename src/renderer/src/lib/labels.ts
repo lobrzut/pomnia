@@ -148,6 +148,8 @@ export interface UiLabels {
   embedded: string
   remote: string
   reindex: string
+  /** Stops just the index pass — the brain (and every agent's MCP) stays up. */
+  reindexCancel: string
   mcpConnect: string
   brainPageTitle: string
   brainPageLead: string
@@ -771,6 +773,7 @@ const PL_LABELS: UiLabels = {
   embedded: 'Lokalnie',
   remote: 'Na serwerze',
   reindex: 'Odśwież indeks',
+  reindexCancel: 'Przerwij indeksowanie',
   mcpConnect: 'Podłącz agenta',
   brainPageTitle: 'Pamięć i wyszukiwarka',
   brainPageLead:
@@ -1468,6 +1471,7 @@ const EN_LABELS: Partial<UiLabels> = {
   embedded: 'Local',
   remote: 'Remote',
   reindex: 'Refresh index',
+  reindexCancel: 'Stop indexing',
   mcpConnect: 'Connect agent',
   brainPageTitle: 'Memory & search',
   brainPageLead: 'Prepare chats for search and start the local search engine — no cloud server.',

@@ -46,6 +46,10 @@ function stateMeta(state: WiredState): { label: string; color: string; Icon: typ
   switch (state) {
     case 'wired':
       return { label: 'Połączony', color: '#34d399', Icon: CheckCircle2 }
+    case 'unreachable':
+      // Config is right, host is not answering — the machine-move case. Must not
+      // read as "Połączony", which is exactly how it used to look.
+      return { label: 'Nie odpowiada', color: '#fb7185', Icon: AlertTriangle }
     case 'partial':
       return { label: 'Niepełny', color: '#fbbf24', Icon: AlertTriangle }
     case 'config_error':

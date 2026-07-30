@@ -28,6 +28,7 @@ import { ClientIcon } from '../components/ClientIcon'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
+import { hasOllamaModel } from '@core/brain/modelMatch'
 import { EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from '@core/brain/snippet'
 import type { BrainStatus, BrainTarget, ClientId, ClientStatus, EmbeddedBrainStatus, Snippet } from '../lib/types'
 
@@ -45,14 +46,6 @@ const REMOTE_URL_PLACEHOLDER = REMOTE_BRAIN_URL_PLACEHOLDER
  */
 
 type StepId = 'welcome' | 'vault' | 'backup' | 'engine' | 'connect' | 'ready'
-
-function hasOllamaModel(models: string[], want: string): boolean {
-  const w = want.toLowerCase()
-  return models.some((m) => {
-    const ml = m.toLowerCase()
-    return ml === w || ml === `${w}:latest` || ml.replace(/:latest$/, '') === w
-  })
-}
 
 interface Outcomes {
   vault: 'done' | null
@@ -507,7 +500,11 @@ function EngineStep({
   const hasEmbed = hasOllamaModel(models, embedModel)
   const hasDistill = hasOllamaModel(models, distillModel)
   const remoteUrlTrimmed = remoteUrl.trim()
-  const canContinue = mode === 'embedded' ? found : remoteUrlTrimmed.length > 0
+  // The embed model is not a nice-to-have: without it the local brain indexes
+  // nothing and every agent search comes back empty, while the app still looks
+  // healthy. Finishing setup in that state is the failure we keep paying for.
+  // The distill model stays optional — search works without it.
+  const canContinue = mode === 'embedded' ? found && hasEmbed : remoteUrlTrimmed.length > 0
 
   function continueWithMode() {
     setBrainTarget(mode)

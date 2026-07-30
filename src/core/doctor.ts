@@ -19,6 +19,7 @@ import {
   formatBuildIdentity,
 } from '../buildInfo.js'
 import { PROFILE_EMBED_MODEL, VRAM_PROFILES } from './brain/profiles.js'
+import { hasOllamaModel as hasModel } from './brain/modelMatch.js'
 import { defaultOllamaConfig, Ollama } from './brain/ollama.js'
 import { isDistillableSource } from './brain/distillSources.js'
 import { pingBrain } from './brain/status.js'
@@ -467,10 +468,6 @@ function readIndexFromDb(
       vaultRoot,
     },
   }
-}
-
-function hasModel(models: string[], want: string): boolean {
-  return models.some((m) => m === want || m === `${want}:latest` || m.replace(/:latest$/, '') === want)
 }
 
 export async function collectDistillQueue(

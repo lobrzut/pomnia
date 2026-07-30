@@ -35,6 +35,7 @@ import {
   classifyImportConversations,
   conversationFingerprint,
   pingBrain,
+  probeMcpUrl,
   runBackup,
   runDoctor,
   saveIndex,
@@ -134,7 +135,13 @@ import {
   listLocalSkillsAt,
   writeSkillsIndexAt,
 } from './skillsScan.js'
-import { brainProcessFailedMessage, ollamaUnreachableMessage, probeOllama, resolveOllamaUrl } from './ollamaSettings.js'
+import {
+  brainProcessFailedMessage,
+  missingEmbedModelMessage,
+  ollamaUnreachableMessage,
+  probeOllama,
+  resolveOllamaUrl,
+} from './ollamaSettings.js'
 
 function vaultSkillsFields(path: string | null | undefined) {
   if (!path) {
@@ -394,6 +401,37 @@ async function runVaultHealthCheck(opts?: { silentOk?: boolean }): Promise<Vault
     detail: getAppSettings().uiLocale === 'en' ? report.detailEn : report.detailPl,
   })
   return report
+}
+
+/**
+ * A remote Brain that stopped existing is invisible from inside Pomnia: the URL
+ * is still saved, the target is still 'remote', and nothing on this machine
+ * notices. That is what a machine move looks like — say it once per run instead
+ * of letting every agent quietly get nothing back.
+ *
+ * Reset by `resetRemoteBrainWarning` whenever the user edits the target or URL.
+ */
+let warnedRemoteUnreachable = false
+
+function resetRemoteBrainWarning(): void {
+  warnedRemoteUnreachable = false
+}
+
+async function warnIfRemoteBrainUnreachable(): Promise<void> {
+  if (warnedRemoteUnreachable) return
+  const s = getAppSettings()
+  if ((s.brainTarget ?? 'embedded') !== 'remote') return
+  const base = s.brainMcpUrl?.trim()
+  if (!base) return
+  const url = `${base.replace(/\/+$/, '').replace(/\/mcp$/, '')}/mcp`
+  const probe = await probeMcpUrl(url, s.connectToken)
+  if (probe.reachable) return
+  warnedRemoteUnreachable = true
+  sendAppToast({
+    kind: 'error',
+    title: 'Zdalny Brain nie odpowiada',
+    detail: `${url} — ${probe.error ?? 'brak odpowiedzi'}. Popraw adres w zakładce Podłącz albo przełącz się na tryb lokalny.`,
+  })
 }
 
 /**
@@ -696,6 +734,7 @@ function registerIpc(): void {
     brainCore.setSkillsRoot(skillsRoot)
     brainCore.setVaultRoot(knowledgeRoot)
     void maybeAutoStartEmbeddedBrain()
+    void warnIfRemoteBrainUnreachable()
     // When autostart is off, still prompt for one-shot index hygiene.
     if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
     return {
@@ -722,6 +761,7 @@ function registerIpc(): void {
     const m = vault.getManifest()
     const pendingLibraryIndex = vault.getPendingIndexDocuments().length
     void maybeAutoStartEmbeddedBrain()
+    void warnIfRemoteBrainUnreachable()
     if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
     return {
       open: true,
@@ -1047,7 +1087,10 @@ function registerIpc(): void {
             const root = brainVaultRoot()
             const newPaths = okNotes.map((n) => join(vaultDistilled, noteFilename(n)))
             if (newPaths.length > 0) {
-              await brainCore.indexFiles(newPaths)
+              const stats = (await brainCore.indexFiles(newPaths)) as { prunedFiles?: number }
+              if (stats?.prunedFiles) {
+                log.info(`indexFiles after distill: pruned ${stats.prunedFiles} dead path(s)`)
+              }
             }
             reindexed = true
             await setAppSettings({ lastIndexedVaultRoot: root })
@@ -1137,6 +1180,13 @@ function registerIpc(): void {
     activity.update({ kind: 'brain-start', phase: 'start', detail: 'sprawdzam Ollama…' })
     const probe = await probeOllama(url)
     if (!probe.ok) throw new Error(ollamaUnreachableMessage(probe))
+    // Reachable is not the same as usable. Start anyway — agents still get the
+    // skills tools — but say it out loud instead of looking healthy while every
+    // search comes back empty.
+    const missingEmbed = missingEmbedModelMessage(probe.models)
+    if (missingEmbed) {
+      sendAppToast({ kind: 'error', title: 'Wyszukiwarka nie ma czym liczyć', detail: missingEmbed })
+    }
     activity.update({ kind: 'brain-start', phase: 'start', detail: 'uruchamiam…' })
     try {
       await brainCore.start({
@@ -1183,6 +1233,12 @@ function registerIpc(): void {
     } finally {
       activity.idle('indexing')
     }
+  })
+  ipcMain.handle('brainCore:cancelIndex', () => {
+    // The awaiting reindex settles on the child's own 'reindex aborted' reply,
+    // so there is nothing to unwind here.
+    brainCore.cancelIndexing()
+    return brainCore.status()
   })
   ipcMain.handle('vault:health', async () => runVaultHealthCheck({ silentOk: true }))
   ipcMain.handle('doctor:run', async (_e, opts?: { distillModel?: string; ollamaUrl?: string }) => {
@@ -1231,6 +1287,10 @@ function registerIpc(): void {
       },
     ) => {
       const next = await setAppSettings(patch)
+      // Editing where the brain lives makes the earlier verdict stale.
+      if (patch.brainMcpUrl !== undefined || patch.brainTarget !== undefined) {
+        resetRemoteBrainWarning()
+      }
       if (Object.prototype.hasOwnProperty.call(patch, 'colorScheme')) {
         const scheme = next.colorScheme ?? 'mint'
         for (const w of BrowserWindow.getAllWindows()) {
@@ -1518,15 +1578,18 @@ function registerIpc(): void {
       (target === 'embedded'
         ? 'http://127.0.0.1:7862'
         : saved.brainMcpUrl?.trim() || '')
+    // Probe rather than trust the file: a config can be word-perfect and still
+    // point at a machine that is no longer on the network.
+    const probeOpts = { probe: true, token: target === 'embedded' ? undefined : token }
     if (!url) {
-      const [clients] = await Promise.all([checkAllClients()])
+      const clients = await checkAllClients(probeOpts)
       return {
         clients,
         brain: { url: '', reachable: false, error: 'Brak skonfigurowanego URL serwera Brain' },
       }
     }
     const [clients, brain] = await Promise.all([
-      checkAllClients(),
+      checkAllClients(probeOpts),
       pingBrain(url, target === 'embedded' ? undefined : token),
     ])
     return { clients, brain }

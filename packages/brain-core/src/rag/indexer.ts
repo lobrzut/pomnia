@@ -477,12 +477,34 @@ export async function indexDir(
   const stats = await indexFiles(db, embedder, toIndex, embedProgress, signal)
   stats.skipped = skipped
 
-  // Prune: missing files under current root + any path outside current root.
-  const present = new Set(paths.map(normalizeIndexPathKey))
+  stats.prunedFiles = pruneIndex(db, rootDir, { paths, signal })
+  return stats
+}
+
+/**
+ * Drop rows whose file is gone from disk, plus anything left behind by an
+ * earlier vault root.
+ *
+ * Split out of indexDir because it needs no embedder — it is a path walk
+ * against the DB, cheap enough to run after an incremental pass. Without that,
+ * the only thing that ever pruned was a full reindex, so notes deleted or
+ * renamed by redistillation piled up as dead entries (50 → 53 across runs that
+ * each reported success) and kept surfacing in search.
+ *
+ * @param paths pre-walked file list; omit and it walks `rootDir` itself.
+ */
+export function pruneIndex(
+  db: Database.Database,
+  rootDir: string,
+  opts?: { paths?: string[]; signal?: AbortSignal },
+): number {
+  const signal = opts?.signal
+  const present = new Set((opts?.paths ?? listTextFiles(rootDir)).map(normalizeIndexPathKey))
   const known = db.prepare('SELECT DISTINCT pdf_path AS p FROM chunks').all() as { p: string }[]
   const delVec = db.prepare('DELETE FROM chunks_vec WHERE rowid = ?')
   const selIds = db.prepare('SELECT id FROM chunks WHERE pdf_path = ?')
   const delChunks = db.prepare('DELETE FROM chunks WHERE pdf_path = ?')
+  let pruned = 0
   for (const { p } of known) {
     if (signal?.aborted) throwIfAborted(signal, 'reindex aborted')
     const underRoot = isIndexPathUnderRoot(p, rootDir)
@@ -498,7 +520,7 @@ export async function indexDir(
       deleteFileMeta(db, p)
     })
     wipe()
-    stats.prunedFiles += 1
+    pruned += 1
   }
 
   // Drop fingerprints for paths no longer on disk / outside root (even if chunks
@@ -514,5 +536,5 @@ export async function indexDir(
     }
   }
 
-  return stats
+  return pruned
 }

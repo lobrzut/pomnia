@@ -54,6 +54,7 @@ const bridge = {
   brainCoreStart: (ollamaUrl?: string) => ipcRenderer.invoke('brainCore:start', ollamaUrl),
   brainCoreStop: () => ipcRenderer.invoke('brainCore:stop'),
   brainCoreReindex: () => ipcRenderer.invoke('brainCore:reindex'),
+  brainCoreCancelIndex: () => ipcRenderer.invoke('brainCore:cancelIndex'),
   vaultHealth: () => ipcRenderer.invoke('vault:health'),
   doctorRun: (opts?: { distillModel?: string; ollamaUrl?: string }) =>
     ipcRenderer.invoke('doctor:run', opts),

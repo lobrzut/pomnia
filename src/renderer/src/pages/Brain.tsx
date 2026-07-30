@@ -28,6 +28,7 @@ import { Badge, Button, GlassCard, Input, ProgressBar, Spinner } from '../compon
 import { relativeTime, sourceMeta } from '../lib/format'
 import { api } from '../lib/api'
 import { VRAM_PROFILES, PROFILE_EMBED_MODEL, PROFILE_EMBED_SIZE } from '@core/brain/profiles'
+import { hasOllamaModel as hasModel } from '@core/brain/modelMatch'
 import { isDistillableSource } from '@core/brain/distillSources'
 import type { BrainHit, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent, QuarantineBucket, QuarantineNoteMeta } from '../lib/types'
 import { uiLabels } from '../lib/labels'
@@ -67,11 +68,6 @@ function doctorLevelClass(level: DoctorCheckRow['level']): string {
 }
 
 const PROFILE_KEY = 'pomnia.brain.profile'
-
-/** "qwen2.5:14b" and "qwen2.5:14b" match; "nomic-embed-text" matches "nomic-embed-text:latest". */
-function hasModel(models: string[], want: string): boolean {
-  return models.some((m) => m === want || m === `${want}:latest` || m.replace(/:latest$/, '') === want)
-}
 
 const STAGE_ICONS = {
   collect: Database,
@@ -318,6 +314,18 @@ export default function Brain() {
       }
     } finally {
       setEmbeddedBusy(false)
+      void refreshEmbedded()
+    }
+  }
+
+  async function cancelIndexEmbedded() {
+    // Cancels the pass only. stopEmbedded() would take the whole brain down and
+    // every connected agent's MCP with it — too blunt for "this reindex is taking
+    // too long".
+    try {
+      setEmbedded(await api.brainCoreCancelIndex())
+    } catch (e) {
+      useStore.getState().toast({ kind: 'error', title: labels.embeddedBrain, detail: (e as Error).message })
       void refreshEmbedded()
     }
   }
@@ -882,16 +890,22 @@ export default function Brain() {
               <User className="h-3.5 w-3.5" />
               {labels.profilePreview}
             </Button>
-            {embedded?.running && showAdvanced && (
-              <Button
-                variant="soft"
-                onClick={() => void reindexEmbedded()}
-                disabled={embeddedBusy || embeddedStopping || embedded.indexing}
-              >
-                {embedded.indexing || embeddedBusy ? <Spinner className="h-3.5 w-3.5" /> : <Layers className="h-3.5 w-3.5" />}
-                {labels.reindex}
-              </Button>
-            )}
+            {embedded?.running && showAdvanced &&
+              (embedded.indexing ? (
+                <Button variant="soft" onClick={() => void cancelIndexEmbedded()} disabled={embeddedStopping}>
+                  <Square className="h-3.5 w-3.5 fill-current" />
+                  {labels.reindexCancel}
+                </Button>
+              ) : (
+                <Button
+                  variant="soft"
+                  onClick={() => void reindexEmbedded()}
+                  disabled={embeddedBusy || embeddedStopping}
+                >
+                  {embeddedBusy ? <Spinner className="h-3.5 w-3.5" /> : <Layers className="h-3.5 w-3.5" />}
+                  {labels.reindex}
+                </Button>
+              ))}
             {embedded?.running || embedded?.starting || embedded?.indexing ? (
               <Button variant="soft" onClick={() => void stopEmbedded()} disabled={embeddedStopping}>
                 {embeddedStopping ? <Spinner className="h-4 w-4" /> : <Square className="h-3.5 w-3.5 fill-current" />}
