@@ -526,6 +526,11 @@ export interface UiLabels {
   brainDoctorRun: string
   brainDoctorRunning: string
   brainDoctorTitle: string
+  brainDoctorCopy: string
+  brainDoctorCopied: string
+  brainDoctorCopyFailed: string
+  brainDoctorOpenLogs: string
+  brainDoctorSummary: (ok: number, warn: number, fail: number) => string
   brainStateLastDistill: (rel: string) => string
   brainStateLoading: string
   brainStateChatsInTools: string
@@ -681,6 +686,8 @@ export interface UiLabels {
   flowNodeDeployDisk: string
   helpDontKnowStart: string
   statusStripTitle: string
+  /** Dashboard badge when last doctor run had FAIL — links to Brain. */
+  statusDoctorFail: string
   statusVault: string
   statusVaultOpen: string
   statusVaultClosed: string
@@ -1196,6 +1203,11 @@ const PL_LABELS: UiLabels = {
   brainDoctorRun: 'Sprawdź stan',
   brainDoctorRunning: 'Sprawdzanie…',
   brainDoctorTitle: 'Diagnostyka (doctor)',
+  brainDoctorCopy: 'Kopiuj raport',
+  brainDoctorCopied: 'Raport skopiowany',
+  brainDoctorCopyFailed: 'Nie udało się skopiować raportu',
+  brainDoctorOpenLogs: 'Otwórz logi',
+  brainDoctorSummary: (ok, warn, fail) => `${ok} OK · ${warn} WARN · ${fail} FAIL`,
   brainStateLastDistill: (rel) => `Ostatnia destylacja ${rel}`,
   brainStateLoading: 'Wczytywanie stanu pipeline…',
   brainStateChatsInTools: 'Czaty w narzędziach',
@@ -1358,6 +1370,7 @@ const PL_LABELS: UiLabels = {
   flowNodeDeployDisk: 'serwer Brain (opc.)',
   helpDontKnowStart: 'Nie wiem od czego zacząć →',
   statusStripTitle: 'Gdzie jesteś teraz',
+  statusDoctorFail: 'Doctor FAIL',
   statusVault: 'Vault',
   statusVaultOpen: 'otwarty',
   statusVaultClosed: 'zamknięty',
@@ -1809,6 +1822,7 @@ const EN_LABELS: Partial<UiLabels> = {
   vaultLocked: 'locked',
   helpDontKnowStart: 'Not sure where to start →',
   statusStripTitle: 'Where you are now',
+  statusDoctorFail: 'Doctor FAIL',
   statusVault: 'Vault',
   statusVaultOpen: 'open',
   statusVaultClosed: 'closed',
@@ -1891,6 +1905,11 @@ const EN_LABELS: Partial<UiLabels> = {
   brainDoctorRun: 'Check health',
   brainDoctorRunning: 'Checking…',
   brainDoctorTitle: 'Diagnostics (doctor)',
+  brainDoctorCopy: 'Copy report',
+  brainDoctorCopied: 'Report copied',
+  brainDoctorCopyFailed: 'Could not copy report',
+  brainDoctorOpenLogs: 'Open logs',
+  brainDoctorSummary: (ok, warn, fail) => `${ok} OK · ${warn} WARN · ${fail} FAIL`,
   brainStateLastDistill: (rel) => `Last distill ${rel}`,
   brainStateLoading: 'Loading…',
   brainStateChatsInTools: 'Chats in tools',
