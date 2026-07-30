@@ -10,6 +10,7 @@
  *   parent → child
  *     { type: 'start', config: Partial<BrainConfig> }
  *     { type: 'reindex', dir: string }        // distilled/sessions/library only (never skills/)
+ *     { type: 'cancel' }                      // abort the pass in flight; it replies with an error
  *     { type: 'index-files', paths: string[] } // embed only these paths (distill new notes)
  *     { type: 'index-document', doc: IndexDocumentInput }
  *     { type: 'document-chunk-counts', paths: string[] }
@@ -35,13 +36,21 @@ import process from 'node:process'
 
 import { defaultConfig, type BrainConfig } from './config/index.js'
 import { EmbedClient } from './rag/embed.js'
-import { indexDir, indexDocument, indexFiles, removeDocumentChunks, type IndexDocumentInput } from './rag/indexer.js'
+import {
+  indexDir,
+  indexDocument,
+  indexFiles,
+  pruneIndex,
+  removeDocumentChunks,
+  type IndexDocumentInput,
+} from './rag/indexer.js'
 import { createBrainServer, type BrainServer } from './mcp/server.js'
 import { openDb } from './storage/db.js'
 
 type ParentMsg =
   | { type: 'start'; config?: Partial<BrainConfig> }
   | { type: 'reindex'; dir: string }
+  | { type: 'cancel' }
   | { type: 'index-files'; paths: string[] }
   | { type: 'index-document'; doc: IndexDocumentInput }
   | { type: 'set-skills-root'; path: string }
@@ -207,6 +216,8 @@ async function handleReindex(dir: string): Promise<void> {
     const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
     try {
       const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
+      // Refuse rather than "succeed" with an empty index — see EmbedClient.preflight.
+      await embedder.preflight()
       const stats = await indexDir(db, embedder, dir, (p) => send({ type: 'reindex-progress', ...p }), ac.signal)
       send({ type: 'reindexed', stats })
       // Sidecar: DISTINCT/total counts in DB — not this-run embed counts (incremental).
@@ -267,6 +278,8 @@ async function handleIndexDocument(doc: IndexDocumentInput): Promise<void> {
     const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
     try {
       const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
+      // Refuse rather than "succeed" with an empty index — see EmbedClient.preflight.
+      await embedder.preflight()
       const stats = await indexDocument(db, embedder, doc, (p) => send({ type: 'index-progress', ...p }), ac.signal)
       send({ type: 'indexed-document', stats })
     } finally {
@@ -300,6 +313,8 @@ async function handleIndexFiles(paths: string[]): Promise<void> {
     const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
     try {
       const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
+      // Refuse rather than "succeed" with an empty index — see EmbedClient.preflight.
+      await embedder.preflight()
       const files = paths.map((p) => ({
         path: p,
         name: basename(p),
@@ -312,6 +327,12 @@ async function handleIndexFiles(paths: string[]): Promise<void> {
         (p) => send({ type: 'reindex-progress', ...p }),
         ac.signal,
       )
+      // Redistillation renames and replaces notes, so an append-only pass leaves
+      // the old paths in the index forever. Pruning needs no embedder, so doing
+      // it here costs a path walk and makes `prunedFiles` mean what it says.
+      if (config.vaultRoot) {
+        stats.prunedFiles = pruneIndex(db, config.vaultRoot, { signal: ac.signal })
+      }
       send({ type: 'reindexed', stats })
     } finally {
       db.close()
@@ -347,6 +368,11 @@ onParentMessage((msg: ParentMsg) => {
       break
     case 'reindex':
       void handleReindex(msg.dir)
+      break
+    case 'cancel':
+      // Whatever pass is in flight rejects with AbortError and its handler
+      // reports `… aborted`, which clears `busy` so the next attempt is free.
+      opAbort?.abort()
       break
     case 'index-files':
       void handleIndexFiles(msg.paths ?? [])

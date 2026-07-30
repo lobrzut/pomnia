@@ -25,6 +25,12 @@ export interface EmbedClientConfig {
   timeoutMs?: number
 }
 
+/** `nomic-embed-text` matches `nomic-embed-text:latest`; an explicit tag must match exactly. */
+export function embedModelMatches(available: string, wanted: string): boolean {
+  if (available === wanted) return true
+  return !wanted.includes(':') && available === `${wanted}:latest`
+}
+
 export class EmbedClient {
   private readonly url: string
   private readonly model: string
@@ -34,6 +40,30 @@ export class EmbedClient {
     this.url = cfg.ollamaUrl.replace(/\/$/, '')
     this.model = cfg.embedModel
     this.timeoutMs = cfg.timeoutMs ?? 300_000
+  }
+
+  /**
+   * Refuse to start an index pass Ollama cannot serve.
+   *
+   * Without this the pass runs to completion embedding nothing: every file
+   * 404s, each one logs a WARN nobody reads, and the run still returns a
+   * file/chunk count that gets written to the stats sidecar and surfaced as a
+   * green "index refreshed". That is how a 1900-note vault came back as 26.
+   */
+  async preflight(): Promise<void> {
+    let models: string[]
+    try {
+      const r = await fetch(`${this.url}/api/tags`, { signal: AbortSignal.timeout(8_000) })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const j = (await r.json()) as { models?: { name?: string }[] }
+      models = (j.models ?? []).map((m) => m.name ?? '').filter(Boolean)
+    } catch (err) {
+      const why = err instanceof Error ? err.message : String(err)
+      throw new Error(`ollama unreachable at ${this.url} (${why}) — start Ollama, then retry`)
+    }
+    if (!models.some((m) => embedModelMatches(m, this.model))) {
+      throw new Error(`embedding model "${this.model}" is not installed — run: ollama pull ${this.model}`)
+    }
   }
 
   /**

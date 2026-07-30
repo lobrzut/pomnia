@@ -216,6 +216,18 @@ interface ChildMsg {
   chunks?: number
 }
 
+/**
+ * Idle timeout for child index passes — reset by every progress message,
+ * NOT a cap on total runtime.
+ *
+ * This replaced a flat 10 min wall clock. Measured against a local Ollama a
+ * full reindex runs ~158 ms/file, so the old cap failed outright on any vault
+ * past ~3.8k notes — and since nothing cancelled the child afterwards, the
+ * orphaned pass held its `busy` flag and bounced every retry until the app
+ * was restarted.
+ */
+const INDEX_IDLE_TIMEOUT_MS = 180_000
+
 export interface IndexDocumentPayload {
   path: string
   name?: string
@@ -593,37 +605,49 @@ export class BrainCoreManager {
     return this.status()
   }
 
-  async reindex(dir: string): Promise<unknown> {
+  /**
+   * Send one index request and await its `reindexed` reply.
+   *
+   * Progress messages re-arm the idle timer, so a vault that legitimately takes
+   * hours never trips it. When it does trip, the child is cancelled first —
+   * leaving it running is what used to wedge every subsequent attempt.
+   */
+  private async runIndexOp(req: { type: string; dir?: string; paths?: string[] }, label: string): Promise<unknown> {
     const child = this.child
     if (!child || !this.url) throw new Error('embedded brain is not running')
     if (this.indexing) throw new Error('reindex already running')
     this.indexing = true
     try {
       return await new Promise((resolve, reject) => {
-        const t = setTimeout(() => {
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const settle = (fn: () => void): void => {
+          clearTimeout(timer)
           this.pendingOpReject = null
-          reject(new Error('reindex timeout (10 min)'))
-        }, 600_000)
-        this.pendingOpReject = (err) => {
-          clearTimeout(t)
           child.offMessage(h)
-          reject(err)
+          fn()
         }
+        const arm = (): void => {
+          clearTimeout(timer)
+          timer = setTimeout(() => {
+            child.send({ type: 'cancel' })
+            settle(() =>
+              reject(new Error(`${label} stalled — no progress for ${INDEX_IDLE_TIMEOUT_MS / 1000}s`)),
+            )
+          }, INDEX_IDLE_TIMEOUT_MS)
+        }
+        this.pendingOpReject = (err) => settle(() => reject(err))
         const h = (m: ChildMsg): void => {
-          if (m.type === 'reindexed') {
-            clearTimeout(t)
-            this.pendingOpReject = null
-            child.offMessage(h)
-            resolve(m.stats)
+          if (m.type === 'reindex-progress' || m.type === 'index-progress') {
+            arm()
+          } else if (m.type === 'reindexed') {
+            settle(() => resolve(m.stats))
           } else if (m.type === 'error') {
-            clearTimeout(t)
-            this.pendingOpReject = null
-            child.offMessage(h)
-            reject(new Error(m.message ?? 'reindex failed'))
+            settle(() => reject(new Error(m.message ?? `${label} failed`)))
           }
         }
         child.onMessage(h)
-        child.send({ type: 'reindex', dir })
+        arm()
+        child.send(req)
       })
     } finally {
       this.indexing = false
@@ -631,45 +655,26 @@ export class BrainCoreManager {
   }
 
   /**
+   * Ask the child to abort the pass in flight. The awaiting `runIndexOp`
+   * settles on the child's own `error` reply, so no bookkeeping happens here.
+   */
+  cancelIndexing(): void {
+    if (!this.indexing) return
+    this.child?.send({ type: 'cancel' })
+  }
+
+  async reindex(dir: string): Promise<unknown> {
+    return await this.runIndexOp({ type: 'reindex', dir }, 'reindex')
+  }
+
+  /**
    * Embed only the given absolute paths into library.db (no full vault walk).
    * Used after distill for new notes — library.db is SoT; skips localIndex dual-embed.
    */
   async indexFiles(paths: string[]): Promise<unknown> {
-    const child = this.child
-    if (!child || !this.url) throw new Error('embedded brain is not running')
-    if (this.indexing) throw new Error('reindex already running')
+    if (!this.child || !this.url) throw new Error('embedded brain is not running')
     if (paths.length === 0) return { files: 0, chunks: 0, empty: 0, prunedFiles: 0, skipped: 0 }
-    this.indexing = true
-    try {
-      return await new Promise((resolve, reject) => {
-        const t = setTimeout(() => {
-          this.pendingOpReject = null
-          reject(new Error('index-files timeout (10 min)'))
-        }, 600_000)
-        this.pendingOpReject = (err) => {
-          clearTimeout(t)
-          child.offMessage(h)
-          reject(err)
-        }
-        const h = (m: ChildMsg): void => {
-          if (m.type === 'reindexed') {
-            clearTimeout(t)
-            this.pendingOpReject = null
-            child.offMessage(h)
-            resolve(m.stats)
-          } else if (m.type === 'error') {
-            clearTimeout(t)
-            this.pendingOpReject = null
-            child.offMessage(h)
-            reject(new Error(m.message ?? 'index-files failed'))
-          }
-        }
-        child.onMessage(h)
-        child.send({ type: 'index-files', paths })
-      })
-    } finally {
-      this.indexing = false
-    }
+    return await this.runIndexOp({ type: 'index-files', paths }, 'index-files')
   }
 
   /** Fast COUNT(*) on library.db via child (no sql.js of 200MB). */

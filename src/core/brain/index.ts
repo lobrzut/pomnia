@@ -62,8 +62,16 @@ export {
   REMOTE_BRAIN_URL_PLACEHOLDER,
 } from './snippet.js'
 export type { ClientId, ClientSpec, Snippet, SnippetBrief, BrainTarget, BuildSnippetOptions, BrainBriefOptions } from './snippet.js'
-export { checkClient, checkAllClients, pingBrain, fetchMcpActivity } from './status.js'
-export type { ClientStatus, WiredState, BrainPing, McpActivityRecord, McpActivityResponse } from './status.js'
+export { checkClient, checkAllClients, pingBrain, probeMcpUrl, fetchMcpActivity } from './status.js'
+export type {
+  ClientStatus,
+  WiredState,
+  BrainPing,
+  McpProbe,
+  CheckClientOptions,
+  McpActivityRecord,
+  McpActivityResponse,
+} from './status.js'
 export { createMcpToken } from './mcpTokens.js'
 export type { McpTokenEntry } from './mcpTokens.js'
 

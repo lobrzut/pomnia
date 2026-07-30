@@ -35,6 +35,8 @@ export function defaultOllamaConfig(): OllamaConfig {
   }
 }
 
+export { hasOllamaModel } from './modelMatch.js'
+
 export class Ollama {
   constructor(readonly cfg: OllamaConfig = defaultOllamaConfig()) {}
 

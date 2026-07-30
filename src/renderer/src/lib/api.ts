@@ -116,6 +116,8 @@ export interface PomniaBridge {
   brainCoreStart(ollamaUrl?: string): Promise<EmbeddedBrainStatus>
   brainCoreStop(): Promise<EmbeddedBrainStatus>
   brainCoreReindex(): Promise<{ stats: { files: number; chunks: number; empty: number; prunedFiles: number } }>
+  /** Abort the index pass in flight; the pending reindex rejects with `reindex aborted`. */
+  brainCoreCancelIndex(): Promise<EmbeddedBrainStatus>
   vaultHealth(): Promise<{
     level: string
     code: string
@@ -634,6 +636,10 @@ function mockBridge(): PomniaBridge {
       await new Promise((r) => setTimeout(r, 1200))
       mockEmbedded.indexing = false
       return { stats: { files: 38, chunks: 121, empty: 2, prunedFiles: 1 } }
+    },
+    async brainCoreCancelIndex() {
+      mockEmbedded.indexing = false
+      return { ...mockEmbedded }
     },
     async vaultHealth() {
       return {
