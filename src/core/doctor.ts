@@ -20,6 +20,7 @@ import {
 } from '../buildInfo.js'
 import { PROFILE_EMBED_MODEL, VRAM_PROFILES } from './brain/profiles.js'
 import { defaultOllamaConfig, Ollama } from './brain/ollama.js'
+import { isDistillableSource } from './brain/distillSources.js'
 import { pingBrain } from './brain/status.js'
 import { appDataRoot, currentOS, homeDir } from './platform.js'
 import type { SourceId } from './model.js'
@@ -489,7 +490,7 @@ export async function collectDistillQueue(
   const perSource: DistillSourceRow[] = []
   for (const s of await detectAll()) {
     const a = getAdapter(s.id)
-    if (!s.installed || !a?.collectConversations) continue
+    if (!s.installed || !a?.collectConversations || !isDistillableSource(s.id)) continue
     const root = a.resolveRoot(os, home)
     if (!root) continue
     if (s.id === 'cursor' && (await isCursorDbTooLarge(root))) {

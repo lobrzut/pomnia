@@ -5,6 +5,12 @@ export { Ollama, defaultOllamaConfig } from './ollama.js'
 export type { OllamaConfig, OllamaModel } from './ollama.js'
 export { distillConversation, assembleNote, transcript, sanitizeUnicode, isWorthDistilling } from './distill.js'
 export type { DistilledNote } from './distill.js'
+export { DISTILLABLE_SOURCES, isDistillableSource } from './distillSources.js'
+export {
+  processedIdsAfterDistill,
+  pendingConversationIds,
+} from './distillLedger.js'
+export type { LedgerConv, LedgerNote } from './distillLedger.js'
 export {
   buildIndex,
   saveIndex,

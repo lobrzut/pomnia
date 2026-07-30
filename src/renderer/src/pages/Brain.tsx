@@ -26,6 +26,7 @@ import { Badge, Button, GlassCard, Input, ProgressBar, Spinner } from '../compon
 import { relativeTime, sourceMeta } from '../lib/format'
 import { api } from '../lib/api'
 import { VRAM_PROFILES, PROFILE_EMBED_MODEL, PROFILE_EMBED_SIZE } from '@core/brain/profiles'
+import { isDistillableSource } from '@core/brain/distillSources'
 import type { BrainHit, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent, QuarantineBucket, QuarantineNoteMeta } from '../lib/types'
 import { uiLabels } from '../lib/labels'
 import { useStore, ollamaUrlFromBrainUrl, dashboardUrlFromBrainUrl } from '../store/useStore'
@@ -277,7 +278,7 @@ export default function Brain() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const distillable = sources.filter((s) => ['claude-code', 'cursor', 'claude-desktop'].includes(s.id))
+  const distillable = sources.filter((s) => isDistillableSource(s.id))
 
   /** Default pending-only — omitting the arg must never silently re-distill everything. */
   function run(pendingOnly = true) {

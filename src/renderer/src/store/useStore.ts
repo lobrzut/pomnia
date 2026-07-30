@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Pomnia
 import { create } from 'zustand'
 import { VRAM_PROFILES } from '@core/brain/profiles'
+import { DISTILLABLE_SOURCES } from '@core/brain/distillSources'
 import { EMBEDDED_BRAIN_DEFAULT_URL } from '@core/brain/snippet'
 import {
   DEFAULT_HANDSHAKE_PHRASE,
@@ -29,8 +30,7 @@ migrateLegacyStorage()
 
 const EMBEDDED_URL = EMBEDDED_BRAIN_DEFAULT_URL
 
-/** Same distillable set as Brain tab — live assistant sources with JSONL/DB chats. */
-const DISTILLABLE_SOURCES = new Set<SourceId>(['claude-code', 'cursor', 'claude-desktop'])
+const DISTILLABLE_SET = new Set<SourceId>(DISTILLABLE_SOURCES)
 const BRAIN_PROFILE_KEY = 'pomnia.brain.profile'
 
 function loadDistillChatModel(): string {
@@ -450,7 +450,7 @@ export const useStore = create<State>((set, get) => ({
     const ok = await get().backup(note, { silent: true })
     if (!ok) return
 
-    const distillable = [...get().selected].filter((id) => DISTILLABLE_SOURCES.has(id))
+    const distillable = [...get().selected].filter((id) => DISTILLABLE_SET.has(id))
     if (distillable.length === 0) {
       get().toast({
         kind: 'info',
