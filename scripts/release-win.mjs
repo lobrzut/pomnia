@@ -9,12 +9,13 @@
  * 2. build @pomnia/brain-core + @pomnia/doc-parser (types/dist needed by typecheck on fresh clone)
  * 3. typecheck (regenerates buildInfo first)
  * 4. tests (regenerates buildInfo first)
- * 5. npm version patch --no-git-tag-version + commit "Release X.Y.Z"
- * 6. npm run build:win  (generates buildInfo from the Release commit, then packs)
+ * 5. golden path — index coverage / search / handshake / rules (read-only)
+ * 6. npm version patch --no-git-tag-version + commit "Release X.Y.Z"
+ * 7. npm run build:win  (generates buildInfo from the Release commit, then packs)
  *
  * Flags:
  *   --check-clean  only step 1 (exit 0 if clean)
- *   --dry-run      steps 1–4 only (no version bump / pack)
+ *   --dry-run      steps 1–5 only (no version bump / pack)
  */
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -69,6 +70,12 @@ run('npm test')
 // After generate:build-info (via typecheck/test), ignored buildInfo must not dirty porcelain
 assertCleanTree()
 console.log('✔ tree still clean after generate:build-info')
+
+// The memory gate is read-only, so run it here rather than only inside build:win.
+// It used to fire at the very last step of a real pack, which meant a passing
+// dry-run said nothing about the one check that guards the product's promise —
+// and that is exactly what "release:win --dry-run passes" was taken to mean.
+run('npm run test:golden')
 
 if (dryRun) {
   console.log('\n✔ release:win --dry-run complete (skipped version bump + pack)')
