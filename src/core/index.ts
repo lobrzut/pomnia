@@ -14,6 +14,24 @@ export { initFileLog } from './logFile.js'
 export { SOURCES, descriptorFor } from './locations.js'
 export * from './brain/index.js'
 export {
+  runDoctor,
+  formatDoctorLines,
+  formatDoctorText,
+  normalizeDoctorPath,
+  findDuplicateSessionGroups,
+  analyzeIndexConsistency,
+  resolveVaultPath,
+  defaultLibraryDbPath,
+} from './doctor.js'
+export type {
+  DoctorCheck,
+  DoctorLevel,
+  DoctorOptions,
+  DoctorReport,
+  DuplicateGroup,
+  IndexConsistencyResult,
+} from './doctor.js'
+export {
   parseExportBuffer,
   parseExportFile,
   parseExportPath,

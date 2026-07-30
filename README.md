@@ -108,7 +108,7 @@ Logs: `%AppData%/Pomnia/logs/` (Windows).
 ## Run (dev)
 
 ```bash
-npm install
+npm ci
 npm run generate:build-info   # writes src/buildInfo.ts (version · git sha · timestamp)
 npm run dev          # Electron + hot reload (regenerates buildInfo first)
 npm test             # vitest
@@ -118,21 +118,27 @@ npm run build:win    # pack only — used by release:win after the Release commi
 npm run pack:mac     # DMG / macOS app
 ```
 
+Use **`npm ci`** on a fresh clone (installs from the lockfile; does not rewrite it). Prefer `npm ci` over `npm install` so `package-lock.json` stays the source of truth across machines and npm versions.
+
 Build identity (Settings → Bezpieczeństwo / Security, and `pomnia --version`): `0.1.45 · 7ff41c7 · 2026-07-30 01:12` — dirty tree at generate time appends `+dirty` to the sha.
 
 ### Windows: never run vitest from a UNC path
 
-If the repo is opened over SMB (`\\server\share\…`), `npm test` / `vitest` can start under `C:\Windows` and **exit 0 without running any tests** (silent failure). Always run install/tests from a **local disk mirror**, e.g. `C:\Users\<you>\pomnia-build-*` (robocopy/sync from the share, then `npm install` + `npx vitest run …` there).
+If the repo is opened over SMB (`\\server\share\…`), `npm test` / `vitest` can start under `C:\Windows` and **exit 0 without running any tests** (silent failure). Always run install/tests from a **local disk mirror**, e.g. `C:\Users\<you>\pomnia-build-*` (robocopy/sync from the share, then `npm ci` + `npx vitest run …` there).
 
 ### CLI (no GUI)
 
 ```bash
 npm run cli scan
+npm run cli doctor
+npm run cli doctor -- --json
 POMNIA_PASS=… npm run cli backup --vault ~/Pomnia.pomnia --create --sources all
 npm run cli list    --vault ~/Pomnia.pomnia
 npm run cli verify  --vault ~/Pomnia.pomnia
 npm run cli brain-export --out ~/brain-notes --sources all
 ```
+
+`pomnia doctor` exits **0** when there are no FAILs (WARN-only is OK), **1** if any check is FAIL. `--json` prints the structured report.
 
 ## Brain — embedded (default) and remote
 
