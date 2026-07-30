@@ -24,8 +24,9 @@ import {
   getAdapter,
   homeDir,
   hostName,
-  isWorthDistilling,
+  isDistillableSource,
   listAllSkills,
+  processedIdsAfterDistill,
   loadIndex,
   log,
   noteFilename,
@@ -1030,13 +1031,9 @@ function registerIpc(): void {
           idxChunks = okNotes.reduce((n, note) => n + chunkText(note.markdown).length, 0)
           idxDim = 768
         }
-        // Only quality:ok locks the ledger. Stub/garbage stay pending so the
-        // next "distill backlog" retries them instead of stranding knowledge in _review/.
-        const okIds = new Set(notes.filter((n) => n.quality === 'ok').map((n) => n.sessionId))
-        const processedIds = convs
-          .filter((c) => !isWorthDistilling(c) || okIds.has(c.id))
-          .map((c) => c.id)
-        await markProcessed(processedIds)
+        // Quality only chooses the note basket — never whether the ledger locks.
+        // One attempt: stub/garbage/failed must not re-enter the pending queue.
+        await markProcessed(processedIdsAfterDistill(convs, notes, failed))
 
         // Local vault deploy is always done above; report it so embedded UX matches remote.
         let deployed = okNotes.length
@@ -1392,7 +1389,7 @@ function registerIpc(): void {
     }[] = []
     for (const s of await detectAll()) {
       const a = getAdapter(s.id)
-      if (!s.installed || !a?.collectConversations) continue
+      if (!s.installed || !a?.collectConversations || !isDistillableSource(s.id)) continue
       const root = a.resolveRoot(os, home)
       if (!root) continue
       if (s.id === 'cursor' && (await isCursorDbTooLarge(root))) {
