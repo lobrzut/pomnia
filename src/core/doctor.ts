@@ -22,6 +22,7 @@ import { PROFILE_EMBED_MODEL, VRAM_PROFILES } from './brain/profiles.js'
 import { hasOllamaModel as hasModel } from './brain/modelMatch.js'
 import { defaultOllamaConfig, Ollama } from './brain/ollama.js'
 import { isDistillableSource } from './brain/distillSources.js'
+import { ledgerPathInVault, ownerProcessed, parseLedger } from './brain/ledgerStore.js'
 import { pingBrain } from './brain/status.js'
 import { appDataRoot, currentOS, homeDir } from './platform.js'
 import type { SourceId } from './model.js'
@@ -263,8 +264,21 @@ export function defaultLibraryDbPath(userDataDir?: string): string {
   return join(resolvePomniaUserData(userDataDir), 'brain-core-data', 'vectordb', 'library.db')
 }
 
+/** Legacy pre-vault location. Migration source only — never the live ledger. */
 export function defaultLedgerPath(userDataDir?: string): string {
   return join(resolvePomniaUserData(userDataDir), 'distill-ledger.json')
+}
+
+/**
+ * The ledger the pipeline actually reads: in the vault when one exists there,
+ * otherwise the legacy AppData copy that has not been migrated yet.
+ */
+export function preferredLedgerPath(vaultPath?: string, userDataDir?: string): string {
+  if (vaultPath) {
+    const inVault = ledgerPathInVault(vaultPath)
+    if (existsSync(inVault)) return inVault
+  }
+  return defaultLedgerPath(userDataDir)
 }
 
 export function resolveVaultPath(explicit?: string, userDataDir?: string): string {
@@ -473,12 +487,11 @@ function readIndexFromDb(
 export async function collectDistillQueue(
   ledgerPath: string,
 ): Promise<{ perSource: DistillSourceRow[]; ledgerProcessed: number }> {
+  // parseLedger accepts both the in-vault owner map and the legacy AppData
+  // shape, so doctor reports the same number the pipeline actually uses.
   let processed: Record<string, string> = {}
   try {
-    const raw = JSON.parse(await fs.readFile(ledgerPath, 'utf8')) as {
-      processed?: Record<string, string>
-    }
-    processed = raw.processed ?? {}
+    processed = ownerProcessed(parseLedger(JSON.parse(await fs.readFile(ledgerPath, 'utf8'))))
   } catch {
     processed = {}
   }
@@ -560,7 +573,10 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
   const userData = resolvePomniaUserData(opts.userDataDir)
   const vaultPath = resolveVaultPath(opts.vaultPath, opts.userDataDir)
   const libraryDb = opts.libraryDbPath ?? defaultLibraryDbPath(opts.userDataDir)
-  const ledgerPath = opts.ledgerPath ?? defaultLedgerPath(opts.userDataDir)
+  // Prefer the vault's ledger — that is the one the pipeline reads now. The
+  // AppData copy only survives as a migration source and goes stale the moment
+  // the vault is opened somewhere else.
+  const ledgerPath = opts.ledgerPath ?? preferredLedgerPath(vaultPath, opts.userDataDir)
   const brainUrl = (opts.brainUrl || 'http://127.0.0.1:7862').replace(/\/+$/, '')
   const embedModel = opts.embedModel || PROFILE_EMBED_MODEL
   const distillModel =

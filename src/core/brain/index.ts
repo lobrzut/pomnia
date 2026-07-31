@@ -72,6 +72,21 @@ export type {
   McpActivityRecord,
   McpActivityResponse,
 } from './status.js'
+export {
+  DEFAULT_OWNER,
+  LEDGER_SCHEMA_VERSION,
+  emptyLedger,
+  ledgerPathInVault,
+  loadLedgerForVault,
+  markProcessedIn,
+  ownerProcessed,
+  parseLedger,
+  readLedgerFile,
+  reconcileWithNotes,
+  sessionIdsFromNotes,
+  writeLedgerFile,
+} from './ledgerStore.js'
+export type { DistillLedgerFile, LedgerOwner, LoadLedgerResult, ProcessedMap } from './ledgerStore.js'
 export { createMcpToken } from './mcpTokens.js'
 export type { McpTokenEntry } from './mcpTokens.js'
 

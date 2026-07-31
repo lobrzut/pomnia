@@ -36,6 +36,13 @@ import {
   conversationFingerprint,
   pingBrain,
   probeMcpUrl,
+  emptyLedger,
+  ledgerPathInVault,
+  loadLedgerForVault,
+  markProcessedIn,
+  ownerProcessed,
+  readLedgerFile,
+  writeLedgerFile,
   runBackup,
   runDoctor,
   saveIndex,
@@ -262,26 +269,64 @@ const brainIndexFile = (): string => join(brainDir(), '.pomnia-index.json')
    Which conversation ids have been through the pipeline. This is what lets
    the UI show an honest backlog ("N chats not distilled yet") instead of
    guessing — and lets "distill backlog" run incrementally. */
-const ledgerFile = (): string => join(app.getPath('userData'), 'distill-ledger.json')
+/** Pre-vault location. Read once for migration; never written to again. */
+const legacyLedgerFile = (): string => join(app.getPath('userData'), 'distill-ledger.json')
+
+/** Current vault's ledger file. Moves with the vault, unlike the legacy path. */
+const vaultLedgerFile = (): string => ledgerPathInVault(brainVaultRoot(vaultPath))
 
 interface DistillLedger {
   /** conversation id → ISO timestamp of the run that processed it */
   processed: Record<string, string>
 }
 
+/**
+ * Cheap read — the file only. Rebuilding from notes costs a scan of every
+ * distilled note, so it happens once per vault open in healLedgerForVault().
+ */
 async function readLedger(): Promise<DistillLedger> {
-  try {
-    return JSON.parse(await fs.readFile(ledgerFile(), 'utf8')) as DistillLedger
-  } catch {
-    return { processed: {} }
-  }
+  const f = await readLedgerFile(vaultLedgerFile())
+  return { processed: f ? ownerProcessed(f) : {} }
 }
 
 async function markProcessed(ids: string[]): Promise<void> {
-  const l = await readLedger()
-  const now = new Date().toISOString()
-  for (const id of ids) if (!l.processed[id]) l.processed[id] = now
-  await fs.writeFile(ledgerFile(), JSON.stringify(l), 'utf8')
+  const path = vaultLedgerFile()
+  const current = (await readLedgerFile(path)) ?? emptyLedger()
+  await writeLedgerFile(path, markProcessedIn(current, ids))
+}
+
+/**
+ * Bring the vault's ledger up to date on open: migrate the legacy AppData copy
+ * if this vault has none, then top it up from `session:` ids in distilled note
+ * frontmatter. Losing the ledger now costs a folder scan instead of re-milling
+ * every conversation on the local LLM.
+ */
+async function healLedgerForVault(): Promise<void> {
+  try {
+    const root = brainVaultRoot(vaultPath)
+    const before = await readLedgerFile(ledgerPathInVault(root))
+    const { ledger, origin, recovered } = await loadLedgerForVault(root, legacyLedgerFile())
+    if (!before || recovered > 0) {
+      await writeLedgerFile(ledgerPathInVault(root), ledger)
+    }
+    const known = Object.keys(ownerProcessed(ledger)).length
+    log.info(`distill ledger: ${known} id(s) known · origin=${origin} · recovered=${recovered}`)
+    if (origin === 'migrated-from-appdata') {
+      sendAppToast({
+        kind: 'info',
+        title: 'Rejestr destylacji przeniesiony do vaultu',
+        detail: `${known} rozmów · od teraz podróżuje razem z danymi`,
+      })
+    } else if (origin === 'rebuilt-from-notes' && recovered > 0) {
+      sendAppToast({
+        kind: 'info',
+        title: 'Rejestr destylacji odbudowany z notatek',
+        detail: `${recovered} rozmów odzyskanych — nie trzeba ich mielić od nowa`,
+      })
+    }
+  } catch (e) {
+    log.warn('distill ledger heal failed:', (e as Error).message)
+  }
 }
 
 function ollamaFor(url?: string, model?: string): Ollama {
@@ -738,6 +783,7 @@ function registerIpc(): void {
     brainCore.setVaultRoot(knowledgeRoot)
     void maybeAutoStartEmbeddedBrain()
     void warnIfRemoteBrainUnreachable()
+    void healLedgerForVault()
     // When autostart is off, still prompt for one-shot index hygiene.
     if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
     return {
@@ -765,6 +811,7 @@ function registerIpc(): void {
     const pendingLibraryIndex = vault.getPendingIndexDocuments().length
     void maybeAutoStartEmbeddedBrain()
     void warnIfRemoteBrainUnreachable()
+    void healLedgerForVault()
     if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
     return {
       open: true,
