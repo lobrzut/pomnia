@@ -50,6 +50,17 @@ export interface BrainConfig {
    */
   autoCheckpointEnabled?: boolean
 
+  /**
+   * Serve a replica: refuse save_conversation / checkpoint_session.
+   *
+   * Set this on every instance that does not own the vault. Two writable brains
+   * over one corpus fork the memory silently — the desktop vault and the Linux
+   * brain drifted to 99 files present on one side only, and nothing reported it.
+   */
+  readOnly?: boolean
+  /** Named in the refusal so an agent can tell the user where to save instead. */
+  authoritativeVaultHint?: string
+
   /** Ollama base URL — reachable http endpoint. */
   ollamaUrl: string
   /** Embedding model name known to Ollama (nomic-embed-text-v1.5 → dim 768). */
@@ -109,6 +120,8 @@ export async function loadConfig(
   if (env.BRAIN_EMBED_MODEL) cfg.embedModel = env.BRAIN_EMBED_MODEL
   if (env.BRAIN_VAULT_ROOT) cfg.vaultRoot = env.BRAIN_VAULT_ROOT
   if (env.BRAIN_SKILLS_ROOT) cfg.skillsRoot = env.BRAIN_SKILLS_ROOT
+  if (env.BRAIN_READ_ONLY === '1' || env.BRAIN_READ_ONLY === 'true') cfg.readOnly = true
+  if (env.BRAIN_VAULT_OWNER) cfg.authoritativeVaultHint = env.BRAIN_VAULT_OWNER
 
   // CLI overrides (simple, no getopt dependency)
   const dataDirBefore = cfg.dataDir
@@ -126,6 +139,8 @@ export async function loadConfig(
     // live at <dataDir>/vault.
     else if (arg === '--vault-root' && next) cfg.vaultRoot = next
     else if (arg === '--skills-root' && next) cfg.skillsRoot = next
+    else if (arg === '--read-only') cfg.readOnly = true
+    else if (arg === '--vault-owner' && next) cfg.authoritativeVaultHint = next
     else if (arg === '--tokens-file' && next) {
       cfg.auth.tokensFile = next
       tokensFileExplicit = true

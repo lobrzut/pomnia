@@ -229,6 +229,15 @@ export async function createBrainServer(
         handshakePhrase: config.handshakePhrase,
         handshakeEnabled: config.handshakeEnabled !== false,
         autoCheckpointEnabled: config.autoCheckpointEnabled !== false,
+        readOnly: config.readOnly === true,
+        authoritativeVaultHint: config.authoritativeVaultHint,
+      }
+
+      if (config.readOnly) {
+        console.error(
+          `[brain-core] READ-ONLY replica — save_conversation and checkpoint_session will refuse` +
+            (config.authoritativeVaultHint ? ` (owner: ${config.authoritativeVaultHint})` : ''),
+        )
       }
 
       const gate = createAuthGate({
