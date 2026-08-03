@@ -187,9 +187,10 @@ export async function indexFiles(
       const batch = chunks.slice(i, i + BATCH)
       // Embedding happens OUTSIDE the write transaction — Ollama can take
       // seconds per batch and holding a write lock that long is rude to
-      // any concurrent search. No nomic prefixes here: Ollama's model
-      // template adds them itself (see embed.ts header, verified Phase 0).
-      const vecs = await embedder.embedBatch(batch, signal)
+      // any concurrent search. The `search_document: ` prefix is applied by
+      // EmbedClient; Ollama's template does NOT add it, contrary to what this
+      // comment used to claim (measured: cosine 0.92 between prefixed and bare).
+      const vecs = await embedder.embedBatch(batch, 'document', signal)
       if (vecs.length !== batch.length) {
         throw new Error(`embed count mismatch: got ${vecs.length} for ${batch.length} chunks (${name})`)
       }
@@ -272,7 +273,7 @@ export async function indexDocument(
     if (signal?.aborted) throwIfAborted(signal, 'index aborted')
     const batch = pending.slice(i, i + BATCH)
     const texts = batch.map((b) => b.text)
-    const vecs = await embedder.embedBatch(texts, signal)
+    const vecs = await embedder.embedBatch(texts, 'document', signal)
     if (vecs.length !== texts.length) {
       throw new Error(`embed count mismatch: got ${vecs.length} for ${texts.length} chunks (${name})`)
     }

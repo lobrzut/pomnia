@@ -11,12 +11,31 @@
  * Python-fastembed backends emit the same directional vector for the same
  * model (verified in Phase 0).
  *
- * Nomic embeddings bake the "search_query: " / "search_document: " prefix into
- * Ollama's model template already, so we do NOT prepend it here (unlike Python
- * fastembed which needs the explicit prefix).
+ * Task prefixes are applied HERE, explicitly.
+ *
+ * An earlier comment claimed Ollama's nomic template adds them itself, so this
+ * client sent bare text. Measured on a live Ollama: embedding "foo" versus
+ * "search_document: foo" gives cosine 0.92 — nowhere near the ~1.0 that would
+ * mean the template prepends anything. It does not. The same claim sits in the
+ * Python brain's rag.py and is equally wrong there.
+ *
+ * Consequences of getting this wrong were twofold: queries and documents landed
+ * in the same undifferentiated space (nomic is trained for an asymmetric pair,
+ * which is the whole point of the prefixes), and vectors sat 0.92 away from the
+ * Python brain's index — so the two could not share one library.db.
+ * fastembed and Ollama agree to 0.99996 when handed the same prefixed input,
+ * so the backend was never the problem; the prefix was.
  */
 
 export const EMBED_DIMS = 768
+
+/** What the text is for. nomic-embed expects the pair to be marked differently. */
+export type EmbedKind = 'document' | 'query'
+
+const EMBED_PREFIX: Record<EmbedKind, string> = {
+  document: 'search_document: ',
+  query: 'search_query: ',
+}
 
 export interface EmbedClientConfig {
   ollamaUrl: string
@@ -69,8 +88,12 @@ export class EmbedClient {
   /**
    * Embed a batch of texts. Returns one vector per input, in order.
    * Throws with the Ollama status body on error.
+   *
+   * `kind` is required rather than defaulted: indexing a query-shaped vector or
+   * searching with a document-shaped one degrades retrieval silently, and a
+   * default would let a new call site inherit the wrong one by omission.
    */
-  async embedBatch(texts: string[], signal?: AbortSignal): Promise<number[][]> {
+  async embedBatch(texts: string[], kind: EmbedKind, signal?: AbortSignal): Promise<number[][]> {
     if (texts.length === 0) return []
     if (signal?.aborted) {
       const err = new Error('embed aborted')
@@ -85,7 +108,7 @@ export class EmbedClient {
       const r = await fetch(`${this.url}/api/embed`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model: this.model, input: texts }),
+        body: JSON.stringify({ model: this.model, input: texts.map((t) => EMBED_PREFIX[kind] + t) }),
         signal: ctl.signal,
       })
       if (!r.ok) {
@@ -102,9 +125,9 @@ export class EmbedClient {
     }
   }
 
-  /** Convenience for the single-query case. */
-  async embedOne(text: string): Promise<number[]> {
-    const [v] = await this.embedBatch([text])
+  /** Convenience for the single-text case. */
+  async embedOne(text: string, kind: EmbedKind): Promise<number[]> {
+    const [v] = await this.embedBatch([text], kind)
     if (!v) throw new Error('ollama returned zero vectors')
     return v
   }
