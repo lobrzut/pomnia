@@ -183,12 +183,25 @@ export function listTools(
         'Load a skill by name (brain .md or cli SKILL.md). Returns full markdown — follow it for that task. Discover names via list_skills.',
       inputSchema: getSkillSchema,
     },
-    // Remaining stubs — schemas present so tools/list stays complete.
-    { name: 'run_skill', description: 'STUB — coming later.', inputSchema: stubSchemas.run_skill },
-    { name: 'search_code', description: 'STUB — coming later.', inputSchema: stubSchemas.search_code },
+    // Not implemented. Kept in the catalog so a client with a cached tool list
+    // gets an explanation rather than "unknown tool" — but the description has
+    // to say so up front, or an agent picks the tool, calls it, and only then
+    // learns it does nothing.
+    {
+      name: 'run_skill',
+      description:
+        'NOT IMPLEMENTED — returns an explanation, runs nothing. Use get_skill to read the skill and follow it yourself.',
+      inputSchema: stubSchemas.run_skill,
+    },
+    {
+      name: 'search_code',
+      description:
+        'NOT IMPLEMENTED — returns an explanation, searches nothing. Pomnia indexes notes and documents, not source trees; grep the repository instead.',
+      inputSchema: stubSchemas.search_code,
+    },
     {
       name: 'code_status',
-      description: 'STUB — coming later.',
+      description: 'NOT IMPLEMENTED — returns an explanation. There is no code index to report on.',
       inputSchema: stubSchemas.code_status,
     },
   ]
