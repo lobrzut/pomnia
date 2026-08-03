@@ -7,7 +7,7 @@
  * Usage:
  *   brain-core                          # reads config from env / ~/.pomnia/brain-core.toml
  *   brain-core --port 7862 --data-dir ~/.pomnia/brain
- *   brain-core --config /etc/brain.toml
+ *   brain-core --reindex                # (re)build the index from the vault on start
  *
  * When Pomnia embeds brain-core, it doesn't go through this file — the Electron
  * main process spawns a child via `child_process.fork()` and passes an options
@@ -17,12 +17,63 @@
 import process from 'node:process'
 import { loadConfig } from './config/index.js'
 import { createBrainServer } from './mcp/server.js'
+import { EmbedClient } from './rag/embed.js'
+import { indexDir } from './rag/indexer.js'
+import { openDb } from './storage/db.js'
+import { defaultVaultConfig, vaultConfigFromRoot } from './storage/vault.js'
+
+/**
+ * Build the index from the vault.
+ *
+ * Indexing used to reach brain-core only over the fork protocol, which is
+ * spoken by Pomnia Desktop and nothing else — so a standalone deployment could
+ * serve an index but never create one, and started life answering every query
+ * from an empty database. Runs in the background: a first index of a few
+ * thousand notes takes minutes, and blocking startup that long trips systemd
+ * start timeouts and container health checks.
+ */
+async function reindexInBackground(config: Awaited<ReturnType<typeof loadConfig>>): Promise<void> {
+  const vaultRoot = (
+    config.vaultRoot ? vaultConfigFromRoot(config.vaultRoot) : defaultVaultConfig(config.dataDir)
+  ).root
+  const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
+  try {
+    await embedder.preflight()
+  } catch (err) {
+    console.error(`[brain-core] reindex refused: ${err instanceof Error ? err.message : String(err)}`)
+    return
+  }
+  const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
+  const started = Date.now()
+  let last = 0
+  try {
+    const stats = await indexDir(db, embedder, vaultRoot, (p) => {
+      if (p.done - last < 250 && p.done !== p.total) return
+      last = p.done
+      console.error(`[brain-core] indexing ${p.done}/${p.total}`)
+    })
+    const secs = ((Date.now() - started) / 1000).toFixed(0)
+    console.error(
+      `[brain-core] reindex done in ${secs}s — ${stats.files} file(s), ${stats.chunks} chunk(s), ` +
+        `${stats.skipped} unchanged, ${stats.prunedFiles} pruned`,
+    )
+  } catch (err) {
+    console.error(`[brain-core] reindex failed: ${err instanceof Error ? err.message : String(err)}`)
+  } finally {
+    db.close()
+  }
+}
 
 async function main(): Promise<void> {
   const config = await loadConfig(process.argv.slice(2), process.env)
 
   const server = await createBrainServer(config)
   await server.start()
+
+  if (process.argv.includes('--reindex')) {
+    console.error('[brain-core] --reindex: building index in the background, serving meanwhile')
+    void reindexInBackground(config)
+  }
 
   const shutdown = async (signal: string): Promise<void> => {
     console.error(`[brain-core] received ${signal}, shutting down…`)
