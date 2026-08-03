@@ -34,6 +34,7 @@ import type { BrainConfig } from '../config/index.js'
 import { EmbedClient } from '../rag/embed.js'
 import { openDb } from '../storage/db.js'
 import { defaultVaultConfig, vaultConfigFromRoot, type VaultConfig } from '../storage/vault.js'
+import { createAuthGate } from './auth.js'
 import { callTool, listTools, type ToolContext } from './tools/index.js'
 
 /** True when an existing brain-core already answers /healthz on host:port. */
@@ -230,18 +231,28 @@ export async function createBrainServer(
         autoCheckpointEnabled: config.autoCheckpointEnabled !== false,
       }
 
+      const gate = createAuthGate({
+        host: config.host,
+        tokensFile: config.auth.tokensFile,
+        maxFailsPerMinute: config.auth.maxFailsPerMinute,
+      })
+      if (gate.required) {
+        const n = await gate.tokenCount()
+        console.error(
+          n > 0
+            ? `[brain-core] bearer auth ON (${n} token(s) from ${config.auth.tokensFile})`
+            : `[brain-core] bearer auth ON but NO TOKENS in ${config.auth.tokensFile} — every request will be refused`,
+        )
+      }
+
       http = createServer((req: IncomingMessage, res: ServerResponse) => {
         const pathOnly = req.url?.split('?')[0] ?? ''
+        // Liveness stays public: systemd/Docker probe it before any token
+        // exists, and it reveals nothing but "the process is up".
         if (pathOnly === '/healthz' || pathOnly === '/healthz/') {
           res.statusCode = 200
           res.setHeader('content-type', 'application/json')
-          res.end(JSON.stringify({ ok: true, service: 'brain-core' }))
-          return
-        }
-        if (pathOnly === '/mcp/activity' || pathOnly === '/mcp/activity/') {
-          res.statusCode = 200
-          res.setHeader('content-type', 'application/json')
-          res.end(JSON.stringify(getMcpActivitySnapshot()))
+          res.end(JSON.stringify({ ok: true, service: 'brain-core', auth: gate.required }))
           return
         }
         // All MCP traffic goes through POST/GET/DELETE on `/mcp`. Anything
@@ -254,37 +265,75 @@ export async function createBrainServer(
           res.end(JSON.stringify({ error: 'not_found', hint: 'MCP endpoint is at /mcp' }))
           return
         }
-        if (!ctx) {
-          res.statusCode = 503
-          res.end('mcp not ready')
-          return
-        }
 
-        // Per-request Server + transport (SDK simpleStatelessStreamableHttp).
-        // Fresh Server+transport each request avoids header/session reuse bugs
-        // ("headers already sent" / "Stateless transport cannot be reused").
         void (async () => {
-          const mcp = createMcpServer(ctx!, opts?.onMcpQuery)
-          const transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: undefined,
-          })
-          await mcp.connect(transport)
-
-          const cleanup = () => {
-            void transport.close().catch(() => {})
-            void mcp.close().catch(() => {})
+          // Gate everything under /mcp, activity included — that endpoint
+          // echoes the last query text, which is vault content.
+          const auth = await gate.check(req)
+          if (!auth.ok) {
+            res.statusCode = auth.reason === 'rate_limited' ? 429 : 401
+            res.setHeader('content-type', 'application/json')
+            res.setHeader('www-authenticate', 'Bearer realm="brain-mcp"')
+            if (auth.retryAfterSec) res.setHeader('retry-after', String(auth.retryAfterSec))
+            res.end(
+              JSON.stringify({
+                error: auth.reason === 'rate_limited' ? 'rate_limited' : 'unauthorized',
+                hint: 'set Authorization: Bearer <token> header',
+              }),
+            )
+            return
           }
-          res.on('close', cleanup)
 
-          await transport.handleRequest(req, res)
+          if (pathOnly === '/mcp/activity' || pathOnly === '/mcp/activity/') {
+            res.statusCode = 200
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify(getMcpActivitySnapshot()))
+            return
+          }
+          if (!ctx) {
+            res.statusCode = 503
+            res.end('mcp not ready')
+            return
+          }
+          await serveMcp(req, res)
         })().catch((err: unknown) => {
-          console.error('[brain-core] transport error:', err)
+          console.error('[brain-core] request error:', err)
           if (!res.headersSent) {
             res.statusCode = 500
             res.end('internal error')
           }
         })
       })
+
+      /**
+       * Per-request Server + transport (SDK simpleStatelessStreamableHttp).
+       * Fresh Server+transport each request avoids header/session reuse bugs
+       * ("headers already sent" / "Stateless transport cannot be reused").
+       * Extracted from the handler so the auth path can await it.
+       */
+      async function serveMcp(req: IncomingMessage, res: ServerResponse): Promise<void> {
+        const mcp = createMcpServer(ctx!, opts?.onMcpQuery)
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+        })
+        await mcp.connect(transport)
+
+        const cleanup = (): void => {
+          void transport.close().catch(() => {})
+          void mcp.close().catch(() => {})
+        }
+        res.on('close', cleanup)
+
+        try {
+          await transport.handleRequest(req, res)
+        } catch (err) {
+          console.error('[brain-core] transport error:', err)
+          if (!res.headersSent) {
+            res.statusCode = 500
+            res.end('internal error')
+          }
+        }
+      }
 
       try {
         await new Promise<void>((resolve, reject) => {

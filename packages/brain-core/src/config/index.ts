@@ -109,6 +109,8 @@ export async function loadConfig(
   if (env.BRAIN_EMBED_MODEL) cfg.embedModel = env.BRAIN_EMBED_MODEL
 
   // CLI overrides (simple, no getopt dependency)
+  const dataDirBefore = cfg.dataDir
+  let tokensFileExplicit = false
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     const next = argv[i + 1]
@@ -117,6 +119,17 @@ export async function loadConfig(
     else if (arg === '--data-dir' && next) cfg.dataDir = next
     else if (arg === '--ollama-url' && next) cfg.ollamaUrl = next
     else if (arg === '--embed-model' && next) cfg.embedModel = next
+    else if (arg === '--tokens-file' && next) {
+      cfg.auth.tokensFile = next
+      tokensFileExplicit = true
+    }
+  }
+
+  // Paths derived from dataDir must follow it. Without this, `--data-dir /srv/x`
+  // moved the vault and db but kept reading tokens from ~/.pomnia/brain — a
+  // server would look authenticated while consulting a file nobody deployed.
+  if (!tokensFileExplicit && cfg.dataDir !== dataDirBefore) {
+    cfg.auth.tokensFile = join(cfg.dataDir, 'mcp-tokens.json')
   }
 
   return cfg
