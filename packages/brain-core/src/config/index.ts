@@ -107,6 +107,8 @@ export async function loadConfig(
   if (env.BRAIN_PORT) cfg.port = Number(env.BRAIN_PORT)
   if (env.BRAIN_OLLAMA_URL) cfg.ollamaUrl = env.BRAIN_OLLAMA_URL
   if (env.BRAIN_EMBED_MODEL) cfg.embedModel = env.BRAIN_EMBED_MODEL
+  if (env.BRAIN_VAULT_ROOT) cfg.vaultRoot = env.BRAIN_VAULT_ROOT
+  if (env.BRAIN_SKILLS_ROOT) cfg.skillsRoot = env.BRAIN_SKILLS_ROOT
 
   // CLI overrides (simple, no getopt dependency)
   const dataDirBefore = cfg.dataDir
@@ -119,6 +121,11 @@ export async function loadConfig(
     else if (arg === '--data-dir' && next) cfg.dataDir = next
     else if (arg === '--ollama-url' && next) cfg.ollamaUrl = next
     else if (arg === '--embed-model' && next) cfg.embedModel = next
+    // A server deploy usually keeps the vault on its own volume, separate from
+    // the data dir holding library.db. Without these the vault could only ever
+    // live at <dataDir>/vault.
+    else if (arg === '--vault-root' && next) cfg.vaultRoot = next
+    else if (arg === '--skills-root' && next) cfg.skillsRoot = next
     else if (arg === '--tokens-file' && next) {
       cfg.auth.tokensFile = next
       tokensFileExplicit = true
