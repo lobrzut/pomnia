@@ -97,7 +97,7 @@ export async function search(
   const topK = opts.topK ?? 5
   const source: SearchSource = opts.source ?? 'all'
 
-  const emb = await embedder.embedOne(opts.query)
+  const emb = await embedder.embedOne(opts.query, 'query')
   const fetchN = Math.max(topK * 3, 12)
 
   const rows = db
