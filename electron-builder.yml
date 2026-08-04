@@ -8,6 +8,16 @@ copyright: Copyright © 2026 Pomnia
 directories:
   output: release
   buildResources: resources
+# Publishing target for the release assets. `--publish never` stays the default
+# for local packs; this only tells electron-builder where a release lives so it
+# emits latest.yml alongside the installer. That file carries the artifact's
+# sha512 and is what makes the download verifiable — it was generated locally
+# and never uploaded, so the checksum reached nobody.
+publish:
+  provider: github
+  owner: lobrzut
+  repo: pomnia
+  releaseType: release
 files:
   - out/**/*
   - resources/icon.ico

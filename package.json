@@ -34,7 +34,8 @@
     "build:win": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && npm run stage:tessdata && npm run generate:build-info && electron-vite build && npm run test:golden && electron-builder --win",
     "pack:win": "npm run build:win",
     "pack:mac": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && npm run stage:tessdata && npm run generate:build-info && electron-vite build && npm run test:golden && electron-builder --mac",
-    "release:win": "node scripts/release-win.mjs"
+    "release:win": "node scripts/release-win.mjs",
+    "publish:release": "node scripts/publish-release.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.80",
