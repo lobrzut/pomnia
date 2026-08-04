@@ -63,6 +63,7 @@ import { formatBuildIdentity } from '../buildInfo.js'
 
 import { brainCore, killLeftoverBrainHelpers } from './brainCore.js'
 import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused } from './mcpActivityPoll.js'
+import { checkForUpdate } from './updateCheck.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { runDocumentOcr } from './docOcr.js'
 import { removeLibraryDocumentWithIndex } from './libraryDocRemove.js'
@@ -1782,6 +1783,21 @@ app.whenReady().then(async () => {
   await fs.mkdir(brainDir(), { recursive: true })
   await migrateBrainIndexFile(brainDir())
   await loadAppSettings()
+
+  // Delayed so it never competes with startup, and never blocks it. Until this
+  // existed, whoever installed a build stayed on it forever — every fix we ship
+  // reached nobody who already had the app.
+  setTimeout(() => {
+    void checkForUpdate(app.getVersion()).then((info) => {
+      if (!info) return
+      log.info(`update available: ${info.version} (running ${app.getVersion()})`)
+      sendAppToast({
+        kind: 'info',
+        title: `Jest nowsza wersja: ${info.version}`,
+        detail: `Masz ${app.getVersion()}. Pobierz z GitHuba — Pomnia nie instaluje aktualizacji sama.`,
+      })
+    })
+  }, 20_000)
   applyLoginItemSettings()
   initActivityReplayStore(app.getPath('userData'))
   await loadLastActivityReplay()
