@@ -387,6 +387,19 @@ async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
     return
   }
   const ensured = await ensureBrainForIndexing(url, undefined, vaultPath)
+  if (!ensured.running) {
+    // ensureBrainForIndexing returns a ready sentence ("Ollama niedostępne pod
+    // …") and this used to drop it on the floor: with Ollama stopped the brain
+    // simply did not start, no toast, no log line, and the health check below
+    // runs with silentOk so it says nothing either. The vault opened, MCP was
+    // absent, and nothing on screen connected the two.
+    log.warn('embedded brain autostart failed:', ensured.error ?? 'unknown')
+    sendAppToast({
+      kind: 'error',
+      title: 'Lokalna wyszukiwarka nie wystartowała',
+      detail: `${ensured.error ?? 'nieznany błąd'} — dopóki nie ruszy, agenci nie widzą pamięci.`,
+    })
+  }
   if (!ensured.running || !vault || !vaultPath) {
     void runVaultHealthCheck({ silentOk: true })
     return
