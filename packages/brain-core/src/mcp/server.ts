@@ -34,6 +34,7 @@ import {
 } from '../storage/vaultOwner.js'
 import { MAX_FILE_BYTES, SYNC_DIRS } from '../sync/paths.js'
 import { applyFile, planSync, type ManifestEntry } from '../sync/receive.js'
+import { indexDir } from '../rag/indexer.js'
 import { renderStatusPage } from './statusPage.js'
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
@@ -186,6 +187,7 @@ export async function createBrainServer(
   let http: HttpServer | null = null
   let ctx: ToolContext | null = null
   let vaultOwnership: OwnershipVerdict | null = null
+  let reindexing = false
   let adopted = false
 
   const url = `http://${config.host}:${config.port}/mcp`
@@ -351,7 +353,8 @@ export async function createBrainServer(
         // else gets a 404 — matches Python mcp-proxy behavior + means
         // `/register` / `/.well-known/*` OAuth discovery probes get a proper
         // 404 instead of stalling. See project memory desktop-mcp-remote-fix.
-        const isSync = pathOnly === '/sync/plan' || pathOnly === '/sync/file'
+        const isSync =
+          pathOnly === '/sync/plan' || pathOnly === '/sync/file' || pathOnly === '/sync/reindex'
         if (!req.url?.startsWith('/mcp') && !isSync) {
           res.statusCode = 404
           res.setHeader('content-type', 'application/json')
@@ -442,6 +445,28 @@ export async function createBrainServer(
           })
         }
         try {
+          if (path === '/sync/reindex') {
+            // Files a replica has but never indexed are files no agent can
+            // find — the sync would report success over an unchanged search.
+            if (reindexing) return json(200, { started: false, reason: 'already running' })
+            reindexing = true
+            void (async () => {
+              const t0 = Date.now()
+              try {
+                const stats = await indexDir(ctx!.db, ctx!.embedder, ctx!.vaultRoot)
+                console.error(
+                  `[brain-core] post-sync reindex: ${stats.files} re-embedded, ` +
+                    `${stats.chunks} chunk(s), ${stats.skipped} unchanged, ` +
+                    `${stats.prunedFiles} pruned in ${((Date.now() - t0) / 1000).toFixed(1)}s`,
+                )
+              } catch (e) {
+                console.error(`[brain-core] post-sync reindex failed: ${(e as Error).message}`)
+              } finally {
+                reindexing = false
+              }
+            })()
+            return json(202, { started: true })
+          }
           if (path === '/sync/plan') {
             const body = (await readJsonBody(req, 32 * 1024 * 1024)) as {
               manifest?: ManifestEntry[]
