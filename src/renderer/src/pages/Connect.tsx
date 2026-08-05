@@ -144,11 +144,26 @@ export default function Connect() {
       setBrainOk(r.brain.reachable)
       setEmbeddedRunning(core?.running ?? null)
       const d = r.brain.data as Record<string, unknown> | undefined
+      // Name the engine that answered. "reachable" alone hid the case that
+      // matters: a saved URL pointing at the legacy Python brain still replies,
+      // so the badge went green while search returned a months-old corpus.
+      // brain-core says {service:"brain-core"}; the Python proxy says {upstream}.
+      const engine =
+        d?.service === 'brain-core'
+          ? 'brain-core'
+          : d?.upstream
+            ? 'legacy Python brain — not brain-core'
+            : null
       setBrainDetail(
         brainTarget === 'embedded' && core && !core.running
           ? 'embedded brain stopped — start in Brain tab'
           : r.brain.reachable
-            ? [d?.notes && `${d.notes} notes`, d?.sessions && `${d.sessions} sessions`, d?.library_docs && `${d.library_docs} docs`]
+            ? [
+                engine,
+                d?.notes && `${d.notes} notes`,
+                d?.sessions && `${d.sessions} sessions`,
+                d?.library_docs && `${d.library_docs} docs`,
+              ]
                 .filter(Boolean)
                 .join(' · ') || (effectiveTarget === 'embedded' ? 'local MCP ready' : 'reachable')
             : r.brain.error || 'unreachable'
