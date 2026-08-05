@@ -8,6 +8,7 @@
  *   brain-core                          # reads config from env / ~/.pomnia/brain-core.toml
  *   brain-core --port 7862 --data-dir ~/.pomnia/brain
  *   brain-core --reindex                # (re)build the index from the vault on start
+ *   brain-core --claim-vault            # take write ownership of the vault, then exit
  *
  * When Pomnia embeds brain-core, it doesn't go through this file — the Electron
  * main process spawns a child via `child_process.fork()` and passes an options
@@ -15,12 +16,15 @@
  */
 
 import process from 'node:process'
-import { loadConfig } from './config/index.js'
+import { hostname } from 'node:os'
+import { join } from 'node:path'
+import { loadConfig, type BrainConfig } from './config/index.js'
 import { createBrainServer } from './mcp/server.js'
 import { EmbedClient } from './rag/embed.js'
 import { indexDir } from './rag/indexer.js'
 import { openDb } from './storage/db.js'
 import { defaultVaultConfig, vaultConfigFromRoot } from './storage/vault.js'
+import { claimVault, describeOwner, localWriterIdentity } from './storage/vaultOwner.js'
 
 /**
  * Build the index from the vault.
@@ -64,8 +68,30 @@ async function reindexInBackground(config: Awaited<ReturnType<typeof loadConfig>
   }
 }
 
+/**
+ * Take the vault's write ownership for this instance and exit.
+ *
+ * Separate from starting the server, and not an MCP tool: seizing a corpus
+ * another machine is writing has to be something a person did on purpose, not
+ * something an agent could talk itself into mid-conversation.
+ */
+async function claimAndExit(config: BrainConfig): Promise<never> {
+  const vaultRoot = config.vaultRoot ?? join(config.dataDir, 'vault')
+  const me = await localWriterIdentity(config.dataDir, config.instanceLabel ?? hostname())
+  const { previous, owner } = await claimVault({ vaultRoot, me })
+  console.error(
+    previous && previous.id !== owner.id
+      ? `[brain-core] vault ownership taken from ${describeOwner(previous)} by ${describeOwner(owner)}\n` +
+          `[brain-core] ${describeOwner(previous)} will now refuse writes to this vault — sync it before it saves anything else`
+      : `[brain-core] vault owned by ${describeOwner(owner)}`,
+  )
+  process.exit(0)
+}
+
 async function main(): Promise<void> {
   const config = await loadConfig(process.argv.slice(2), process.env)
+
+  if (process.argv.includes('--claim-vault')) await claimAndExit(config)
 
   const server = await createBrainServer(config)
   await server.start()

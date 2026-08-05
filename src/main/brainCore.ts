@@ -525,6 +525,10 @@ export class BrainCoreManager {
               ...(opts.handshakePhrase ? { handshakePhrase: opts.handshakePhrase } : {}),
               handshakeEnabled: opts.handshakeEnabled !== false,
               autoCheckpointEnabled: opts.autoCheckpointEnabled !== false,
+              // Named so the *other* side of a shared vault can say who is
+              // holding it. Without a label the refusal would only name a
+              // hostname, which tells nobody which of their Pomnias it is.
+              instanceLabel: 'Pomnia Desktop',
             },
           })
         } catch (err) {
