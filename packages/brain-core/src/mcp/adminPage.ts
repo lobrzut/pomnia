@@ -147,11 +147,14 @@ export function renderAdminPage(origin: string): string {
 
     <section class="card" id="tab-status">
       <h2>Stan serwera</h2>
-      <p class="lead">To samo, co <code class="mono">/healthz</code> — z powodami, bo masz token.</p>
+      <p class="lead">
+        To samo, co <code class="mono">/healthz</code> — z powodami, bo jesteś zalogowany.
+      </p>
       <table><tbody id="checks"></tbody></table>
       <div class="row">
         <button id="refresh" class="ghost">Odśwież</button>
       </div>
+      <div id="status-msg"></div>
     </section>
 
     <section class="card hidden" id="tab-engine">
@@ -283,6 +286,7 @@ export function renderAdminPage(origin: string): string {
   const text = (el, s) => { el.textContent = s }
 
   function msg(el, kind, s) {
+    if (!el) return
     el.innerHTML = ''
     if (!s) return
     const d = document.createElement('div')
@@ -381,7 +385,18 @@ export function renderAdminPage(origin: string): string {
     const tb = $('checks')
     tb.innerHTML = ''
     let h
-    try { h = await api('GET', '/healthz') } catch (e) { msg($('gate-msg'), 'err', e.message); return }
+    try {
+      // /healthz answers 503 precisely when something is wrong — which is the
+      // case whose reasons you most want on screen. Treating it as a failed
+      // request blanked the tab exactly when it mattered.
+      const r = await fetch('/healthz', { credentials: 'same-origin', cache: 'no-store' })
+      h = await r.json()
+      if (!h || !h.checks) throw new Error('HTTP ' + r.status)
+    } catch (e) {
+      msg($('status-msg'), 'err', 'Nie udało się odczytać stanu: ' + e.message)
+      return
+    }
+    msg($('status-msg'), null, null)
     const add = (k, v, cls) => {
       const tr = document.createElement('tr')
       const th = document.createElement('td'); th.textContent = k; th.style.color = 'var(--ink-faint)'
@@ -511,9 +526,7 @@ export function renderAdminPage(origin: string): string {
   }
 
   async function changePw(username) {
-    const pw = window.prompt('Nowe hasło dla „' + username + '" (min. 12 znaków).
-
-Wszystkie sesje tego konta zostaną zakończone.')
+    const pw = window.prompt('Nowe hasło dla „' + username + '" (min. 12 znaków). Wszystkie sesje tego konta zostaną zakończone.')
     if (!pw) return
     try {
       const r = await api('PUT', '/admin/users/' + encodeURIComponent(username) + '/password', { password: pw })
