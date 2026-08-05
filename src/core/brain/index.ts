@@ -63,6 +63,8 @@ export {
 } from './snippet.js'
 export type { ClientId, ClientSpec, Snippet, SnippetBrief, BrainTarget, BuildSnippetOptions, BrainBriefOptions } from './snippet.js'
 export { checkClient, checkAllClients, pingBrain, probeMcpUrl, fetchMcpActivity } from './status.js'
+export { identifyEngine } from './engine.js'
+export type { BrainEngine, EngineInfo } from './engine.js'
 export type {
   ClientStatus,
   WiredState,

@@ -24,6 +24,7 @@ import {
   EMBEDDED_BRAIN_DEFAULT_URL,
   REMOTE_BRAIN_URL_PLACEHOLDER,
 } from '@core/brain/snippet'
+import { identifyEngine } from '@core/brain/engine'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore, dashboardUrlFromBrainUrl } from '../store/useStore'
@@ -147,13 +148,7 @@ export default function Connect() {
       // Name the engine that answered. "reachable" alone hid the case that
       // matters: a saved URL pointing at the legacy Python brain still replies,
       // so the badge went green while search returned a months-old corpus.
-      // brain-core says {service:"brain-core"}; the Python proxy says {upstream}.
-      const engine =
-        d?.service === 'brain-core'
-          ? 'brain-core'
-          : d?.upstream
-            ? 'legacy Python brain — not brain-core'
-            : null
+      const engine = identifyEngine(d).label
       setBrainDetail(
         brainTarget === 'embedded' && core && !core.running
           ? 'embedded brain stopped — start in Brain tab'

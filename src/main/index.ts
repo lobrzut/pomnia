@@ -36,6 +36,7 @@ import {
   conversationFingerprint,
   pingBrain,
   probeMcpUrl,
+  identifyEngine,
   emptyLedger,
   ledgerPathInVault,
   loadLedgerForVault,
@@ -468,28 +469,48 @@ async function runVaultHealthCheck(opts?: { silentOk?: boolean }): Promise<Vault
  * notices. That is what a machine move looks like — say it once per run instead
  * of letting every agent quietly get nothing back.
  *
+ * The second half of the same problem is a URL that answers but isn't ours, so
+ * the guard checks who replied, not only that somebody did.
+ *
  * Reset by `resetRemoteBrainWarning` whenever the user edits the target or URL.
  */
-let warnedRemoteUnreachable = false
+let warnedRemoteBrain = false
 
 function resetRemoteBrainWarning(): void {
-  warnedRemoteUnreachable = false
+  warnedRemoteBrain = false
 }
 
-async function warnIfRemoteBrainUnreachable(): Promise<void> {
-  if (warnedRemoteUnreachable) return
+async function warnIfRemoteBrainUnusable(): Promise<void> {
+  if (warnedRemoteBrain) return
   const s = getAppSettings()
   if ((s.brainTarget ?? 'embedded') !== 'remote') return
   const base = s.brainMcpUrl?.trim()
   if (!base) return
-  const url = `${base.replace(/\/+$/, '').replace(/\/mcp$/, '')}/mcp`
+  const root = base.replace(/\/+$/, '').replace(/\/mcp$/, '')
+  const url = `${root}/mcp`
   const probe = await probeMcpUrl(url, s.connectToken)
-  if (probe.reachable) return
-  warnedRemoteUnreachable = true
+  if (!probe.reachable) {
+    warnedRemoteBrain = true
+    sendAppToast({
+      kind: 'error',
+      title: 'Zdalny Brain nie odpowiada',
+      detail: `${url} — ${probe.error ?? 'brak odpowiedzi'}. Popraw adres w zakładce Podłącz albo przełącz się na tryb lokalny.`,
+    })
+    return
+  }
+
+  // Answering is not the same as being the right server. A URL saved on an
+  // older machine pointed at the legacy Python brain: it replies to `initialize`
+  // exactly like brain-core does, so reachability alone would have kept quiet
+  // while every agent read a different vault.
+  const ping = await pingBrain(root, s.connectToken)
+  const engine = identifyEngine(ping.data)
+  if (engine.compatible) return
+  warnedRemoteBrain = true
   sendAppToast({
-    kind: 'error',
-    title: 'Zdalny Brain nie odpowiada',
-    detail: `${url} — ${probe.error ?? 'brak odpowiedzi'}. Popraw adres w zakładce Podłącz albo przełącz się na tryb lokalny.`,
+    kind: 'warn',
+    title: 'Zdalny serwer to nie brain-core',
+    detail: `${root} — ${engine.label}. Agenci dostaną z niego inną pamięć niż ta aplikacja. Popraw adres w zakładce Podłącz albo wróć do trybu lokalnego.`,
   })
 }
 
@@ -796,7 +817,7 @@ function registerIpc(): void {
     brainCore.setSkillsRoot(skillsRoot)
     brainCore.setVaultRoot(knowledgeRoot)
     void maybeAutoStartEmbeddedBrain()
-    void warnIfRemoteBrainUnreachable()
+    void warnIfRemoteBrainUnusable()
     void healLedgerForVault()
     // When autostart is off, still prompt for one-shot index hygiene.
     if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
@@ -824,7 +845,7 @@ function registerIpc(): void {
     const m = vault.getManifest()
     const pendingLibraryIndex = vault.getPendingIndexDocuments().length
     void maybeAutoStartEmbeddedBrain()
-    void warnIfRemoteBrainUnreachable()
+    void warnIfRemoteBrainUnusable()
     void healLedgerForVault()
     if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
     return {
