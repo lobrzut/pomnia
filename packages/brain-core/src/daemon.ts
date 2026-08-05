@@ -9,7 +9,8 @@
  *   brain-core --port 7862 --data-dir ~/.pomnia/brain
  *   brain-core --reindex                # (re)build the index from the vault on start
  *   brain-core --claim-vault            # take write ownership of the vault, then exit
- *   brain-core --add-token ops --role admin   # issue a credential, print it once
+ *   brain-core --add-token ops --role admin   # issue a machine credential, print it once
+ *   brain-core --add-user helluk --role admin # create a panel account (password on stdin)
  *
  * When Pomnia embeds brain-core, it doesn't go through this file — the Electron
  * main process spawns a child via `child_process.fork()` and passes an options
@@ -27,6 +28,7 @@ import { openDb } from './storage/db.js'
 import { defaultVaultConfig, vaultConfigFromRoot } from './storage/vault.js'
 import { claimVault, describeOwner, localWriterIdentity } from './storage/vaultOwner.js'
 import { createToken } from './admin/tokens.js'
+import { createUser } from './admin/users.js'
 
 /**
  * Build the index from the vault.
@@ -146,10 +148,80 @@ async function addTokenAndExit(config: BrainConfig, argv: string[]): Promise<nev
   process.exit(0)
 }
 
+/**
+ * Read a password without echoing it, and without hand-rolling a raw-mode
+ * keystroke loop.
+ *
+ * `readline` with `terminal: true` gives line editing for free; muting the
+ * output stream while the question is open is the standard way to suppress the
+ * echo. A pipe (`echo pw | brain-core --add-user …`) takes the same path and
+ * simply never renders a prompt, which is what an installer wants.
+ */
+async function readSecret(prompt: string): Promise<string> {
+  const { createInterface } = await import('node:readline')
+  const muted = { write: (_c: string) => {}, muted: true }
+  const out = process.stdin.isTTY
+    ? (Object.assign(Object.create(process.stderr), {
+        write(chunk: string) {
+          // Let the prompt through once, then swallow the echoed keystrokes.
+          if (!muted.muted) process.stderr.write(chunk)
+        },
+      }) as unknown as NodeJS.WritableStream)
+    : undefined
+
+  const rl = createInterface({
+    input: process.stdin,
+    output: out,
+    terminal: process.stdin.isTTY === true,
+  })
+  if (process.stdin.isTTY) process.stderr.write(prompt)
+
+  return await new Promise<string>((resolve) => {
+    rl.question('', (answer) => {
+      rl.close()
+      if (process.stdin.isTTY) process.stderr.write('\n')
+      resolve(answer.replace(/\r?\n$/, ''))
+    })
+  })
+}
+
+/**
+ * Create a panel account and exit.
+ *
+ * The password comes from stdin, not from a flag: an argument lands in shell
+ * history and in `ps` output for every user on the box, which is a poor place
+ * for the credential that guards the settings.
+ *
+ *   brain-core --add-user helluk --role admin        # prompts (or reads a pipe)
+ *   echo 'long passphrase' | brain-core --add-user helluk --role admin
+ */
+async function addUserAndExit(config: BrainConfig, argv: string[]): Promise<never> {
+  const at = argv.indexOf('--add-user')
+  const username = argv[at + 1]
+  const roleFlag = argv.indexOf('--role')
+  const role = roleFlag >= 0 && argv[roleFlag + 1] === 'admin' ? 'admin' : 'agent'
+  if (!username || username.startsWith('--')) {
+    console.error('usage: brain-core --add-user <login> [--role admin]   (password on stdin)')
+    process.exit(2)
+  }
+
+  const password = await readSecret(`Hasło dla „${username}" (min. 12 znaków): `)
+
+  const r = await createUser(config.dataDir, { username, password, role })
+  if (!r.ok) {
+    console.error(`[brain-core] ${r.detail}`)
+    process.exit(1)
+  }
+  console.error(`[brain-core] konto „${r.summary.username}" (${r.summary.role}) utworzone`)
+  console.error(`[brain-core] zaloguj się w panelu: http://${config.host}:${config.port}/admin`)
+  process.exit(0)
+}
+
 async function main(): Promise<void> {
   installCrashReporting()
   const config = await loadConfig(process.argv.slice(2), process.env)
 
+  if (process.argv.includes('--add-user')) await addUserAndExit(config, process.argv)
   if (process.argv.includes('--add-token')) await addTokenAndExit(config, process.argv)
   if (process.argv.includes('--claim-vault')) await claimAndExit(config)
 

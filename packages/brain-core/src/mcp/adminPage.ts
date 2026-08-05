@@ -114,19 +114,22 @@ export function renderAdminPage(origin: string): string {
     <span class="who" id="who"></span>
   </div>
 
-  <!-- ── unlock ─────────────────────────────────────────────────────────── -->
+  <!-- ── login ──────────────────────────────────────────────────────────── -->
   <section class="card" id="gate">
-    <h2>Token administratora</h2>
+    <h2>Logowanie</h2>
     <p class="lead">
-      Nie zapisuję go nigdzie — ani w ciasteczku, ani w localStorage. Żyje tylko
-      w tej karcie; jej zamknięcie kończy sesję. Nie masz tokena? Na serwerze:
-      <code class="mono">brain-core --add-token nazwa --role admin</code>
+      Nie masz jeszcze konta? Na serwerze:
+      <code class="mono">brain-core --add-user login --role admin</code>
     </p>
-    <label for="tok">Token</label>
-    <input id="tok" type="password" autocomplete="off" spellcheck="false" placeholder="btk_…">
-    <div class="row">
-      <button id="unlock">Odblokuj</button>
-    </div>
+    <form id="login-form" autocomplete="on">
+      <label for="user">Login</label>
+      <input id="user" name="username" autocomplete="username" spellcheck="false" autocapitalize="off">
+      <label for="pass">Hasło</label>
+      <input id="pass" name="password" type="password" autocomplete="current-password">
+      <div class="row">
+        <button type="submit" id="login">Zaloguj</button>
+      </div>
+    </form>
     <div id="gate-msg"></div>
   </section>
 
@@ -136,7 +139,10 @@ export function renderAdminPage(origin: string): string {
       <button data-tab="status" aria-current="true">Stan</button>
       <button data-tab="engine">Silnik</button>
       <button data-tab="clients">Klienci</button>
+      <button data-tab="users">Konta</button>
+      <button data-tab="behaviour">Zachowanie</button>
       <button data-tab="vault">Vault</button>
+      <button id="logout" class="ghost" style="margin-left:auto">Wyloguj</button>
     </nav>
 
     <section class="card" id="tab-status">
@@ -191,6 +197,60 @@ export function renderAdminPage(origin: string): string {
       <div id="clients-msg"></div>
     </section>
 
+    <section class="card hidden" id="tab-users">
+      <h2>Konta panelu</h2>
+      <p class="lead">
+        Ludzie logujący się tutaj — to co innego niż tokeny, którymi łączą się
+        maszyny. Zmiana hasła natychmiast kończy wszystkie sesje tego konta.
+      </p>
+      <table>
+        <thead><tr><th>Login</th><th>Rola</th><th>Ostatnie logowanie</th><th></th></tr></thead>
+        <tbody id="users"></tbody>
+      </table>
+      <div class="row">
+        <div>
+          <label for="nu">Nowe konto</label>
+          <input id="nu" spellcheck="false" autocapitalize="off" placeholder="login">
+        </div>
+        <div>
+          <label for="np">Hasło (min. 12 znaków)</label>
+          <input id="np" type="password" autocomplete="new-password">
+        </div>
+        <button id="adduser">Utwórz</button>
+      </div>
+      <div id="users-msg"></div>
+    </section>
+
+    <section class="card hidden" id="tab-behaviour">
+      <h2>Zachowanie agentów</h2>
+      <p class="lead">
+        Te ustawienia trafiają do opisów narzędzi, które czyta każdy podłączony
+        agent — działają od następnego wywołania, bez restartu.
+      </p>
+      <label for="phrase">Fraza handshake</label>
+      <input id="phrase" spellcheck="false" placeholder="OK to Go Go Go">
+      <p class="lead" style="margin:.4rem 0 0">
+        Agent otwiera nią pierwszą odpowiedź — to dowód, że Pomnia jest naprawdę podpięta.
+      </p>
+      <div class="row">
+        <label style="display:flex;align-items:center;gap:.5rem;color:var(--ink);font-size:.83rem;margin:0">
+          <input id="hs-on" type="checkbox" style="width:auto"> Wymagaj frazy
+        </label>
+        <label style="display:flex;align-items:center;gap:.5rem;color:var(--ink);font-size:.83rem;margin:0">
+          <input id="ac-on" type="checkbox" style="width:auto"> Pozwól na auto-checkpoint
+        </label>
+      </div>
+      <label for="label">Nazwa tej instancji</label>
+      <input id="label" spellcheck="false" placeholder="pomnia-server">
+      <p class="lead" style="margin:.4rem 0 0">
+        Pod tą nazwą serwer przedstawia się, gdy przejmie vault.
+      </p>
+      <div class="row">
+        <button id="save-behaviour">Zapisz</button>
+      </div>
+      <div id="behaviour-msg"></div>
+    </section>
+
     <section class="card hidden" id="tab-vault">
       <h2>Vault</h2>
       <p class="lead">
@@ -212,9 +272,12 @@ export function renderAdminPage(origin: string): string {
 <script>
 (() => {
   'use strict'
-  // The only copy of the credential. Not stored, not in a global, not in the
-  // DOM — a closure variable that dies with the tab.
-  let token = null
+  // The session lives in an HttpOnly cookie the browser attaches for us, which
+  // means script cannot read it and an XSS on this origin cannot steal it. What
+  // we do hold is the CSRF token — deliberately NOT in a cookie, because the
+  // whole point is that a cross-site page cannot read it to replay.
+  let csrf = null
+  let me = null
 
   const $ = (id) => document.getElementById(id)
   const text = (el, s) => { el.textContent = s }
@@ -230,16 +293,18 @@ export function renderAdminPage(origin: string): string {
   }
 
   async function api(method, path, body) {
+    const headers = {}
+    if (body) headers['content-type'] = 'application/json'
+    // Only mutations carry it; a GET changes nothing, so requiring it there
+    // would only break the first load after a session is restored.
+    if (csrf && method !== 'GET') headers['x-pomnia-csrf'] = csrf
     const r = await fetch(path, {
       method,
-      headers: Object.assign(
-        { 'Authorization': 'Bearer ' + token },
-        body ? { 'content-type': 'application/json' } : {},
-      ),
+      headers,
       body: body ? JSON.stringify(body) : undefined,
-      // No cookies on any request, even same-origin. Nothing here needs them,
-      // and not sending them means none can be stolen by a confused deputy.
-      credentials: 'omit',
+      // same-origin, not include: the cookie is scoped to /admin on this host
+      // and has no business travelling anywhere else.
+      credentials: 'same-origin',
       cache: 'no-store',
     })
     const data = await r.json().catch(() => ({}))
@@ -251,30 +316,60 @@ export function renderAdminPage(origin: string): string {
     return data
   }
 
-  // ── unlock ──────────────────────────────────────────────────────────────
-  async function unlock() {
-    const input = $('tok')
-    const candidate = input.value.trim()
-    if (!candidate) return
-    token = candidate
+  // ── login ───────────────────────────────────────────────────────────────
+  async function login(ev) {
+    if (ev) ev.preventDefault()
+    const btn = $('login')
+    btn.disabled = true
     try {
-      const s = await api('GET', '/admin/settings')
-      // Wipe the field the moment it is no longer needed: a token left in a
-      // DOM node is a token any injected script can read.
-      input.value = ''
-      $('gate').classList.add('hidden')
-      $('panel').classList.remove('hidden')
-      text($('who'), 'zalogowano · sesja tylko w tej karcie')
-      fill(s)
-      await Promise.all([loadStatus(), loadTokens(), loadVault()])
+      const r = await api('POST', '/admin/login', {
+        username: $('user').value.trim(),
+        password: $('pass').value,
+      })
+      csrf = r.csrf
+      me = { username: r.username, role: r.role }
+      // Clear the field immediately: a password sitting in a DOM node is a
+      // password any injected script can read.
+      $('pass').value = ''
+      await enter()
     } catch (e) {
-      token = null
-      msg($('gate-msg'), 'err',
-        e.status === 403
-          ? 'Ten token działa, ale nie jest administratorem. Panel wymaga roli admin.'
-          : e.status === 401
-            ? 'Nieprawidłowy token.'
-            : e.message)
+      msg($('gate-msg'), 'err', e.message)
+      $('pass').value = ''
+      $('pass').focus()
+    } finally {
+      btn.disabled = false
+    }
+  }
+
+  /** Show the panel and load everything it needs. */
+  async function enter() {
+    $('gate').classList.add('hidden')
+    $('panel').classList.remove('hidden')
+    text($('who'), me.username + ' · ' + me.role)
+    const s = await api('GET', '/admin/settings')
+    fill(s)
+    await Promise.all([loadStatus(), loadTokens(), loadUsers(), loadBehaviour(), loadVault()])
+  }
+
+  async function logout() {
+    try { await api('POST', '/admin/logout') } catch { /* going anyway */ }
+    csrf = null
+    me = null
+    location.reload()
+  }
+
+  /**
+   * A reload should not demand the password again — the cookie is still valid.
+   * If it is not, we simply show the login form, which is the same as before.
+   */
+  async function restore() {
+    try {
+      const r = await api('GET', '/admin/me')
+      csrf = r.csrf
+      me = { username: r.username, role: r.role }
+      await enter()
+    } catch {
+      $('user').focus()
     }
   }
 
@@ -378,6 +473,87 @@ export function renderAdminPage(origin: string): string {
     } catch (e) { msg($('clients-msg'), 'err', e.message) }
   }
 
+  // ── users ───────────────────────────────────────────────────────────────
+  async function loadUsers() {
+    const tb = $('users')
+    tb.innerHTML = ''
+    const { users } = await api('GET', '/admin/users')
+    for (const u of users) {
+      const tr = document.createElement('tr')
+      const name = document.createElement('td'); name.textContent = u.username
+      const role = document.createElement('td')
+      const tag = document.createElement('span'); tag.className = 'tag ' + u.role; tag.textContent = u.role
+      role.appendChild(tag)
+      const seen = document.createElement('td'); seen.className = 'mono'
+      seen.textContent = u.lastLogin ? new Date(u.lastLogin).toLocaleString('pl') : '—'
+      const act = document.createElement('td'); act.style.textAlign = 'right'
+      const chg = document.createElement('button'); chg.className = 'ghost'; chg.textContent = 'Hasło'
+      chg.onclick = () => changePw(u.username)
+      const del = document.createElement('button'); del.className = 'danger'; del.textContent = 'Usuń'
+      del.style.marginLeft = '.4rem'
+      del.onclick = () => delUser(u.username)
+      act.append(chg, del)
+      tr.append(name, role, seen, act); tb.appendChild(tr)
+    }
+  }
+
+  async function addUser() {
+    try {
+      await api('POST', '/admin/users', {
+        username: $('nu').value.trim(),
+        password: $('np').value,
+        role: 'admin',
+      })
+      $('nu').value = ''; $('np').value = ''
+      msg($('users-msg'), 'ok', 'Konto utworzone.')
+      await loadUsers()
+    } catch (e) { msg($('users-msg'), 'err', e.message) }
+  }
+
+  async function changePw(username) {
+    const pw = window.prompt('Nowe hasło dla „' + username + '" (min. 12 znaków).
+
+Wszystkie sesje tego konta zostaną zakończone.')
+    if (!pw) return
+    try {
+      const r = await api('PUT', '/admin/users/' + encodeURIComponent(username) + '/password', { password: pw })
+      msg($('users-msg'), 'ok', 'Hasło zmienione. Zakończone sesje: ' + r.sessionsEnded + '.')
+      // Including possibly this one.
+      if (me && me.username === username) setTimeout(() => location.reload(), 1200)
+    } catch (e) { msg($('users-msg'), 'err', e.message) }
+  }
+
+  async function delUser(username) {
+    if (!window.confirm('Usunąć konto „' + username + '"?')) return
+    try {
+      await api('DELETE', '/admin/users/' + encodeURIComponent(username))
+      msg($('users-msg'), 'ok', 'Konto usunięte: ' + username)
+      await loadUsers()
+    } catch (e) { msg($('users-msg'), 'err', e.message) }
+  }
+
+  // ── behaviour ───────────────────────────────────────────────────────────
+  async function loadBehaviour() {
+    const b = await api('GET', '/admin/behaviour')
+    $('phrase').value = b.handshakePhrase
+    $('hs-on').checked = b.handshakeEnabled
+    $('ac-on').checked = b.autoCheckpointEnabled
+    $('label').value = b.instanceLabel
+  }
+
+  async function saveBehaviour() {
+    try {
+      await api('PUT', '/admin/behaviour', {
+        handshakePhrase: $('phrase').value.trim(),
+        handshakeEnabled: $('hs-on').checked,
+        autoCheckpointEnabled: $('ac-on').checked,
+        instanceLabel: $('label').value.trim(),
+      })
+      msg($('behaviour-msg'), 'ok', 'Zapisane — działa od następnego wywołania narzędzia.')
+      await loadBehaviour()
+    } catch (e) { msg($('behaviour-msg'), 'err', e.message) }
+  }
+
   // ── vault ───────────────────────────────────────────────────────────────
   async function loadVault() {
     const tb = $('vault-info')
@@ -412,20 +588,22 @@ export function renderAdminPage(origin: string): string {
   for (const b of document.querySelectorAll('nav button')) {
     b.onclick = () => {
       for (const o of document.querySelectorAll('nav button')) o.setAttribute('aria-current', String(o === b))
-      for (const s of ['status', 'engine', 'clients', 'vault']) {
+      for (const s of ['status', 'engine', 'clients', 'users', 'behaviour', 'vault']) {
         $('tab-' + s).classList.toggle('hidden', s !== b.dataset.tab)
       }
     }
   }
 
-  $('unlock').onclick = unlock
-  $('tok').onkeydown = (e) => { if (e.key === 'Enter') unlock() }
+  $('login-form').onsubmit = login
+  $('logout').onclick = logout
+  $('adduser').onclick = addUser
+  $('save-behaviour').onclick = saveBehaviour
   $('refresh').onclick = loadStatus
   $('save-engine').onclick = saveEngine
   $('reindex').onclick = reindex
   $('add').onclick = addToken
   $('claim').onclick = claim
-  $('tok').focus()
+  void restore()
 })()
 </script>
 </body>

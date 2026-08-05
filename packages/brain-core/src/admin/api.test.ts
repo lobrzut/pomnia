@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { handleAdmin, type AdminDeps } from './api.js'
+import { handleAdmin, type AdminDeps, type RuntimeSettings } from './api.js'
 import { createToken, readTokens } from './tokens.js'
 import { readSettings } from './settings.js'
 
@@ -13,6 +13,8 @@ let tokensFile: string
 let deps: AdminDeps
 let live: { ollamaUrl: string; embedModel: string }
 let readOnlyFlag: boolean
+let runtime: RuntimeSettings
+let dropped: string[]
 
 const call = (method: string, path: string, body?: unknown, actor = 'admin-token') =>
   handleAdmin({ method, path, body: body ?? null, actor }, deps)
@@ -22,9 +24,24 @@ beforeEach(async () => {
   tokensFile = join(dir, 'mcp-tokens.json')
   live = { ollamaUrl: 'http://127.0.0.1:11434', embedModel: 'nomic-embed-text' }
   readOnlyFlag = false
+  runtime = {
+    handshakePhrase: 'OK to Go Go Go',
+    handshakeEnabled: true,
+    autoCheckpointEnabled: true,
+    instanceLabel: 'pomnia-server',
+  }
+  dropped = []
   deps = {
     dataDir: dir,
     tokensFile,
+    runtime: {
+      get: () => ({ ...runtime }),
+      set: (n) => Object.assign(runtime, n),
+    },
+    dropSessionsFor: vi.fn((u: string) => {
+      dropped.push(u)
+      return 2
+    }),
     applyOllama: vi.fn((n) => {
       if (n.ollamaUrl) live.ollamaUrl = n.ollamaUrl
       if (n.embedModel) live.embedModel = n.embedModel
@@ -178,5 +195,97 @@ describe('routing', () => {
   it('does not act on the wrong method', async () => {
     expect((await call('POST', '/admin/settings')).status).toBe(404)
     expect((await call('GET', '/admin/reindex')).status).toBe(404)
+  })
+})
+
+describe('behaviour', () => {
+  it('reports the running values', async () => {
+    expect((await call('GET', '/admin/behaviour')).body).toMatchObject({
+      handshakePhrase: 'OK to Go Go Go',
+      autoCheckpointEnabled: true,
+    })
+  })
+
+  it('applies a change without a restart', async () => {
+    const r = await call('PUT', '/admin/behaviour', { handshakePhrase: 'Pomnia gotowa' })
+    expect(r.status).toBe(200)
+    expect(runtime.handshakePhrase).toBe('Pomnia gotowa')
+  })
+
+  it('accepts false, which a truthiness check would drop', async () => {
+    await call('PUT', '/admin/behaviour', { autoCheckpointEnabled: false, handshakeEnabled: false })
+    expect(runtime.autoCheckpointEnabled).toBe(false)
+    expect(runtime.handshakeEnabled).toBe(false)
+  })
+
+  /** The phrase is injected into every tool description an agent reads. */
+  it('refuses a phrase that is empty, huge or multi-line', async () => {
+    for (const p of ['', 'x'.repeat(80), 'two\nlines']) {
+      expect((await call('PUT', '/admin/behaviour', { handshakePhrase: p })).status, p).toBe(400)
+    }
+    expect(runtime.handshakePhrase).toBe('OK to Go Go Go')
+  })
+
+  it('refuses an empty instance label', async () => {
+    expect((await call('PUT', '/admin/behaviour', { instanceLabel: '   ' })).status).toBe(400)
+  })
+})
+
+describe('users', () => {
+  const PW = 'correct horse battery staple'
+
+  it('creates and lists without ever exposing a hash', async () => {
+    expect((await call('POST', '/admin/users', { username: 'helluk', password: PW, role: 'admin' })).status).toBe(201)
+    const list = await call('GET', '/admin/users')
+    expect(JSON.stringify(list.body)).not.toContain('scrypt$')
+    expect(JSON.stringify(list.body)).not.toContain(PW)
+  })
+
+  it('refuses a weak password', async () => {
+    const r = await call('POST', '/admin/users', { username: 'weak', password: 'short', role: 'admin' })
+    expect(r.status).toBe(400)
+  })
+
+  /** A password change that leaves old sessions alive has changed nothing. */
+  it('ends every session for the account when the password changes', async () => {
+    await call('POST', '/admin/users', { username: 'helluk', password: PW, role: 'admin' })
+    const r = await call('PUT', '/admin/users/helluk/password', { password: 'a different long one' })
+    expect(r.status).toBe(200)
+    expect(dropped).toContain('helluk')
+    expect((r.body as { sessionsEnded: number }).sessionsEnded).toBe(2)
+  })
+
+  it('refuses to delete the last admin account', async () => {
+    await call('POST', '/admin/users', { username: 'only', password: PW, role: 'admin' })
+    expect((await call('DELETE', '/admin/users/only')).status).toBe(400)
+  })
+
+  it('ends sessions when an account is deleted', async () => {
+    await call('POST', '/admin/users', { username: 'a1', password: PW, role: 'admin' })
+    await call('POST', '/admin/users', { username: 'a2', password: PW, role: 'admin' })
+    expect((await call('DELETE', '/admin/users/a1')).status).toBe(200)
+    expect(dropped).toContain('a1')
+  })
+})
+
+describe('accounts are always admins', () => {
+  /** Login refuses a non-admin, so such an account could never sign in. */
+  it('refuses to create an account that could never log in', async () => {
+    const r = await call('POST', '/admin/users', {
+      username: 'agentacct',
+      password: 'correct horse battery staple',
+      role: 'agent',
+    })
+    expect(r.status).toBe(400)
+    expect((r.body as { detail: string }).detail).toMatch(/token/)
+  })
+
+  it('creates an admin when the role is omitted', async () => {
+    const r = await call('POST', '/admin/users', {
+      username: 'someone',
+      password: 'correct horse battery staple',
+    })
+    expect(r.status).toBe(201)
+    expect((r.body as { role: string }).role).toBe('admin')
   })
 })
