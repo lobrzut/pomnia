@@ -88,7 +88,35 @@ async function claimAndExit(config: BrainConfig): Promise<never> {
   process.exit(0)
 }
 
+/**
+ * Say why the process died before it dies.
+ *
+ * Node terminates on an unhandled rejection, and there was nothing installed
+ * to catch one — so a stray rejection anywhere killed the server, systemd
+ * restarted it five seconds later, and the only trace was a restart counter
+ * nobody reads. Exiting is still right (a process with an unknown broken
+ * invariant should not keep serving); exiting *silently* is not.
+ *
+ * `unhandledRejection` gets a moment to flush before exit, because journald
+ * loses the last line often enough to matter when it is the only line.
+ */
+function installCrashReporting(): void {
+  process.on('uncaughtException', (err) => {
+    console.error('[brain-core] FATAL uncaught exception:', err)
+    process.exit(1)
+  })
+  process.on('unhandledRejection', (reason) => {
+    console.error('[brain-core] FATAL unhandled rejection:', reason)
+    setTimeout(() => process.exit(1), 50).unref()
+  })
+  // Not fatal, but a symptom worth a line: someone forgot to remove a listener.
+  process.on('warning', (w) => {
+    if (w.name === 'MaxListenersExceededWarning') console.error('[brain-core] warning:', w.message)
+  })
+}
+
 async function main(): Promise<void> {
+  installCrashReporting()
   const config = await loadConfig(process.argv.slice(2), process.env)
 
   if (process.argv.includes('--claim-vault')) await claimAndExit(config)
@@ -101,9 +129,40 @@ async function main(): Promise<void> {
     void reindexInBackground(config)
   }
 
+  // Say at boot what /healthz would say if anyone asked it. A server that
+  // starts cleanly and then answers every search with nothing looks identical
+  // to a working one in the log, which is where an operator actually looks.
+  void (async () => {
+    try {
+      await new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel }).preflight()
+      console.error(`[brain-core] embeddings ready (${config.embedModel} via ${config.ollamaUrl})`)
+    } catch (e) {
+      console.error(
+        `[brain-core] DEGRADED — semantic search will return nothing: ${(e as Error).message}`,
+      )
+      console.error('[brain-core] skills, profile and note reads still work; /healthz reports this')
+    }
+  })()
+
+  let shuttingDown = false
   const shutdown = async (signal: string): Promise<void> => {
+    // A second Ctrl-C used to start a second teardown over a half-closed
+    // server; systemd sends SIGTERM again if the first is slow.
+    if (shuttingDown) return
+    shuttingDown = true
     console.error(`[brain-core] received ${signal}, shutting down…`)
-    await server.stop()
+    // Never let a hung close hold the unit in `deactivating` until systemd's
+    // 90-second default kills it — the operator reads that as a broken service.
+    const hard = setTimeout(() => {
+      console.error('[brain-core] shutdown exceeded 10s — exiting anyway')
+      process.exit(0)
+    }, 10_000)
+    hard.unref()
+    try {
+      await server.stop()
+    } catch (e) {
+      console.error('[brain-core] stop failed:', (e as Error).message)
+    }
     process.exit(0)
   }
 

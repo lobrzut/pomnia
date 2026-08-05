@@ -56,6 +56,12 @@ export interface AuthGate {
   /** False for loopback binds — callers can skip the check entirely. */
   readonly required: boolean
   check(req: IncomingMessage): Promise<AuthResult>
+  /**
+   * Same token comparison as `check`, but records nothing against the rate
+   * limit. For surfaces where an anonymous request is expected rather than
+   * suspicious — the status page — so page views cannot lock out agents.
+   */
+  peek(req: IncomingMessage): Promise<boolean>
   /** Count of currently loaded tokens — for startup logging and /healthz. */
   tokenCount(): Promise<number>
 }
@@ -137,6 +143,26 @@ export function createAuthGate(opts: AuthGateOptions): AuthGate {
 
     async tokenCount() {
       return (await loadTokens()).length
+    },
+
+    /**
+     * Is this request carrying a valid token? — asked without consequences.
+     *
+     * `check` registers a failure on every miss, which is right for an endpoint
+     * where a miss is an attempt. The status page is not that: it serves anyone
+     * who opens the address, so routing it through `check` would let ordinary
+     * page views burn the rate-limit budget and lock out the agents. Same
+     * comparison, no bookkeeping.
+     */
+    async peek(req: IncomingMessage): Promise<boolean> {
+      if (!required) return true
+      const header = req.headers.authorization ?? ''
+      if (!/^bearer\s+/i.test(header)) return false
+      const presented = header.replace(/^bearer\s+/i, '').trim()
+      for (const entry of await loadTokens()) {
+        if (sameToken(presented, entry.token)) return true
+      }
+      return false
     },
 
     async check(req: IncomingMessage): Promise<AuthResult> {

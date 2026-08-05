@@ -34,6 +34,7 @@ import {
 } from '../storage/vaultOwner.js'
 import { MAX_FILE_BYTES, SYNC_DIRS } from '../sync/paths.js'
 import { applyFile, planSync, type ManifestEntry } from '../sync/receive.js'
+import { collectHealth, redactHealth } from '../health.js'
 import { indexDir } from '../rag/indexer.js'
 import { renderStatusPage } from './statusPage.js'
 
@@ -51,7 +52,15 @@ import { defaultVaultConfig, vaultConfigFromRoot, type VaultConfig } from '../st
 import { createAuthGate } from './auth.js'
 import { callTool, listTools, type ToolContext } from './tools/index.js'
 
-/** True when an existing brain-core already answers /healthz on host:port. */
+/**
+ * True when an existing brain-core already holds host:port.
+ *
+ * The question is identity, not health. This used to require `ok === true`,
+ * which was harmless while `ok` meant "listening" — now that it means "can
+ * actually answer", a brain-core with an empty index would fail to be
+ * recognised, and the second instance would try to bind and die on EADDRINUSE
+ * instead of adopting the first. So: 503 still counts, `service` decides.
+ */
 async function healthzOk(host: string, port: number): Promise<boolean> {
   const url = `http://${host}:${port}/healthz`
   try {
@@ -59,9 +68,8 @@ async function healthzOk(host: string, port: number): Promise<boolean> {
     const t = setTimeout(() => ac.abort(), 1_500)
     try {
       const res = await fetch(url, { signal: ac.signal })
-      if (!res.ok) return false
-      const body = (await res.json()) as { ok?: boolean; service?: string }
-      return body?.ok === true && body?.service === 'brain-core'
+      const body = (await res.json().catch(() => null)) as { service?: string } | null
+      return body?.service === 'brain-core'
     } finally {
       clearTimeout(t)
     }
@@ -188,6 +196,7 @@ export async function createBrainServer(
   let ctx: ToolContext | null = null
   let vaultOwnership: OwnershipVerdict | null = null
   let reindexing = false
+  let startedAt = Date.now()
   let adopted = false
 
   const url = `http://${config.host}:${config.port}/mcp`
@@ -300,28 +309,56 @@ export async function createBrainServer(
 
       http = createServer((req: IncomingMessage, res: ServerResponse) => {
         const pathOnly = req.url?.split('?')[0] ?? ''
-        // Liveness stays public: systemd/Docker probe it before any token
-        // exists, and it reveals nothing but "the process is up".
+        // Public: systemd and Docker probe it before any token exists.
+        //
+        // It reports whether the server can actually answer, not merely whether
+        // it is listening — a Pomnia with no embedding model or an empty index
+        // used to answer here exactly like a working one, so every monitor and
+        // every client badge showed green over a brain returning nothing.
+        //
+        // Counts and check reasons are the only things it adds, and none of
+        // them is vault content. The status code carries the same verdict, so
+        // a probe that reads nothing but the code still gets it right.
         if (pathOnly === '/healthz' || pathOnly === '/healthz/') {
-          res.statusCode = 200
-          res.setHeader('content-type', 'application/json')
-          res.end(
-            JSON.stringify({
-              ok: true,
-              service: 'brain-core',
-              auth: gate.required,
-              // Who owns writes is not a secret and is exactly what a client
-              // needs before offering to save. The label is a machine name the
-              // user chose; no vault content is implied by it.
+          void (async () => {
+            const health = await collectHealth({
+              db: ctx?.db ?? null,
+              embedder: ctx?.embedder ?? null,
+              vaultRoot: ctx?.vaultRoot ?? '',
+              version: BRAIN_CORE_VERSION,
+              authRequired: gate.required,
               writable: vaultOwnership?.writable ?? false,
-              // Same fallback the refusal uses: a pinned replica has no marker
-              // of its own to read, so the operator's hint is all there is —
-              // and a client showing "read-only, owner unknown" helps nobody.
+              // Same fallback the write refusal uses: a pinned replica has no
+              // marker of its own, so the operator's hint is all there is, and
+              // "read-only, owner unknown" helps nobody.
               vaultOwner: vaultOwnership?.owner
                 ? describeOwner(vaultOwnership.owner)
                 : (ctx?.authoritativeVaultHint ?? null),
-            }),
-          )
+              startedAt,
+            })
+            // The verdict is public — a monitor has to be able to see a broken
+            // server. The reasons are not: they name the vault path, the Ollama
+            // URL and the model, and the counts say how much is in there.
+            const authed = await gate.peek(req)
+            res.statusCode = health.ok ? 200 : 503
+            res.setHeader('content-type', 'application/json')
+            res.setHeader('cache-control', 'no-store')
+            res.end(JSON.stringify(authed ? health : redactHealth(health)))
+          })().catch((e: unknown) => {
+            // The health check itself failing is a health answer.
+            if (!res.headersSent) {
+              res.statusCode = 503
+              res.setHeader('content-type', 'application/json')
+              res.end(
+                JSON.stringify({
+                  ok: false,
+                  service: 'brain-core',
+                  status: 'down',
+                  error: (e as Error).message,
+                }),
+              )
+            }
+          })
           return
         }
         // A human typing the address gets a page instead of `not_found`.
@@ -330,23 +367,66 @@ export async function createBrainServer(
         if (pathOnly === '/' || pathOnly === '/index.html') {
           const host = req.headers.host ?? `${config.host}:${config.port}`
           const proto = String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0].trim()
-          res.statusCode = 200
-          res.setHeader('content-type', 'text/html; charset=utf-8')
-          // Everything is inline; the CSP says so, so a future edit that reaches
-          // for a CDN font breaks visibly instead of quietly phoning out.
-          res.setHeader(
-            'content-security-policy',
-            "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'",
-          )
-          res.setHeader('referrer-policy', 'no-referrer')
-          res.setHeader('x-content-type-options', 'nosniff')
-          res.end(
-            renderStatusPage({
+          void (async () => {
+            const health = await collectHealth({
+              db: ctx?.db ?? null,
+              embedder: ctx?.embedder ?? null,
+              vaultRoot: ctx?.vaultRoot ?? '',
               version: BRAIN_CORE_VERSION,
               authRequired: gate.required,
-              origin: `${proto === 'https' ? 'https' : 'http'}://${host}`,
-            }),
-          )
+              writable: vaultOwnership?.writable ?? false,
+              vaultOwner: vaultOwnership?.owner
+                ? describeOwner(vaultOwnership.owner)
+                : (ctx?.authoritativeVaultHint ?? null),
+              startedAt,
+            })
+            // Per-check reasons name paths and models, so they follow the same
+            // rule as every other detail: behind the token. The overall verdict
+            // does not — a red dot tells an operator to look, and telling
+            // nobody that the server is broken helps nobody.
+            // peek, not check: a page view is not an auth attempt, and routing
+            // it through the counting path would let ordinary visits burn the
+            // rate-limit budget and lock the agents out.
+            const authed = await gate.peek(req)
+            res.statusCode = 200
+            res.setHeader('content-type', 'text/html; charset=utf-8')
+            // Everything is inline; the CSP says so, so a future edit that
+            // reaches for a CDN font breaks visibly instead of phoning out.
+            res.setHeader(
+              'content-security-policy',
+              "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'",
+            )
+            res.setHeader('referrer-policy', 'no-referrer')
+            res.setHeader('x-content-type-options', 'nosniff')
+            res.setHeader('cache-control', 'no-store')
+            res.end(
+              renderStatusPage({
+                version: BRAIN_CORE_VERSION,
+                authRequired: gate.required,
+                origin: `${proto === 'https' ? 'https' : 'http'}://${host}`,
+                state: health.status,
+                writable: health.writable,
+                vaultOwner: health.vaultOwner,
+                uptimeSec: health.uptimeSec,
+                ...(authed
+                  ? {
+                      index: health.index,
+                      checks: [
+                        { name: 'Database', ...health.checks.db },
+                        { name: 'Index', ...health.checks.index },
+                        { name: 'Vault', ...health.checks.vault },
+                        { name: 'Embeddings (Ollama)', ...health.checks.ollama },
+                      ],
+                    }
+                  : {}),
+              }),
+            )
+          })().catch(() => {
+            if (!res.headersSent) {
+              res.statusCode = 500
+              res.end('status page failed')
+            }
+          })
           return
         }
         // All MCP traffic goes through POST/GET/DELETE on `/mcp`. Anything
