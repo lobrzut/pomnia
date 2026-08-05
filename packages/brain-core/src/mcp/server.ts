@@ -310,7 +310,12 @@ export async function createBrainServer(
               // needs before offering to save. The label is a machine name the
               // user chose; no vault content is implied by it.
               writable: vaultOwnership?.writable ?? false,
-              vaultOwner: vaultOwnership?.owner ? describeOwner(vaultOwnership.owner) : null,
+              // Same fallback the refusal uses: a pinned replica has no marker
+              // of its own to read, so the operator's hint is all there is —
+              // and a client showing "read-only, owner unknown" helps nobody.
+              vaultOwner: vaultOwnership?.owner
+                ? describeOwner(vaultOwnership.owner)
+                : (ctx?.authoritativeVaultHint ?? null),
             }),
           )
           return
