@@ -623,7 +623,12 @@ export async function createBrainServer(
           startReindex: () => startReindex(),
           vaultState: () => ({
             writable: vaultOwnership?.writable ?? false,
-            owner: vaultOwnership?.owner ? describeOwner(vaultOwnership.owner) : null,
+            // Same fallback /healthz and the write refusal use: a pinned
+            // replica has no marker of its own, so the operator's hint is all
+            // there is, and showing "—" for the owner helps nobody.
+            owner: vaultOwnership?.owner
+              ? describeOwner(vaultOwnership.owner)
+              : (ctx?.authoritativeVaultHint ?? null),
             readOnlyFlag: config.readOnly === true,
           }),
         }
