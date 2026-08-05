@@ -236,6 +236,10 @@ export interface UiLabels {
   onboardingEngineRemoteFail: string
   onboardingEngineRemoteWrongEngine: (engine: string) => string
   onboardingEngineRemoteUntested: string
+  settingsEngineNow: (where: string) => string
+  settingsEngineLocal: string
+  settingsEngineRemote: string
+  settingsEngineWhereToSwitch: string
   onboardingEngineLooking: string
   onboardingEngineRunning: string
   onboardingEngineMoreModels: (n: number) => string
@@ -882,6 +886,10 @@ const PL_LABELS: UiLabels = {
   onboardingEngineRemoteWrongEngine: (engine) =>
     `Coś odpowiada, ale to ${engine}. Ten adres poda agentom inną pamięć niż ta aplikacja.`,
   onboardingEngineRemoteUntested: 'Przetestuj połączenie — inaczej agenci mogą nie zobaczyć nic.',
+  settingsEngineNow: (where) => `Silnik pamięci: ${where}`,
+  settingsEngineLocal: 'lokalny, w tej aplikacji',
+  settingsEngineRemote: 'zdalny serwer',
+  settingsEngineWhereToSwitch: 'Przełączysz w zakładce Podłącz — bez reinstalacji.',
   onboardingEngineLooking: 'Szukam Ollama na tym komputerze…',
   onboardingEngineRunning: 'Ollama działa',
   onboardingEngineMoreModels: (n) => `+${n} więcej`,
@@ -1584,6 +1592,10 @@ const EN_LABELS: Partial<UiLabels> = {
   onboardingEngineRemoteWrongEngine: (engine) =>
     `Something answered, but it is ${engine}. This address would hand your agents a different memory than this app.`,
   onboardingEngineRemoteUntested: 'Test the connection — otherwise your agents may see nothing.',
+  settingsEngineNow: (where) => `Memory engine: ${where}`,
+  settingsEngineLocal: 'local, inside this app',
+  settingsEngineRemote: 'remote server',
+  settingsEngineWhereToSwitch: 'Switch it in the Connect tab — no reinstall needed.',
   onboardingEngineLooking: 'Looking for Ollama on this machine…',
   onboardingEngineRunning: 'Ollama is running',
   onboardingEngineMoreModels: (n) => `+${n} more`,

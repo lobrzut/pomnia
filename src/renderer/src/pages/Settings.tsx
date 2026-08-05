@@ -256,6 +256,8 @@ export default function Settings() {
     pl: labels.uiLocalePl,
     en: labels.uiLocaleEn,
   }
+  // Simple mode pins the engine local regardless of the saved target.
+  const engineIsLocal = simpleMode || brainTarget === 'embedded'
   const [exportSnap, setExportSnap] = useState(snapshots[0]?.id ?? '')
   const [verifying, setVerifying] = useState(false)
   const [appVersion, setAppVersion] = useState('')
@@ -590,7 +592,21 @@ export default function Settings() {
         <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
           <Plug className="h-4 w-4 text-cyan" /> {labels.mcpClients}
         </div>
-        <p className="mb-4 text-xs text-ink-dim">{labels.mcpClientsLead}</p>
+        <p className="mb-3 text-xs text-ink-dim">{labels.mcpClientsLead}</p>
+        {/* The switch itself lives in Connect, but Settings is where people
+            look for it — asked outright whether going server-side meant
+            reinstalling. Say what is running and where to change it. */}
+        <div className="mb-4 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5 text-xs">
+          <span className="text-ink">
+            {labels.settingsEngineNow(
+              engineIsLocal ? labels.settingsEngineLocal : labels.settingsEngineRemote,
+            )}
+          </span>
+          <span className="ml-2 font-mono text-ink-faint">
+            {(engineIsLocal ? EMBEDDED_URL : remoteBrainUrl.trim()) || '—'}
+          </span>
+          <div className="mt-1 text-ink-faint">{labels.settingsEngineWhereToSwitch}</div>
+        </div>
         <div className="space-y-2">
           {ALL_CLIENTS.map((id) => {
             const c = mcpClients.find((x) => x.id === id)
