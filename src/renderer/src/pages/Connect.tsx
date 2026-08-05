@@ -172,9 +172,18 @@ export default function Connect() {
 
   function switchTarget(next: BrainTarget) {
     setBrainTarget(next)
-    const url = next === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
     setPicked(null)
     setSnippet(null)
+    // Switching to a remote with nothing saved leaves every client pointed at
+    // an empty address. The checklist above already tracks this, but say it
+    // at the moment of the switch rather than waiting to be noticed.
+    if (next === 'remote' && !remoteBrainUrl.trim()) {
+      toast({
+        kind: 'warn',
+        title: labels.connectStepUrl,
+        detail: labels.onboardingEngineRemoteUntested,
+      })
+    }
   }
 
   useEffect(() => {
