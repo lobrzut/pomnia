@@ -72,6 +72,25 @@ else
   ok "kept the existing tokens file — upgrade does not rotate credentials"
 fi
 
+# First panel account. Random, printed once, never chosen by a human and never
+# passed as an argument — an argument lands in shell history and in `ps` output
+# for every user on the box. `admin/changeme` is the failure mode this avoids:
+# a default that is meant to be changed is a default that stays.
+USERS="$DATA/users.json"
+if [[ ! -f "$USERS" ]]; then
+  ADMIN_PW="$(head -c 18 /dev/urandom | base64 | tr -d '+/=' | head -c 24)"
+  if printf '%s\n' "$ADMIN_PW" | sudo -u "$USER_NAME" node "$PREFIX/dist/daemon.js" \
+       --data-dir "$DATA" --add-user admin --role admin >/dev/null 2>&1; then
+    ok "created the panel account 'admin'"
+    NEW_USER=1
+  else
+    echo "! could not create the first account — do it yourself:" >&2
+    echo "    sudo -u $USER_NAME node $PREFIX/dist/daemon.js --data-dir $DATA --add-user <login> --role admin" >&2
+  fi
+else
+  ok "kept the existing accounts — upgrade does not reset passwords"
+fi
+
 sed -e "s|--port 7865|--port $PORT|" \
     -e "s|/opt/pomnia-brain-core|$PREFIX|g" \
     -e "s|/var/lib/pomnia|$DATA|g" \
@@ -100,10 +119,18 @@ if [[ -z "$HEALTH" ]]; then
 fi
 
 STATUS=$(printf '%s' "$HEALTH" | grep -o '"status":"[a-z]*"' | cut -d'"' -f4)
+HOST_IP="$(hostname -I | awk '{print $1}')"
 echo
-echo "  Pomnia brain-core  →  http://$(hostname -I | awk '{print $1}'):$PORT"
+echo "  Pomnia brain-core  →  http://$HOST_IP:$PORT"
+echo "  panel              →  http://$HOST_IP:$PORT/admin"
 echo "  status             →  ${STATUS:-unknown}"
-[[ -n "${NEW_TOKEN:-}" ]] && echo "  token              →  $NEW_TOKEN"
+[[ -n "${NEW_TOKEN:-}" ]] && echo "  agent token        →  $NEW_TOKEN"
+if [[ -n "${NEW_USER:-}" ]]; then
+  echo
+  echo "  panel login        →  admin"
+  echo "  panel password     →  $ADMIN_PW"
+  echo "  ^ shown once. Change it after the first login (Konta → Hasło)."
+fi
 echo
 
 case "$STATUS" in
