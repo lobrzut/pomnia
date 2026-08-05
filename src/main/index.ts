@@ -380,12 +380,12 @@ async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
   if (brainCore.status().running) {
     await flushPendingLibraryDocs(url)
     await maybeHygieneReindexAfterVaultChange()
-    void runVaultHealthCheck({ silentOk: true })
+    checkVaultHealthInBackground({ silentOk: true })
     return
   }
   if (brainCore.status().starting) return
   if (!getAppSettings().embeddedBrainAutoStart) {
-    void runVaultHealthCheck({ silentOk: true })
+    checkVaultHealthInBackground({ silentOk: true })
     return
   }
   const ensured = await ensureBrainForIndexing(url, undefined, vaultPath)
@@ -403,13 +403,13 @@ async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
     })
   }
   if (!ensured.running || !vault || !vaultPath) {
-    void runVaultHealthCheck({ silentOk: true })
+    checkVaultHealthInBackground({ silentOk: true })
     return
   }
   refreshTrayMenu(win, requestQuit)
   await flushPendingLibraryDocs(url)
   await maybeHygieneReindexAfterVaultChange()
-  void runVaultHealthCheck({ silentOk: true })
+  checkVaultHealthInBackground({ silentOk: true })
 }
 
 /** Slash-normalize vault roots so AppData vs portable switches compare reliably. */
@@ -461,6 +461,21 @@ async function runVaultHealthCheck(opts?: { silentOk?: boolean }): Promise<Vault
     detail: getAppSettings().uiLocale === 'en' ? report.detailEn : report.detailPl,
   })
   return report
+}
+
+/**
+ * Fire-and-forget health check.
+ *
+ * `silentOk` only ever silenced the healthy case — a warn or critical report
+ * always toasts. What did not survive was the check *itself* failing: every
+ * caller wrote `void runVaultHealthCheck(...)`, so a throw from the fingerprint
+ * write or the assessment became an unhandled rejection and the check simply
+ * never reported anything, indefinitely and without a line anywhere.
+ */
+function checkVaultHealthInBackground(opts?: { silentOk?: boolean }): void {
+  runVaultHealthCheck(opts).catch((e: unknown) =>
+    log.warn('vault health check failed:', (e as Error).message),
+  )
 }
 
 /**
@@ -547,7 +562,7 @@ async function maybeHygieneReindexAfterVaultChange(): Promise<void> {
     if (typeof stats?.files === 'number' && typeof stats?.chunks === 'number') {
       writeLibraryStatsSidecar({ files: stats.files, chunks: stats.chunks, vaultRoot: root })
     }
-    void runVaultHealthCheck({ silentOk: true })
+    checkVaultHealthInBackground({ silentOk: true })
     // An index that came back empty is the failure this whole pass exists to
     // prevent — reporting it green is how 1886 notes were once shown as 26.
     const indexedFiles = stats?.files ?? 0
@@ -646,9 +661,11 @@ function createWindow(): void {
         fs.writeFile(
           join(app.getPath('userData'), 'launch-check.json'),
           JSON.stringify({ ts: new Date().toISOString(), bridge, version: app.getVersion() }, null, 2)
-        ).catch(() => {})
+        ).catch((e: unknown) => log.warn('launch-check marker not written:', (e as Error).message))
       })
-      .catch(() => {})
+      // This probe is how we learn the preload bridge failed to load — the
+      // failure it exists to report must not be the one it swallows.
+      .catch((e: unknown) => log.warn('renderer bridge check failed:', (e as Error).message))
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
@@ -705,8 +722,10 @@ function registerIpc(): void {
     const skillsRoot = brainSkillsDir(vaultPath)
     try {
       writeSkillsIndexAt(skillsRoot)
-    } catch {
-      /* ignore */
+    } catch (e) {
+      // The list below still renders from disk, so this is not fatal — but a
+      // stale index is what agents read, so the divergence needs a trace.
+      log.warn('skills index not written:', (e as Error).message)
     }
     const all = listLocalSkillsAt(skillsRoot)
     return {
@@ -1286,7 +1305,7 @@ function registerIpc(): void {
       await setAppSettings({ embeddedBrainAutoStart: true, ollamaUrl: url })
       await flushPendingLibraryDocs(url)
       void maybeHygieneReindexAfterVaultChange()
-      void runVaultHealthCheck()
+      checkVaultHealthInBackground()
       refreshTrayMenu(win, requestQuit)
       return brainCore.status()
     } catch (err) {
@@ -1313,7 +1332,7 @@ function registerIpc(): void {
       }
       // Also rebuild encrypted library docs missing from library.db (not covered by indexDir).
       const flush = await flushPendingLibraryDocs()
-      void runVaultHealthCheck({ silentOk: true })
+      checkVaultHealthInBackground({ silentOk: true })
       return { stats, libraryFlush: flush }
     } finally {
       activity.idle('indexing')
@@ -1737,8 +1756,12 @@ function registerIpc(): void {
         let existing = ''
         try {
           existing = await fs.readFile(filePath, 'utf8')
-        } catch {
-          /* create new */
+        } catch (e) {
+          // Only "there is no file yet" means create. Any other read failure —
+          // a lock, a permission denial — used to land here too, and the write
+          // below would then upsert into an empty string and replace whatever
+          // the user actually had in their CLAUDE.md or rules file.
+          if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
         }
         next = upsertPomniaBrainBrief(existing, snippet.brief.content)
       }
@@ -1824,12 +1847,28 @@ app.whenReady().then(async () => {
   await loadLastActivityReplay()
   registerIpc()
   createWindow()
-  if (win) void initTray(win, requestQuit)
+  if (win) {
+    void initTray(win, requestQuit).catch((e: unknown) =>
+      log.warn('tray not initialised:', (e as Error).message),
+    )
+  }
   // Ephemeral profile preview — Ctrl+Shift+U (avoid P clash with print / other apps).
   const hkProfile = globalShortcut.register('CommandOrControl+Shift+U', () => {
-    void showProfilePreview().then(() => {
-      if (win) refreshTrayMenu(win, requestQuit)
-    })
+    // A hotkey that does nothing and says nothing is indistinguishable from a
+    // hotkey that is not registered — and this one builds a preview from the
+    // brain index, which has plenty of ways to fail.
+    void showProfilePreview()
+      .then(() => {
+        if (win) refreshTrayMenu(win, requestQuit)
+      })
+      .catch((e: unknown) => {
+        log.warn('profile preview failed:', (e as Error).message)
+        sendAppToast({
+          kind: 'error',
+          title: 'Podgląd profilu nieudany',
+          detail: (e as Error).message,
+        })
+      })
   })
   if (!hkProfile) log.warn('profile preview hotkey Ctrl+Shift+U not registered (conflict?)')
   app.on('will-quit', () => {

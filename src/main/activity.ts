@@ -111,6 +111,9 @@ class ActivityManager {
     const replay = buildReplayFromSession(this.sessionSamples, Date.now())
     this.resetSession()
     if (!replay) return
+    // Deliberate: the replay is a decorative animation of the last session.
+    // Losing one changes nothing a user can act on, and this runs on every
+    // session end — a warning here would be noise, not signal.
     void saveLastActivityReplay(replay).catch(() => {})
   }
 
