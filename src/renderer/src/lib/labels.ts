@@ -234,6 +234,8 @@ export interface UiLabels {
   onboardingEngineTestConn: string
   onboardingEngineRemoteOk: string
   onboardingEngineRemoteFail: string
+  onboardingEngineRemoteWrongEngine: (engine: string) => string
+  onboardingEngineRemoteUntested: string
   onboardingEngineLooking: string
   onboardingEngineRunning: string
   onboardingEngineMoreModels: (n: number) => string
@@ -872,11 +874,14 @@ const PL_LABELS: UiLabels = {
   onboardingEngineLocal: 'Lokalnie (embedded)',
   onboardingEngineLocalHint: (url) => `Jeden .exe, MCP na ${url} — bez zdalnego serwera, bez tokena.`,
   onboardingEngineRemote: 'Zdalny master',
-  onboardingEngineRemoteHint: 'Twój serwer Brain w LAN — trzy serwery MCP + Bearer token.',
+  onboardingEngineRemoteHint: 'Twój serwer Pomnia w LAN — MCP + Bearer token.',
   onboardingEngineMasterUrl: 'URL Master MCP',
   onboardingEngineTestConn: 'Test połączenia',
-  onboardingEngineRemoteOk: 'Serwer Brain odpowiada',
+  onboardingEngineRemoteOk: 'Serwer odpowiada — brain-core',
   onboardingEngineRemoteFail: 'Brak połączenia — sprawdź URL i sieć',
+  onboardingEngineRemoteWrongEngine: (engine) =>
+    `Coś odpowiada, ale to ${engine}. Ten adres poda agentom inną pamięć niż ta aplikacja.`,
+  onboardingEngineRemoteUntested: 'Przetestuj połączenie — inaczej agenci mogą nie zobaczyć nic.',
   onboardingEngineLooking: 'Szukam Ollama na tym komputerze…',
   onboardingEngineRunning: 'Ollama działa',
   onboardingEngineMoreModels: (n) => `+${n} więcej`,
@@ -1571,11 +1576,14 @@ const EN_LABELS: Partial<UiLabels> = {
   onboardingEngineLocal: 'Local embedded',
   onboardingEngineLocalHint: (url) => `One .exe, MCP on ${url} — no remote server, no token.`,
   onboardingEngineRemote: 'Remote master',
-  onboardingEngineRemoteHint: 'Your Brain server on the LAN — three MCP servers + Bearer token.',
+  onboardingEngineRemoteHint: 'Your Pomnia server on the LAN — MCP + Bearer token.',
   onboardingEngineMasterUrl: 'Master MCP URL',
   onboardingEngineTestConn: 'Test connection',
-  onboardingEngineRemoteOk: 'Brain server is responding',
+  onboardingEngineRemoteOk: 'Server responding — brain-core',
   onboardingEngineRemoteFail: 'Unreachable — check URL and network',
+  onboardingEngineRemoteWrongEngine: (engine) =>
+    `Something answered, but it is ${engine}. This address would hand your agents a different memory than this app.`,
+  onboardingEngineRemoteUntested: 'Test the connection — otherwise your agents may see nothing.',
   onboardingEngineLooking: 'Looking for Ollama on this machine…',
   onboardingEngineRunning: 'Ollama is running',
   onboardingEngineMoreModels: (n) => `+${n} more`,

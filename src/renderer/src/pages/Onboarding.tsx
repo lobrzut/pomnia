@@ -28,6 +28,7 @@ import { ClientIcon } from '../components/ClientIcon'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
+import { identifyEngine } from '@core/brain/engine'
 import { hasOllamaModel } from '@core/brain/modelMatch'
 import { EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from '@core/brain/snippet'
 import type { BrainStatus, BrainTarget, ClientId, ClientStatus, EmbeddedBrainStatus, Snippet } from '../lib/types'
@@ -457,6 +458,12 @@ function EngineStep({
   const [remoteOk, setRemoteOk] = useState<boolean | null>(null)
   const [remoteDetail, setRemoteDetail] = useState('')
 
+  /**
+   * "Reachable" is not the question. A saved URL from an older machine pointed
+   * at the legacy Python brain, which answers every probe — the test would have
+   * gone green while the agents got a different brain over a different vault.
+   * So the pass condition is the engine naming itself, not the socket opening.
+   */
   async function testRemote() {
     const url = remoteUrl.trim()
     if (!url) return
@@ -464,11 +471,17 @@ function EngineStep({
     setRemoteOk(null)
     try {
       const r = await api.connectStatus(url, undefined, 'remote')
-      setRemoteOk(r.brain.reachable)
+      if (!r.brain.reachable) {
+        setRemoteOk(false)
+        setRemoteDetail(r.brain.error || labels.onboardingEngineRemoteFail)
+        return
+      }
+      const engine = identifyEngine(r.brain.data as Record<string, unknown> | undefined)
+      setRemoteOk(engine.compatible)
       setRemoteDetail(
-        r.brain.reachable
+        engine.compatible
           ? labels.onboardingEngineRemoteOk
-          : r.brain.error || labels.onboardingEngineRemoteFail,
+          : labels.onboardingEngineRemoteWrongEngine(engine.label),
       )
     } catch (e) {
       setRemoteOk(false)
@@ -504,7 +517,11 @@ function EngineStep({
   // nothing and every agent search comes back empty, while the app still looks
   // healthy. Finishing setup in that state is the failure we keep paying for.
   // The distill model stays optional — search works without it.
-  const canContinue = mode === 'embedded' ? found && hasEmbed : remoteUrlTrimmed.length > 0
+  //
+  // Remote gets the same bar for the same reason: a URL that was typed but
+  // never verified is setup that reports done while nothing is wired. The step
+  // is skippable, so a user whose server is down still has a way past.
+  const canContinue = mode === 'embedded' ? found && hasEmbed : remoteOk === true
 
   function continueWithMode() {
     setBrainTarget(mode)
@@ -565,6 +582,9 @@ function EngineStep({
             )}
             {remoteOk === false && (
               <span className="text-[11px] text-amber">{remoteDetail}</span>
+            )}
+            {remoteOk === null && !remoteTesting && remoteUrlTrimmed.length > 0 && (
+              <span className="text-[11px] text-ink-faint">{labels.onboardingEngineRemoteUntested}</span>
             )}
           </div>
         </div>
