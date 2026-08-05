@@ -23,6 +23,9 @@
 import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http'
 import { join } from 'node:path'
 
+import { BRAIN_CORE_VERSION } from '../version.js'
+import { renderStatusPage } from './statusPage.js'
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import {
@@ -128,7 +131,7 @@ function createMcpServer(
   onMcpQuery?: (ev: McpQueryEvent) => void,
 ): Server {
   const mcp = new Server(
-    { name: 'brain-core', version: '0.1.0' },
+    { name: 'brain-core', version: BRAIN_CORE_VERSION },
     { capabilities: { tools: {} } },
   )
 
@@ -262,6 +265,31 @@ export async function createBrainServer(
           res.statusCode = 200
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ ok: true, service: 'brain-core', auth: gate.required }))
+          return
+        }
+        // A human typing the address gets a page instead of `not_found`.
+        // Exact paths only: `/.well-known/*` and `/register` must keep their
+        // 404 (see below), and a prefix match would swallow them.
+        if (pathOnly === '/' || pathOnly === '/index.html') {
+          const host = req.headers.host ?? `${config.host}:${config.port}`
+          const proto = String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0].trim()
+          res.statusCode = 200
+          res.setHeader('content-type', 'text/html; charset=utf-8')
+          // Everything is inline; the CSP says so, so a future edit that reaches
+          // for a CDN font breaks visibly instead of quietly phoning out.
+          res.setHeader(
+            'content-security-policy',
+            "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'",
+          )
+          res.setHeader('referrer-policy', 'no-referrer')
+          res.setHeader('x-content-type-options', 'nosniff')
+          res.end(
+            renderStatusPage({
+              version: BRAIN_CORE_VERSION,
+              authRequired: gate.required,
+              origin: `${proto === 'https' ? 'https' : 'http'}://${host}`,
+            }),
+          )
           return
         }
         // All MCP traffic goes through POST/GET/DELETE on `/mcp`. Anything
