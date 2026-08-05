@@ -23,7 +23,15 @@
 import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http'
 import { join } from 'node:path'
 
+import { hostname } from 'node:os'
+
 import { BRAIN_CORE_VERSION } from '../version.js'
+import {
+  describeOwner,
+  localWriterIdentity,
+  resolveVaultOwnership,
+  type OwnershipVerdict,
+} from '../storage/vaultOwner.js'
 import { renderStatusPage } from './statusPage.js'
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
@@ -175,6 +183,7 @@ export async function createBrainServer(
   // MCP Server + transport are created per /mcp request (stateless SDK rule).
   let http: HttpServer | null = null
   let ctx: ToolContext | null = null
+  let vaultOwnership: OwnershipVerdict | null = null
   let adopted = false
 
   const url = `http://${config.host}:${config.port}/mcp`
@@ -223,6 +232,20 @@ export async function createBrainServer(
         ollamaUrl: config.ollamaUrl,
         embedModel: config.embedModel,
       })
+      // Who may write is decided by the vault, not by this process's flags.
+      // `--read-only` still pins a replica, but an instance without it no
+      // longer gets to assume it owns a corpus another instance is holding.
+      const me = await localWriterIdentity(
+        config.dataDir,
+        config.instanceLabel ?? config.authoritativeVaultHint ?? hostname(),
+      )
+      const ownership = await resolveVaultOwnership({
+        vaultRoot: vault.root,
+        me,
+        forceReadOnly: config.readOnly === true,
+      })
+      vaultOwnership = ownership
+
       ctx = {
         db,
         embedder,
@@ -232,14 +255,28 @@ export async function createBrainServer(
         handshakePhrase: config.handshakePhrase,
         handshakeEnabled: config.handshakeEnabled !== false,
         autoCheckpointEnabled: config.autoCheckpointEnabled !== false,
-        readOnly: config.readOnly === true,
-        authoritativeVaultHint: config.authoritativeVaultHint,
+        readOnly: !ownership.writable,
+        // Prefer the marker's own account of who holds the vault over a hint
+        // someone typed into a unit file months ago — the hint is what went
+        // stale last time and pointed at the wrong machine.
+        authoritativeVaultHint: ownership.owner
+          ? describeOwner(ownership.owner)
+          : config.authoritativeVaultHint,
       }
 
-      if (config.readOnly) {
+      if (ownership.writable) {
         console.error(
-          `[brain-core] READ-ONLY replica — save_conversation and checkpoint_session will refuse` +
-            (config.authoritativeVaultHint ? ` (owner: ${config.authoritativeVaultHint})` : ''),
+          ownership.reason === 'claimed'
+            ? `[brain-core] vault claimed by ${describeOwner(me)} — this instance owns writes`
+            : `[brain-core] vault owner: ${describeOwner(me)} — writes enabled`,
+        )
+      } else {
+        console.error(
+          `[brain-core] READ-ONLY — save_conversation and checkpoint_session will refuse (` +
+            (ownership.reason === 'read-only-flag'
+              ? `--read-only${ownership.owner ? `; vault held by ${describeOwner(ownership.owner)}` : ''}`
+              : `vault held by ${describeOwner(ownership.owner)}`) +
+            ')',
         )
       }
 
@@ -264,7 +301,18 @@ export async function createBrainServer(
         if (pathOnly === '/healthz' || pathOnly === '/healthz/') {
           res.statusCode = 200
           res.setHeader('content-type', 'application/json')
-          res.end(JSON.stringify({ ok: true, service: 'brain-core', auth: gate.required }))
+          res.end(
+            JSON.stringify({
+              ok: true,
+              service: 'brain-core',
+              auth: gate.required,
+              // Who owns writes is not a secret and is exactly what a client
+              // needs before offering to save. The label is a machine name the
+              // user chose; no vault content is implied by it.
+              writable: vaultOwnership?.writable ?? false,
+              vaultOwner: vaultOwnership?.owner ? describeOwner(vaultOwnership.owner) : null,
+            }),
+          )
           return
         }
         // A human typing the address gets a page instead of `not_found`.

@@ -61,6 +61,13 @@ export interface BrainConfig {
   /** Named in the refusal so an agent can tell the user where to save instead. */
   authoritativeVaultHint?: string
 
+  /**
+   * How this instance names itself when it takes ownership of a vault, e.g.
+   * "Pomnia Desktop" or "pomnia-master". Shown to the other side when it is
+   * refused, so it must say something a person recognises.
+   */
+  instanceLabel?: string
+
   /** Ollama base URL — reachable http endpoint. */
   ollamaUrl: string
   /** Embedding model name known to Ollama (nomic-embed-text-v1.5 → dim 768). */
@@ -122,6 +129,7 @@ export async function loadConfig(
   if (env.BRAIN_SKILLS_ROOT) cfg.skillsRoot = env.BRAIN_SKILLS_ROOT
   if (env.BRAIN_READ_ONLY === '1' || env.BRAIN_READ_ONLY === 'true') cfg.readOnly = true
   if (env.BRAIN_VAULT_OWNER) cfg.authoritativeVaultHint = env.BRAIN_VAULT_OWNER
+  if (env.BRAIN_INSTANCE_LABEL) cfg.instanceLabel = env.BRAIN_INSTANCE_LABEL
 
   // CLI overrides (simple, no getopt dependency)
   const dataDirBefore = cfg.dataDir
@@ -141,6 +149,7 @@ export async function loadConfig(
     else if (arg === '--skills-root' && next) cfg.skillsRoot = next
     else if (arg === '--read-only') cfg.readOnly = true
     else if (arg === '--vault-owner' && next) cfg.authoritativeVaultHint = next
+    else if (arg === '--instance-label' && next) cfg.instanceLabel = next
     else if (arg === '--tokens-file' && next) {
       cfg.auth.tokensFile = next
       tokensFileExplicit = true

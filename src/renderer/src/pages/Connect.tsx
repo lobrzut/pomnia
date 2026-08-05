@@ -155,6 +155,13 @@ export default function Connect() {
           : r.brain.reachable
             ? [
                 engine,
+                // Reachable and writable are different questions. A replica
+                // answers every probe and then refuses every save — better to
+                // read that here than from an agent's apology afterwards.
+                d?.writable === false &&
+                  (d?.vaultOwner
+                    ? `tylko odczyt — vault trzyma ${d.vaultOwner}`
+                    : 'tylko odczyt'),
                 d?.notes && `${d.notes} notes`,
                 d?.sessions && `${d.sessions} sessions`,
                 d?.library_docs && `${d.library_docs} docs`,
