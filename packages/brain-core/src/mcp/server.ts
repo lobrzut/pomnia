@@ -27,6 +27,7 @@ import { hostname } from 'node:os'
 
 import { BRAIN_CORE_VERSION } from '../version.js'
 import {
+  claimVault as claimVaultFor,
   describeOwner,
   localWriterIdentity,
   resolveVaultOwnership,
@@ -34,8 +35,12 @@ import {
 } from '../storage/vaultOwner.js'
 import { MAX_FILE_BYTES, SYNC_DIRS } from '../sync/paths.js'
 import { applyFile, planSync, type ManifestEntry } from '../sync/receive.js'
+import { handleAdmin, readAdminBody, sendAdmin, type AdminDeps } from '../admin/api.js'
+import { readSettings } from '../admin/settings.js'
+import { touchToken } from '../admin/tokens.js'
 import { collectHealth, redactHealth } from '../health.js'
 import { indexDir } from '../rag/indexer.js'
+import { renderAdminPage } from './adminPage.js'
 import { renderStatusPage } from './statusPage.js'
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
@@ -241,6 +246,14 @@ export async function createBrainServer(
       // library.db stays under dataDir (AppData) even when vaultRoot is portable.
       const vault = resolveVault()
       const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
+
+      // Saved settings win over the unit for the two fields the panel owns.
+      // They are the more recent deliberate act; the unit still decides
+      // everything structural, which a compromised panel therefore cannot move.
+      const saved = await readSettings(config.dataDir)
+      if (saved.ollamaUrl) config.ollamaUrl = saved.ollamaUrl
+      if (saved.embedModel) config.embedModel = saved.embedModel
+
       const embedder = new EmbedClient({
         ollamaUrl: config.ollamaUrl,
         embedModel: config.embedModel,
@@ -361,6 +374,29 @@ export async function createBrainServer(
           })
           return
         }
+        // The panel itself is a static page and carries no data: everything it
+        // shows comes from /admin/* calls that need an admin token. Serving the
+        // shell unauthenticated means a wrong token shows a login, not a 401
+        // page nobody can act on.
+        if (pathOnly === '/admin' || pathOnly === '/admin/') {
+          const host = req.headers.host ?? `${config.host}:${config.port}`
+          const proto = String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0].trim()
+          res.statusCode = 200
+          res.setHeader('content-type', 'text/html; charset=utf-8')
+          res.setHeader(
+            'content-security-policy',
+            "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; " +
+              "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+          )
+          // Clickjacking: a panel with a "claim the vault" button must not be
+          // frameable, and frame-ancestors above is ignored by older browsers.
+          res.setHeader('x-frame-options', 'DENY')
+          res.setHeader('referrer-policy', 'no-referrer')
+          res.setHeader('x-content-type-options', 'nosniff')
+          res.setHeader('cache-control', 'no-store')
+          res.end(renderAdminPage(`${proto === 'https' ? 'https' : 'http'}://${host}`))
+          return
+        }
         // A human typing the address gets a page instead of `not_found`.
         // Exact paths only: `/.well-known/*` and `/register` must keep their
         // 404 (see below), and a prefix match would swallow them.
@@ -435,7 +471,8 @@ export async function createBrainServer(
         // 404 instead of stalling. See project memory desktop-mcp-remote-fix.
         const isSync =
           pathOnly === '/sync/plan' || pathOnly === '/sync/file' || pathOnly === '/sync/reindex'
-        if (!req.url?.startsWith('/mcp') && !isSync) {
+        const isAdmin = pathOnly.startsWith('/admin/')
+        if (!req.url?.startsWith('/mcp') && !isSync && !isAdmin) {
           res.statusCode = 404
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ error: 'not_found', hint: 'MCP endpoint is at /mcp' }))
@@ -445,18 +482,55 @@ export async function createBrainServer(
         void (async () => {
           // Gate everything under /mcp, activity included — that endpoint
           // echoes the last query text, which is vault content. /sync/* is
-          // gated by the same token: it writes to the vault.
-          const auth = await gate.check(req)
+          // gated by the same token: it writes to the vault. /admin/* needs
+          // more than that — an agent token must not be able to repoint the
+          // embedder, mint itself credentials, or take the vault.
+          const auth = await gate.check(req, isAdmin ? 'admin' : undefined)
           if (!auth.ok) {
-            res.statusCode = auth.reason === 'rate_limited' ? 429 : 401
+            res.statusCode =
+              auth.reason === 'rate_limited' ? 429 : auth.reason === 'forbidden' ? 403 : 401
             res.setHeader('content-type', 'application/json')
-            res.setHeader('www-authenticate', 'Bearer realm="brain-mcp"')
+            if (auth.reason !== 'forbidden') {
+              res.setHeader('www-authenticate', 'Bearer realm="brain-mcp"')
+            }
             if (auth.retryAfterSec) res.setHeader('retry-after', String(auth.retryAfterSec))
             res.end(
-              JSON.stringify({
-                error: auth.reason === 'rate_limited' ? 'rate_limited' : 'unauthorized',
-                hint: 'set Authorization: Bearer <token> header',
-              }),
+              JSON.stringify(
+                auth.reason === 'forbidden'
+                  ? {
+                      error: 'forbidden',
+                      // The credential is real and the scope is wrong; telling
+                      // them to try another token sends them hunting for a
+                      // problem that is not there.
+                      hint: 'this endpoint needs an admin token — `brain-core --add-token <name> --role admin`',
+                    }
+                  : {
+                      error: auth.reason === 'rate_limited' ? 'rate_limited' : 'unauthorized',
+                      hint: 'set Authorization: Bearer <token> header',
+                    },
+              ),
+            )
+            return
+          }
+
+          if (auth.name && auth.name !== 'loopback') {
+            // Best-effort "last seen", so the panel can show which clients are
+            // still alive. Never allowed to fail a request.
+            void touchToken(config.auth.tokensFile, auth.name).catch(() => {})
+          }
+
+          if (isAdmin) {
+            const body = await readAdminBody(req).catch(() => undefined)
+            if (body === undefined) {
+              sendAdmin(res, { status: 400, body: { error: 'bad_body' } })
+              return
+            }
+            sendAdmin(
+              res,
+              await handleAdmin(
+                { method: req.method ?? 'GET', path: pathOnly, body, actor: auth.name ?? '?' },
+                adminDeps(),
+              ),
             )
             return
           }
@@ -486,6 +560,74 @@ export async function createBrainServer(
           }
         })
       })
+
+      /**
+       * Rebuild the index in the background. Refuses to stack, so a double
+       * click or a sync racing the panel costs nothing.
+       */
+      function startReindex(): { started: boolean; reason?: string } {
+        if (reindexing) return { started: false, reason: 'already running' }
+        if (!ctx) return { started: false, reason: 'server not started' }
+        reindexing = true
+        void (async () => {
+          const t0 = Date.now()
+          try {
+            const stats = await indexDir(ctx!.db, ctx!.embedder, ctx!.vaultRoot)
+            console.error(
+              `[brain-core] reindex: ${stats.files} re-embedded, ${stats.chunks} chunk(s), ` +
+                `${stats.skipped} unchanged, ${stats.prunedFiles} pruned in ` +
+                `${((Date.now() - t0) / 1000).toFixed(1)}s`,
+            )
+          } catch (e) {
+            console.error(`[brain-core] reindex failed: ${(e as Error).message}`)
+          } finally {
+            reindexing = false
+          }
+        })()
+        return { started: true }
+      }
+
+      /**
+       * Everything the admin surface is allowed to touch, in one place.
+       *
+       * A factory rather than an object literal built once: `ctx` and
+       * `vaultOwnership` are reassigned at start(), and a captured snapshot
+       * would keep answering with the state the server had at boot.
+       */
+      function adminDeps(): AdminDeps {
+        return {
+          dataDir: config.dataDir,
+          tokensFile: config.auth.tokensFile,
+          applyOllama(next) {
+            if (next.ollamaUrl) config.ollamaUrl = next.ollamaUrl
+            if (next.embedModel) config.embedModel = next.embedModel
+            ctx?.embedder.reconfigure(next)
+          },
+          currentOllama: () => ({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel }),
+          async claimVault() {
+            const me = await localWriterIdentity(
+              config.dataDir,
+              config.instanceLabel ?? hostname(),
+            )
+            const r = await claimVaultFor({ vaultRoot: ctx!.vaultRoot, me })
+            vaultOwnership = { writable: true, reason: 'claimed', owner: r.owner }
+            if (ctx) {
+              ctx.readOnly = false
+              ctx.authoritativeVaultHint = describeOwner(r.owner)
+            }
+            return {
+              previous: r.previous ? describeOwner(r.previous) : null,
+              owner: describeOwner(r.owner),
+            }
+          },
+          startReindex: () => startReindex(),
+          vaultState: () => ({
+            writable: vaultOwnership?.writable ?? false,
+            owner: vaultOwnership?.owner ? describeOwner(vaultOwnership.owner) : null,
+            readOnlyFlag: config.readOnly === true,
+          }),
+        }
+      }
 
       /** Read a bounded JSON body. Anything larger is refused, not buffered. */
       async function readJsonBody(req: IncomingMessage, limit: number): Promise<unknown> {

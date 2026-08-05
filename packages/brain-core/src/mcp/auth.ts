@@ -22,11 +22,26 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import type { IncomingMessage } from 'node:http'
 
+/**
+ * What a token is allowed to do.
+ *
+ * One class of token was fine while the only surface was MCP. It stops being
+ * fine the moment the server can be *configured* over HTTP: a token handed to
+ * an agent would then also let that agent repoint Ollama, mint itself more
+ * tokens, or seize the vault. Those are different powers and they need
+ * different credentials.
+ *
+ * Entries with no role are `agent` — every token that exists today was issued
+ * for an agent, and silently promoting them would be the opposite of a fix.
+ */
+export type TokenRole = 'agent' | 'admin'
+
 export interface AuthResult {
   ok: boolean
   /** Token name on success — safe to log. The raw token never is. */
   name?: string
-  reason?: 'no_header' | 'bad_token' | 'no_tokens_configured' | 'rate_limited'
+  role?: TokenRole
+  reason?: 'no_header' | 'bad_token' | 'no_tokens_configured' | 'rate_limited' | 'forbidden'
   retryAfterSec?: number
 }
 
@@ -50,18 +65,25 @@ function sameToken(a: string, b: string): boolean {
 interface TokenEntry {
   name: string
   token: string
+  role: TokenRole
 }
 
 export interface AuthGate {
   /** False for loopback binds — callers can skip the check entirely. */
   readonly required: boolean
-  check(req: IncomingMessage): Promise<AuthResult>
+  /**
+   * `need` is the role the endpoint requires. A valid agent token on an admin
+   * endpoint is `forbidden` (403), not `bad_token` (401) — the credential is
+   * real, the scope is wrong, and telling the caller to try another token
+   * would send them looking for a problem that is not there.
+   */
+  check(req: IncomingMessage, need?: TokenRole): Promise<AuthResult>
   /**
    * Same token comparison as `check`, but records nothing against the rate
    * limit. For surfaces where an anonymous request is expected rather than
    * suspicious — the status page — so page views cannot lock out agents.
    */
-  peek(req: IncomingMessage): Promise<boolean>
+  peek(req: IncomingMessage, need?: TokenRole): Promise<boolean>
   /** Count of currently loaded tokens — for startup logging and /healthz. */
   tokenCount(): Promise<number>
 }
@@ -102,7 +124,13 @@ export function createAuthGate(opts: AuthGateOptions): AuthGate {
       cached = Array.isArray(parsed)
         ? parsed
             .filter((e): e is TokenEntry => !!e && typeof e === 'object' && typeof (e as TokenEntry).token === 'string')
-            .map((e) => ({ name: typeof e.name === 'string' ? e.name : '?', token: e.token }))
+            .map((e) => ({
+              name: typeof e.name === 'string' ? e.name : '?',
+              token: e.token,
+              // Anything that is not exactly "admin" is an agent. A typo in the
+              // role field must not hand out administrative access.
+              role: (e as { role?: unknown }).role === 'admin' ? 'admin' : 'agent',
+            }))
         : []
       cachedMtimeMs = mtimeMs
     } catch {
@@ -154,19 +182,23 @@ export function createAuthGate(opts: AuthGateOptions): AuthGate {
      * page views burn the rate-limit budget and lock out the agents. Same
      * comparison, no bookkeeping.
      */
-    async peek(req: IncomingMessage): Promise<boolean> {
+    async peek(req: IncomingMessage, need?: TokenRole): Promise<boolean> {
       if (!required) return true
       const header = req.headers.authorization ?? ''
       if (!/^bearer\s+/i.test(header)) return false
       const presented = header.replace(/^bearer\s+/i, '').trim()
       for (const entry of await loadTokens()) {
-        if (sameToken(presented, entry.token)) return true
+        if (sameToken(presented, entry.token)) {
+          return need !== 'admin' || entry.role === 'admin'
+        }
       }
       return false
     },
 
-    async check(req: IncomingMessage): Promise<AuthResult> {
-      if (!required) return { ok: true, name: 'loopback' }
+    async check(req: IncomingMessage, need?: TokenRole): Promise<AuthResult> {
+      // Loopback is trusted for everything, admin included: the port is not
+      // reachable off-box, and this is the mode Pomnia Desktop embeds.
+      if (!required) return { ok: true, name: 'loopback', role: 'admin' }
 
       const key = clientKey(req)
       const header = req.headers.authorization ?? ''
@@ -178,7 +210,14 @@ export function createAuthGate(opts: AuthGateOptions): AuthGate {
       if (/^bearer\s+/i.test(header)) {
         const presented = header.replace(/^bearer\s+/i, '').trim()
         for (const entry of await loadTokens()) {
-          if (sameToken(presented, entry.token)) return { ok: true, name: entry.name }
+          if (!sameToken(presented, entry.token)) continue
+          if (need === 'admin' && entry.role !== 'admin') {
+            // Not a failed guess, so it does not feed the rate limiter: an
+            // agent reaching an admin route is a misconfiguration, and burning
+            // the budget for it would take the working agents down with it.
+            return { ok: false, name: entry.name, role: entry.role, reason: 'forbidden' }
+          }
+          return { ok: true, name: entry.name, role: entry.role }
         }
       }
 

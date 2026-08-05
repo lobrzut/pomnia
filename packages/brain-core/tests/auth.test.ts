@@ -59,7 +59,14 @@ describe('auth gate', () => {
   it('accepts a listed token and names it', async () => {
     writeTokens(['claude-code-laptop', 'btk_good'])
     const g = gate('0.0.0.0')
-    expect(await g.check(req('Bearer btk_good'))).toEqual({ ok: true, name: 'claude-code-laptop' })
+    // A token written without a role is an agent — every token issued before
+    // roles existed was issued for an agent, and promoting them silently would
+    // be the opposite of the fix roles are there to make.
+    expect(await g.check(req('Bearer btk_good'))).toEqual({
+      ok: true,
+      name: 'claude-code-laptop',
+      role: 'agent',
+    })
   })
 
   it('rejects a wrong token and a missing header', async () => {

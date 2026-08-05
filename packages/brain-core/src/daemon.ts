@@ -9,6 +9,7 @@
  *   brain-core --port 7862 --data-dir ~/.pomnia/brain
  *   brain-core --reindex                # (re)build the index from the vault on start
  *   brain-core --claim-vault            # take write ownership of the vault, then exit
+ *   brain-core --add-token ops --role admin   # issue a credential, print it once
  *
  * When Pomnia embeds brain-core, it doesn't go through this file — the Electron
  * main process spawns a child via `child_process.fork()` and passes an options
@@ -25,6 +26,7 @@ import { indexDir } from './rag/indexer.js'
 import { openDb } from './storage/db.js'
 import { defaultVaultConfig, vaultConfigFromRoot } from './storage/vault.js'
 import { claimVault, describeOwner, localWriterIdentity } from './storage/vaultOwner.js'
+import { createToken } from './admin/tokens.js'
 
 /**
  * Build the index from the vault.
@@ -115,10 +117,40 @@ function installCrashReporting(): void {
   })
 }
 
+/**
+ * Issue a token and exit — how the first admin credential comes into being.
+ *
+ * There has to be a way in that does not already require a way in. This is it:
+ * you have shell on the box, so you can create the credential that the panel
+ * then needs. Deliberately not an unauthenticated bootstrap endpoint, which
+ * would be a window that is open until someone remembers to close it.
+ */
+async function addTokenAndExit(config: BrainConfig, argv: string[]): Promise<never> {
+  const at = argv.indexOf('--add-token')
+  const name = argv[at + 1]
+  const roleFlag = argv.indexOf('--role')
+  const role = roleFlag >= 0 && argv[roleFlag + 1] === 'admin' ? 'admin' : 'agent'
+  if (!name || name.startsWith('--')) {
+    console.error('usage: brain-core --add-token <name> [--role admin]')
+    process.exit(2)
+  }
+  const r = await createToken(config.auth.tokensFile, { name, role })
+  if (!r.ok) {
+    console.error(`[brain-core] ${r.detail}`)
+    process.exit(1)
+  }
+  console.error(`[brain-core] ${role} token "${r.summary.name}" written to ${config.auth.tokensFile}`)
+  console.error('[brain-core] shown once — copy it now:\n')
+  // stdout, so `brain-core --add-token x | tee` works and the noise above does not.
+  console.log(r.token)
+  process.exit(0)
+}
+
 async function main(): Promise<void> {
   installCrashReporting()
   const config = await loadConfig(process.argv.slice(2), process.env)
 
+  if (process.argv.includes('--add-token')) await addTokenAndExit(config, process.argv)
   if (process.argv.includes('--claim-vault')) await claimAndExit(config)
 
   const server = await createBrainServer(config)
