@@ -51,14 +51,34 @@ export function embedModelMatches(available: string, wanted: string): boolean {
 }
 
 export class EmbedClient {
-  private readonly url: string
-  private readonly model: string
+  private url: string
+  private model: string
   private readonly timeoutMs: number
 
   constructor(cfg: EmbedClientConfig) {
     this.url = cfg.ollamaUrl.replace(/\/$/, '')
     this.model = cfg.embedModel
     this.timeoutMs = cfg.timeoutMs ?? 300_000
+  }
+
+  /**
+   * Repoint a live client after an admin changes the setting.
+   *
+   * Mutating beats rebuilding: the ToolContext holds this instance, so a new
+   * object would have to be threaded through every consumer, and one missed
+   * reference would leave part of the server talking to the old address —
+   * working, and wrong, which is the hardest state to notice.
+   *
+   * The caller validates the URL. Changing the *model* invalidates the index;
+   * that warning belongs to whoever made the change, not to this setter.
+   */
+  reconfigure(cfg: Partial<EmbedClientConfig>): void {
+    if (cfg.ollamaUrl) this.url = cfg.ollamaUrl.replace(/\/$/, '')
+    if (cfg.embedModel) this.model = cfg.embedModel
+  }
+
+  get config(): { ollamaUrl: string; embedModel: string } {
+    return { ollamaUrl: this.url, embedModel: this.model }
   }
 
   /**
