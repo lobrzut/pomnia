@@ -77,10 +77,15 @@ describe('syncVaultToReplica', () => {
     unchanged?: number
     extra?: string[]
     rejected?: Array<{ path: string; reason: string }>
-  }): { fetch: typeof fetch; uploads: string[] } => {
+  }): { fetch: typeof fetch; uploads: string[]; reindexed: () => number } => {
     const uploads: string[] = []
+    let reindexCalls = 0
     const f = vi.fn(async (url: string, init: RequestInit) => {
       const body = JSON.parse(String(init.body))
+      if (String(url).endsWith('/sync/reindex')) {
+        reindexCalls++
+        return { ok: true, status: 202, text: async () => JSON.stringify({ started: true }) }
+      }
       if (String(url).endsWith('/sync/plan')) {
         return {
           ok: true,
@@ -98,8 +103,47 @@ describe('syncVaultToReplica', () => {
       return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, path: body.path, bytes: 1 }) }
     })
     vi.stubGlobal('fetch', f)
-    return { fetch: f as unknown as typeof fetch, uploads }
+    return { fetch: f as unknown as typeof fetch, uploads, reindexed: () => reindexCalls }
   }
+
+  /** Uploading into an index nobody rebuilt changes nothing an agent can find. */
+  it('tells the replica to reindex after uploading, and not before', async () => {
+    await put('sessions/a.md', 'a')
+    const s = fakeServer({ wanted: ['sessions/a.md'] })
+    await syncVaultToReplica({ vaultRoot: root, target: 'http://replica:7865' })
+    expect(s.reindexed()).toBe(1)
+  })
+
+  it('does not reindex when nothing was uploaded', async () => {
+    await put('sessions/a.md', 'a')
+    const s = fakeServer({ wanted: [], unchanged: 1 })
+    await syncVaultToReplica({ vaultRoot: root, target: 'http://replica:7865' })
+    expect(s.reindexed()).toBe(0)
+  })
+
+  it('reports a failed reindex instead of calling the sync clean', async () => {
+    await put('sessions/a.md', 'a')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).endsWith('/sync/reindex')) {
+          return { ok: false, status: 500, text: async () => JSON.stringify({ error: 'boom' }) }
+        }
+        if (String(url).endsWith('/sync/plan')) {
+          return {
+            ok: true,
+            status: 200,
+            text: async () =>
+              JSON.stringify({ wanted: ['sessions/a.md'], unchanged: 0, extra: [], rejected: [] }),
+          }
+        }
+        return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true }) }
+      }),
+    )
+    const r = await syncVaultToReplica({ vaultRoot: root, target: 'http://replica:7865' })
+    expect(r.uploaded).toBe(1)
+    expect(r.failed.map((f) => f.path)).toContain('(reindeks repliki)')
+  })
 
   it('uploads only what the replica asked for', async () => {
     await put('sessions/a.md', 'a')

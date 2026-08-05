@@ -211,6 +211,17 @@ export async function syncVaultToReplica(opts: VaultSyncOptions): Promise<VaultS
     }
   }
 
+  // Files a replica holds but never indexed are files no agent can find, so
+  // the upload is only half the job. Fire-and-forget: the replica reindexes in
+  // the background and the count lands in its log, not in this result.
+  if (result.uploaded > 0) {
+    try {
+      await post(base, '/sync/reindex', opts.token, {}, 15_000)
+    } catch (e) {
+      result.failed.push({ path: '(reindeks repliki)', reason: (e as Error).message })
+    }
+  }
+
   log.info(
     `vault sync → ${base}: ${result.uploaded} uploaded, ${result.unchanged} unchanged, ` +
       `${result.failed.length} failed, ${result.extraOnReplica.length} extra on replica`,
