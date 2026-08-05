@@ -102,6 +102,16 @@ export function renderAdminPage(origin: string): string {
   .secret{font-family:var(--mono);font-size:.8rem;word-break:break-all;
     background:rgba(0,0,0,.3);padding:.6rem .8rem;border-radius:10px;margin-top:.5rem}
   @media (prefers-color-scheme:light){.secret{background:rgba(0,0,0,.06)}}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr));gap:.7rem;margin-bottom:1.4rem}
+  .tile{border:1px solid var(--border);border-radius:14px;padding:.8rem .9rem}
+  .tile .n{font-size:1.45rem;font-weight:800;letter-spacing:-.02em;line-height:1.15}
+  .tile .k{font-size:.72rem;color:var(--ink-faint);margin-top:.15rem}
+  .tile.warn .n{color:var(--amber)}
+  .tile.bad .n{color:var(--rose)}
+  .tile.good .n{color:var(--mint)}
+  .sub-h{margin:1.5rem 0 .4rem;font-size:.78rem;font-weight:700;color:var(--ink-faint);
+    text-transform:uppercase;letter-spacing:.06em}
+  .empty{color:var(--ink-faint);font-size:.82rem;padding:.5rem 0}
   .hidden{display:none}
   footer{margin-top:1.5rem;color:var(--ink-faint);font-size:.76rem;text-align:center}
   a{color:var(--iris)}
@@ -136,7 +146,8 @@ export function renderAdminPage(origin: string): string {
   <!-- ── panel ──────────────────────────────────────────────────────────── -->
   <div id="panel" class="hidden">
     <nav>
-      <button data-tab="status" aria-current="true">Stan</button>
+      <button data-tab="dash" aria-current="true">Pulpit</button>
+      <button data-tab="status">Stan</button>
       <button data-tab="engine">Silnik</button>
       <button data-tab="clients">Klienci</button>
       <button data-tab="users">Konta</button>
@@ -145,7 +156,21 @@ export function renderAdminPage(origin: string): string {
       <button id="logout" class="ghost" style="margin-left:auto">Wyloguj</button>
     </nav>
 
-    <section class="card" id="tab-status">
+    <section class="card" id="tab-dash">
+      <h2>Pulpit</h2>
+      <p class="lead">Co ten serwer ma i co się z nim dzieje.</p>
+      <div class="tiles" id="tiles"></div>
+      <h3 class="sub-h">Vault na dysku</h3>
+      <table><tbody id="vault-rows"></tbody></table>
+      <h3 class="sub-h">Kto pyta (ostatnie 24 h)</h3>
+      <table><tbody id="actor-rows"></tbody></table>
+      <h3 class="sub-h">Ostatnie zapytania</h3>
+      <table><tbody id="act-rows"></tbody></table>
+      <div class="row"><button id="dash-refresh" class="ghost">Odśwież</button></div>
+      <div id="dash-msg"></div>
+    </section>
+
+    <section class="card hidden" id="tab-status">
       <h2>Stan serwera</h2>
       <p class="lead">
         To samo, co <code class="mono">/healthz</code> — z powodami, bo jesteś zalogowany.
@@ -352,7 +377,7 @@ export function renderAdminPage(origin: string): string {
     text($('who'), me.username + ' · ' + me.role)
     const s = await api('GET', '/admin/settings')
     fill(s)
-    await Promise.all([loadStatus(), loadTokens(), loadUsers(), loadBehaviour(), loadVault()])
+    await Promise.all([loadDash(), loadStatus(), loadTokens(), loadUsers(), loadBehaviour(), loadVault()])
   }
 
   async function logout() {
@@ -375,6 +400,85 @@ export function renderAdminPage(origin: string): string {
     } catch {
       $('user').focus()
     }
+  }
+
+  // ── dashboard ───────────────────────────────────────────────────────────
+  const fmt = (n) => Number(n || 0).toLocaleString('pl')
+
+  function bytes(n) {
+    if (n < 1024) return n + ' B'
+    if (n < 1024 * 1024) return (n / 1024).toFixed(0) + ' kB'
+    return (n / 1024 / 1024).toFixed(1) + ' MB'
+  }
+
+  function ago(ts) {
+    const s = Math.max(0, Math.round((Date.now() - ts) / 1000))
+    if (s < 60) return s + ' s temu'
+    if (s < 3600) return Math.round(s / 60) + ' min temu'
+    if (s < 86400) return Math.round(s / 3600) + ' h temu'
+    return new Date(ts).toLocaleString('pl')
+  }
+
+  function uptime(sec) {
+    if (sec < 3600) return Math.round(sec / 60) + ' min'
+    if (sec < 86400) return Math.floor(sec / 3600) + ' h ' + String(Math.floor((sec % 3600) / 60)).padStart(2, '0') + ' min'
+    return Math.floor(sec / 86400) + ' d ' + String(Math.floor((sec % 86400) / 3600)).padStart(2, '0') + ' h'
+  }
+
+  function tile(parent, value, key, cls) {
+    const d = document.createElement('div')
+    d.className = 'tile' + (cls ? ' ' + cls : '')
+    const n = document.createElement('div'); n.className = 'n'; n.textContent = value
+    const k = document.createElement('div'); k.className = 'k'; k.textContent = key
+    d.append(n, k); parent.appendChild(d)
+  }
+
+  function rows(tbody, list, cells, emptyText) {
+    tbody.innerHTML = ''
+    if (!list.length) {
+      const tr = document.createElement('tr')
+      const td = document.createElement('td'); td.className = 'empty'; td.colSpan = 3
+      td.textContent = emptyText
+      tr.appendChild(td); tbody.appendChild(tr)
+      return
+    }
+    for (const item of list) {
+      const tr = document.createElement('tr')
+      for (const [text, cls] of cells(item)) {
+        const td = document.createElement('td')
+        if (cls) td.className = cls
+        td.textContent = text
+        tr.appendChild(td)
+      }
+      tbody.appendChild(tr)
+    }
+  }
+
+  async function loadDash() {
+    let o
+    try { o = await api('GET', '/admin/overview') } catch (e) { msg($('dash-msg'), 'err', e.message); return }
+    msg($('dash-msg'), null, null)
+
+    const t = $('tiles'); t.innerHTML = ''
+    tile(t, fmt(o.index.files), 'plików w indeksie')
+    tile(t, fmt(o.index.chunks), 'fragmentów')
+    // The number worth a colour: notes on disk the index has never seen.
+    tile(t, fmt(o.unindexed), 'czeka na indeks', o.unindexed > 0 ? 'warn' : 'good')
+    tile(t, fmt(o.activity.last24h), 'zapytań / 24 h', o.activity.last24h > 0 ? 'good' : '')
+    tile(t, String(o.activity.actors.length), 'aktywnych klientów')
+    tile(t, uptime(o.uptimeSec), 'działa')
+
+    rows($('vault-rows'), o.vault,
+      (v) => [[v.dir + (v.indexable ? '' : '  · nie indeksowane')], [fmt(v.files) + ' plików', 'mono'], [bytes(v.bytes), 'mono']],
+      'Vault jest pusty — nic tu jeszcze nie trafiło.')
+
+    rows($('actor-rows'), o.activity.actors,
+      (a) => [[a.name], [fmt(a.calls) + ' zapytań', 'mono'], [ago(a.last), 'mono']],
+      'Żaden agent nie odpytywał w ostatniej dobie.')
+
+    rows($('act-rows'), o.activity.recent,
+      (e) => [[e.tool], [e.detail || '—', 'mono'], [ago(e.ts), 'mono']],
+      'Brak zapytań od startu serwera.')
   }
 
   // ── status ──────────────────────────────────────────────────────────────
@@ -601,7 +705,7 @@ export function renderAdminPage(origin: string): string {
   for (const b of document.querySelectorAll('nav button')) {
     b.onclick = () => {
       for (const o of document.querySelectorAll('nav button')) o.setAttribute('aria-current', String(o === b))
-      for (const s of ['status', 'engine', 'clients', 'users', 'behaviour', 'vault']) {
+      for (const s of ['dash', 'status', 'engine', 'clients', 'users', 'behaviour', 'vault']) {
         $('tab-' + s).classList.toggle('hidden', s !== b.dataset.tab)
       }
     }
@@ -612,6 +716,7 @@ export function renderAdminPage(origin: string): string {
   $('adduser').onclick = addUser
   $('save-behaviour').onclick = saveBehaviour
   $('refresh').onclick = loadStatus
+  $('dash-refresh').onclick = loadDash
   $('save-engine').onclick = saveEngine
   $('reindex').onclick = reindex
   $('add').onclick = addToken

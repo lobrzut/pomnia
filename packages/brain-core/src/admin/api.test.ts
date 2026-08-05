@@ -42,6 +42,7 @@ beforeEach(async () => {
       dropped.push(u)
       return 2
     }),
+    overview: vi.fn(async () => ({ index: { files: 1, chunks: 2 }, unindexed: 0 })),
     applyOllama: vi.fn((n) => {
       if (n.ollamaUrl) live.ollamaUrl = n.ollamaUrl
       if (n.embedModel) live.embedModel = n.embedModel
