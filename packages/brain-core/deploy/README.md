@@ -82,6 +82,46 @@ sudo -u pomnia node dist/daemon.js --data-dir /var/lib/pomnia \
   --vault-root /var/lib/pomnia/vault --reindex
 ```
 
+## Accounts and tokens
+
+Two kinds of credential, because they are stolen and revoked differently:
+
+| | for | how |
+| --- | --- | --- |
+| **Account** | a person at the panel | login + password, session cookie |
+| **Token** | an agent or a script | `Authorization: Bearer …`, no expiry |
+
+The installer creates one account with a **random** password and prints it
+once. There is no `admin/changeme`: a default that is meant to be changed is a
+default that stays. Change it after the first login anyway — it was on a
+terminal.
+
+```bash
+# another person, or a replacement if you lose the first
+sudo -u pomnia node dist/daemon.js --data-dir /var/lib/pomnia \
+  --add-user someone --role admin
+```
+
+The password is read from stdin, never from a flag: an argument lands in shell
+history and in `ps` output for every user on the box.
+
+Accounts are always admins — login refuses anything else, so a non-admin
+account would be one that can never sign in. For machines, issue a token.
+
+Sessions live in memory: a restart logs everyone out, and a stolen session file
+is not a thing that exists. The cookie is `HttpOnly` (script cannot read it, so
+an XSS on this origin cannot steal the session), `SameSite=Strict`, scoped to
+`/admin`, and `Secure` only over HTTPS — setting it on plain HTTP would make
+the browser drop it and the panel would look broken with no explanation.
+Mutations additionally carry a CSRF token returned in the login body and never
+in a cookie, so a cross-site page cannot read it to replay.
+
+Changing a password ends every session for that account, including the one
+doing the changing.
+
+Ten failed logins per quarter hour per address. A password is guessable in a
+way a 256-bit token is not, so it does not share the bearer budget.
+
 ## Tokens
 
 `/var/lib/pomnia/mcp-tokens.json`, mode 600, owned by `pomnia`:
