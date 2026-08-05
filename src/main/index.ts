@@ -48,6 +48,7 @@ import {
   runDoctor,
   saveIndex,
   searchIndex,
+  syncVaultToReplica,
   setLogSink,
   initFileLog,
   syncSkills,
@@ -1278,6 +1279,67 @@ function registerIpc(): void {
       refreshTrayMenu(win, requestQuit)
     }
   }
+  /**
+   * Push this machine's vault to a replica.
+   *
+   * Until now "the server has a copy" meant a tar somebody ran once, which
+   * started rotting with the next saved conversation and never said so.
+   */
+  ipcMain.handle('vault:syncToReplica', async (_e, target: string, token?: string) => {
+    if (!vaultPath) throw new Error('Vault nie jest otwarty.')
+    const url = (target ?? '').trim()
+    if (!url) throw new Error('Podaj adres serwera (zakładka Podłącz).')
+    const root = brainVaultRoot(vaultPath)
+    activity.update({ kind: 'indexing', phase: 'reindex', detail: 'porównuję z repliką…' })
+    try {
+      const r = await syncVaultToReplica({
+        vaultRoot: root,
+        target: url,
+        token: token?.trim() || undefined,
+        onProgress: (done, total, path) =>
+          activity.update({
+            kind: 'indexing',
+            phase: 'reindex',
+            detail: `wysyłam ${done}/${total} — ${basename(path)}`,
+          }),
+      })
+      // Uploading files a replica does not index changes nothing an agent can
+      // find, so the count that matters is the one after the reindex, not the
+      // one after the upload.
+      const toast =
+        r.failed.length > 0
+          ? {
+              kind: 'warn' as const,
+              title: `Wysłano ${r.uploaded}, nie udało się ${r.failed.length}`,
+              detail: r.failed
+                .slice(0, 3)
+                .map((f) => `${basename(f.path)}: ${f.reason}`)
+                .join(' · '),
+            }
+          : r.uploaded === 0
+            ? {
+                kind: 'info' as const,
+                title: 'Replika była już aktualna',
+                detail: `${r.unchanged} plików identycznych — nic do wysłania.`,
+              }
+            : {
+                kind: 'success' as const,
+                title: `Zsynchronizowano ${r.uploaded} plik(ów)`,
+                detail:
+                  `${r.unchanged} bez zmian · ${r.bytesUploaded > 0 ? `${(r.bytesUploaded / 1024).toFixed(0)} kB` : '0 kB'}` +
+                  (r.extraOnReplica.length
+                    ? ` · ${r.extraOnReplica.length} plik(ów) jest tylko na replice (nic nie skasowano)`
+                    : ''),
+              }
+      sendAppToast(toast)
+      if (r.failed.length) log.warn('vault sync failures:', r.failed.slice(0, 10))
+      if (r.skipped.length) log.warn('vault sync skipped locally:', r.skipped.slice(0, 10))
+      return r
+    } finally {
+      activity.idle('indexing')
+    }
+  })
+
   ipcMain.handle('brainCore:status', () => brainCore.status())
   ipcMain.handle('brainCore:start', async (_e, ollamaUrl?: string) => {
     const url = resolveOllamaUrl(ollamaUrl)

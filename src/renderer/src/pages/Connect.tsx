@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Settings2,
   Sparkles,
+  UploadCloud,
   X
 } from 'lucide-react'
 import { Badge, Button, GlassCard, Input, Spinner, Toggle } from '../components/ui'
@@ -133,6 +134,7 @@ export default function Connect() {
   }
 
   const [syncing, setSyncing] = useState(false)
+  const [pushing, setPushing] = useState(false)
 
   async function refresh() {
     setLoading(true)
@@ -266,6 +268,21 @@ export default function Connect() {
       })
     } finally {
       setWritingBrief(false)
+    }
+  }
+
+  /**
+   * Push the vault to the replica. The toast is written by the main process,
+   * which is the side that knows how many files actually moved.
+   */
+  async function pushVault() {
+    setPushing(true)
+    try {
+      await api.vaultSyncToReplica(remoteBrainUrl.trim(), connectToken || undefined)
+    } catch (e) {
+      toast({ kind: 'error', title: labels.vaultReplicaFailed, detail: (e as Error).message })
+    } finally {
+      setPushing(false)
     }
   }
 
@@ -773,6 +790,23 @@ export default function Connect() {
           Sync skills
         </Button>
       </GlassCard>
+      )}
+
+      {/* Vault replication — this machine owns the vault, the server mirrors it */}
+      {effectiveTarget === 'remote' && (
+        <GlassCard className="mt-4 p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+              <UploadCloud className="h-4 w-4 text-mint" /> {labels.vaultReplicaTitle}
+            </div>
+            <Badge color="#9aa3bd">{labels.vaultReplicaBadge}</Badge>
+          </div>
+          <p className="mb-3 text-xs text-ink-faint">{labels.vaultReplicaLead}</p>
+          <Button onClick={() => void pushVault()} disabled={pushing || !remoteBrainUrl.trim()}>
+            {pushing ? <Spinner className="h-4 w-4" /> : <UploadCloud className="h-4 w-4" />}
+            {labels.vaultReplicaAction}
+          </Button>
+        </GlassCard>
       )}
     </div>
   )

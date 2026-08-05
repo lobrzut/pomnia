@@ -182,6 +182,17 @@ export interface PomniaBridge {
   >
   connectSkillsList(brainUrl: string, token?: string): Promise<SkillListEntry[]>
   connectSkillsSync(brainUrl: string, token?: string): Promise<SkillSyncResult>
+  vaultSyncToReplica(
+    target: string,
+    token?: string,
+  ): Promise<{
+    unchanged: number
+    uploaded: number
+    failed: Array<{ path: string; reason: string }>
+    skipped: Array<{ path: string; reason: string }>
+    extraOnReplica: string[]
+    bytesUploaded: number
+  }>
   connectMcpTokenCreate(
     brainUrl: string,
     name: string,
@@ -781,6 +792,18 @@ function mockBridge(): PomniaBridge {
         ok: true as const,
         path,
         bytes: 420,
+      }
+    },
+    async vaultSyncToReplica() {
+      // Browser mock: the interesting shape is "already up to date", because
+      // that is what a second run looks like and it must not read as failure.
+      return {
+        unchanged: 2864,
+        uploaded: 0,
+        failed: [],
+        skipped: [],
+        extraOnReplica: [],
+        bytesUploaded: 0,
       }
     },
     async connectSkillsList() {
