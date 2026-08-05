@@ -38,6 +38,15 @@ import { applyFile, planSync, type ManifestEntry } from '../sync/receive.js'
 import { handleAdmin, readAdminBody, sendAdmin, type AdminDeps } from '../admin/api.js'
 import { readSettings } from '../admin/settings.js'
 import { touchToken } from '../admin/tokens.js'
+import {
+  CSRF_HEADER,
+  SESSION_COOKIE,
+  clearCookie,
+  createSessionStore,
+  readCookie,
+  sessionCookie,
+} from '../admin/sessions.js'
+import { authenticate, touchLogin } from '../admin/users.js'
 import { collectHealth, redactHealth } from '../health.js'
 import { indexDir } from '../rag/indexer.js'
 import { renderAdminPage } from './adminPage.js'
@@ -202,6 +211,13 @@ export async function createBrainServer(
   let vaultOwnership: OwnershipVerdict | null = null
   let reindexing = false
   let startedAt = Date.now()
+  const sessions = createSessionStore()
+  /**
+   * Failed logins per address. Separate from the bearer gate's counter: a
+   * password is guessable in a way a 256-bit token is not, so this is the
+   * endpoint that actually gets attacked and it gets a tighter budget.
+   */
+  const loginFails = new Map<string, number[]>()
   let adopted = false
 
   const url = `http://${config.host}:${config.port}/mcp`
@@ -480,6 +496,12 @@ export async function createBrainServer(
         }
 
         void (async () => {
+          // The panel authenticates with a session cookie, so its requests
+          // carry no Authorization header and would 401 at the bearer gate.
+          // Handled first; the bearer path below still works for scripts and
+          // for Pomnia Desktop driving the same API.
+          if (isAdmin && (await serveAdminSession(pathOnly, req, res))) return
+
           // Gate everything under /mcp, activity included — that endpoint
           // echoes the last query text, which is vault content. /sync/* is
           // gated by the same token: it writes to the vault. /admin/* needs
@@ -588,6 +610,129 @@ export async function createBrainServer(
       }
 
       /**
+       * Password login for the panel, and everything that hangs off a session.
+       *
+       * Returns true when it has answered the request; false means "not mine,
+       * fall through to the bearer gate". Both credentials reach the same API
+       * on purpose — a browser gets a session, a script keeps its token.
+       */
+      async function serveAdminSession(
+        path: string,
+        req: IncomingMessage,
+        res: ServerResponse,
+      ): Promise<boolean> {
+        const isHttps = String(req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() === 'https'
+        const clientKey = (): string => {
+          const fwd = req.headers['x-forwarded-for']
+          const first = Array.isArray(fwd) ? fwd[0] : fwd?.split(',')[0]
+          return (first?.trim() || req.socket.remoteAddress || 'unknown').toLowerCase()
+        }
+
+        if (path === '/admin/login') {
+          if (req.method !== 'POST') {
+            sendAdmin(res, { status: 405, body: { error: 'method_not_allowed' } })
+            return true
+          }
+          // A password is guessable in a way a 256-bit token is not, so this
+          // gets its own, tighter budget rather than sharing the bearer one.
+          const key = clientKey()
+          const t = Date.now()
+          const win = (loginFails.get(key) ?? []).filter((ts) => t - ts < 15 * 60_000)
+          if (win.length >= 10) {
+            res.setHeader('retry-after', '900')
+            sendAdmin(res, {
+              status: 429,
+              body: { error: 'rate_limited', detail: 'Za dużo prób. Spróbuj za kwadrans.' },
+            })
+            return true
+          }
+
+          const body = (await readAdminBody(req).catch(() => null)) as {
+            username?: unknown
+            password?: unknown
+          } | null
+          const r = await authenticate(
+            config.dataDir,
+            String(body?.username ?? ''),
+            String(body?.password ?? ''),
+          )
+          if (!r.ok || r.user.role !== 'admin') {
+            win.push(t)
+            loginFails.set(key, win)
+            console.error(`[brain-core] failed panel login from ${key}`)
+            // One message for both cases: naming which half was wrong turns a
+            // login form into an account enumerator.
+            sendAdmin(res, {
+              status: 401,
+              body: { error: 'bad_credentials', detail: 'Nieprawidłowy login lub hasło.' },
+            })
+            return true
+          }
+
+          loginFails.delete(key)
+          const s = sessions.create(r.user.username, r.user.role)
+          void touchLogin(config.dataDir, r.user.username).catch(() => {})
+          console.error(`[brain-core] panel login: ${r.user.username} from ${key}`)
+          res.setHeader('set-cookie', sessionCookie(s.id, isHttps))
+          // The CSRF token goes in the body, never in a cookie: the whole point
+          // is that a cross-site page cannot read it.
+          sendAdmin(res, {
+            status: 200,
+            body: { ok: true, username: r.user.username, role: r.user.role, csrf: s.csrf },
+          })
+          return true
+        }
+
+        const sid = readCookie(req.headers.cookie, SESSION_COOKIE)
+        const session = sessions.get(sid)
+
+        if (path === '/admin/logout') {
+          sessions.destroy(sid)
+          res.setHeader('set-cookie', clearCookie(isHttps))
+          sendAdmin(res, { status: 200, body: { ok: true } })
+          return true
+        }
+
+        if (path === '/admin/me') {
+          sendAdmin(
+            res,
+            session
+              ? { status: 200, body: { username: session.username, role: session.role, csrf: session.csrf } }
+              : { status: 401, body: { error: 'no_session' } },
+          )
+          return true
+        }
+
+        if (!session) return false // no session — let the bearer gate try
+
+        // SameSite=Strict already stops a cross-site POST in every browser that
+        // matters; this covers the same-site-but-untrusted case and costs one
+        // header. Reads are exempt: they change nothing.
+        const mutating = req.method !== 'GET' && req.method !== 'HEAD'
+        if (mutating && !sessions.checkCsrf(session, req.headers[CSRF_HEADER] as string | undefined)) {
+          sendAdmin(res, {
+            status: 403,
+            body: { error: 'csrf', detail: 'Brak lub zły token CSRF — odśwież panel i zaloguj się ponownie.' },
+          })
+          return true
+        }
+
+        const body = await readAdminBody(req).catch(() => undefined)
+        if (body === undefined) {
+          sendAdmin(res, { status: 400, body: { error: 'bad_body' } })
+          return true
+        }
+        sendAdmin(
+          res,
+          await handleAdmin(
+            { method: req.method ?? 'GET', path, body, actor: session.username },
+            adminDeps(),
+          ),
+        )
+        return true
+      }
+
+      /**
        * Everything the admin surface is allowed to touch, in one place.
        *
        * A factory rather than an object literal built once: `ctx` and
@@ -598,6 +743,32 @@ export async function createBrainServer(
         return {
           dataDir: config.dataDir,
           tokensFile: config.auth.tokensFile,
+          runtime: {
+            get: () => ({
+              handshakePhrase: config.handshakePhrase ?? 'OK to Go Go Go',
+              handshakeEnabled: config.handshakeEnabled !== false,
+              autoCheckpointEnabled: config.autoCheckpointEnabled !== false,
+              instanceLabel: config.instanceLabel ?? hostname(),
+            }),
+            set(next) {
+              if (next.handshakePhrase !== undefined) config.handshakePhrase = next.handshakePhrase
+              if (next.handshakeEnabled !== undefined) config.handshakeEnabled = next.handshakeEnabled
+              if (next.autoCheckpointEnabled !== undefined) {
+                config.autoCheckpointEnabled = next.autoCheckpointEnabled
+              }
+              if (next.instanceLabel !== undefined) config.instanceLabel = next.instanceLabel
+              // ToolContext feeds the tool descriptions agents read, so a change
+              // that stops at `config` would look applied and do nothing.
+              if (ctx) {
+                if (next.handshakePhrase !== undefined) ctx.handshakePhrase = next.handshakePhrase
+                if (next.handshakeEnabled !== undefined) ctx.handshakeEnabled = next.handshakeEnabled
+                if (next.autoCheckpointEnabled !== undefined) {
+                  ctx.autoCheckpointEnabled = next.autoCheckpointEnabled
+                }
+              }
+            },
+          },
+          dropSessionsFor: (username) => sessions.destroyUser(username),
           applyOllama(next) {
             if (next.ollamaUrl) config.ollamaUrl = next.ollamaUrl
             if (next.embedModel) config.embedModel = next.embedModel
