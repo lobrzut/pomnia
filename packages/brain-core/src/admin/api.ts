@@ -44,6 +44,8 @@ export interface AdminDeps {
   }
   /** Sessions to end when a password changes or an account is removed. */
   dropSessionsFor(username: string): number
+  /** Everything the dashboard shows. Derived on each call, never cached. */
+  overview(): Promise<unknown>
   /** Applied live so a settings change does not need a restart. */
   applyOllama(next: { ollamaUrl?: string; embedModel?: string }): void
   currentOllama(): { ollamaUrl: string; embedModel: string }
@@ -138,6 +140,11 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
           }
         : {}),
     })
+  }
+
+  // ── overview (the dashboard) ────────────────────────────────────────────
+  if (path === '/admin/overview' && method === 'GET') {
+    return j(200, await deps.overview())
   }
 
   // ── behaviour (runtime, no restart) ─────────────────────────────────────

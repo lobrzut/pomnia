@@ -309,7 +309,7 @@ export async function indexDocument(
  * - `blobs` / `snapshots`: encrypted vault sidecar (not markdown knowledge)
  * - `node_modules` / `.git`: deps / VCS (`.git` also caught by dot-prefix skip)
  */
-const SKIP_DIRS = new Set([
+export const SKIP_DIRS = new Set([
   '_review',
   '_quarantine_stubs',
   'skills',
@@ -324,7 +324,7 @@ const SKIP_DIRS = new Set([
  * walked (plus any loose `.md`/`.txt` at the root, e.g. USER.md).
  * Skills live next to distilled/ but must never enter RAG.
  */
-const INDEX_SUBDIRS = new Set(['distilled', 'sessions', 'library'])
+export const INDEX_SUBDIRS = new Set(['distilled', 'sessions', 'library'])
 
 /** Basenames never indexed even if they appear outside skills/ (belt-and-suspenders). */
 const SKIP_BASENAMES = new Set(['example_usage.md'])

@@ -47,6 +47,7 @@ import {
   sessionCookie,
 } from '../admin/sessions.js'
 import { authenticate, touchLogin } from '../admin/users.js'
+import { collectOverview, createActivityRing, type ActivityRing } from '../admin/overview.js'
 import { collectHealth, redactHealth } from '../health.js'
 import { indexDir } from '../rag/indexer.js'
 import { renderAdminPage } from './adminPage.js'
@@ -149,8 +150,21 @@ function mcpQueryDetail(tool: string, args: unknown): string | undefined {
 
 let lastMcpActivity: { tool: string; detail?: string; ts: number } | null = null
 
-function recordMcpActivity(ev: McpQueryEvent): void {
-  lastMcpActivity = { tool: ev.tool, detail: ev.detail, ts: Date.now() }
+/**
+ * A window on recent calls, so the dashboard can answer "is anything actually
+ * using this". Module-level alongside `lastMcpActivity` because both are fed
+ * from the same place, and splitting them would let the two disagree.
+ */
+const activityRing: ActivityRing = createActivityRing(50)
+
+export function getActivityRing(): ActivityRing {
+  return activityRing
+}
+
+function recordMcpActivity(ev: McpQueryEvent, actor?: string): void {
+  const ts = Date.now()
+  lastMcpActivity = { tool: ev.tool, detail: ev.detail, ts }
+  activityRing.push({ tool: ev.tool, detail: ev.detail, ts, actor })
 }
 
 export function getMcpActivitySnapshot(): { last: typeof lastMcpActivity; recent: boolean } {
@@ -162,6 +176,8 @@ export function getMcpActivitySnapshot(): { last: typeof lastMcpActivity; recent
 function createMcpServer(
   ctx: ToolContext,
   onMcpQuery?: (ev: McpQueryEvent) => void,
+  /** Token name from the auth gate, so the dashboard can say *who* asked. */
+  actor?: string,
 ): Server {
   const mcp = new Server(
     { name: 'brain-core', version: BRAIN_CORE_VERSION },
@@ -175,7 +191,7 @@ function createMcpServer(
     const toolArgs = req.params.arguments ?? {}
     if (MCP_QUERY_TOOLS.has(toolName)) {
       const ev = { tool: toolName, detail: mcpQueryDetail(toolName, toolArgs) }
-      recordMcpActivity(ev)
+      recordMcpActivity(ev, actor)
       onMcpQuery?.(ev)
     }
     try {
@@ -573,7 +589,7 @@ export async function createBrainServer(
             res.end('mcp not ready')
             return
           }
-          await serveMcp(req, res)
+          await serveMcp(req, res, auth.name)
         })().catch((err: unknown) => {
           console.error('[brain-core] request error:', err)
           if (!res.headersSent) {
@@ -769,6 +785,14 @@ export async function createBrainServer(
             },
           },
           dropSessionsFor: (username) => sessions.destroyUser(username),
+          overview: () =>
+            collectOverview({
+              db: ctx?.db ?? null,
+              vaultRoot: ctx?.vaultRoot ?? '',
+              ring: activityRing,
+              startedAt,
+              version: BRAIN_CORE_VERSION,
+            }),
           applyOllama(next) {
             if (next.ollamaUrl) config.ollamaUrl = next.ollamaUrl
             if (next.embedModel) config.embedModel = next.embedModel
@@ -905,8 +929,12 @@ export async function createBrainServer(
        * ("headers already sent" / "Stateless transport cannot be reused").
        * Extracted from the handler so the auth path can await it.
        */
-      async function serveMcp(req: IncomingMessage, res: ServerResponse): Promise<void> {
-        const mcp = createMcpServer(ctx!, opts?.onMcpQuery)
+      async function serveMcp(
+        req: IncomingMessage,
+        res: ServerResponse,
+        actor?: string,
+      ): Promise<void> {
+        const mcp = createMcpServer(ctx!, opts?.onMcpQuery, actor)
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: undefined,
         })
