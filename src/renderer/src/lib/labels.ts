@@ -240,6 +240,11 @@ export interface UiLabels {
   settingsEngineLocal: string
   settingsEngineRemote: string
   settingsEngineWhereToSwitch: string
+  vaultReplicaTitle: string
+  vaultReplicaBadge: string
+  vaultReplicaLead: string
+  vaultReplicaAction: string
+  vaultReplicaFailed: string
   onboardingEngineLooking: string
   onboardingEngineRunning: string
   onboardingEngineMoreModels: (n: number) => string
@@ -890,6 +895,12 @@ const PL_LABELS: UiLabels = {
   settingsEngineLocal: 'lokalny, w tej aplikacji',
   settingsEngineRemote: 'zdalny serwer',
   settingsEngineWhereToSwitch: 'Przełączysz w zakładce Podłącz — bez reinstalacji.',
+  vaultReplicaTitle: 'Replikacja vaultu',
+  vaultReplicaBadge: 'ten komputer jest właścicielem',
+  vaultReplicaLead:
+    'Wysyła na serwer tylko to, co się zmieniło — reszta zostaje na miejscu. Nic nie kasuje: pliki, których tu już nie ma, zostaną wypisane, nie usunięte. Blobów nie wysyła.',
+  vaultReplicaAction: 'Wyślij zmiany na serwer',
+  vaultReplicaFailed: 'Replikacja nieudana',
   onboardingEngineLooking: 'Szukam Ollama na tym komputerze…',
   onboardingEngineRunning: 'Ollama działa',
   onboardingEngineMoreModels: (n) => `+${n} więcej`,
@@ -1596,6 +1607,12 @@ const EN_LABELS: Partial<UiLabels> = {
   settingsEngineLocal: 'local, inside this app',
   settingsEngineRemote: 'remote server',
   settingsEngineWhereToSwitch: 'Switch it in the Connect tab — no reinstall needed.',
+  vaultReplicaTitle: 'Vault replication',
+  vaultReplicaBadge: 'this machine owns it',
+  vaultReplicaLead:
+    'Sends only what changed. Deletes nothing: files missing here are listed, not removed. Blobs stay put.',
+  vaultReplicaAction: 'Push changes to the server',
+  vaultReplicaFailed: 'Replication failed',
   onboardingEngineLooking: 'Looking for Ollama on this machine…',
   onboardingEngineRunning: 'Ollama is running',
   onboardingEngineMoreModels: (n) => `+${n} more`,

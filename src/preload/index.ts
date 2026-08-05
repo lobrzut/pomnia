@@ -105,6 +105,8 @@ const bridge = {
     return () => ipcRenderer.removeListener('activity:idle', l)
   },
   brainDeploy: (opts: unknown) => ipcRenderer.invoke('brain:deploy', opts),
+  vaultSyncToReplica: (target: string, token?: string) =>
+    ipcRenderer.invoke('vault:syncToReplica', target, token),
   connectStatus: (brainUrl?: string, token?: string, target?: string) =>
     ipcRenderer.invoke('connect:status', brainUrl, token, target),
   connectSnippet: (

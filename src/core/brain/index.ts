@@ -89,6 +89,8 @@ export {
   writeLedgerFile,
 } from './ledgerStore.js'
 export type { DistillLedgerFile, LedgerOwner, LoadLedgerResult, ProcessedMap } from './ledgerStore.js'
+export { buildVaultManifest, syncVaultToReplica, SYNCED_DIRS, SYNCED_ROOT_FILES } from './vaultSync.js'
+export type { VaultSyncResult, VaultSyncOptions, SyncManifestEntry } from './vaultSync.js'
 export { createMcpToken } from './mcpTokens.js'
 export type { McpTokenEntry } from './mcpTokens.js'
 

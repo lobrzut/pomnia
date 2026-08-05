@@ -32,6 +32,8 @@ import {
   resolveVaultOwnership,
   type OwnershipVerdict,
 } from '../storage/vaultOwner.js'
+import { MAX_FILE_BYTES, SYNC_DIRS } from '../sync/paths.js'
+import { applyFile, planSync, type ManifestEntry } from '../sync/receive.js'
 import { renderStatusPage } from './statusPage.js'
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
@@ -349,7 +351,8 @@ export async function createBrainServer(
         // else gets a 404 — matches Python mcp-proxy behavior + means
         // `/register` / `/.well-known/*` OAuth discovery probes get a proper
         // 404 instead of stalling. See project memory desktop-mcp-remote-fix.
-        if (!req.url?.startsWith('/mcp')) {
+        const isSync = pathOnly === '/sync/plan' || pathOnly === '/sync/file'
+        if (!req.url?.startsWith('/mcp') && !isSync) {
           res.statusCode = 404
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ error: 'not_found', hint: 'MCP endpoint is at /mcp' }))
@@ -358,7 +361,8 @@ export async function createBrainServer(
 
         void (async () => {
           // Gate everything under /mcp, activity included — that endpoint
-          // echoes the last query text, which is vault content.
+          // echoes the last query text, which is vault content. /sync/* is
+          // gated by the same token: it writes to the vault.
           const auth = await gate.check(req)
           if (!auth.ok) {
             res.statusCode = auth.reason === 'rate_limited' ? 429 : 401
@@ -371,6 +375,11 @@ export async function createBrainServer(
                 hint: 'set Authorization: Bearer <token> header',
               }),
             )
+            return
+          }
+
+          if (isSync) {
+            await serveSync(pathOnly, req, res)
             return
           }
 
@@ -394,6 +403,78 @@ export async function createBrainServer(
           }
         })
       })
+
+      /** Read a bounded JSON body. Anything larger is refused, not buffered. */
+      async function readJsonBody(req: IncomingMessage, limit: number): Promise<unknown> {
+        const chunks: Buffer[] = []
+        let total = 0
+        for await (const c of req) {
+          total += (c as Buffer).length
+          if (total > limit) throw new Error(`body exceeds ${limit} bytes`)
+          chunks.push(c as Buffer)
+        }
+        return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+      }
+
+      /**
+       * Replication intake.
+       *
+       * Only a replica accepts a push. The instance that owns the vault must
+       * never be writable over the network — otherwise a misconfigured peer
+       * could overwrite the corpus everything else replicates *from*, which is
+       * the one file set with no other copy.
+       */
+      async function serveSync(
+        path: string,
+        req: IncomingMessage,
+        res: ServerResponse,
+      ): Promise<void> {
+        const json = (code: number, body: unknown): void => {
+          res.statusCode = code
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify(body))
+        }
+        if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' })
+        if (vaultOwnership?.writable) {
+          return json(409, {
+            error: 'not_a_replica',
+            hint: 'This instance owns the vault; replication only writes to replicas.',
+          })
+        }
+        try {
+          if (path === '/sync/plan') {
+            const body = (await readJsonBody(req, 32 * 1024 * 1024)) as {
+              manifest?: ManifestEntry[]
+              reportExtras?: boolean
+            }
+            if (!Array.isArray(body?.manifest)) return json(400, { error: 'manifest_required' })
+            const plan = await planSync({
+              vaultRoot: ctx!.vaultRoot,
+              manifest: body.manifest,
+              scanDirs: body.reportExtras ? SYNC_DIRS : undefined,
+            })
+            return json(200, plan)
+          }
+          // /sync/file
+          const body = (await readJsonBody(req, MAX_FILE_BYTES * 2)) as {
+            path?: string
+            sha256?: string
+            contentBase64?: string
+          }
+          if (!body?.path || !body?.sha256 || typeof body.contentBase64 !== 'string') {
+            return json(400, { error: 'path_sha256_content_required' })
+          }
+          const result = await applyFile({
+            vaultRoot: ctx!.vaultRoot,
+            path: body.path,
+            content: Buffer.from(body.contentBase64, 'base64'),
+            sha256: body.sha256,
+          })
+          return json(result.ok ? 200 : 400, result)
+        } catch (e) {
+          return json(400, { error: 'bad_request', detail: (e as Error).message })
+        }
+      }
 
       /**
        * Per-request Server + transport (SDK simpleStatelessStreamableHttp).
