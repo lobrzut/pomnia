@@ -251,6 +251,52 @@ export interface UiLabels {
   vaultReplicaLast: string
   vaultReplicaLastOk: (uploaded: number, unchanged: number) => string
   vaultReplicaNoUrl: string
+  // ── update card ──────────────────────────────────────────────────────────
+  updateIdle: string
+  updateAvailable: (latest: string) => string
+  updateUnreachable: (detail: string) => string
+  updateCurrent: string
+  updateCheckNow: string
+  updateDownload: string
+  updateNoConnection: string
+  // ── connect: client state ────────────────────────────────────────────────
+  clientWired: string
+  clientUnreachable: string
+  clientPartial: string
+  clientConfigError: string
+  clientNone: string
+  // ── connect: token + snippet ─────────────────────────────────────────────
+  tokenNamePrompt: string
+  tokenSavedDetail: string
+  tokenCreateFailed: string
+  tokenCreateFailedDetail: (msg: string) => string
+  snippetBuildFailed: string
+  copyFailed: string
+  skillSyncErrorsDetail: (n: number) => string
+  skillSyncAvailableOffline: string
+  embeddedSnippetHint: string
+  urlChangeHint: string
+  snippetFilePath: string
+  snippetWholeFile: string
+  snippetPasteWhole: string
+  snippetCreateOverwrite: string
+  snippetRulePath: string
+  // ── settings: health + integrity ─────────────────────────────────────────
+  healthVaultAction: string
+  healthOllamaMissing: string
+  healthCoreAction: string
+  healthMcpUnreachable: string
+  vaultIntegrityOk: string
+  vaultIntegrityErrors: (n: number) => string
+  vaultIntegrityChecked: (n: number) => string
+  exportNoNotes: string
+  showClientInConnect: (name: string) => string
+  brainReadOnly: string
+  brainReadOnlyBy: (owner: string) => string
+  brainStoppedStartInTab: string
+  skillsNoneOnServer: string
+  snippetLocalModeHint: string
+  snippetTokenInHeaders: string
   onboardingEngineLooking: string
   onboardingEngineRunning: string
   onboardingEngineMoreModels: (n: number) => string
@@ -914,6 +960,49 @@ const PL_LABELS: UiLabels = {
   vaultReplicaLast: 'Ostatnia replikacja:',
   vaultReplicaLastOk: (u, n) => `wysłano ${u}, bez zmian ${n}`,
   vaultReplicaNoUrl: 'Najpierw podaj adres repliki.',
+  updateIdle: 'Pomnia sprawdza wydania i mówi, gdy jest nowsze — nigdy nie instaluje nic sama.',
+  updateAvailable: (latest) =>
+    `Jest nowsza wersja: ${latest}. Pobierzesz ją z GitHuba — instalacja zawsze ręczna.`,
+  updateUnreachable: (detail) => `Nie udało się sprawdzić: ${detail}`,
+  updateCurrent: 'Masz najnowszą wersję.',
+  updateCheckNow: 'Sprawdź aktualizacje',
+  updateDownload: 'Pobierz',
+  updateNoConnection: 'brak połączenia',
+  clientWired: 'Połączony',
+  clientUnreachable: 'Nie odpowiada',
+  clientPartial: 'Niepełny',
+  clientConfigError: 'Błąd config',
+  clientNone: 'Brak',
+  tokenNamePrompt: 'Nazwa tokena (np. macbook, windows — ułatwia późniejsze odwołanie):',
+  tokenSavedDetail: 'Zapisany w polu — snippet odświeży się automatycznie.',
+  tokenCreateFailed: 'Nie udało się utworzyć tokena',
+  tokenCreateFailedDetail: (msg) => `${msg} — otwórz dashboard :7860 i wklej token ręcznie.`,
+  snippetBuildFailed: 'Nie udało się zbudować snippeta',
+  copyFailed: 'Nie udało się skopiować',
+  skillSyncErrorsDetail: (n) => `${n} błąd(ów) — konsola`,
+  skillSyncAvailableOffline: 'Dostępne offline.',
+  embeddedSnippetHint: 'Snippety wskazują na localhost — jeden serwer MCP, bez tokena.',
+  urlChangeHint: 'Zmiana URL/tokena odświeża snippet automatycznie.',
+  snippetFilePath: 'ścieżka pliku',
+  snippetWholeFile: 'pełny plik',
+  snippetPasteWhole: 'Wklej jako całą zawartość pliku.',
+  snippetCreateOverwrite: 'Utwórz / nadpisz: ',
+  snippetRulePath: 'ścieżka reguły',
+  healthVaultAction: 'Otwórz lub utwórz vault',
+  healthOllamaMissing: 'Ollama niedostępne — zainstaluj i uruchom ollama.com',
+  healthCoreAction: 'Uruchom w zakładce Brain',
+  healthMcpUnreachable: 'Brain MCP nieosiągalny',
+  vaultIntegrityOk: 'Integralność vaultu OK',
+  vaultIntegrityErrors: (n) => `${n} błąd(ów) integralności`,
+  vaultIntegrityChecked: (n) => `Sprawdzono ${n} zaszyfrowanych blobów`,
+  exportNoNotes: 'Nie wyeksportowano żadnej notatki',
+  showClientInConnect: (name) => `Pokaż ${name} w Connect`,
+  brainReadOnly: 'tylko odczyt',
+  brainReadOnlyBy: (owner) => `tylko odczyt — vault trzyma ${owner}`,
+  brainStoppedStartInTab: 'lokalny brain zatrzymany — uruchom w zakładce Brain',
+  skillsNoneOnServer: 'Serwer Brain nie ma jeszcze skilli.',
+  snippetLocalModeHint: 'Tryb lokalny: jeden serwer pomnia na /mcp — bez Bearer tokena.',
+  snippetTokenInHeaders: 'Token jest w headers — trzymaj plik prywatny (chmod 600).',
   onboardingEngineLooking: 'Szukam Ollama na tym komputerze…',
   onboardingEngineRunning: 'Ollama działa',
   onboardingEngineMoreModels: (n) => `+${n} więcej`,
@@ -1632,6 +1721,49 @@ const EN_LABELS: Partial<UiLabels> = {
   vaultReplicaLast: 'Last replication:',
   vaultReplicaLastOk: (u, n) => `${u} uploaded, ${n} unchanged`,
   vaultReplicaNoUrl: 'Set the replica address first.',
+  updateIdle: 'Pomnia checks for releases and tells you — it never installs anything by itself.',
+  updateAvailable: (latest) =>
+    `Version ${latest} is out. Download it from GitHub — installing is always your call.`,
+  updateUnreachable: (detail) => `Could not check: ${detail}`,
+  updateCurrent: 'You are on the latest version.',
+  updateCheckNow: 'Check for updates',
+  updateDownload: 'Download',
+  updateNoConnection: 'no connection',
+  clientWired: 'Connected',
+  clientUnreachable: 'Not responding',
+  clientPartial: 'Incomplete',
+  clientConfigError: 'Config error',
+  clientNone: 'None',
+  tokenNamePrompt: 'Token name (e.g. macbook, windows — makes it easier to revoke later):',
+  tokenSavedDetail: 'Saved to the field — the snippet refreshes by itself.',
+  tokenCreateFailed: 'Could not create the token',
+  tokenCreateFailedDetail: (msg) => `${msg} — open the dashboard on :7860 and paste a token by hand.`,
+  snippetBuildFailed: 'Could not build the snippet',
+  copyFailed: 'Could not copy',
+  skillSyncErrorsDetail: (n) => `${n} error(s) — see the console`,
+  skillSyncAvailableOffline: 'Available offline.',
+  embeddedSnippetHint: 'Snippets point at localhost — one MCP server, no token.',
+  urlChangeHint: 'Changing the URL or token refreshes the snippet automatically.',
+  snippetFilePath: 'file path',
+  snippetWholeFile: 'whole file',
+  snippetPasteWhole: 'Paste as the entire file contents.',
+  snippetCreateOverwrite: 'Create / overwrite: ',
+  snippetRulePath: 'rule path',
+  healthVaultAction: 'Open or create a vault',
+  healthOllamaMissing: 'Ollama unreachable — install and start it from ollama.com',
+  healthCoreAction: 'Start it in the Brain tab',
+  healthMcpUnreachable: 'Brain MCP unreachable',
+  vaultIntegrityOk: 'Vault integrity OK',
+  vaultIntegrityErrors: (n) => `${n} integrity error(s)`,
+  vaultIntegrityChecked: (n) => `Checked ${n} encrypted blobs`,
+  exportNoNotes: 'No notes were exported',
+  showClientInConnect: (name) => `Show ${name} in Connect`,
+  brainReadOnly: 'read-only',
+  brainReadOnlyBy: (owner) => `read-only — the vault is held by ${owner}`,
+  brainStoppedStartInTab: 'local brain stopped — start it in the Brain tab',
+  skillsNoneOnServer: 'The Brain server has no skills yet.',
+  snippetLocalModeHint: 'Local mode: one pomnia server on /mcp — no bearer token.',
+  snippetTokenInHeaders: 'The token sits in headers — keep this file private (chmod 600).',
   onboardingEngineLooking: 'Looking for Ollama on this machine…',
   onboardingEngineRunning: 'Ollama is running',
   onboardingEngineMoreModels: (n) => `+${n} more`,

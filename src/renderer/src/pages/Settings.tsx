@@ -46,7 +46,7 @@ function HealthCheck() {
         id: 'vault',
         label: labels.healthVault,
         ok: vault.open,
-        detail: vault.open ? vault.path ?? vault.name ?? labels.healthOk : 'Otwórz lub utwórz vault'
+        detail: vault.open ? vault.path ?? vault.name ?? labels.healthOk : labels.healthVaultAction
       })
 
       let status = null
@@ -59,7 +59,7 @@ function HealthCheck() {
         id: 'ollama',
         label: labels.healthOllama,
         ok: !!status?.reachable,
-        detail: status?.reachable ? status.baseUrl : 'Ollama niedostępne — zainstaluj i uruchom ollama.com'
+        detail: status?.reachable ? status.baseUrl : labels.healthOllamaMissing
       })
 
       const models = status?.models ?? []
@@ -95,7 +95,7 @@ function HealthCheck() {
           ok: core.running,
           detail: core.running
             ? core.url ?? labels.healthOk
-            : core.lastError || 'Uruchom w zakładce Brain'
+            : core.lastError || labels.healthCoreAction
         })
       } else {
         next.push({
@@ -118,7 +118,7 @@ function HealthCheck() {
           ok: conn.brain.reachable,
           detail: conn.brain.reachable
             ? conn.brain.url
-            : conn.brain.error || 'Brain MCP nieosiągalny'
+            : conn.brain.error || labels.healthMcpUnreachable
         })
       } catch (e) {
         next.push({
@@ -327,8 +327,8 @@ export default function Settings() {
       const r = await api.verify()
       toast({
         kind: r.ok ? 'success' : 'error',
-        title: r.ok ? 'Integralność vaultu OK' : `${r.errors.length} błąd(ów) integralności`,
-        detail: `Sprawdzono ${r.checked} zaszyfrowanych blobów`,
+        title: r.ok ? labels.vaultIntegrityOk : labels.vaultIntegrityErrors(r.errors.length),
+        detail: labels.vaultIntegrityChecked(r.checked),
       })
     } finally {
       setVerifying(false)
@@ -352,7 +352,7 @@ export default function Settings() {
       toast(
         r.count > 0
           ? { kind: 'success', title: `Wyeksportowano ${r.count} notatek`, detail: r.dir }
-          : { kind: 'warn', title: 'Nie wyeksportowano żadnej notatki', detail: `Snapshot nie zawiera notatek · ${r.dir}` },
+          : { kind: 'warn', title: labels.exportNoNotes, detail: `Snapshot nie zawiera notatek · ${r.dir}` },
       )
     } catch (e) {
       toast({ kind: 'error', title: 'Eksport nieudany', detail: (e as Error).message })
@@ -378,12 +378,12 @@ export default function Settings() {
             </div>
             <p className="mt-1 text-xs text-ink-dim">
               {update === null
-                ? 'Pomnia sprawdza wydania i mówi, gdy jest nowsze — nigdy nie instaluje nic sama.'
+                ? labels.updateIdle
                 : update.state === 'available'
-                  ? `Jest nowsza wersja: ${update.latest}. Pobierzesz ją z GitHuba — instalacja zawsze ręczna.`
+                  ? labels.updateAvailable(update.latest ?? '')
                   : update.state === 'unreachable'
-                    ? `Nie udało się sprawdzić: ${update.detail ?? 'brak połączenia'}`
-                    : 'Masz najnowszą wersję.'}
+                    ? labels.updateUnreachable(update.detail ?? labels.updateNoConnection)
+                    : labels.updateCurrent}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -397,12 +397,12 @@ export default function Settings() {
                 rel="noreferrer"
                 className="no-drag rounded-xl border border-white/10 bg-mint/15 px-3.5 py-2 text-[13px] font-semibold text-mint"
               >
-                Pobierz
+                {labels.updateDownload}
               </a>
             )}
             <Button variant="soft" onClick={() => void runUpdateCheck()} disabled={checkingUpdate}>
               {checkingUpdate ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              Sprawdź aktualizacje
+              {labels.updateCheckNow}
             </Button>
           </div>
         </div>
@@ -704,7 +704,7 @@ export default function Settings() {
                 <Toggle
                   checked={visible}
                   onChange={(v) => setConnectClientVisible(id, v)}
-                  aria-label={`Pokaż ${c?.label ?? id} w Connect`}
+                  aria-label={labels.showClientInConnect(c?.label ?? id)}
                 />
               </div>
             )
