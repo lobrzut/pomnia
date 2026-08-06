@@ -24,6 +24,7 @@
  */
 
 import { promises as fs } from 'node:fs'
+import { join } from 'node:path'
 
 import type Database from 'better-sqlite3'
 
@@ -35,6 +36,45 @@ export interface Check {
   state: CheckState
   /** Present whenever the state is not `ok`. Written for a human. */
   detail?: string
+}
+
+/**
+ * Can this process actually write where it keeps its state?
+ *
+ * Nothing checked this, and "writable" in the report below means something
+ * else entirely — who owns the vault. A full or read-only filesystem fails the
+ * next sync, the next reindex and every token touch, while /healthz reports
+ * `ok` because the database opens fine for reads.
+ *
+ * A real write, not a free-space calculation: quotas, read-only remounts and
+ * permission changes all produce a working `statfs` and a failing write, and
+ * the failing write is the thing that matters.
+ */
+async function checkDisk(dataDir: string): Promise<Check> {
+  if (!dataDir) return { state: 'down', detail: 'no data directory configured' }
+  const probe = join(dataDir, '.write-probe')
+  try {
+    await fs.writeFile(probe, String(Date.now()), 'utf8')
+    await fs.rm(probe, { force: true })
+  } catch (e) {
+    return { state: 'down', detail: `cannot write to ${dataDir}: ${(e as Error).message}` }
+  }
+  try {
+    const { bavail, bsize } = await fs.statfs(dataDir)
+    const freeMb = (bavail * bsize) / 1024 / 1024
+    // Indexing a large vault writes hundreds of megabytes of vectors. Warning
+    // before it fails leaves room to act; warning after does not.
+    if (freeMb < 200) {
+      return { state: 'down', detail: `only ${freeMb.toFixed(0)} MB free on ${dataDir}` }
+    }
+    if (freeMb < 1024) {
+      return { state: 'degraded', detail: `${freeMb.toFixed(0)} MB free — a full reindex may not fit` }
+    }
+  } catch {
+    // statfs is unavailable on some filesystems; the write probe above already
+    // answered the question that matters.
+  }
+  return { state: 'ok' }
 }
 
 export interface HealthReport {
@@ -52,6 +92,7 @@ export interface HealthReport {
     db: Check
     index: Check
     vault: Check
+    disk: Check
     ollama: Check
   }
   /** Chunk/file counts — cheap, and the number people actually ask for. */
@@ -77,6 +118,7 @@ export function redactHealth(h: HealthReport): HealthReport {
       db: bare(h.checks.db),
       index: bare(h.checks.index),
       vault: bare(h.checks.vault),
+      disk: bare(h.checks.disk),
       ollama: bare(h.checks.ollama),
     },
   }
@@ -117,6 +159,7 @@ export async function collectHealth(opts: {
   db: Database.Database | null
   embedder: EmbedClient | null
   vaultRoot: string
+  dataDir: string
   version: string
   authRequired: boolean
   writable: boolean
@@ -155,6 +198,8 @@ export async function collectHealth(opts: {
     vault = { state: 'down', detail: `${opts.vaultRoot}: ${(e as Error).message}` }
   }
 
+  const disk = await checkDisk(opts.dataDir)
+
   const ollama = opts.embedder
     ? await checkOllama(opts.embedder)
     : { state: 'down' as const, detail: 'embedder not configured' }
@@ -164,7 +209,7 @@ export async function collectHealth(opts: {
   // that is still useful teaches people to ignore the field.
   const effectiveOllama: Check = ollama.state === 'down' ? { ...ollama, state: 'degraded' } : ollama
 
-  const status = worstOf([db, index, vault, effectiveOllama])
+  const status = worstOf([db, index, vault, disk, effectiveOllama])
   return {
     ok: status !== 'down',
     service: 'brain-core',
@@ -174,7 +219,7 @@ export async function collectHealth(opts: {
     writable: opts.writable,
     vaultOwner: opts.vaultOwner,
     uptimeSec: Math.round((Date.now() - opts.startedAt) / 1000),
-    checks: { db, index, vault, ollama: effectiveOllama },
+    checks: { db, index, vault, disk, ollama: effectiveOllama },
     index: counts,
   }
 }

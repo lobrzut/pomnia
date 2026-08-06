@@ -370,6 +370,7 @@ export async function createBrainServer(
               db: ctx?.db ?? null,
               embedder: ctx?.embedder ?? null,
               vaultRoot: ctx?.vaultRoot ?? '',
+              dataDir: config.dataDir,
               version: BRAIN_CORE_VERSION,
               authRequired: gate.required,
               writable: vaultOwnership?.writable ?? false,
@@ -440,6 +441,7 @@ export async function createBrainServer(
               db: ctx?.db ?? null,
               embedder: ctx?.embedder ?? null,
               vaultRoot: ctx?.vaultRoot ?? '',
+              dataDir: config.dataDir,
               version: BRAIN_CORE_VERSION,
               authRequired: gate.required,
               writable: vaultOwnership?.writable ?? false,
@@ -483,6 +485,7 @@ export async function createBrainServer(
                         { name: 'Database', ...health.checks.db },
                         { name: 'Index', ...health.checks.index },
                         { name: 'Vault', ...health.checks.vault },
+                        { name: 'Dysk / zapis', ...health.checks.disk },
                         { name: 'Embeddings (Ollama)', ...health.checks.ollama },
                       ],
                     }
