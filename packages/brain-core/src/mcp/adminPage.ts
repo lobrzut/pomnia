@@ -11,23 +11,27 @@
  *
  * Security shape, and every part of it is deliberate:
  *
- *   no cookies      the token lives in one closure variable and goes out as an
- *                   Authorization header. No cookie means cross-site request
- *                   forgery is not mitigated, it is absent — a hostile page can
- *                   make your browser issue a request, but it cannot make it
- *                   carry a header it does not know.
- *   no storage      not localStorage, not sessionStorage. Closing the tab ends
- *                   the session, and no XSS anywhere on the host can read a
- *                   credential out of a store that was never written to.
- *   no autofill     the field is type=password with autocomplete off, so a
- *                   password manager never learns it and never offers it back
- *                   on a lookalike page.
+ *   session cookie  HttpOnly, so script cannot read it and an XSS anywhere on
+ *                   this origin cannot steal the session. SameSite=Strict and
+ *                   scoped to /admin. Secure only over HTTPS — setting it on a
+ *                   plain-HTTP LAN would make the browser drop it and the panel
+ *                   would look broken with no explanation.
+ *   csrf token      returned in the login response *body*, never in a cookie,
+ *                   echoed in a header on every mutation. SameSite already
+ *                   stops the cross-site POST; this also covers the
+ *                   same-site-but-untrusted case, and costs one header.
+ *   no storage      not localStorage, not sessionStorage, never document.cookie
+ *                   from script. The only thing the page holds is the CSRF
+ *                   token, in a closure, for as long as the tab lives.
  *   inline only     one file, no fetch of anything but this server's own API.
- *                   The CSP the server sends says exactly that.
+ *                   The CSP the server sends says exactly that, so an edit that
+ *                   reaches for a CDN breaks loudly instead of phoning out.
  *
- * The token is typed in, once, per tab. That is a real cost and it is the
- * right trade for a credential that can repoint the embedder and mint more
- * credentials.
+ * One vault, one set of accounts, and no link between them: `vaultRoot` is a
+ * property of the process (the systemd unit's --vault-root), not of whoever
+ * signed in. Accounts answer "may you in", never "whose memory" — Pomnia is
+ * single-user by design, and per-person attribution was considered and
+ * deliberately left out while there is one person.
  */
 
 export function renderAdminPage(origin: string): string {
