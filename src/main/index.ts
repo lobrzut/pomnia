@@ -194,6 +194,11 @@ function canSendToWindow(w: BrowserWindow | null | undefined): w is BrowserWindo
   return !!w && !w.isDestroyed() && !w.webContents.isDestroyed()
 }
 
+/** UI language for anything the main process phrases before sending it out. */
+function uiLocale(): 'pl' | 'en' {
+  return getAppSettings().uiLocale === 'en' ? 'en' : 'pl'
+}
+
 function safeSend(wc: WebContents | null | undefined, channel: string, ...args: unknown[]): void {
   if (!wc || wc.isDestroyed()) return
   try {
@@ -238,12 +243,15 @@ function emitBrainProgress(p: { phase: string; done?: number; total?: number; de
   const kind: ActivityUpdate['kind'] =
     p.phase === 'index' ? 'embed' : p.phase === 'distill' || p.phase === 'collect' || p.phase === 'deploy' ? 'distill' : 'distill'
   activity.update({ kind, phase: p.phase, done: p.done, total: p.total, detail: p.detail })
-  const payload = localizePipelineProgress({
-    phase: p.phase,
-    done: p.done ?? 0,
-    total: p.total ?? 0,
-    detail: p.detail,
-  })
+  const payload = localizePipelineProgress(
+    {
+      phase: p.phase,
+      done: p.done ?? 0,
+      total: p.total ?? 0,
+      detail: p.detail,
+    },
+    uiLocale(),
+  )
   safeSendMain('brain:progress', payload)
 }
 
@@ -262,7 +270,7 @@ function emitDocImportProgress(ev: { phase: string; done: number; total: number;
           ? 'doc-import'
           : 'doc-import'
   activity.update({ kind, phase: ev.phase, done: ev.done, total: ev.total, detail: ev.detail })
-  safeSendMain('doc:import-progress', localizePipelineProgress(ev))
+  safeSendMain('doc:import-progress', localizePipelineProgress(ev, uiLocale()))
 }
 
 const brainDir = (): string => join(app.getPath('userData'), 'brain-notes')
