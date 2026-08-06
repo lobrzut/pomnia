@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Pomnia
 import { hasOllamaModel } from '@core/brain/modelMatch.js'
 import { defaultOllamaConfig } from '@core/brain/ollama.js'
+import { m } from './mainStrings.js'
 import { getAppSettings } from './appSettings.js'
 
 export function resolveOllamaUrl(passed?: string): string {
@@ -53,15 +54,15 @@ export async function probeOllama(passedUrl?: string): Promise<OllamaProbeResult
 export function missingEmbedModelMessage(models: string[]): string | null {
   const embedModel = defaultOllamaConfig().embedModel
   if (hasOllamaModel(models, embedModel)) return null
-  return `Brak modelu embeddingów „${embedModel}" — wyszukiwanie i indeksowanie nie zadziałają. Uruchom: ollama pull ${embedModel}`
+  return m().ollamaMissingModel(embedModel, `ollama pull ${embedModel}`)
 }
 
 export function ollamaUnreachableMessage(probe: Extract<OllamaProbeResult, { ok: false }>): string {
   const suffix = probe.detail ? ` — ${probe.detail}` : ''
-  return `Ollama niedostępne pod ${probe.url} (GET /api/tags${suffix})`
+  return m().ollamaUnreachable(probe.url, suffix)
 }
 
 export function brainProcessFailedMessage(err: unknown): string {
   const detail = err instanceof Error ? err.message : String(err)
-  return `Proces wyszukiwarki nie wystartował: ${detail}`
+  return m().brainProcessFailed(detail)
 }

@@ -11,6 +11,7 @@ import { pagesFromExtractedMarkdown, parseDocument } from '@pomnia/doc-parser'
 import { libraryDocLogicalPath, type Vault } from '@core/vault.js'
 import { log } from '@core/log.js'
 import { brainCore } from './brainCore.js'
+import { m } from './mainStrings.js'
 import { ensureBrainForIndexing } from './ensureBrain.js'
 
 export type LibraryIndexProgress = {
@@ -151,7 +152,7 @@ export async function indexPendingLibraryDocuments(
 
   if (opts?.skipEnsure) {
     if (!brainCore.status().running) {
-      return { indexed: 0, chunks: 0, errors: ['Wyszukiwarka niedostępna'] }
+      return { indexed: 0, chunks: 0, errors: [m().searchUnavailable] }
     }
   } else {
     const ensured = await ensureBrainForIndexing(opts?.ollamaUrl, opts?.onProgress, vaultDir)
@@ -159,7 +160,7 @@ export async function indexPendingLibraryDocuments(
       return {
         indexed: 0,
         chunks: 0,
-        errors: [ensured.error ?? 'Wyszukiwarka niedostępna'],
+        errors: [ensured.error ?? m().searchUnavailable],
       }
     }
   }
