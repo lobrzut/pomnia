@@ -829,8 +829,16 @@ export default function Connect() {
       </GlassCard>
       )}
 
-      {/* Vault replication — this machine owns the vault, the server mirrors it */}
-      {effectiveTarget === 'remote' && (
+      {/*
+        Vault replication — deliberately NOT gated on the engine target.
+        Which brain answers your searches and where you keep a copy are
+        different questions; gating this on `remote` hid the card in exactly
+        the normal case — a desktop running its own brain, mirroring to a
+        server — so auto-sync could never be switched on by the machine that
+        actually owns the vault. Simple mode still hides it, because it hides
+        every server-shaped control.
+      */}
+      {!simpleMode && (
         <GlassCard className="mt-4 p-5">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-semibold text-ink">
