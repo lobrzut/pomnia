@@ -44,20 +44,23 @@ const CLIENT_ORDER: ClientId[] = [
   'hermes'
 ]
 
-function stateMeta(state: WiredState): { label: string; color: string; Icon: typeof CheckCircle2 } {
+function stateMeta(
+  state: WiredState,
+  labels: ReturnType<typeof uiLabels>,
+): { label: string; color: string; Icon: typeof CheckCircle2 } {
   switch (state) {
     case 'wired':
-      return { label: 'Połączony', color: '#34d399', Icon: CheckCircle2 }
+      return { label: labels.clientWired, color: '#34d399', Icon: CheckCircle2 }
     case 'unreachable':
       // Config is right, host is not answering — the machine-move case. Must not
       // read as "Połączony", which is exactly how it used to look.
-      return { label: 'Nie odpowiada', color: '#fb7185', Icon: AlertTriangle }
+      return { label: labels.clientUnreachable, color: '#fb7185', Icon: AlertTriangle }
     case 'partial':
-      return { label: 'Niepełny', color: '#fbbf24', Icon: AlertTriangle }
+      return { label: labels.clientPartial, color: '#fbbf24', Icon: AlertTriangle }
     case 'config_error':
-      return { label: 'Błąd config', color: '#fb7185', Icon: AlertTriangle }
+      return { label: labels.clientConfigError, color: '#fb7185', Icon: AlertTriangle }
     default:
-      return { label: 'Brak', color: '#5b6178', Icon: Circle }
+      return { label: labels.clientNone, color: '#5b6178', Icon: Circle }
   }
 }
 
@@ -96,7 +99,7 @@ export default function Connect() {
     const dashboardUrl = dashboardUrlFromBrainUrl(brainUrl)
     const suggested = `pomnia-${new Date().toISOString().slice(0, 10)}`
     const name = window.prompt(
-      'Nazwa tokena (np. macbook, windows — ułatwia późniejsze odwołanie):',
+      labels.tokenNamePrompt,
       suggested,
     )
     if (!name) return
@@ -107,7 +110,7 @@ export default function Connect() {
       toast({
         kind: 'success',
         title: `Token: ${r.name}`,
-        detail: 'Zapisany w polu — snippet odświeży się automatycznie.',
+        detail: labels.tokenSavedDetail,
       })
       // Token is in React state async — pass explicitly for immediate rebuild.
       if (picked) {
@@ -125,8 +128,8 @@ export default function Connect() {
     } catch (e) {
       toast({
         kind: 'error',
-        title: 'Nie udało się utworzyć tokena',
-        detail: `${(e as Error).message} — otwórz dashboard :7860 i wklej token ręcznie.`,
+        title: labels.tokenCreateFailed,
+        detail: labels.tokenCreateFailedDetail((e as Error).message),
       })
     } finally {
       setMinting(false)
@@ -159,7 +162,7 @@ export default function Connect() {
       const engine = identifyEngine(d).label
       setBrainDetail(
         brainTarget === 'embedded' && core && !core.running
-          ? 'embedded brain stopped — start in Brain tab'
+          ? labels.brainStoppedStartInTab
           : r.brain.reachable
             ? [
                 engine,
@@ -168,8 +171,8 @@ export default function Connect() {
                 // read that here than from an agent's apology afterwards.
                 d?.writable === false &&
                   (d?.vaultOwner
-                    ? `tylko odczyt — vault trzyma ${d.vaultOwner}`
-                    : 'tylko odczyt'),
+                    ? labels.brainReadOnlyBy(String(d.vaultOwner))
+                    : labels.brainReadOnly),
                 d?.notes && `${d.notes} notes`,
                 d?.sessions && `${d.sessions} sessions`,
                 d?.library_docs && `${d.library_docs} docs`,
@@ -221,7 +224,7 @@ export default function Connect() {
     try {
       setSnippet(await api.connectSnippet(id, brainUrl, effectiveTarget === 'remote' ? connectToken || undefined : undefined, effectiveTarget, agentBrainMode))
     } catch (e) {
-      toast({ kind: 'error', title: 'Nie udało się zbudować snippeta', detail: (e as Error).message })
+      toast({ kind: 'error', title: labels.snippetBuildFailed, detail: (e as Error).message })
     } finally {
       setSnippetLoading(false)
     }
@@ -244,7 +247,7 @@ export default function Connect() {
     try {
       await navigator.clipboard.writeText(text)
     } catch (e) {
-      toast({ kind: 'error', title: 'Nie udało się skopiować', detail: (e as Error).message })
+      toast({ kind: 'error', title: labels.copyFailed, detail: (e as Error).message })
       return
     }
     setCopied(key)
@@ -333,10 +336,10 @@ export default function Connect() {
       const r = await api.connectSkillsSync(skillsDash, connectToken || undefined)
       toast(
         r.errors.length
-          ? { kind: 'warn', title: `Zsynchronizowano ${r.written} skill(i)`, detail: `${r.errors.length} błąd(ów) — konsola` }
+          ? { kind: 'warn', title: `Zsynchronizowano ${r.written} skill(i)`, detail: labels.skillSyncErrorsDetail(r.errors.length) }
           : r.written === 0
-            ? { kind: 'info', title: 'Brak skilli', detail: 'Serwer Brain nie ma jeszcze skilli.' }
-            : { kind: 'success', title: `Zsynchronizowano ${r.written} skill(i)`, detail: 'Dostępne offline.' }
+            ? { kind: 'info', title: 'Brak skilli', detail: labels.skillsNoneOnServer }
+            : { kind: 'success', title: `Zsynchronizowano ${r.written} skill(i)`, detail: labels.skillSyncAvailableOffline }
       )
       if (r.errors.length) console.warn('skill sync errors', r.errors)
     } catch (e) {
@@ -514,10 +517,10 @@ export default function Connect() {
           )}
           <span className="text-[11px] text-ink-faint">
             {simpleMode || brainTarget === 'embedded'
-              ? 'Snippety wskazują na localhost — jeden serwer MCP, bez tokena.'
+              ? labels.embeddedSnippetHint
               : !connectToken.trim()
                 ? labels.connectTokenRequired
-                : 'Zmiana URL/tokena odświeża snippet automatycznie.'}
+                : labels.urlChangeHint}
           </span>
         </div>
       </GlassCard>
@@ -565,7 +568,7 @@ export default function Connect() {
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           {visibleClients.map((id) => {
             const c = clients.find((c) => c.id === id)
-            const meta = stateMeta(c?.state ?? 'not_wired')
+            const meta = stateMeta(c?.state ?? 'not_wired', labels)
             const active = picked === id
             const brand = CLIENT_BRAND[id]
             const wiredKeys = c?.servers.filter((s) => s.present).map((s) => s.key) ?? []
@@ -662,7 +665,7 @@ export default function Connect() {
                 <Step n={1}>
                   Otwórz lub utwórz plik:
                   <button
-                    onClick={() => void copy(snippet.filePath, 'path', 'ścieżka pliku')}
+                    onClick={() => void copy(snippet.filePath, 'path', labels.snippetFilePath)}
                     className="no-drag group ml-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-white/10 bg-black/30 px-2 py-1 align-middle text-[11px] text-ink-dim transition-colors hover:border-iris/40 hover:text-ink"
                   >
                     <span className="truncate">{snippet.filePath}</span>
@@ -695,7 +698,7 @@ export default function Connect() {
                     void copy(
                       mode === 'new' ? snippet.fullFileJson : snippet.mergeJson,
                       'code',
-                      mode === 'new' ? 'pełny plik' : 'merge snippet'
+                      mode === 'new' ? labels.snippetWholeFile : 'merge snippet'
                     )
                   }
                   className="no-drag absolute right-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-ink transition-colors hover:bg-white/14"
@@ -712,7 +715,7 @@ export default function Connect() {
                 </button>
                 <p className="mb-1.5 text-[11px] text-ink-faint">
                   {mode === 'new'
-                    ? 'Wklej jako całą zawartość pliku.'
+                    ? labels.snippetPasteWhole
                     : `Dodaj te klucze do obiektu "${snippet.mcpKey}".`}
                 </p>
                 <pre className="max-h-56 overflow-auto rounded-xl border border-white/8 bg-black/40 p-3.5 pt-9 text-[11px] leading-relaxed text-cyan">
@@ -772,10 +775,10 @@ export default function Connect() {
                   </div>
                   {snippet.brief ? (
                     <p className="mb-2 text-[11px] text-ink-dim">
-                      {snippet.brief.mode === 'append-to-existing' ? 'Dopisz / upsert: ' : 'Utwórz / nadpisz: '}
+                      {snippet.brief.mode === 'append-to-existing' ? 'Dopisz / upsert: ' : labels.snippetCreateOverwrite}
                       <button
                         type="button"
-                        onClick={() => void copy(snippet.brief!.filePath, 'brief-path', 'ścieżka reguły')}
+                        onClick={() => void copy(snippet.brief!.filePath, 'brief-path', labels.snippetRulePath)}
                         className="no-drag font-mono text-cyan hover:underline"
                       >
                         {snippet.brief.filePath}
@@ -798,9 +801,9 @@ export default function Connect() {
                 <KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-faint" />
                 <p className="text-[11px] leading-relaxed text-ink-faint">
                   {brainTarget === 'embedded'
-                    ? 'Tryb lokalny: jeden serwer pomnia na /mcp — bez Bearer tokena.'
+                    ? labels.snippetLocalModeHint
                     : connectToken
-                      ? 'Token jest w headers — trzymaj plik prywatny (chmod 600).'
+                      ? labels.snippetTokenInHeaders
                       : labels.connectTokenRequired}
                 </p>
               </div>
