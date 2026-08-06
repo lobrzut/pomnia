@@ -19,7 +19,7 @@ import {
   UploadCloud,
   X
 } from 'lucide-react'
-import { Badge, Button, GlassCard, Input, Spinner, Toggle } from '../components/ui'
+import { Badge, Button, Field, GlassCard, Input, Spinner, Toggle } from '../components/ui'
 import { ClientIcon, CLIENT_BRAND } from '../components/ClientIcon'
 import {
   EMBEDDED_BRAIN_DEFAULT_URL,
@@ -135,6 +135,12 @@ export default function Connect() {
 
   const [syncing, setSyncing] = useState(false)
   const [pushing, setPushing] = useState(false)
+  const [replica, setReplica] = useState<{
+    url: string
+    hasToken: boolean
+    autoSync: boolean
+    last: { at: string; ok: boolean; uploaded: number; unchanged: number; failed: number; error?: string } | null
+  } | null>(null)
 
   async function refresh() {
     setLoading(true)
@@ -194,6 +200,12 @@ export default function Connect() {
       })
     }
   }
+
+  // Replication state is independent of which brain is selected — the machine
+  // that owns the vault has something to mirror either way.
+  useEffect(() => {
+    void api.vaultReplicaState().then(setReplica).catch(() => setReplica(null))
+  }, [])
 
   useEffect(() => {
     void refresh()
@@ -276,13 +288,38 @@ export default function Connect() {
    * which is the side that knows how many files actually moved.
    */
   async function pushVault() {
+    const target = replica?.url?.trim() || remoteBrainUrl.trim()
+    if (!target) {
+      toast({ kind: 'warn', title: labels.vaultReplicaFailed, detail: labels.vaultReplicaNoUrl })
+      return
+    }
     setPushing(true)
     try {
-      await api.vaultSyncToReplica(remoteBrainUrl.trim(), connectToken || undefined)
+      await api.vaultSyncToReplica(target, connectToken || undefined)
     } catch (e) {
       toast({ kind: 'error', title: labels.vaultReplicaFailed, detail: (e as Error).message })
     } finally {
       setPushing(false)
+      // Whatever happened, the recorded outcome is the thing worth showing.
+      void api.vaultReplicaState().then(setReplica).catch(() => {})
+    }
+  }
+
+  async function setAutoSync(on: boolean) {
+    try {
+      await api.vaultReplicaConfig({ autoSync: on })
+      setReplica(await api.vaultReplicaState())
+    } catch (e) {
+      toast({ kind: 'error', title: labels.vaultReplicaFailed, detail: (e as Error).message })
+    }
+  }
+
+  async function saveReplicaUrl(url: string) {
+    try {
+      await api.vaultReplicaConfig({ url })
+      setReplica(await api.vaultReplicaState())
+    } catch (e) {
+      toast({ kind: 'error', title: labels.vaultReplicaFailed, detail: (e as Error).message })
     }
   }
 
@@ -802,10 +839,48 @@ export default function Connect() {
             <Badge color="#9aa3bd">{labels.vaultReplicaBadge}</Badge>
           </div>
           <p className="mb-3 text-xs text-ink-faint">{labels.vaultReplicaLead}</p>
-          <Button onClick={() => void pushVault()} disabled={pushing || !remoteBrainUrl.trim()}>
-            {pushing ? <Spinner className="h-4 w-4" /> : <UploadCloud className="h-4 w-4" />}
-            {labels.vaultReplicaAction}
-          </Button>
+
+          <Field label={labels.vaultReplicaUrl}>
+            <Input
+              value={replica?.url ?? ''}
+              onChange={(e) => setReplica((r) => (r ? { ...r, url: e.target.value } : r))}
+              onBlur={(e) => void saveReplicaUrl(e.target.value)}
+              placeholder="http://192.168.1.201:7865"
+            />
+          </Field>
+
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+            <div>
+              <div className="text-[13px] text-ink">{labels.vaultReplicaAuto}</div>
+              <p className="mt-0.5 text-[11px] text-ink-faint">{labels.vaultReplicaAutoHint}</p>
+            </div>
+            <Toggle checked={replica?.autoSync === true} onChange={(v) => void setAutoSync(v)} />
+          </div>
+
+          {/* The reason auto-sync is allowed to exist at all: its outcome is
+              on screen, including — especially — when it failed. */}
+          {replica?.last && (
+            <div
+              className={
+                replica.last.ok
+                  ? 'mt-3 rounded-xl border border-mint/20 bg-mint/5 px-3.5 py-2.5 text-[11px] text-ink-dim'
+                  : 'mt-3 rounded-xl border border-amber/25 bg-amber/10 px-3.5 py-2.5 text-[11px] text-amber-100'
+              }
+            >
+              <span className="font-semibold text-ink">{labels.vaultReplicaLast}</span>{' '}
+              {new Date(replica.last.at).toLocaleString('pl')} ·{' '}
+              {replica.last.ok
+                ? labels.vaultReplicaLastOk(replica.last.uploaded, replica.last.unchanged)
+                : (replica.last.error ?? labels.vaultReplicaFailed)}
+            </div>
+          )}
+
+          <div className="mt-3">
+            <Button onClick={() => void pushVault()} disabled={pushing}>
+              {pushing ? <Spinner className="h-4 w-4" /> : <UploadCloud className="h-4 w-4" />}
+              {labels.vaultReplicaAction}
+            </Button>
+          </div>
         </GlassCard>
       )}
     </div>

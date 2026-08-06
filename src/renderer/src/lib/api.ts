@@ -182,6 +182,24 @@ export interface PomniaBridge {
   >
   connectSkillsList(brainUrl: string, token?: string): Promise<SkillListEntry[]>
   connectSkillsSync(brainUrl: string, token?: string): Promise<SkillSyncResult>
+  vaultReplicaState(): Promise<{
+    url: string
+    hasToken: boolean
+    autoSync: boolean
+    last: {
+      at: string
+      ok: boolean
+      uploaded: number
+      unchanged: number
+      failed: number
+      error?: string
+    } | null
+  }>
+  vaultReplicaConfig(patch: {
+    url?: string
+    token?: string
+    autoSync?: boolean
+  }): Promise<{ url: string; hasToken: boolean; autoSync: boolean }>
   vaultSyncToReplica(
     target: string,
     token?: string,
@@ -793,6 +811,26 @@ function mockBridge(): PomniaBridge {
         path,
         bytes: 420,
       }
+    },
+    async vaultReplicaState() {
+      return {
+        url: 'http://192.168.1.201:7865',
+        hasToken: true,
+        autoSync: true,
+        // The interesting mock is a *failure*: a success tells you nothing
+        // about whether the failure path renders.
+        last: {
+          at: new Date(Date.now() - 40 * 60_000).toISOString(),
+          ok: false,
+          uploaded: 0,
+          unchanged: 0,
+          failed: 0,
+          error: 'fetch failed',
+        },
+      }
+    },
+    async vaultReplicaConfig(patch: { url?: string; token?: string; autoSync?: boolean }) {
+      return { url: patch.url ?? '', hasToken: !!patch.token, autoSync: patch.autoSync === true }
     },
     async vaultSyncToReplica() {
       // Browser mock: the interesting shape is "already up to date", because
