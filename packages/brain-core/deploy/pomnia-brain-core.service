@@ -8,11 +8,20 @@
 [Unit]
 Description=Pomnia brain-core — MCP memory server (vault + RAG)
 Documentation=https://pomnia.ai
-; Ollama supplies the embeddings. `Wants` rather than `Requires`: without it
-; the server still serves skills, profile and note reads, and /healthz reports
-; `degraded`. Refusing to start would turn a partial outage into a full one.
-Wants=network-online.target ollama.service
-After=network-online.target ollama.service
+; Ollama supplies the embeddings, and there is deliberately no ordering on it.
+;
+; It may be a systemd service, a container, or a box across the LAN — on the
+; machine this was written for it is a container with `restart: unless-stopped`,
+; so `Wants=ollama.service` named a unit that does not exist and quietly did
+; nothing. A dependency that cannot be true everywhere is worse than none: it
+; reads as handled.
+;
+; Nothing is needed instead. The embedder is consulted per request, so a late
+; Ollama means /healthz says `degraded` until it appears and `ok` afterwards,
+; with no restart. Refusing to start would turn a partial outage into a full
+; one; declaring a fake ordering would hide that it can happen at all.
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple

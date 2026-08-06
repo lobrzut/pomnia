@@ -1,0 +1,20 @@
+; SPDX-License-Identifier: AGPL-3.0-only
+; Daily credential backup.
+
+[Unit]
+Description=Pomnia — daily credential backup
+Documentation=https://pomnia.ai
+
+[Timer]
+OnCalendar=daily
+; A homelab box is often off overnight. Without this the timer simply never
+; fires and the backup silently never happens — which is the failure mode a
+; backup exists to prevent, reproduced by the backup.
+Persistent=true
+; Nothing here is time-critical; spreading the wake-up keeps it off the same
+; second as every other daily timer on the machine.
+RandomizedDelaySec=30m
+Unit=pomnia-backup.service
+
+[Install]
+WantedBy=timers.target
