@@ -1593,7 +1593,19 @@ const PL_LABELS: UiLabels = {
  * English chrome overlay — critical paths (nav, Settings, Dashboard, common toasts).
  * Missing keys fall back to PL via merge in uiLabels(). Grow over time.
  */
-const EN_LABELS: Partial<UiLabels> = {
+/**
+ * Not `Partial`, and that is the whole point.
+ *
+ * It used to be, which made English an overlay: any key missing here fell back
+ * to the Polish one, silently, and the compiler was happy. 111 of 665 keys were
+ * missing — the entire Import page among them — so an English build showed
+ * Polish headings under an English sidebar and nothing anywhere said so.
+ *
+ * Typed as the full interface, a forgotten key is a build error. The merge
+ * below stays because a spread is still the cheapest way to build the object,
+ * but it no longer has anything to paper over.
+ */
+const EN_LABELS: UiLabels = {
   distill: 'Prepare memory',
   distillBacklog: (n) => `Prepare memory (${n} new)`,
   runPipeline: 'Re-distill everything…',
@@ -2218,6 +2230,138 @@ const EN_LABELS: Partial<UiLabels> = {
     'This client has no fixed rules path — paste the block into AGENTS.md or the system prompt.',
   agentBrainModeRefreshHint:
     'After changing the Handshake phrase: save the rule again. Cursor: also copy pomnia.mdc into the project `.cursor/rules/` (Agent loads workspace rules), then Reload Window + NEW chat. Claude / Antigravity: full restart + new chat. Active chats do not reload CLAUDE.md / pomnia.mdc / GEMINI.md.',
+
+  // ── Connect: first-run checklist ──────────────────────────────────────────
+  connectChecklistTitle: 'First connection (4 steps)',
+  connectStepUrl: 'Brain MCP URL (:7862)',
+  connectStepToken: 'Bearer token from the dashboard (:7860)',
+  connectStepCopy: 'Copy the full mcp.json (3 servers)',
+  connectCopyForClient: (name) => `Copy mcp.json for ${name}`,
+  connectTokenPlaceholder: 'Bearer token (required for remote)',
+  connectTokenRequired: 'Remote MCP usually will not work without a token — paste or create one below.',
+  connectOpenDashboard: 'Open the token dashboard',
+  connectPartialTitle: 'Incomplete mcp.json — vault/library missing',
+  connectPartialDetail:
+    'Only some Pomnia servers were found. Remote needs pomnia + pomnia-vault + pomnia-library.',
+  connectPartialFix: 'Copy the full config below and overwrite or merge mcp.json',
+  embeddedBrainNotRunning: 'The local search engine is not running. Open the tab',
+  embeddedBrainNotRunningLink: 'Brain',
+
+  // ── Import ────────────────────────────────────────────────────────────────
+  importTitle: 'Import',
+  importLead: 'Upload an export from Claude.ai, ChatGPT, Gemini or Grok — it lands in the vault.',
+  importPickBusy: 'Importing…',
+  importVaultClosed: 'Unlock the vault first',
+  importFormats: 'ZIP · JSON · JSONL · MD — the source is detected automatically',
+  importSelect: 'Choose a file…',
+  importChatSection: 'Chat exports',
+  importDocSection: 'Documents',
+  importDocBusy: 'Importing the document…',
+  importDocFormats: 'PDF · DOCX · EPUB · MD · TXT — encrypted in the vault, indexed for search',
+  importDocSelect: 'Choose a document…',
+  importDocDrop: 'Drop the file here',
+  importUnsupportedFormat: 'Unsupported format',
+  importDocDone: 'Document imported',
+  importDocBrainOff: 'Start the local search engine (Brain) to index the chunks.',
+  importDocQueuedHint: 'Saved to the vault — it will be indexed once Brain starts.',
+  importDocQueuedDetail: 'The document is in the vault; the index is built when the engine starts.',
+  importDocFailedToast: 'Document import failed',
+  importDocIndexedBadge: (chunks) => `${chunks} chunks`,
+  importDocPagesBadge: (n) => `${n} pp.`,
+  importDocEncryptedBadge: 'encrypted in the vault',
+  importDocProgressParse: 'Parsing',
+  importDocProgressIndex: 'Indexing',
+  importDocProgressEncrypt: 'Encrypting into the vault',
+  importProviders: 'Where to get an export',
+  importLegalNote:
+    'Pomnia imports official exports only — it never signs in to your accounts. Claude Desktop and Gemini need an export from the web version.',
+
+  // ── Guide ─────────────────────────────────────────────────────────────────
+  guideStep1Title: 'Step 1 — Collect',
+  guideStep1Body:
+    'Cursor, Claude Code, Antigravity… — Pomnia reads the live logs off your disk, or imports ZIP/JSON exports.',
+  guideStep1Where: 'Dashboard → Backup · Import',
+  guideStep2Title: 'Step 2 — The Pomnia vault',
+  guideStep2Body:
+    'The vault folder you picked when creating it (e.g. C:\\Vault — any name, sometimes *.pomnia). Encrypted snapshots plus documents. An archive, not a search engine, and not AppData.',
+  guideStep2Where: 'Dashboard · Settings → Vault',
+  guideStep3Title: 'Step 3 — Distill',
+  guideStep3Body:
+    'Ollama (qwen) shortens conversations into notes in brain-notes/ — summaries, NOT full copies of the chats.',
+  guideStep3Where: 'Brain → Prepare memory',
+  guideStep4Title: 'Step 4 — Search engine',
+  guideStep4Body:
+    'The embedded brain builds library.db — chunks plus embeddings, locally on this machine.',
+  guideStep4Where: 'Brain → Local search engine',
+  guideStep5Title: 'Step 5 — Agent over MCP',
+  guideStep5Body:
+    'An MCP client connects the agent to the local search engine. While coding, the agent can call search_library (RAG) and optionally load skills — that is asking a question mid-work, not writing to memory.',
+  guideStep5Where: 'Connect · search_library · get_skill',
+  guideStepOptionalTitle: 'Optional — a Brain server',
+  guideStepOptionalBody:
+    'Deploy a copy of the notes to an optional Brain server on your LAN — shared memory for several machines.',
+  guideStepOptionalWhere: 'Brain → Advanced → Deploy',
+  guideDocsTitle: 'Documents (PDF / EPUB)',
+  guideDocsBody:
+    'Import → vault (encrypted) → straight to the embedding index. NO LLM distillation — chunk and embed only.',
+  guideDocsWhere: 'Import → Documents',
+  guideOpenTab: 'Open the tab',
+  guideDiagramToggle: 'Show the diagram',
+  guideDiagramHide: 'Hide the diagram',
+  guideFlowReplayLastNone: 'Nothing recorded yet — run a distillation, an import or an MCP query.',
+  guideFlowReplayLastBusy: 'Hold on — something is running right now.',
+  guideFlowReplayHint:
+    'A demo of the steps, or a replay of the last real run (distillation, import, MCP)',
+  guideFlowMainLegend: 'Chat path',
+  guideFlowDocsLegend: 'Document path',
+  guideFlowOptionalLegend: 'Optional',
+  guideFlowAgentLegend: 'Agent query',
+  flowAgentConsumptionCaption: 'Reading (not writing):',
+  guideFlowMiniExpand: 'Full map →',
+  flowEdgeMemoryReturn: 'answer from memory',
+
+  // ── Flow diagram nodes ────────────────────────────────────────────────────
+  flowNodeAiLabel: 'AI tools',
+  flowNodeAiHint: 'Cursor, Claude Code, Antigravity — raw session logs on your local disk.',
+  flowNodeAiDisk: 'Cursor · Claude · Antigravity',
+  flowNodeVaultLabel: 'Vault folder',
+  flowNodeVaultLabelPip: 'Vault',
+  flowNodeVaultHint:
+    'The encrypted archive (header.json, blobs, skills/, USER.md, distilled…) — the whole folder, e.g. C:\\Vault.',
+  flowNodeVaultDisk: 'e.g. C:\\Vault',
+  flowNodeDistillLabel: 'Distill',
+  flowNodeDistillHint:
+    'Ollama (qwen) shortens conversations into terse notes — not full copies of the chats.',
+  flowNodeDistillDisk: 'localhost:11434',
+  flowNodeNotesLabel: 'brain-notes',
+  flowNodeNotesHint: 'Distilled session summaries, ready to index.',
+  flowNodeNotesDisk: 'notes/distilled',
+  flowNodeLibraryLabel: 'library.db',
+  flowNodeLibraryLabelPip: 'library.db',
+  flowNodeLibraryHint: 'Embedded brain: text chunks plus embedding vectors, locally on this PC.',
+  flowNodeLibraryDisk: 'core-data/library.db',
+  flowNodeMcpLabel: 'Agent over MCP',
+  flowNodeMcpLabelPip: 'MCP agent',
+  flowNodeMcpHint: 'The agent connects over MCP — the bridge to the local Brain search engine.',
+  flowNodeMcpDisk: 'Connect · mcp.json',
+  flowAgentLayerSkills: 'skills',
+  flowAgentLayerSkillsOptional: 'opt.',
+  flowAgentLayerSearch: 'search_library',
+  flowMiniStatus: (state) => (state.kind === 'idle' ? 'Idle' : formatFlowFocusBanner(state)),
+  dashboardActivityNow: (state) => formatFlowLiveBadge(state),
+  dashboardActivityLast: (relative) => `Last activity: distillation ${relative}`,
+  dashboardActivityNone: 'No distillation yet — start Brain to prepare your memory',
+  flowIllustrationCaption:
+    'Waiting — the animation starts on a distillation, import, indexing run or MCP query',
+  flowNodeImportLabel: 'Import',
+  flowNodeImportHint: 'PDF, EPUB, ZIP — lands in the vault without LLM distillation.',
+  flowNodeImportDisk: 'vault/library.cvb',
+  flowNodeDocsIndexLabel: 'Index',
+  flowNodeDocsIndexHint: 'Chunk and embed — no distillation.',
+  flowNodeDocsIndexDisk: 'library.db (docs)',
+  flowNodeDeployLabel: 'Deploy',
+  flowNodeDeployHint: 'An optional copy of the notes on a remote Brain server (e.g. LAN :7860).',
+  flowNodeDeployDisk: 'Brain server (opt.)',
 }
 
 let cachedEn: UiLabels | null = null
