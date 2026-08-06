@@ -487,7 +487,7 @@ export function renderAdminPage(origin: string): string {
 
   // ── status ──────────────────────────────────────────────────────────────
   const STATE_PL = { ok: 'sprawne', degraded: 'ograniczone', down: 'nie działa' }
-  const NAMES = { db: 'Baza', index: 'Indeks', vault: 'Vault', ollama: 'Embeddingi (Ollama)' }
+  const NAMES = { db: 'Baza', index: 'Indeks', vault: 'Vault', disk: 'Dysk / zapis', ollama: 'Embeddingi (Ollama)' }
 
   async function loadStatus() {
     const tb = $('checks')
@@ -514,7 +514,7 @@ export function renderAdminPage(origin: string): string {
     add('Ogólnie', STATE_PL[h.status] || h.status)
     add('Wersja', 'brain-core ' + h.version)
     add('Indeks', h.index.files.toLocaleString('pl') + ' plików · ' + h.index.chunks.toLocaleString('pl') + ' fragmentów')
-    for (const key of ['db', 'index', 'vault', 'ollama']) {
+    for (const key of ['db', 'index', 'vault', 'disk', 'ollama']) {
       const c = h.checks[key]
       add(NAMES[key], STATE_PL[c.state] + (c.detail ? ' — ' + c.detail : ''))
     }
