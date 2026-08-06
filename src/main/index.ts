@@ -61,6 +61,7 @@ import {
   type SourceId,
   localizePipelineProgress,
 } from '@core/index'
+import { m } from './mainStrings.js'
 import { formatBuildIdentity } from '../buildInfo.js'
 
 import { brainCore, killLeftoverBrainHelpers } from './brainCore.js'
@@ -326,13 +327,13 @@ async function healLedgerForVault(): Promise<void> {
       sendAppToast({
         kind: 'info',
         title: 'Rejestr destylacji przeniesiony do vaultu',
-        detail: `${known} rozmów · od teraz podróżuje razem z danymi`,
+        detail: m().ledgerTravels(known),
       })
     } else if (origin === 'rebuilt-from-notes' && recovered > 0) {
       sendAppToast({
         kind: 'info',
         title: 'Rejestr destylacji odbudowany z notatek',
-        detail: `${recovered} rozmów odzyskanych — nie trzeba ich mielić od nowa`,
+        detail: m().ledgerRecovered(recovered),
       })
     }
   } catch (e) {
@@ -370,7 +371,7 @@ async function flushPendingLibraryDocs(ollamaUrl?: string): Promise<PendingIndex
   }
   if (vault.getPendingIndexDocuments().length === 0) return null
   const url = resolveOllamaUrl(ollamaUrl)
-  activity.update({ kind: 'indexing', phase: 'index', detail: 'oczekujące dokumenty…' })
+  activity.update({ kind: 'indexing', phase: 'index', detail: m().pendingDocs })
   try {
     const flush = await indexPendingLibraryDocuments(vault, vaultPath, {
       ollamaUrl: url,
@@ -407,8 +408,8 @@ async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
     log.warn('embedded brain autostart failed:', ensured.error ?? 'unknown')
     sendAppToast({
       kind: 'error',
-      title: 'Lokalna wyszukiwarka nie wystartowała',
-      detail: `${ensured.error ?? 'nieznany błąd'} — dopóki nie ruszy, agenci nie widzą pamięci.`,
+      title: m().brainStartFailedTitle,
+      detail: m().brainStartFailedDetail(ensured.error ?? '?'),
     })
   }
   if (!ensured.running || !vault || !vaultPath) {
@@ -517,8 +518,8 @@ async function warnIfRemoteBrainUnusable(): Promise<void> {
     warnedRemoteBrain = true
     sendAppToast({
       kind: 'error',
-      title: 'Zdalny Brain nie odpowiada',
-      detail: `${url} — ${probe.error ?? 'brak odpowiedzi'}. Popraw adres w zakładce Podłącz albo przełącz się na tryb lokalny.`,
+      title: m().remoteUnreachableTitle,
+      detail: m().remoteUnreachableDetail(url, probe.error ?? '?'),
     })
     return
   }
@@ -533,8 +534,8 @@ async function warnIfRemoteBrainUnusable(): Promise<void> {
   warnedRemoteBrain = true
   sendAppToast({
     kind: 'warn',
-    title: 'Zdalny serwer to nie brain-core',
-    detail: `${root} — ${engine.label}. Agenci dostaną z niego inną pamięć niż ta aplikacja. Popraw adres w zakładce Podłącz albo wróć do trybu lokalnego.`,
+    title: m().remoteNotBrainCoreTitle,
+    detail: m().remoteNotBrainCoreDetail(root, engine.label),
   })
 }
 
@@ -551,9 +552,9 @@ async function maybeHygieneReindexAfterVaultChange(): Promise<void> {
   if (!brainCore.status().running) {
     sendAppToast({
       kind: 'info',
-      title: 'Pełny reindex indeksu',
+      title: m().fullReindexTitle,
       detail:
-        'Vault przenośny — po starcie lokalnej wyszukiwarki kliknij „Odśwież indeks” (raz), żeby usunąć stare ścieżki AppData z wyszukiwania.',
+        m().fullReindexDetail,
     })
     return
   }
@@ -577,9 +578,9 @@ async function maybeHygieneReindexAfterVaultChange(): Promise<void> {
     const indexedFiles = stats?.files ?? 0
     sendAppToast({
       kind: indexedFiles > 0 ? 'success' : 'warn',
-      title: indexedFiles > 0 ? 'Indeks dopasowany do vaultu' : 'Reindeks nie zaindeksował niczego',
+      title: indexedFiles > 0 ? m().reindexMatchedTitle : m().reindexNothingTitle,
       detail: `${indexedFiles} plików · ${stats?.chunks ?? 0} chunków${
-        pruned ? ` · usunięto ${pruned} starych ścieżek` : ''
+        pruned ? m().reindexPruned(pruned) : ''
       }`,
     })
   } catch (e) {
@@ -587,7 +588,7 @@ async function maybeHygieneReindexAfterVaultChange(): Promise<void> {
     sendAppToast({
       kind: 'warn',
       title: 'Reindex po otwarciu vaultu nieudany',
-      detail: `${(e as Error).message} — kliknij „Odśwież indeks” w Brain.`,
+      detail: m().reindexFailedDetail((e as Error).message),
     })
   } finally {
     activity.idle('indexing')
@@ -1319,7 +1320,7 @@ function registerIpc(): void {
         // saving a bad address means the first failure arrives at 3am after a
         // distillation, not now while someone is looking.
         if (url && !/^https?:\/\//i.test(url)) {
-          throw new Error('Adres repliki musi zaczynać się od http:// lub https://')
+          throw new Error(m().replicaUrlScheme)
         }
         next.replicaUrl = url
       }
@@ -1334,9 +1335,9 @@ function registerIpc(): void {
   ipcMain.handle('vault:syncToReplica', async (_e, target: string, token?: string) => {
     if (!vaultPath) throw new Error('Vault nie jest otwarty.')
     const url = (target ?? '').trim()
-    if (!url) throw new Error('Podaj adres serwera (zakładka Podłącz).')
+    if (!url) throw new Error(m().replicaNoTarget)
     const root = brainVaultRoot(vaultPath)
-    activity.update({ kind: 'indexing', phase: 'reindex', detail: 'porównuję z repliką…' })
+    activity.update({ kind: 'indexing', phase: 'reindex', detail: m().replicaComparing })
     try {
       const r = await syncVaultToReplica({
         vaultRoot: root,
@@ -1346,7 +1347,7 @@ function registerIpc(): void {
           activity.update({
             kind: 'indexing',
             phase: 'reindex',
-            detail: `wysyłam ${done}/${total} — ${basename(path)}`,
+            detail: m().replicaSending(done, total, basename(path)),
           }),
       })
       // Uploading files a replica does not index changes nothing an agent can
@@ -1356,7 +1357,7 @@ function registerIpc(): void {
         r.failed.length > 0
           ? {
               kind: 'warn' as const,
-              title: `Wysłano ${r.uploaded}, nie udało się ${r.failed.length}`,
+              title: m().replicaPartialTitle(r.uploaded, r.failed.length),
               detail: r.failed
                 .slice(0, 3)
                 .map((f) => `${basename(f.path)}: ${f.reason}`)
@@ -1365,16 +1366,16 @@ function registerIpc(): void {
           : r.uploaded === 0
             ? {
                 kind: 'info' as const,
-                title: 'Replika była już aktualna',
-                detail: `${r.unchanged} plików identycznych — nic do wysłania.`,
+                title: m().replicaUpToDateTitle,
+                detail: m().replicaUpToDateDetail(r.unchanged),
               }
             : {
                 kind: 'success' as const,
-                title: `Zsynchronizowano ${r.uploaded} plik(ów)`,
+                title: m().replicaSyncedTitle(r.uploaded),
                 detail:
                   `${r.unchanged} bez zmian · ${r.bytesUploaded > 0 ? `${(r.bytesUploaded / 1024).toFixed(0)} kB` : '0 kB'}` +
                   (r.extraOnReplica.length
-                    ? ` · ${r.extraOnReplica.length} plik(ów) jest tylko na replice (nic nie skasowano)`
+                    ? m().replicaExtraSuffix(r.extraOnReplica.length)
                     : ''),
               }
       sendAppToast(toast)
@@ -1419,8 +1420,8 @@ function registerIpc(): void {
       if (r.failed.length) {
         sendAppToast({
           kind: 'warn',
-          title: `Replikacja: ${r.failed.length} plik(ów) nie poszło`,
-          detail: `${r.uploaded} wysłane · ${r.failed[0].reason}`,
+          title: m().replicaAutoFailedTitle(r.failed.length),
+          detail: m().replicaAutoFailedDetail(r.uploaded, r.failed[0].reason),
         })
       }
     } catch (e) {
@@ -1440,8 +1441,8 @@ function registerIpc(): void {
       log.warn(`auto-replication after ${reason} failed:`, (e as Error).message)
       sendAppToast({
         kind: 'warn',
-        title: 'Replikacja na serwer nieudana',
-        detail: `${(e as Error).message} — serwer ma teraz starszą kopię niż ten komputer.`,
+        title: m().replicaOfflineTitle,
+        detail: m().replicaOfflineDetail((e as Error).message),
       })
     }
   }
@@ -1473,7 +1474,7 @@ function registerIpc(): void {
     // search comes back empty.
     const missingEmbed = missingEmbedModelMessage(probe.models)
     if (missingEmbed) {
-      sendAppToast({ kind: 'error', title: 'Wyszukiwarka nie ma czym liczyć', detail: missingEmbed })
+      sendAppToast({ kind: 'error', title: m().brainNoEmbedTitle, detail: missingEmbed })
     }
     activity.update({ kind: 'brain-start', phase: 'start', detail: 'uruchamiam…' })
     try {
@@ -2049,7 +2050,7 @@ app.whenReady().then(async () => {
         log.warn('profile preview failed:', (e as Error).message)
         sendAppToast({
           kind: 'error',
-          title: 'Podgląd profilu nieudany',
+          title: m().profilePreviewFailed,
           detail: (e as Error).message,
         })
       })

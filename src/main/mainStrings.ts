@@ -44,6 +44,7 @@ export interface MainStrings {
   fullReindexTitle: string
   fullReindexDetail: string
   reindexNothingTitle: string
+  reindexMatchedTitle: string
   reindexPruned: (pruned: number) => string
   reindexFailedDetail: (why: string) => string
 
@@ -122,6 +123,7 @@ const PL: MainStrings = {
   fullReindexDetail:
     'Vault przenośny — po starcie lokalnej wyszukiwarki kliknij „Odśwież indeks” (raz), żeby usunąć stare ścieżki AppData z wyszukiwania.',
   reindexNothingTitle: 'Reindeks nie zaindeksował niczego',
+  reindexMatchedTitle: 'Indeks dopasowany do vaultu',
   reindexPruned: (pruned) => ` · usunięto ${pruned} starych ścieżek`,
   reindexFailedDetail: (why) => `${why} — kliknij „Odśwież indeks” w Brain.`,
 
@@ -202,6 +204,7 @@ const EN: MainStrings = {
   fullReindexDetail:
     'Portable vault — once the local search engine is running, click “Refresh index” once to drop the old AppData paths from search.',
   reindexNothingTitle: 'The rebuild indexed nothing',
+  reindexMatchedTitle: 'Index matched to the vault',
   reindexPruned: (pruned) => ` · removed ${pruned} stale paths`,
   reindexFailedDetail: (why) => `${why} — click “Refresh index” in Brain.`,
 
