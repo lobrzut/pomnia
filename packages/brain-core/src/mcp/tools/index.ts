@@ -36,7 +36,8 @@ import {
   listCliSkillsSchema,
   getSkillSchema,
 } from './skills.js'
-import { stubSchemas, runStub } from './stubs.js'
+// Only the handler: these tools are answered, not advertised. See listTools.
+import { runStub } from './stubs.js'
 
 export interface ToolDef {
   name: string
@@ -183,27 +184,17 @@ export function listTools(
         'Load a skill by name (brain .md or cli SKILL.md). Returns full markdown — follow it for that task. Discover names via list_skills.',
       inputSchema: getSkillSchema,
     },
-    // Not implemented. Kept in the catalog so a client with a cached tool list
-    // gets an explanation rather than "unknown tool" — but the description has
-    // to say so up front, or an agent picks the tool, calls it, and only then
-    // learns it does nothing.
-    {
-      name: 'run_skill',
-      description:
-        'NOT IMPLEMENTED — returns an explanation, runs nothing. Use get_skill to read the skill and follow it yourself.',
-      inputSchema: stubSchemas.run_skill,
-    },
-    {
-      name: 'search_code',
-      description:
-        'NOT IMPLEMENTED — returns an explanation, searches nothing. Pomnia indexes notes and documents, not source trees; grep the repository instead.',
-      inputSchema: stubSchemas.search_code,
-    },
-    {
-      name: 'code_status',
-      description: 'NOT IMPLEMENTED — returns an explanation. There is no code index to report on.',
-      inputSchema: stubSchemas.code_status,
-    },
+    // run_skill / search_code / code_status are deliberately absent here.
+    //
+    // They are still *handled* — callTool answers them with an explanation, so
+    // a client holding a cached catalog gets something useful instead of
+    // "unknown tool". What they are not is advertised: three entries that
+    // announce themselves as NOT IMPLEMENTED cost context in every listing, in
+    // every conversation, and their only possible outcome is an agent choosing
+    // one and being told no.
+    //
+    // Listing and handling are different questions, and answering both with
+    // "yes" was the compromise nobody actually wanted.
   ]
 }
 
