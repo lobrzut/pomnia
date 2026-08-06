@@ -65,7 +65,7 @@ import { formatBuildIdentity } from '../buildInfo.js'
 
 import { brainCore, killLeftoverBrainHelpers } from './brainCore.js'
 import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused } from './mcpActivityPoll.js'
-import { checkForUpdate } from './updateCheck.js'
+import { checkForUpdate, describeUpdate } from './updateCheck.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { runDocumentOcr } from './docOcr.js'
 import { removeLibraryDocumentWithIndex } from './libraryDocRemove.js'
@@ -1437,6 +1437,22 @@ function registerIpc(): void {
       })
     }
   }
+
+  /**
+   * Version and update state, on demand.
+   *
+   * The startup check only ever produced a toast when a newer build existed —
+   * so on the overwhelmingly common day, when you are current, the feature was
+   * invisible and there was no way to tell it from a feature that does not
+   * work. "Up to date, checked just now" is the answer people are looking for,
+   * and it has to be askable.
+   */
+  ipcMain.handle('app:updateCheck', async () => {
+    const current = app.getVersion()
+    const r = await describeUpdate(current)
+    if (r.state === 'unreachable') log.warn('manual update check failed:', r.detail)
+    return { current, checkedAt: new Date().toISOString(), ...r }
+  })
 
   ipcMain.handle('brainCore:status', () => brainCore.status())
   ipcMain.handle('brainCore:start', async (_e, ollamaUrl?: string) => {

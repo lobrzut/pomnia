@@ -182,6 +182,14 @@ export interface PomniaBridge {
   >
   connectSkillsList(brainUrl: string, token?: string): Promise<SkillListEntry[]>
   connectSkillsSync(brainUrl: string, token?: string): Promise<SkillSyncResult>
+  appUpdateCheck(): Promise<{
+    current: string
+    checkedAt: string
+    state: 'current' | 'available' | 'unreachable'
+    latest?: string | null
+    releaseUrl?: string
+    detail?: string
+  }>
   vaultReplicaState(): Promise<{
     url: string
     hasToken: boolean
@@ -810,6 +818,14 @@ function mockBridge(): PomniaBridge {
         ok: true as const,
         path,
         bytes: 420,
+      }
+    },
+    async appUpdateCheck() {
+      return {
+        current: '0.1.54',
+        checkedAt: new Date().toISOString(),
+        state: 'current' as const,
+        latest: '0.1.54',
       }
     },
     async vaultReplicaState() {

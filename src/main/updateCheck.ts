@@ -55,6 +55,50 @@ export function isNewerVersion(candidate: string, current: string): boolean {
  * repo is public once released, and an unauthenticated call is enough for a
  * version string.
  */
+/**
+ * The same question, answered with its reasons.
+ *
+ * `checkForUpdate` returns null for "you are current", "GitHub said 404",
+ * "the network is down" and "the payload was junk" alike — right for the
+ * startup path, which must stay silent, and wrong for a person who pressed a
+ * button and deserves to know whether the check happened at all. Reporting
+ * "up to date" over a failed request is a small lie that costs exactly the
+ * trust an update mechanism runs on.
+ */
+export type UpdateCheckResult =
+  | { state: 'current'; latest: string | null }
+  | { state: 'available'; latest: string; releaseUrl: string }
+  | { state: 'unreachable'; detail: string }
+
+export async function describeUpdate(
+  currentVersion: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<UpdateCheckResult> {
+  try {
+    const r = await fetchImpl('https://api.github.com/repos/lobrzut/pomnia/releases/latest', {
+      headers: { accept: 'application/vnd.github+json', 'user-agent': 'pomnia-desktop' },
+      signal: AbortSignal.timeout(8_000),
+    })
+    // 404 is the ordinary state of a repo with no releases yet — that is
+    // "nothing published", not a broken check.
+    if (r.status === 404) return { state: 'current', latest: null }
+    if (!r.ok) return { state: 'unreachable', detail: `GitHub odpowiedział ${r.status}` }
+    const j = (await r.json()) as {
+      tag_name?: string
+      html_url?: string
+      draft?: boolean
+      prerelease?: boolean
+    }
+    if (!j.tag_name || j.draft || j.prerelease) return { state: 'current', latest: null }
+    const latest = j.tag_name.replace(/^v/, '')
+    return isNewerVersion(j.tag_name, currentVersion)
+      ? { state: 'available', latest, releaseUrl: j.html_url ?? RELEASES_URL }
+      : { state: 'current', latest }
+  } catch (e) {
+    return { state: 'unreachable', detail: (e as Error).message }
+  }
+}
+
 export async function checkForUpdate(
   currentVersion: string,
   fetchImpl: typeof fetch = fetch,

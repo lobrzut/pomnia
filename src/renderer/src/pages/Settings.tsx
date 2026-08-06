@@ -261,6 +261,26 @@ export default function Settings() {
   const [exportSnap, setExportSnap] = useState(snapshots[0]?.id ?? '')
   const [verifying, setVerifying] = useState(false)
   const [appVersion, setAppVersion] = useState('')
+  const [update, setUpdate] = useState<Awaited<ReturnType<typeof api.appUpdateCheck>> | null>(null)
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+
+  async function runUpdateCheck() {
+    setCheckingUpdate(true)
+    try {
+      setUpdate(await api.appUpdateCheck())
+    } catch (e) {
+      // The check failing is itself an answer, and a silent button is the one
+      // thing this card exists to stop being.
+      setUpdate({
+        current: appVersion,
+        checkedAt: new Date().toISOString(),
+        state: 'unreachable',
+        detail: (e as Error).message,
+      })
+    } finally {
+      setCheckingUpdate(false)
+    }
+  }
   const [phraseDraft, setPhraseDraft] = useState(handshakePhrase)
   const [phraseError, setPhraseError] = useState<string | null>(null)
   const [phraseSaving, setPhraseSaving] = useState(false)
@@ -343,6 +363,50 @@ export default function Settings() {
     <div className="mx-auto max-w-3xl">
       <h1 className="mb-1 text-[26px] font-bold tracking-tight text-grad">{labels.settingsTitle}</h1>
       <p className="mb-6 text-sm text-ink-dim">{labels.settingsLead}</p>
+
+      {/*
+        Version and updates, first thing on the page.
+        The startup check only ever spoke when a newer build existed, so on the
+        overwhelmingly common day — you are current — the feature was invisible
+        and indistinguishable from one that does not work.
+      */}
+      <GlassCard className="mb-4 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-ink">
+              Pomnia {appVersion || '—'}
+            </div>
+            <p className="mt-1 text-xs text-ink-dim">
+              {update === null
+                ? 'Pomnia sprawdza wydania i mówi, gdy jest nowsze — nigdy nie instaluje nic sama.'
+                : update.state === 'available'
+                  ? `Jest nowsza wersja: ${update.latest}. Pobierzesz ją z GitHuba — instalacja zawsze ręczna.`
+                  : update.state === 'unreachable'
+                    ? `Nie udało się sprawdzić: ${update.detail ?? 'brak połączenia'}`
+                    : 'Masz najnowszą wersję.'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {update?.state === 'available' && update.releaseUrl && (
+              // A plain anchor rather than an IPC round-trip: Electron's
+              // setWindowOpenHandler already sends target=_blank to the system
+              // browser, so there is nothing to add and one less channel.
+              <a
+                href={update.releaseUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="no-drag rounded-xl border border-white/10 bg-mint/15 px-3.5 py-2 text-[13px] font-semibold text-mint"
+              >
+                Pobierz
+              </a>
+            )}
+            <Button variant="soft" onClick={() => void runUpdateCheck()} disabled={checkingUpdate}>
+              {checkingUpdate ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              Sprawdź aktualizacje
+            </Button>
+          </div>
+        </div>
+      </GlassCard>
 
       <GlassCard className="mb-4 p-5">
         <div className="mb-1 flex items-center justify-between gap-3">
