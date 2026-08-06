@@ -245,6 +245,12 @@ export interface UiLabels {
   vaultReplicaLead: string
   vaultReplicaAction: string
   vaultReplicaFailed: string
+  vaultReplicaUrl: string
+  vaultReplicaAuto: string
+  vaultReplicaAutoHint: string
+  vaultReplicaLast: string
+  vaultReplicaLastOk: (uploaded: number, unchanged: number) => string
+  vaultReplicaNoUrl: string
   onboardingEngineLooking: string
   onboardingEngineRunning: string
   onboardingEngineMoreModels: (n: number) => string
@@ -901,6 +907,13 @@ const PL_LABELS: UiLabels = {
     'Wysyła na serwer tylko to, co się zmieniło — reszta zostaje na miejscu. Nic nie kasuje: pliki, których tu już nie ma, zostaną wypisane, nie usunięte. Blobów nie wysyła.',
   vaultReplicaAction: 'Wyślij zmiany na serwer',
   vaultReplicaFailed: 'Replikacja nieudana',
+  vaultReplicaUrl: 'Adres repliki',
+  vaultReplicaAuto: 'Wysyłaj automatycznie po destylacji',
+  vaultReplicaAutoHint:
+    'Nieudana próba nie zniknie po cichu — wynik jest zawsze zapisany i widoczny niżej.',
+  vaultReplicaLast: 'Ostatnia replikacja:',
+  vaultReplicaLastOk: (u, n) => `wysłano ${u}, bez zmian ${n}`,
+  vaultReplicaNoUrl: 'Najpierw podaj adres repliki.',
   onboardingEngineLooking: 'Szukam Ollama na tym komputerze…',
   onboardingEngineRunning: 'Ollama działa',
   onboardingEngineMoreModels: (n) => `+${n} więcej`,
@@ -1613,6 +1626,12 @@ const EN_LABELS: Partial<UiLabels> = {
     'Sends only what changed. Deletes nothing: files missing here are listed, not removed. Blobs stay put.',
   vaultReplicaAction: 'Push changes to the server',
   vaultReplicaFailed: 'Replication failed',
+  vaultReplicaUrl: 'Replica address',
+  vaultReplicaAuto: 'Push automatically after distillation',
+  vaultReplicaAutoHint: 'A failed attempt is recorded and shown below — it never disappears quietly.',
+  vaultReplicaLast: 'Last replication:',
+  vaultReplicaLastOk: (u, n) => `${u} uploaded, ${n} unchanged`,
+  vaultReplicaNoUrl: 'Set the replica address first.',
   onboardingEngineLooking: 'Looking for Ollama on this machine…',
   onboardingEngineRunning: 'Ollama is running',
   onboardingEngineMoreModels: (n) => `+${n} more`,

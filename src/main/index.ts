@@ -1232,6 +1232,11 @@ function registerIpc(): void {
           })
         }
 
+        // Notes are in the vault by now, so the replica is out of date. Fire
+        // and forget: replication must never hold up the pipeline's result,
+        // and its own outcome is recorded regardless.
+        if (okNotes.length > 0) void autoReplicate('distillation')
+
         triggerFinale = true
         return {
           notesDir: dir,
@@ -1285,6 +1290,39 @@ function registerIpc(): void {
    * Until now "the server has a copy" meant a tar somebody ran once, which
    * started rotting with the next saved conversation and never said so.
    */
+  /** What the panel shows about replication: where, whether automatic, and how it went. */
+  ipcMain.handle('vault:replicaState', () => {
+    const s = getAppSettings()
+    return {
+      url: s.replicaUrl ?? '',
+      hasToken: !!s.replicaToken?.trim(),
+      autoSync: s.replicaAutoSync === true,
+      last: s.lastReplication ?? null,
+    }
+  })
+
+  ipcMain.handle(
+    'vault:replicaConfig',
+    async (_e, patch: { url?: string; token?: string; autoSync?: boolean }) => {
+      const next: Parameters<typeof setAppSettings>[0] = {}
+      if (patch.url !== undefined) {
+        const url = patch.url.trim()
+        // Same shape the sync itself accepts, checked before it is stored:
+        // saving a bad address means the first failure arrives at 3am after a
+        // distillation, not now while someone is looking.
+        if (url && !/^https?:\/\//i.test(url)) {
+          throw new Error('Adres repliki musi zaczynać się od http:// lub https://')
+        }
+        next.replicaUrl = url
+      }
+      if (patch.token !== undefined) next.replicaToken = patch.token.trim()
+      if (patch.autoSync !== undefined) next.replicaAutoSync = patch.autoSync === true
+      await setAppSettings(next)
+      const s = getAppSettings()
+      return { url: s.replicaUrl ?? '', hasToken: !!s.replicaToken?.trim(), autoSync: s.replicaAutoSync === true }
+    },
+  )
+
   ipcMain.handle('vault:syncToReplica', async (_e, target: string, token?: string) => {
     if (!vaultPath) throw new Error('Vault nie jest otwarty.')
     const url = (target ?? '').trim()
@@ -1339,6 +1377,66 @@ function registerIpc(): void {
       activity.idle('indexing')
     }
   })
+
+  /**
+   * Mirror the vault to the configured replica after new notes land.
+   *
+   * Only when asked for, and never silently: the outcome is written to settings
+   * whether it worked or not, because an auto-sync that fails quietly is worse
+   * than none — it leaves you believing the server is current. Toasts only on
+   * failure; a working sync after every distillation would be noise.
+   */
+  async function autoReplicate(reason: string): Promise<void> {
+    const s = getAppSettings()
+    const target = s.replicaUrl?.trim()
+    if (!s.replicaAutoSync || !target || !vaultPath) return
+
+    try {
+      const r = await syncVaultToReplica({
+        vaultRoot: brainVaultRoot(vaultPath),
+        target,
+        token: s.replicaToken?.trim() || undefined,
+      })
+      await setAppSettings({
+        lastReplication: {
+          at: new Date().toISOString(),
+          ok: r.failed.length === 0,
+          uploaded: r.uploaded,
+          unchanged: r.unchanged,
+          failed: r.failed.length,
+          ...(r.failed.length ? { error: r.failed[0].reason } : {}),
+        },
+      })
+      log.info(`auto-replication after ${reason}: ${r.uploaded} uploaded, ${r.failed.length} failed`)
+      if (r.failed.length) {
+        sendAppToast({
+          kind: 'warn',
+          title: `Replikacja: ${r.failed.length} plik(ów) nie poszło`,
+          detail: `${r.uploaded} wysłane · ${r.failed[0].reason}`,
+        })
+      }
+    } catch (e) {
+      // The server being off is the ordinary case, not an emergency — but it
+      // must still be recorded, or the next glance at "last replication" shows
+      // a stale success and reads as current.
+      await setAppSettings({
+        lastReplication: {
+          at: new Date().toISOString(),
+          ok: false,
+          uploaded: 0,
+          unchanged: 0,
+          failed: 0,
+          error: (e as Error).message,
+        },
+      })
+      log.warn(`auto-replication after ${reason} failed:`, (e as Error).message)
+      sendAppToast({
+        kind: 'warn',
+        title: 'Replikacja na serwer nieudana',
+        detail: `${(e as Error).message} — serwer ma teraz starszą kopię niż ten komputer.`,
+      })
+    }
+  }
 
   ipcMain.handle('brainCore:status', () => brainCore.status())
   ipcMain.handle('brainCore:start', async (_e, ollamaUrl?: string) => {
