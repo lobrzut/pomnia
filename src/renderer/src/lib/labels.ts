@@ -1727,7 +1727,7 @@ const EN_LABELS: Partial<UiLabels> = {
   colorSchemeHint: 'App look — backgrounds, accents, and panel glass. Orange logo stays.',
   colorSchemeMint: 'Mint',
   colorSchemeIris: 'Iris',
-  colorSchemeGlass: 'Szkło',
+  colorSchemeGlass: 'Glass',
   uiLocale: 'Interface language',
   uiLocaleHint:
     'App chrome only (menus, Settings, toasts). Brain stays automatically bilingual — no separate knowledge language setting.',

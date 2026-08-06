@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
 import type { SourceId } from './types'
+import { getUiLocale } from './uiLocale'
 
 export function humanBytes(bytes: number): string {
   if (!bytes) return '0 B'
@@ -19,13 +20,20 @@ export function relativeTime(iso?: string): string {
   const then = new Date(iso).getTime()
   const diff = Date.now() - then
   const m = Math.round(diff / 60000)
-  if (m < 1) return 'przed chwilą'
-  if (m < 60) return `${m} min temu`
+  const en = getUiLocale() === 'en'
+  if (m < 1) return en ? 'just now' : 'przed chwilą'
+  if (m < 60) return en ? `${m} min ago` : `${m} min temu`
   const h = Math.round(m / 60)
-  if (h < 24) return h === 1 ? '1 godz. temu' : `${h} godz. temu`
+  if (h < 24) {
+    if (en) return h === 1 ? '1 hour ago' : `${h} hours ago`
+    return h === 1 ? '1 godz. temu' : `${h} godz. temu`
+  }
   const d = Math.round(h / 24)
-  if (d < 30) return d === 1 ? '1 dzień temu' : `${d} dni temu`
-  return new Date(iso).toLocaleDateString('pl-PL')
+  if (d < 30) {
+    if (en) return d === 1 ? 'yesterday' : `${d} days ago`
+    return d === 1 ? '1 dzień temu' : `${d} dni temu`
+  }
+  return new Date(iso).toLocaleDateString(en ? 'en-GB' : 'pl-PL')
 }
 
 export interface SourceMeta {
