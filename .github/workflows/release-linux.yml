@@ -45,6 +45,9 @@ jobs:
             dpkg \
             libfuse2
 
+      - name: Build workspace packages
+        run: npm run build:brain-core && npm run build:doc-parser
+
       - name: Run tests
         run: npm test
 
