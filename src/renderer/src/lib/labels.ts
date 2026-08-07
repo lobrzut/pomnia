@@ -272,6 +272,11 @@ export interface UiLabels {
   tokenCreateFailedDetail: (msg: string) => string
   snippetBuildFailed: string
   copyFailed: string
+  copied: string
+  statusCheckFailed: string
+  skillSyncOk: (n: number) => string
+  skillSyncNone: string
+  skillSyncFailed: string
   skillSyncErrorsDetail: (n: number) => string
   skillSyncAvailableOffline: string
   embeddedSnippetHint: string
@@ -290,6 +295,11 @@ export interface UiLabels {
   vaultIntegrityErrors: (n: number) => string
   vaultIntegrityChecked: (n: number) => string
   exportNoNotes: string
+  exportOk: (n: number) => string
+  exportFailed: string
+  exportSnapshotEmptyDetail: (dir: string) => string
+  healthDeployNotSet: string
+  tokenCreatedTitle: (name: string) => string
   showClientInConnect: (name: string) => string
   brainReadOnly: string
   brainReadOnlyBy: (owner: string) => string
@@ -352,6 +362,37 @@ export interface UiLabels {
   /** Some notes landed, some sub-step failed — the detail spells out which. */
   toastDeployPartial: string
   toastDeployFailed: string
+  embeddedBrainStartBeforeConnect: string
+  mintTokenBtn: string
+  connectYourClients: string
+  connectClientsConnected: (connected: number, total: number) => string
+  connectDetectingClients: string
+  connectNoClientsDetected: string
+  connectNoClientsHintPrefix: string
+  connectNoClientsHintLink: string
+  connectNoClientsHintSuffix: string
+  connectSnippetOpenFile: string
+  connectSnippetChooseMode: string
+  connectSnippetNewFile: string
+  connectSnippetMerge: string
+  connectCopyAction: string
+  connectMergeKeysHint: (mcpKey: string) => string
+  connectSkillsTitle: string
+  connectSkillsBadge: string
+  connectSkillsLead: string
+  connectSkillsSync: string
+  guideAltPath: string
+  pendingIndexesWaiting: (n: number) => string
+  healthModelMissing: (pullCmd: string) => string
+  snapshotEmptyOption: string
+  snapshotChatsOption: (label: string, chats: number, shortId: string) => string
+  snapshotFilesBytes: (files: number, bytes: string) => string
+  securityAesBullet: string
+  securityScryptBullet: string
+  securityContentAddressedBullet: string
+  brainEmbedModelShared: string
+  brainDashboardUrlLabel: string
+  brainDistilledFolderLabel: string
   brainSearchPlaceholder: string
   brainSearchButton: string
   brainSearchEmpty: string
@@ -678,6 +719,15 @@ export interface UiLabels {
   sidebarBusyGeneric: string
   lockVaultBtn: string
   vaultLocked: string
+  vaultToastCreated: string
+  vaultToastCreateFailed: string
+  vaultToastUnlocked: string
+  vaultToastUnlockFailed: string
+  vaultToastLocked: string
+  errorBoundaryTitle: string
+  errorBoundaryHint: string
+  errorBoundaryReload: string
+  unexpectedError: string
   guideTitle: string
   guideSubtitle: string
   guideLead: string
@@ -979,6 +1029,11 @@ const PL_LABELS: UiLabels = {
   tokenCreateFailedDetail: (msg) => `${msg} — otwórz dashboard :7860 i wklej token ręcznie.`,
   snippetBuildFailed: 'Nie udało się zbudować snippeta',
   copyFailed: 'Nie udało się skopiować',
+  copied: 'Skopiowano',
+  statusCheckFailed: 'Nie udało się sprawdzić statusu',
+  skillSyncOk: (n) => `Zsynchronizowano ${n} skill(i)`,
+  skillSyncNone: 'Brak skilli',
+  skillSyncFailed: 'Sync skilli nieudany',
   skillSyncErrorsDetail: (n) => `${n} błąd(ów) — konsola`,
   skillSyncAvailableOffline: 'Dostępne offline.',
   embeddedSnippetHint: 'Snippety wskazują na localhost — jeden serwer MCP, bez tokena.',
@@ -996,6 +1051,11 @@ const PL_LABELS: UiLabels = {
   vaultIntegrityErrors: (n) => `${n} błąd(ów) integralności`,
   vaultIntegrityChecked: (n) => `Sprawdzono ${n} zaszyfrowanych blobów`,
   exportNoNotes: 'Nie wyeksportowano żadnej notatki',
+  exportOk: (n) => `Wyeksportowano ${n} notatek`,
+  exportFailed: 'Eksport nieudany',
+  exportSnapshotEmptyDetail: (dir) => `Snapshot nie zawiera notatek · ${dir}`,
+  healthDeployNotSet: 'Nie skonfigurowano (opcjonalnie)',
+  tokenCreatedTitle: (name) => `Token: ${name}`,
   showClientInConnect: (name) => `Pokaż ${name} w Connect`,
   brainReadOnly: 'tylko odczyt',
   brainReadOnlyBy: (owner) => `tylko odczyt — vault trzyma ${owner}`,
@@ -1064,6 +1124,38 @@ const PL_LABELS: UiLabels = {
   toastDeployed: 'Wysłano',
   toastDeployPartial: 'Wysłano częściowo',
   toastDeployFailed: 'Deploy nieudany',
+  embeddedBrainStartBeforeConnect: 'i naciśnij Start, zanim klienci będą mogli się połączyć.',
+  mintTokenBtn: 'Nowy token',
+  connectYourClients: 'Twoi klienci MCP',
+  connectClientsConnected: (connected, total) => `${connected}/${total} połączonych`,
+  connectDetectingClients: 'wykrywam klientów…',
+  connectNoClientsDetected: 'Nie wykryto klientów MCP na tej maszynie.',
+  connectNoClientsHintPrefix: 'Wybierz te, których używasz w',
+  connectNoClientsHintLink: 'Ustawienia → Klienci MCP',
+  connectNoClientsHintSuffix: ', żeby je skonfigurować.',
+  connectSnippetOpenFile: 'Otwórz lub utwórz plik:',
+  connectSnippetChooseMode: 'Wybierz tryb, skopiuj config i wklej:',
+  connectSnippetNewFile: 'Nowy / pusty plik',
+  connectSnippetMerge: 'Merge do istniejącego',
+  connectCopyAction: 'Kopiuj',
+  connectMergeKeysHint: (mcpKey) => `Dodaj te klucze do obiektu "${mcpKey}".`,
+  connectSkillsTitle: 'Skille Brain',
+  connectSkillsBadge: 'offline po synchronizacji',
+  connectSkillsLead:
+    'Pobierz skille workflow i expertise z serwera Brain, żeby były dostępne także poza LAN.',
+  connectSkillsSync: 'Sync skilli',
+  guideAltPath: 'Osobna ścieżka',
+  pendingIndexesWaiting: (n) => `${n} indeksów czeka`,
+  healthModelMissing: (pullCmd) => `Brak modelu — ${pullCmd}`,
+  snapshotEmptyOption: '— brak —',
+  snapshotChatsOption: (label, chats, shortId) => `${label} · ${chats} czatów · ${shortId}`,
+  snapshotFilesBytes: (files, bytes) => `${files} plików · ${bytes}`,
+  securityAesBullet: 'AES-256-GCM — szyfrowanie uwierzytelnione, losowy IV na blob.',
+  securityScryptBullet: 'scrypt (N=2¹⁷) — pochodna klucza z hasła.',
+  securityContentAddressedBullet: 'Content-addressed blob store — identyczne pliki trzymane raz.',
+  brainEmbedModelShared: 'Model embeddingów (wspólny)',
+  brainDashboardUrlLabel: 'URL dashboardu',
+  brainDistilledFolderLabel: 'Folder distilled (opcjonalnie SMB)',
   brainSearchPlaceholder: 'zapytaj o coś, o czym już rozmawiałeś…',
   brainSearchButton: 'Szukaj',
   brainSearchEmpty:
@@ -1414,6 +1506,15 @@ const PL_LABELS: UiLabels = {
   sidebarBusyGeneric: 'praca w tle…',
   lockVaultBtn: 'Zablokuj vault',
   vaultLocked: 'zablokowany',
+  vaultToastCreated: 'Utworzono vault',
+  vaultToastCreateFailed: 'Nie udało się utworzyć vaultu',
+  vaultToastUnlocked: 'Vault odblokowany',
+  vaultToastUnlockFailed: 'Odblokowanie nieudane',
+  vaultToastLocked: 'Vault zablokowany',
+  errorBoundaryTitle: 'Ta strona się wysypała',
+  errorBoundaryHint: 'Kliknij inną zakładkę w menu, albo przeładuj aplikację.',
+  errorBoundaryReload: 'Przeładuj',
+  unexpectedError: 'Nieoczekiwany błąd',
   guideTitle: 'Mapa Pomnia',
   guideSubtitle: 'Jak to działa',
   guideLead:
@@ -1752,6 +1853,11 @@ const EN_LABELS: UiLabels = {
   tokenCreateFailedDetail: (msg) => `${msg} — open the dashboard on :7860 and paste a token by hand.`,
   snippetBuildFailed: 'Could not build the snippet',
   copyFailed: 'Could not copy',
+  copied: 'Copied',
+  statusCheckFailed: 'Could not check status',
+  skillSyncOk: (n) => `Synced ${n} skill(s)`,
+  skillSyncNone: 'No skills',
+  skillSyncFailed: 'Skill sync failed',
   skillSyncErrorsDetail: (n) => `${n} error(s) — see the console`,
   skillSyncAvailableOffline: 'Available offline.',
   embeddedSnippetHint: 'Snippets point at localhost — one MCP server, no token.',
@@ -1769,6 +1875,11 @@ const EN_LABELS: UiLabels = {
   vaultIntegrityErrors: (n) => `${n} integrity error(s)`,
   vaultIntegrityChecked: (n) => `Checked ${n} encrypted blobs`,
   exportNoNotes: 'No notes were exported',
+  exportOk: (n) => `Exported ${n} notes`,
+  exportFailed: 'Export failed',
+  exportSnapshotEmptyDetail: (dir) => `Snapshot has no notes · ${dir}`,
+  healthDeployNotSet: 'Not configured (optional)',
+  tokenCreatedTitle: (name) => `Token: ${name}`,
   showClientInConnect: (name) => `Show ${name} in Connect`,
   brainReadOnly: 'read-only',
   brainReadOnlyBy: (owner) => `read-only — the vault is held by ${owner}`,
@@ -1837,6 +1948,38 @@ const EN_LABELS: UiLabels = {
   toastDeployed: 'Deployed',
   toastDeployPartial: 'Deployed with problems',
   toastDeployFailed: 'Deploy failed',
+  embeddedBrainStartBeforeConnect: 'and press Start before clients can connect.',
+  mintTokenBtn: 'New token',
+  connectYourClients: 'Your MCP clients',
+  connectClientsConnected: (connected, total) => `${connected}/${total} connected`,
+  connectDetectingClients: 'detecting clients…',
+  connectNoClientsDetected: 'No MCP clients detected on this machine.',
+  connectNoClientsHintPrefix: 'Pick the ones you use in',
+  connectNoClientsHintLink: 'Settings → MCP clients',
+  connectNoClientsHintSuffix: ' to set them up.',
+  connectSnippetOpenFile: 'Open or create the file:',
+  connectSnippetChooseMode: 'Pick a mode, copy the config, and paste:',
+  connectSnippetNewFile: 'New / empty file',
+  connectSnippetMerge: 'Merge into existing',
+  connectCopyAction: 'Copy',
+  connectMergeKeysHint: (mcpKey) => `Add these keys to the "${mcpKey}" object.`,
+  connectSkillsTitle: 'Brain skills',
+  connectSkillsBadge: 'offline-capable once synced',
+  connectSkillsLead:
+    "Pull workflow + expertise skills from your Brain server so they're available even when you're not on the LAN.",
+  connectSkillsSync: 'Sync skills',
+  guideAltPath: 'Separate path',
+  pendingIndexesWaiting: (n) => `${n} indexes waiting`,
+  healthModelMissing: (pullCmd) => `Model missing — ${pullCmd}`,
+  snapshotEmptyOption: '— none —',
+  snapshotChatsOption: (label, chats, shortId) => `${label} · ${chats} chats · ${shortId}`,
+  snapshotFilesBytes: (files, bytes) => `${files} files · ${bytes}`,
+  securityAesBullet: 'AES-256-GCM — authenticated encryption, random IV per blob.',
+  securityScryptBullet: 'scrypt (N=2¹⁷) — passphrase key derivation.',
+  securityContentAddressedBullet: 'Content-addressed blob store — identical files stored once.',
+  brainEmbedModelShared: 'Embedding model (shared)',
+  brainDashboardUrlLabel: 'Dashboard URL',
+  brainDistilledFolderLabel: 'Distilled folder (optional SMB)',
   brainSearchPlaceholder: "ask anything you've discussed before…",
   brainSearchButton: 'Search',
   brainSearchEmpty:
@@ -2034,6 +2177,15 @@ const EN_LABELS: UiLabels = {
   sidebarBusyGeneric: 'working…',
   lockVaultBtn: 'Lock vault',
   vaultLocked: 'locked',
+  vaultToastCreated: 'Vault created',
+  vaultToastCreateFailed: 'Could not create vault',
+  vaultToastUnlocked: 'Vault unlocked',
+  vaultToastUnlockFailed: 'Unlock failed',
+  vaultToastLocked: 'Vault locked',
+  errorBoundaryTitle: 'This page crashed',
+  errorBoundaryHint: 'Click another tab in the menu, or reload the app.',
+  errorBoundaryReload: 'Reload',
+  unexpectedError: 'Unexpected error',
   helpDontKnowStart: 'Not sure where to start →',
   statusStripTitle: 'Where you are now',
   statusDoctorFail: 'Doctor FAIL',
@@ -2347,8 +2499,8 @@ const EN_LABELS: UiLabels = {
   flowAgentLayerSkills: 'skills',
   flowAgentLayerSkillsOptional: 'opt.',
   flowAgentLayerSearch: 'search_library',
-  flowMiniStatus: (state) => (state.kind === 'idle' ? 'Idle' : formatFlowFocusBanner(state)),
-  dashboardActivityNow: (state) => formatFlowLiveBadge(state),
+  flowMiniStatus: (state) => (state.kind === 'idle' ? 'Idle' : formatFlowFocusBannerEn(state)),
+  dashboardActivityNow: (state) => formatFlowLiveBadgeEn(state),
   dashboardActivityLast: (relative) => `Last activity: distillation ${relative}`,
   dashboardActivityNone: 'No distillation yet — start Brain to prepare your memory',
   flowIllustrationCaption:

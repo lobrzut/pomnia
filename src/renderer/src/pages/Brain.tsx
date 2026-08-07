@@ -842,7 +842,7 @@ export default function Brain() {
 
         {/* Shared embedding model — one for every profile, changing it = full reindex */}
         <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
-          <span className="text-[11px] font-medium text-ink-dim">Embedding model (shared)</span>
+          <span className="text-[11px] font-medium text-ink-dim">{labels.brainEmbedModelShared}</span>
           <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-cyan">{PROFILE_EMBED_MODEL}</code>
           <span className="text-[10px] text-ink-faint">{PROFILE_EMBED_SIZE}</span>
           {pull?.model === PROFILE_EMBED_MODEL ? (
@@ -1099,7 +1099,7 @@ export default function Brain() {
           </span>
         </div>
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-medium text-ink-dim">Dashboard URL</span>
+          <span className="text-[11px] font-medium text-ink-dim">{labels.brainDashboardUrlLabel}</span>
           <Input
             value={brainDeployUrl}
             onChange={(e) => setBrainDeployUrl(e.target.value)}
@@ -1108,7 +1108,7 @@ export default function Brain() {
           />
         </div>
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-medium text-ink-dim">Distilled folder (optional SMB)</span>
+          <span className="text-[11px] font-medium text-ink-dim">{labels.brainDistilledFolderLabel}</span>
           <Input
             value={brainDeployTarget}
             onChange={(e) => setBrainDeployTarget(e.target.value)}

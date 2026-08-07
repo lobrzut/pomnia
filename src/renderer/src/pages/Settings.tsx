@@ -71,7 +71,7 @@ function HealthCheck() {
         detail: embedOk
           ? status?.embedModel ?? 'nomic-embed-text'
           : status?.reachable
-            ? `Brak modelu — ollama pull ${status?.embedModel ?? 'nomic-embed-text'}`
+            ? labels.healthModelMissing(`ollama pull ${status?.embedModel ?? 'nomic-embed-text'}`)
             : labels.healthSkip
       })
 
@@ -83,7 +83,7 @@ function HealthCheck() {
         detail: chatOk
           ? status?.chatModel ?? 'qwen2.5:14b'
           : status?.reachable
-            ? `Brak modelu — ollama pull ${status?.chatModel ?? 'qwen2.5:14b'}`
+            ? labels.healthModelMissing(`ollama pull ${status?.chatModel ?? 'qwen2.5:14b'}`)
             : labels.healthSkip
       })
 
@@ -134,7 +134,7 @@ function HealthCheck() {
           id: 'deploy',
           label: labels.healthDeployPath,
           ok: null,
-          detail: brainDeployTarget?.trim() || 'Nie skonfigurowano (opcjonalnie)'
+          detail: brainDeployTarget?.trim() || labels.healthDeployNotSet
         })
       }
     } finally {
@@ -351,11 +351,11 @@ export default function Settings() {
       // Zero notes exported is not a success — the folder is empty either way.
       toast(
         r.count > 0
-          ? { kind: 'success', title: `Wyeksportowano ${r.count} notatek`, detail: r.dir }
-          : { kind: 'warn', title: labels.exportNoNotes, detail: `Snapshot nie zawiera notatek · ${r.dir}` },
+          ? { kind: 'success', title: labels.exportOk(r.count), detail: r.dir }
+          : { kind: 'warn', title: labels.exportNoNotes, detail: labels.exportSnapshotEmptyDetail(r.dir) },
       )
     } catch (e) {
-      toast({ kind: 'error', title: 'Eksport nieudany', detail: (e as Error).message })
+      toast({ kind: 'error', title: labels.exportFailed, detail: (e as Error).message })
     }
   }
 
@@ -630,10 +630,10 @@ export default function Settings() {
               onChange={(e) => setExportSnap(e.target.value)}
               className="no-drag w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-ink outline-none"
             >
-              {snapshots.length === 0 && <option value="">— brak —</option>}
+              {snapshots.length === 0 && <option value="">{labels.snapshotEmptyOption}</option>}
               {snapshots.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.source.label} · {s.stats.conversations} czatów · {s.id.slice(0, 8)}
+                  {labels.snapshotChatsOption(s.source.label, s.stats.conversations, s.id.slice(0, 8))}
                 </option>
               ))}
             </select>
@@ -750,7 +750,7 @@ export default function Settings() {
                       <Clock className="h-3 w-3" /> {relativeTime(s.createdAt)}
                     </span>
                     <span>
-                      {s.stats.files} plików · {humanBytes(s.stats.bytes)}
+                      {labels.snapshotFilesBytes(s.stats.files, humanBytes(s.stats.bytes))}
                     </span>
                   </div>
                 </div>
@@ -790,9 +790,9 @@ export default function Settings() {
           <ShieldCheck className="h-4 w-4 text-mint" /> {labels.securityAbout}
         </div>
         <ul className="space-y-1.5 text-xs text-ink-dim">
-          <li>• AES-256-GCM — szyfrowanie uwierzytelnione, losowy IV na blob.</li>
-          <li>• scrypt (N=2¹⁷) — pochodna klucza z hasła.</li>
-          <li>• Content-addressed blob store — identyczne pliki trzymane raz.</li>
+          <li>• {labels.securityAesBullet}</li>
+          <li>• {labels.securityScryptBullet}</li>
+          <li>• {labels.securityContentAddressedBullet}</li>
           <li>• {labels.securityPortability}</li>
           {appVersion && (
             <li className="text-ink-faint">{labels.securityAboutCli(appVersion)}</li>

@@ -10,7 +10,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { useStore } from './store/useStore'
 import { api } from './lib/api'
 import { applyColorScheme, isColorScheme } from './lib/theme'
-import { invalidateUiLabelsCache } from './lib/labels'
+import { invalidateUiLabelsCache, uiLabels } from './lib/labels'
 import { isUiLocale, setUiLocaleCache } from './lib/uiLocale'
 import Dashboard from './pages/Dashboard'
 import Browse from './pages/Browse'
@@ -138,9 +138,9 @@ export default function App() {
       toast(t)
     })
     // Surface otherwise-silent async failures as toasts (diagnostics).
-    const onErr = (e: ErrorEvent) => toast({ kind: 'error', title: 'Unexpected error', detail: e.message })
+    const onErr = (e: ErrorEvent) => toast({ kind: 'error', title: uiLabels().unexpectedError, detail: e.message })
     const onRej = (e: PromiseRejectionEvent) =>
-      toast({ kind: 'error', title: 'Unexpected error', detail: String((e.reason as Error)?.message ?? e.reason) })
+      toast({ kind: 'error', title: uiLabels().unexpectedError, detail: String((e.reason as Error)?.message ?? e.reason) })
     window.addEventListener('error', onErr)
     window.addEventListener('unhandledrejection', onRej)
     return () => {

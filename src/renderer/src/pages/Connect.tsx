@@ -28,6 +28,7 @@ import {
 import { identifyEngine } from '@core/brain/engine'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
+import { getUiLocale } from '../lib/uiLocale'
 import { useStore, dashboardUrlFromBrainUrl } from '../store/useStore'
 import type { BrainTarget, ClientId, ClientStatus, Snippet, WiredState } from '../lib/types'
 
@@ -109,7 +110,7 @@ export default function Connect() {
       setConnectToken(r.token)
       toast({
         kind: 'success',
-        title: `Token: ${r.name}`,
+        title: labels.tokenCreatedTitle(r.name),
         detail: labels.tokenSavedDetail,
       })
       // Token is in React state async — pass explicitly for immediate rebuild.
@@ -182,7 +183,7 @@ export default function Connect() {
             : r.brain.error || 'unreachable'
       )
     } catch (e) {
-      toast({ kind: 'error', title: 'Could not check status', detail: (e as Error).message })
+      toast({ kind: 'error', title: labels.statusCheckFailed, detail: (e as Error).message })
     } finally {
       setLoading(false)
     }
@@ -252,7 +253,7 @@ export default function Connect() {
     }
     setCopied(key)
     window.setTimeout(() => setCopied((c) => (c === key ? null : c)), 1600)
-    toast({ kind: 'success', title: 'Skopiowano', detail: label })
+    toast({ kind: 'success', title: labels.copied, detail: label })
   }
 
   async function writeBrief() {
@@ -336,14 +337,14 @@ export default function Connect() {
       const r = await api.connectSkillsSync(skillsDash, connectToken || undefined)
       toast(
         r.errors.length
-          ? { kind: 'warn', title: `Zsynchronizowano ${r.written} skill(i)`, detail: labels.skillSyncErrorsDetail(r.errors.length) }
+          ? { kind: 'warn', title: labels.skillSyncOk(r.written), detail: labels.skillSyncErrorsDetail(r.errors.length) }
           : r.written === 0
-            ? { kind: 'info', title: 'Brak skilli', detail: labels.skillsNoneOnServer }
-            : { kind: 'success', title: `Zsynchronizowano ${r.written} skill(i)`, detail: labels.skillSyncAvailableOffline }
+            ? { kind: 'info', title: labels.skillSyncNone, detail: labels.skillsNoneOnServer }
+            : { kind: 'success', title: labels.skillSyncOk(r.written), detail: labels.skillSyncAvailableOffline }
       )
       if (r.errors.length) console.warn('skill sync errors', r.errors)
     } catch (e) {
-      toast({ kind: 'error', title: 'Sync skilli nieudany', detail: (e as Error).message })
+      toast({ kind: 'error', title: labels.skillSyncFailed, detail: (e as Error).message })
     } finally {
       setSyncing(false)
     }
@@ -474,7 +475,7 @@ export default function Connect() {
             <button onClick={() => setRoute('brain')} className="no-drag font-medium text-iris hover:underline">
               {labels.embeddedBrainNotRunningLink}
             </button>{' '}
-            i naciśnij Start, zanim klienci będą mogli się połączyć.
+            {labels.embeddedBrainStartBeforeConnect}
           </p>
         )}
 
@@ -503,7 +504,7 @@ export default function Connect() {
               />
               <Button variant="soft" onClick={() => void mintToken()} disabled={minting || !brainUrl.trim()}>
                 {minting ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
-                Nowy token
+                {labels.mintTokenBtn}
               </Button>
               {dashboardUrl && (
                 <Button
@@ -543,25 +544,25 @@ export default function Connect() {
       <GlassCard className="mb-5 p-5">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <ListChecks className="h-4 w-4 text-cyan" /> Your MCP clients
+            <ListChecks className="h-4 w-4 text-cyan" /> {labels.connectYourClients}
           </div>
           <Badge color={connectedCount ? '#34d399' : '#9aa3bd'}>
-            {connectedCount}/{visibleClients.length} connected
+            {labels.connectClientsConnected(connectedCount, visibleClients.length)}
           </Badge>
         </div>
         {loading && clients.length === 0 ? (
           <div className="flex items-center gap-2 py-2 text-sm text-ink-dim">
-            <Spinner className="h-4 w-4" /> detecting clients…
+            <Spinner className="h-4 w-4" /> {labels.connectDetectingClients}
           </div>
         ) : visibleClients.length === 0 ? (
           <div className="rounded-xl border border-white/8 bg-black/20 px-4 py-5 text-center">
-            <p className="text-sm text-ink-dim">No MCP clients detected on this machine.</p>
+            <p className="text-sm text-ink-dim">{labels.connectNoClientsDetected}</p>
             <p className="mt-1 text-[12px] text-ink-faint">
-              Pick the ones you use in{' '}
+              {labels.connectNoClientsHintPrefix}{' '}
               <button onClick={() => setRoute('settings')} className="no-drag font-medium text-iris hover:underline">
-                Settings → MCP clients
-              </button>{' '}
-              to set them up.
+                {labels.connectNoClientsHintLink}
+              </button>
+              {labels.connectNoClientsHintSuffix}
             </p>
           </div>
         ) : (
@@ -663,7 +664,7 @@ export default function Connect() {
               {/* Steps */}
               <ol className="mb-4 space-y-2.5">
                 <Step n={1}>
-                  Otwórz lub utwórz plik:
+                  {labels.connectSnippetOpenFile}
                   <button
                     onClick={() => void copy(snippet.filePath, 'path', labels.snippetFilePath)}
                     className="no-drag group ml-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-white/10 bg-black/30 px-2 py-1 align-middle text-[11px] text-ink-dim transition-colors hover:border-iris/40 hover:text-ink"
@@ -677,17 +678,17 @@ export default function Connect() {
                   </button>
                 </Step>
                 <Step n={2}>
-                  Wybierz tryb, skopiuj config i wklej:
+                  {labels.connectSnippetChooseMode}
                 </Step>
               </ol>
 
               {/* Segmented mode toggle */}
               <div className="mb-2.5 inline-flex rounded-xl border border-white/10 bg-black/30 p-1">
                 <SegBtn active={mode === 'new'} onClick={() => setMode('new')} Icon={FilePlus2}>
-                  Nowy / pusty plik
+                  {labels.connectSnippetNewFile}
                 </SegBtn>
                 <SegBtn active={mode === 'merge'} onClick={() => setMode('merge')} Icon={GitMerge}>
-                  Merge do istniejącego
+                  {labels.connectSnippetMerge}
                 </SegBtn>
               </div>
 
@@ -698,25 +699,25 @@ export default function Connect() {
                     void copy(
                       mode === 'new' ? snippet.fullFileJson : snippet.mergeJson,
                       'code',
-                      mode === 'new' ? labels.snippetWholeFile : 'merge snippet'
+                      mode === 'new' ? labels.snippetWholeFile : labels.connectSnippetMerge
                     )
                   }
                   className="no-drag absolute right-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-ink transition-colors hover:bg-white/14"
                 >
                   {copied === 'code' ? (
                     <>
-                      <Check className="h-3.5 w-3.5 text-mint" /> Skopiowano
+                      <Check className="h-3.5 w-3.5 text-mint" /> {labels.copied}
                     </>
                   ) : (
                     <>
-                      <Copy className="h-3.5 w-3.5" /> Kopiuj
+                      <Copy className="h-3.5 w-3.5" /> {labels.connectCopyAction}
                     </>
                   )}
                 </button>
                 <p className="mb-1.5 text-[11px] text-ink-faint">
                   {mode === 'new'
                     ? labels.snippetPasteWhole
-                    : `Dodaj te klucze do obiektu "${snippet.mcpKey}".`}
+                    : labels.connectMergeKeysHint(snippet.mcpKey)}
                 </p>
                 <pre className="max-h-56 overflow-auto rounded-xl border border-white/8 bg-black/40 p-3.5 pt-9 text-[11px] leading-relaxed text-cyan">
                   {mode === 'new' ? snippet.fullFileJson : snippet.mergeJson}
@@ -817,17 +818,14 @@ export default function Connect() {
       <GlassCard className="p-5">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <Sparkles className="h-4 w-4 text-amber" /> Brain skills
+            <Sparkles className="h-4 w-4 text-amber" /> {labels.connectSkillsTitle}
           </div>
-          <Badge color="#9aa3bd">offline-capable once synced</Badge>
+          <Badge color="#9aa3bd">{labels.connectSkillsBadge}</Badge>
         </div>
-        <p className="mb-3 text-xs text-ink-faint">
-          Pull workflow + expertise skills from your Brain server so they're available even when you're not on the
-          LAN.
-        </p>
+        <p className="mb-3 text-xs text-ink-faint">{labels.connectSkillsLead}</p>
         <Button onClick={() => void syncSkills()} disabled={syncing}>
           {syncing ? <Spinner className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-          Sync skills
+          {labels.connectSkillsSync}
         </Button>
       </GlassCard>
       )}
@@ -856,7 +854,7 @@ export default function Connect() {
               value={replica?.url ?? ''}
               onChange={(e) => setReplica((r) => (r ? { ...r, url: e.target.value } : r))}
               onBlur={(e) => void saveReplicaUrl(e.target.value)}
-              placeholder="http://192.168.1.201:7865"
+              placeholder="https://brain.example.com"
             />
           </Field>
 
@@ -879,7 +877,7 @@ export default function Connect() {
               }
             >
               <span className="font-semibold text-ink">{labels.vaultReplicaLast}</span>{' '}
-              {new Date(replica.last.at).toLocaleString('pl')} ·{' '}
+              {new Date(replica.last.at).toLocaleString(getUiLocale() === 'en' ? 'en-GB' : 'pl-PL')} ·{' '}
               {replica.last.ok
                 ? labels.vaultReplicaLastOk(replica.last.uploaded, replica.last.unchanged)
                 : (replica.last.error ?? labels.vaultReplicaFailed)}
