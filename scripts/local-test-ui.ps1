@@ -1,7 +1,12 @@
-# Run from PowerShell. Syncs UNC repo to local mirror, then typecheck + focused tests.
+# Run from PowerShell. Syncs a UNC/share repo to a local mirror, then typecheck + focused tests.
+# Set POMNIA_UNC_SRC / POMNIA_LOCAL_MIRROR before running — do not hardcode home NAS paths.
 $ErrorActionPreference = "Stop"
-$src = "\\192.168.1.150\Projekty\z dysk C\Projects\pomnia"
-$dst = "C:\Users\helluk\pomnia-build-ui"
+$src = $env:POMNIA_UNC_SRC
+$dst = $env:POMNIA_LOCAL_MIRROR
+if (-not $src -or -not $dst) {
+  Write-Error "Set POMNIA_UNC_SRC and POMNIA_LOCAL_MIRROR (local disk mirror). Never run vitest from a UNC path."
+  exit 1
+}
 New-Item -ItemType Directory -Force -Path $dst | Out-Null
 robocopy $src $dst /MIR /NFL /NDL /NJH /NJS /nc /ns /np /XD node_modules out dist .git release
 Set-Location $dst

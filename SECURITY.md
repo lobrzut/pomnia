@@ -1,66 +1,70 @@
-﻿# Pomnia - zasady bezpieczenstwa i zaufania
+﻿# Pomnia — security and trust
 
-**Dokument wewnetrzny** dla zespolu i przyszlego audytu. Opisuje model zaufania przy premierze (v1). Kod zrodlowy produktu (wlacznie z vault/crypto) jest publikowany na **AGPL-3.0-only** - ten plik nie jest specyfikacja kryptograficzna ani instrukcja ataku; streszcza gwarancje dla uzytkownika i audytu.
-
----
-
-## 1. Vault jako chroniony rdzen
-
-Sejf (vault) ma bezposredni dostep do wszystkich danych uzytkownika zgromadzonych w Pomnia - rozmow, snapshotow konfiguracji, metadanych importow. To **najbardziej chroniona warstwa** produktu pod wzgledem izolacji runtime i klucza.
-
-- Implementacja vault/crypto jest w publicznym kodzie AGPL (`src/core/vault.ts`, `crypto` itd.) - przejrzystosc zrodla nie oznacza otwartego dostepu do danych uzytkownika.
-- Sejf to lokalny, przenosny "safe": dane na dysku pozostaja zaszyfrowane; fraza dostepu nie opuszcza maszyny uzytkownika. Model zaufania opiera sie na kryptografii i izolacji IPC, nie na ukrywaniu kodu.
+Public trust summary for users and auditors (premiere v1). Product source (including vault/crypto) is published under **AGPL-3.0-only**. This file is not a cryptographic specification or attack guide; it states guarantees and honesty boundaries.
 
 ---
 
-## 2. Gwarancje techniczne (poziom wysoki)
+## 1. Vault as the protected core
 
-Ponizej streszczenie zachowania systemu - **bez odwolan do sciezek plikow kluczy ani wewnetrznego ukladu binarnego sejfu**.
+The vault has direct access to user data collected by Pomnia — conversations, config snapshots, import metadata. It is the **most protected product layer** for runtime isolation and key handling.
 
-| Obszar | Gwarancja |
-|--------|-----------|
-| **Fraza dostepu** | Nigdy nie jest zapisywana na dysku. Utrata frazy = brak odzyskania sejfu. |
-| **Szyfrowanie** | AES-256-GCM (szyfrowanie uwierzytelnione). Klucz wyprowadzany przez scrypt (parametr N=2^17 - zgodnie z UI Ustawien). |
-| **Blokada sejfu** | Po zamknieciu klucz jest usuwany z pamieci procesu glownego; dane na dysku pozostaja zaszyfrowane. |
-| **Izolacja UI** | Proces renderera (React) **nie ma** bezposredniego dostepu do plikow sejfu. Wszystkie operacje przechodza przez IPC do procesu glownego. |
-| **Import** | Wejscie kontrolowane - walidacja formatu i normalizacja przed zapisem. Brak "surowego" zapisu dowolnych plikow do sejfu. |
-| **Eksport** | Brak cichego wycieku. Dane opuszczaja sejf wylacznie przy **jawnej akcji uzytkownika**: backup, eksport do Brain, deploy pipeline. |
+- Vault/crypto lives in public AGPL code (`src/core/vault.ts`, etc.) — open source does not mean open access to user data.
+- The vault is a local, portable safe: **conversation/document blobs** on disk stay encrypted; the passphrase does not leave the user's machine. Trust rests on cryptography and IPC isolation, not on hiding the code.
+
+**Honesty boundary:** vault folder sidecars used as a knowledge surface (`skills/`, `USER.md`, `sessions/`, distilled notes) and Brain's on-disk index (`library.db` under `%AppData%/Pomnia/brain-core-data/`) are **plaintext on disk**. Protect the folder. See [docs/START-HERE.md](docs/START-HERE.md).
 
 ---
 
-## 3. Model publikacji przy premierze (v1)
+## 2. Technical guarantees (high level)
 
-| Kategoria | Co wchodzi |
-|-----------|------------|
-| **PUBLIC (AGPL)** | Kod zrodlowy klienta Pomnia (UI, adaptery, vault/crypto, embedded `packages/brain-core`, pipeline importu), instalatory (exe/dmg), dokumentacja MCP. |
-| **SEPARATE** | Strona marketingowa [pomnia.ai](https://pomnia.ai) (deploy poza tym tree) oraz Homelab Brain Hub (osobny serwer RAG na infrastrukturze uzytkownika) - **nie** sa wymagane w repo klienta. |
-| **NIE PUBLIC** | Prywatne vaulty uzytkownikow, klucze, dane produkcyjne, lokalne artefakty build (`out/`, `dist/`, sandbox/). |
+Summary of system behaviour — **without** key-file paths or internal vault binary layout.
 
-Klient bundluje **embedded Brain** (`brain-core` / MCP `:7862`) w Desktop. Osobny Homelab Brain Hub (Python / remote) pozostaje opcjonalny - Pomnia wysyla do niego dane tylko na wyrazne zadanie (eksport/deploy).
-
----
-
-## 4. Pitch zaufania
-
-**PL:** Twoje rozmowy leza w lokalnym, zaszyfrowanym sejfie - klucz tylko w Twojej glowie, a aplikacja nie wysyla ich nigdzie bez Twojej wyraznej decyzji.
-
-**EN:** Your conversations live in a local encrypted vault - the key stays in your head, and the app never moves them anywhere without your explicit choice.
+| Area | Guarantee |
+|------|-----------|
+| **Passphrase** | Never written to disk. Lost passphrase = vault unrecoverable. |
+| **Encryption** | AES-256-GCM (authenticated). Key derived with scrypt (N=2^17 — matches Settings UI). Applies to vault **blobs**. |
+| **Lock** | On lock, the key is cleared from main-process memory; encrypted blobs stay encrypted on disk. |
+| **UI isolation** | The renderer (React) has **no** direct vault filesystem access. All operations go through IPC to the main process. |
+| **Import** | Gated entry — format validation and normalization before write. No raw dump of arbitrary files into the vault. |
+| **Export** | No silent exfiltration. Data leaves the vault only on **explicit user action**: backup, Brain export, deploy pipeline. |
 
 ---
 
-## 5. Warstwy - dostep i postawa ochronna
+## 3. Publication model at premiere (v1)
 
-| Warstwa | Poziom dostepu do danych uzytkownika | Postawa ochronna |
-|---------|-------------------------------------|------------------|
-| **Vault** | Pelny - odczyt/zapis calego archiwum po odblokowaniu | Najwyzsza izolacja; brak bezposredniego dostepu z renderera; klucz tylko w RAM procesu glownego; kod AGPL audytowalny |
-| **Adapters** | Odczyt zrodel zewnetrznych (Claude Code, Cursor, profile itd.) przed zapisem do sejfu | Tylko odczyt z znanych lokalizacji OS; normalizacja do wspolnego modelu; brak zapisu poza vault |
-| **Import** | Wejscie z plikow eksportu (ZIP/JSON/MD) uzytkownika | Bramkowany punkt wejscia; walidacja i parsowanie; brak arbitralnego zapisu; ten sam model co backup |
-| **Brain-MCP** | Eksport wybranych rozmow / notatek na zadanie | Jednokierunkowy, jawny eksport; opcjonalny deploy do osobnego serwera Brain; brak domyslnej telemetrii |
+| Category | What ships |
+|----------|------------|
+| **PUBLIC (AGPL)** | Pomnia client source (UI, adapters, vault/crypto, embedded `packages/brain-core`, import pipeline), installers (exe/dmg), MCP docs. |
+| **SEPARATE** | Marketing site [pomnia.ai](https://pomnia.ai) (deployed outside this tree) and optional Homelab Brain Hub (user's own RAG server) — **not** required in the client repo. |
+| **NOT PUBLIC** | Users' private vaults, keys, production data, local build artifacts (`out/`, `dist/`, sandboxes). |
+
+The client bundles **embedded Brain** (`brain-core` / MCP `:7862`) in Desktop. A separate Homelab Brain Hub (Python / remote) stays optional — Pomnia sends data there only on explicit export/deploy.
+
+**Ship posture (Windows):** installers may be **unsigned** at premiere. SmartScreen / AV warnings on a new hash are expected reputation noise — not a reason to disable antivirus. Authenticode is the long-term fix ([docs/CODE-SIGNING.md](docs/CODE-SIGNING.md)).
 
 ---
 
-## Zakres dokumentu
+## 4. Trust pitch
 
-Ten plik nie zastepuje polityki bezpieczenstwa organizacji ani raportu audytu. Aktualizacje modelu publikacji lub gwarancji technicznych powinny byc odzwierciedlone tutaj przed kazda wieksza wersja produkcyjna.
+**EN:** Conversation and document **blobs** live in a local encrypted vault — the key stays in your head, and the app never moves them anywhere without your explicit choice. Knowledge sidecars and the Brain search index on disk are plaintext; protect those folders.
 
-*Ostatnia aktualizacja: 2026-07-27 - zgodnosc z AGPL (publiczne zrodlo vault/crypto).*
+**PL:** Bloby rozmów i dokumentów leżą w lokalnym, zaszyfrowanym sejfie — klucz tylko w Twojej głowie, a aplikacja nie wysyła ich nigdzie bez Twojej wyraźnej decyzji. Sidecary wiedzy i indeks Brain na dysku są plaintext — chroń te foldery.
+
+---
+
+## 5. Layers — access and posture
+
+| Layer | Access to user data | Protective posture |
+|-------|---------------------|--------------------|
+| **Vault** | Full — read/write of the archive after unlock | Highest isolation; no direct renderer access; key only in main-process RAM; AGPL-auditable code |
+| **Adapters** | Read external sources (Claude Code, Cursor, profiles, etc.) before vault write | Read-only from known OS locations; normalize to a common model; no write outside vault |
+| **Import** | User export files (ZIP/JSON/MD) | Gated entry; validate and parse; no arbitrary write; same model as backup |
+| **Brain-MCP** | Export of selected conversations / notes on demand | One-way, explicit export; optional deploy to a separate Brain server; **no telemetry by default** |
+
+---
+
+## Scope
+
+This file does not replace an organisational security policy or an audit report. Updates to the publication model or technical guarantees should be reflected here before each major production cut.
+
+*Last updated: 2026-08-07 — public EN trust doc + plaintext sidecar honesty (aligned with START-HERE / landing privacy).*

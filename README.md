@@ -167,10 +167,12 @@ Remote / KVM = advanced mode (your own Brain server on the LAN) — see docs abo
 
 Rules: [SECURITY.md](SECURITY.md).
 
-- AES-256-GCM, random IV per blob, integrity tag.
+- AES-256-GCM, random IV per blob, integrity tag — for vault **conversation/document blobs**.
 - scrypt (N=2¹⁷) from passphrase; passphrase never stored.
 - Vault header: salt + check token — no secrets.
 - `verify` walks every blob and checks hashes.
+- **Honesty:** vault sidecars (`skills/`, `USER.md`, `sessions/`, distilled notes) and Brain’s on-disk index (`library.db`) are **plaintext** — protect those folders ([docs/START-HERE.md](docs/START-HERE.md)).
+- **No telemetry by default.** Windows installers may be unsigned; SmartScreen warnings are expected until Authenticode ([docs/CODE-SIGNING.md](docs/CODE-SIGNING.md)).
 
 ## Roadmap
 
