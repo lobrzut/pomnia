@@ -26,7 +26,7 @@ export const MCP_LEGACY_RAG_KEY = 'brain-rag'
 
 export const EMBEDDED_BRAIN_DEFAULT_URL = 'http://127.0.0.1:7862'
 /** Placeholder shown in URL fields — user must configure their own remote Brain. */
-export const REMOTE_BRAIN_URL_PLACEHOLDER = 'https://twoj-serwer:7862'
+export const REMOTE_BRAIN_URL_PLACEHOLDER = 'https://brain.example.com:7862'
 /** No default remote URL — each user saves their own in app-settings / localStorage. */
 export const REMOTE_BRAIN_DEFAULT_URL = ''
 
