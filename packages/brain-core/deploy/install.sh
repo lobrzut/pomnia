@@ -126,10 +126,16 @@ echo "  panel              →  http://$HOST_IP:$PORT/admin"
 echo "  status             →  ${STATUS:-unknown}"
 [[ -n "${NEW_TOKEN:-}" ]] && echo "  agent token        →  $NEW_TOKEN"
 if [[ -n "${NEW_USER:-}" ]]; then
+  # Never echo the password to stdout (logs, scrollback, shared tmux). Write once
+  # to a 600 file the operator can read and delete after first login.
+  PASSFILE="$DATA/admin-initial-password"
+  printf '%s\n' "$ADMIN_PW" > "$PASSFILE"
+  chown "$USER_NAME:$USER_NAME" "$PASSFILE"
+  chmod 600 "$PASSFILE"
   echo
   echo "  panel login        →  admin"
-  echo "  panel password     →  $ADMIN_PW"
-  echo "  ^ shown once. Change it after the first login (Konta → Hasło)."
+  echo "  panel password     →  written once to $PASSFILE (chmod 600; delete after login)"
+  echo "  Change it after the first login (Konta → Hasło)."
 fi
 echo
 

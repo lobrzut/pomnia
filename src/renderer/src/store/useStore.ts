@@ -363,36 +363,38 @@ export const useStore = create<State>((set, get) => ({
     else set({ snapshots: [] })
   },
   async createVault(path, name, pass) {
+    const labels = uiLabels()
     try {
       const vault = await api.createVault(path, name, pass)
       saveStr(VAULT_PATH_KEY, path)
       set({ vault, snapshots: [], vaultLastPath: path })
       // Refresh so skillsCount / distilledNotes match vault:status (open may omit older fields).
       await get().refreshVault()
-      get().toast({ kind: 'success', title: 'Vault created', detail: name })
+      get().toast({ kind: 'success', title: labels.vaultToastCreated, detail: name })
       return true
     } catch (e) {
-      get().toast({ kind: 'error', title: 'Could not create vault', detail: (e as Error).message })
+      get().toast({ kind: 'error', title: labels.vaultToastCreateFailed, detail: (e as Error).message })
       return false
     }
   },
   async openVault(path, pass) {
+    const labels = uiLabels()
     try {
       const vault = await api.openVault(path, pass)
       saveStr(VAULT_PATH_KEY, path)
       set({ vault, snapshots: await api.listSnapshots(), vaultLastPath: path })
       await get().refreshVault()
-      get().toast({ kind: 'success', title: 'Vault unlocked', detail: vault.name })
+      get().toast({ kind: 'success', title: labels.vaultToastUnlocked, detail: vault.name })
       return true
     } catch (e) {
-      get().toast({ kind: 'error', title: 'Unlock failed', detail: (e as Error).message })
+      get().toast({ kind: 'error', title: labels.vaultToastUnlockFailed, detail: (e as Error).message })
       return false
     }
   },
   async lockVault() {
     await api.lockVault()
     set({ vault: { open: false, snapshots: 0 }, snapshots: [] })
-    get().toast({ kind: 'info', title: 'Vault locked' })
+    get().toast({ kind: 'info', title: uiLabels().vaultToastLocked })
   },
 
   backingUp: false,

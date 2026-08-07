@@ -11,6 +11,7 @@
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { validateOllamaUrl } from '../admin/settings.js'
 
 export interface BrainConfig {
   /** Host to bind. `127.0.0.1` when embedded in Pomnia, `0.0.0.0` on server deploys. */
@@ -162,6 +163,14 @@ export async function loadConfig(
   if (!tokensFileExplicit && cfg.dataDir !== dataDirBefore) {
     cfg.auth.tokensFile = join(cfg.dataDir, 'mcp-tokens.json')
   }
+
+  // Same SSRF gate as the admin panel — refuse link-local / credentialed /
+  // non-http Ollama URLs before the daemon ever fetches them.
+  const ollama = validateOllamaUrl(cfg.ollamaUrl)
+  if (!ollama.ok) {
+    throw new Error(`invalid Ollama URL (${ollama.reason}): ${ollama.detail}`)
+  }
+  cfg.ollamaUrl = ollama.url
 
   return cfg
 }

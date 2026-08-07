@@ -830,7 +830,7 @@ function mockBridge(): PomniaBridge {
     },
     async vaultReplicaState() {
       return {
-        url: 'http://192.168.1.201:7865',
+        url: 'https://brain.example.com',
         hasToken: true,
         autoSync: true,
         // The interesting mock is a *failure*: a success tells you nothing
