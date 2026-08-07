@@ -52,12 +52,17 @@ jobs:
         run: npm test
 
       - name: Build Linux AppImage + deb
-        run: npm run pack:linux
+        run: |
+          rm -rf release/linux-unpacked release/*.AppImage release/*.deb release/latest-linux.yml || true
+          npm run pack:linux
         env:
           # CI runners have no operator vault — skip the local memory gate.
           GOLDEN_PATH_SKIP: '1'
           # Honest unsigned build (same stance as Windows/macOS early public).
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          # Avoid EEXIST hardlink collisions when canvas is listed both as an
+          # explicit files: copy and as a resolved dependency (Linux CI).
+          USE_HARD_LINKS: 'false'
 
       - name: SHA-256 checksums
         run: |
