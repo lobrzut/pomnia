@@ -124,6 +124,23 @@ mac:
   target: [dmg]
   category: public.app-category.utilities
   artifactName: ${productName}-${version}.${ext}
-# Linux target intentionally omitted for now — focus is Windows + macOS.
-# The engine stays cross-platform (path logic handles linux), so re-adding a
-# linux: AppImage target later is a one-block change.
+# Linux: build on Linux (or ubuntu-latest CI). AppImage needs Linux host —
+# Windows cannot cross-produce a working AppImage with native better-sqlite3.
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Utility
+  icon: resources/icon.png
+  executableName: Pomnia
+  artifactName: ${productName}-${version}.${ext}
+  synopsis: Local-first AI memory — encrypted vault, MCP-native Brain
+  description: >-
+    Pomnia — one encrypted memory your AI agents share. Local-first,
+    MCP-native: encrypted vault, distill pipeline, embedded Brain.
+  desktop:
+    Name: Pomnia
+    Comment: Local-first AI memory
+    Categories: Utility;
+    StartupWMClass: Pomnia
+

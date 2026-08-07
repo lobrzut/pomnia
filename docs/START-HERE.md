@@ -102,10 +102,11 @@ Jeśli Cursor backup pokazuje 0 czatów — użyj Import.
 ## Czego ta beta jeszcze nie ma
 
 - Podpisany instalator (SmartScreen / Gatekeeper)
-- Instalator Linux
 - Pełny OCR wszystkich stron / Ollama vision (jest thin OCR: pierwsze sparse pages)
 - Sync vault do chmury
 - Gwarancja Antigravity na każdej maszynie (adapter w testach)
+
+Linux Desktop (AppImage/deb): budowa na Linux/CI — [LINUX-BUILD.md](./LINUX-BUILD.md).
 
 ---
 

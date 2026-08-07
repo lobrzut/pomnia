@@ -164,7 +164,7 @@ Instalacja → Vault (hasło) → Backup czatów → Import (opcjonalnie)
 3. Minimalna konfiguracja (Ollama + 2 modele)
 4. 5 kroków do „Cursor pamięta"
 5. Gdzie szukać pomocy / logi
-6. Czego NIE obiecywać (Linux installer, OCR, cloud sync)
+6. Czego NIE obiecywać (podpisany installer, OCR full, cloud sync) — Linux AppImage dopiero gdy asset jest na Releases
 
 ### 3.3 Landing vs produkt
 
@@ -247,7 +247,6 @@ Instalacja → Vault (hasło) → Backup czatów → Import (opcjonalnie)
 | Nie teraz | Powód |
 |-----------|-------|
 | **Mac build** | Osobny track (już w toku) |
-| **Linux installer** | Świadomie odłożony w `electron-builder.yml` |
 | **Tier 2 OCR / vision PDF** | Dokumentacja już mówi 🔲 — nie obiecywać w landing |
 | **Sync sejfu (git/S3/WebDAV)** | README roadmap — rozprasza przed betą |
 | **Tauri migracja** | Architektura OK na Electronie |

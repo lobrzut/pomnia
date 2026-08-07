@@ -61,6 +61,12 @@ Do not commit the PFX or password.
 
 See [MAC-BUILD.md](./MAC-BUILD.md) §6 (`CSC_LINK`, Apple Developer ID, notarization).
 
+## Linux
+
+Desktop packs are **unsigned** by design for now (same honesty as Windows). Build on
+Linux or CI — see [LINUX-BUILD.md](./LINUX-BUILD.md). No code-signing cert required
+to ship AppImage/deb for premiere.
+
 ## Related reliability work (not a substitute for signing)
 
 - Clean quit + `taskkill /T` of `Pomnia.exe` (Brain MCP is an Electron `utilityProcess` under the main tree; legacy `pomnia-brain.exe` kill kept only for upgrades from ≤0.1.35)
