@@ -28,6 +28,7 @@
     "test": "npm run generate:build-info && vitest run",
     "test:golden": "node scripts/golden-path.mjs",
     "test:e2e:smoke": "node e2e/smoke-first-window.mjs",
+    "test:e2e:walkthrough": "node e2e/smoke-walkthrough.mjs",
     "build:brain-core": "npm run build --prefix packages/brain-core",
     "build:doc-parser": "npm run build --prefix packages/doc-parser",
     "stage:brain-core": "node scripts/stage-brain-core.mjs",
