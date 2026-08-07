@@ -7,6 +7,12 @@ name: Release Linux (AppImage + deb)
 on:
   workflow_dispatch:
   push:
+    branches:
+      # Until this workflow lands on the default branch, workflow_dispatch 404s.
+      # Branch pushes still run the workflow file from this commit.
+      - fix/machine-move-honesty
+      - master
+      - main
     tags:
       - 'v*'
 
