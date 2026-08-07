@@ -21,13 +21,14 @@ Current version: see `package.json`. Artifacts:
 ## Fastest path (premiere from Windows)
 
 1. Push this branch (or merge) so `.github/workflows/release-linux.yml` is on the remote.
-2. Dispatch the workflow:
+2. A push to `fix/machine-move-honesty` / `master` / `main` starts the job automatically.
+   After the file exists on the **default** branch, you can also dispatch:
 
 ```bash
-gh workflow run "Release Linux (AppImage + deb)" --ref fix/machine-move-honesty
-# or after merge:
 gh workflow run "Release Linux (AppImage + deb)" --ref master
 ```
+
+   (`workflow_dispatch` 404s until the workflow file is on the repo default branch.)
 
 3. Wait for the run (~8–15 min typical), download the `pomnia-linux` artifact:
 
