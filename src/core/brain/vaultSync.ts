@@ -145,7 +145,7 @@ async function post(
 
 export interface VaultSyncOptions {
   vaultRoot: string
-  /** Replica base URL, e.g. http://192.168.1.201:7865 */
+  /** Replica base URL, e.g. https://brain.example.com */
   target: string
   token?: string
   onProgress?: (done: number, total: number, path: string) => void
