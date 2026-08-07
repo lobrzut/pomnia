@@ -68,7 +68,7 @@ assets.push(shaFile)
 const sizeMb = (readFileSync(exe).length / 1024 / 1024).toFixed(2)
 const sha = sh('git', ['rev-parse', '--short', 'HEAD'])
 
-const notes = `Pomnia ${version}
+let notes = `Pomnia ${version}
 
 **Windows installer** · ${sizeMb} MB · built from \`${sha}\`
 
@@ -85,6 +85,41 @@ ${sha256}
 
 Pomnia checks for newer releases and tells you — it never installs anything by itself.
 `
+
+// Optional Linux packages (from CI / Linux host) — attach without blocking Windows path.
+const linuxExtras = []
+for (const name of readdirSync(releaseDir)) {
+  if (name.endsWith('.AppImage') || name.endsWith('.deb') || name === 'latest-linux.yml') {
+    linuxExtras.push(join(releaseDir, name))
+  }
+  if (/\.(AppImage|deb)\.sha256$/i.test(name)) linuxExtras.push(join(releaseDir, name))
+}
+// Deduplicate paths (sha may match both filters).
+const seen = new Set()
+for (let i = linuxExtras.length - 1; i >= 0; i--) {
+  if (seen.has(linuxExtras[i])) linuxExtras.splice(i, 1)
+  else seen.add(linuxExtras[i])
+}
+for (const img of linuxExtras.filter((p) => p.endsWith('.AppImage'))) {
+  const base = img.split(/[/\\]/).pop()
+  const shaPath = `${img}.sha256`
+  if (!existsSync(shaPath)) {
+    const hash = createHash('sha256').update(readFileSync(img)).digest('hex').toUpperCase()
+    writeFileSync(shaPath, `${hash}  ${base}\n`, 'utf8')
+    linuxExtras.push(shaPath)
+  }
+}
+if (linuxExtras.length) {
+  assets.push(...linuxExtras)
+  notes += `
+
+**Linux** · AppImage/deb also in this release (unsigned).
+
+\`\`\`bash
+chmod +x Pomnia-${version}.AppImage && ./Pomnia-${version}.AppImage
+\`\`\`
+`
+}
 
 console.log(`tag        ${tag}`)
 console.log(`commit     ${sha}`)

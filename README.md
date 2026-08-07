@@ -184,7 +184,7 @@ Rules: [SECURITY.md](SECURITY.md).
 - [ ] Vault sync (git-remote / S3 / WebDAV)
 - [ ] Backup schedules (CLI + Task Scheduler / launchd)
 - [ ] Signed installers
-- Linux packing **skipped for now** (engine is cross-platform).
+- [ ] Linux AppImage/deb via CI ([docs/LINUX-BUILD.md](docs/LINUX-BUILD.md)) — configure shipped; premiere artifact from `ubuntu-latest`
 
 ---
 

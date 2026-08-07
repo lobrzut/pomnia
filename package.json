@@ -36,8 +36,11 @@
     "build:win": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && npm run stage:tessdata && npm run generate:build-info && electron-vite build && npm run test:golden && electron-builder --win",
     "pack:win": "npm run build:win",
     "pack:mac": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && npm run stage:tessdata && npm run generate:build-info && electron-vite build && npm run test:golden && electron-builder --mac",
+    "build:linux": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && npm run stage:tessdata && npm run generate:build-info && electron-vite build && npm run test:golden && electron-builder --linux",
+    "pack:linux": "npm run build:linux",
     "release:win": "node scripts/release-win.mjs",
     "publish:release": "node scripts/publish-release.mjs",
+    "attach:linux-release": "node scripts/attach-linux-release.mjs",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.json"
   },
