@@ -129,6 +129,8 @@ describe('uiLabels', () => {
     expect(labels.importChatConfirmGenericWarn).toContain('Nie rozpoznano formatu')
     expect(labels.onboardingEngineLead).toMatch(/nomic-embed-text/)
     expect(labels.onboardingEngineLead).toMatch(/qwen2\.5:14b/)
+    expect(labels.onboardingEnginePullBtn).toMatch(/Pobierz|Pomni/)
+    expect(labels.onboardingEngineCancelPull).toBe('Anuluj')
     expect(labels.quarantinePromote).toContain('distilled')
     expect(labels.quarantineHeader(50)).toBe('Kwarantanna · 50')
     expect(labels.quarantineWeakToggle(235)).toContain('235')
