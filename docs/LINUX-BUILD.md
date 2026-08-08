@@ -95,6 +95,10 @@ sha256sum -c release/Pomnia-*.AppImage.sha256
 
 - Desktop Linux = Electron AppImage/deb (this doc). Separate from
   `packages/brain-core/deploy` (headless MCP server on Linux).
+- **Self-hosted completeness** (vault ownership, XDG paths, updates honesty,
+  Desktop vs server): [LINUX-SELF-HOSTED.md](./LINUX-SELF-HOSTED.md).
 - Hero CTA on pomnia.ai stays **Download for Windows** until a Release
   actually lists an AppImage — do not advertise a missing asset.
 - No code signing for Linux at premiere; users verify SHA-256 from the Release.
+- **Self-hosted completeness** (vault ownership, XDG paths, updates, Desktop vs
+  server): [LINUX-SELF-HOSTED.md](./LINUX-SELF-HOSTED.md).

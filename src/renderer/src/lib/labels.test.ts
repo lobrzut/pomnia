@@ -203,6 +203,10 @@ describe('uiLabels', () => {
     expect(labels.agentBrainModeBriefWrite).toContain('Zapisz')
     expect(labels.profilePreviewCopy).toBe('Kopiuj')
     expect(labels.profilePreviewCopied).toBe('Skopiowano USER.md')
+    expect(labels.updateLinuxHint).toMatch(/AppImage|\.deb/)
+    expect(labels.dataLocationsTitle).toBe('Gdzie leżą dane')
+    expect(labels.linuxUnsignedTitle).toMatch(/Linux/)
+    expect(labels.openAtLogin).not.toMatch(/Windows/i)
   })
 })
 

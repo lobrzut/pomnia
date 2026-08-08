@@ -190,6 +190,19 @@ export interface PomniaBridge {
     releaseUrl?: string
     detail?: string
   }>
+  appDataLocations(): Promise<{
+    platform: 'win32' | 'darwin' | 'linux'
+    installForm: 'appimage' | 'deb' | 'nsis' | 'dmg' | 'dev' | 'unknown'
+    userDataDir: string
+    brainCoreDataDir: string
+    libraryDbPath: string
+    logsDir: string
+    defaultVaultExample: string
+    vaultPath: string | null
+    indexIsPlaintext: true
+  }>
+  openUserData(): Promise<string>
+  openBrainData(): Promise<string>
   vaultReplicaState(): Promise<{
     url: string
     hasToken: boolean
@@ -827,6 +840,25 @@ function mockBridge(): PomniaBridge {
         state: 'current' as const,
         latest: '0.1.54',
       }
+    },
+    async appDataLocations() {
+      return {
+        platform: 'linux' as const,
+        installForm: 'appimage' as const,
+        userDataDir: '/home/alice/.config/Pomnia',
+        brainCoreDataDir: '/home/alice/.config/Pomnia/brain-core-data',
+        libraryDbPath: '/home/alice/.config/Pomnia/brain-core-data/vectordb/library.db',
+        logsDir: '/home/alice/.config/Pomnia/logs',
+        defaultVaultExample: '/home/alice/Vault',
+        vaultPath: '/home/alice/Vault',
+        indexIsPlaintext: true as const,
+      }
+    },
+    async openUserData() {
+      return '/home/alice/.config/Pomnia'
+    },
+    async openBrainData() {
+      return '/home/alice/.config/Pomnia/brain-core-data'
     },
     async vaultReplicaState() {
       return {

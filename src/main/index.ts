@@ -67,6 +67,7 @@ import { formatBuildIdentity } from '../buildInfo.js'
 import { brainCore, killLeftoverBrainHelpers } from './brainCore.js'
 import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused } from './mcpActivityPoll.js'
 import { checkForUpdate, describeUpdate } from './updateCheck.js'
+import { buildDataLocationsSnapshot, detectInstallForm } from '@core/dataLocations.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { runDocumentOcr } from './docOcr.js'
 import { removeLibraryDocumentWithIndex } from './libraryDocRemove.js'
@@ -1462,6 +1463,34 @@ function registerIpc(): void {
     if (r.state === 'unreachable') log.warn('manual update check failed:', r.detail)
     return { current, checkedAt: new Date().toISOString(), ...r }
   })
+
+  /** Live vault + XDG/AppData paths for Settings honesty (Linux self-hosted). */
+  ipcMain.handle('app:openUserData', async () => {
+    const dir = app.getPath('userData')
+    await fs.mkdir(dir, { recursive: true })
+    await shell.openPath(dir)
+    return dir
+  })
+
+  ipcMain.handle('app:openBrainData', async () => {
+    const dir = brainCoreDataDir()
+    await fs.mkdir(dir, { recursive: true })
+    await shell.openPath(dir)
+    return dir
+  })
+
+  /**
+   * Where vault / Brain data actually live on this machine.
+   * Linux must not inherit Windows AppData copy — XDG + ~/Vault honesty.
+   */
+  ipcMain.handle('app:dataLocations', () =>
+    buildDataLocationsSnapshot({
+      userDataDir: app.getPath('userData'),
+      vaultPath,
+      platform: currentOS(),
+      installForm: app.isPackaged ? detectInstallForm() : 'dev',
+    }),
+  )
 
   ipcMain.handle('brainCore:status', () => brainCore.status())
   ipcMain.handle('brainCore:start', async (_e, ollamaUrl?: string) => {

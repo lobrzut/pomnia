@@ -106,6 +106,9 @@ const bridge = {
   },
   brainDeploy: (opts: unknown) => ipcRenderer.invoke('brain:deploy', opts),
   appUpdateCheck: () => ipcRenderer.invoke('app:updateCheck'),
+  openUserData: () => ipcRenderer.invoke('app:openUserData') as Promise<string>,
+  openBrainData: () => ipcRenderer.invoke('app:openBrainData') as Promise<string>,
+  appDataLocations: () => ipcRenderer.invoke('app:dataLocations'),
   vaultReplicaState: () => ipcRenderer.invoke('vault:replicaState'),
   vaultReplicaConfig: (patch: { url?: string; token?: string; autoSync?: boolean }) =>
     ipcRenderer.invoke('vault:replicaConfig', patch),
