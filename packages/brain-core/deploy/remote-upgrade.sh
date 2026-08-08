@@ -30,4 +30,9 @@ echo "=== service ==="
 systemctl is-active pomnia-brain-core
 test -f /var/lib/pomnia/mcp-tokens.json && echo tokens_ok
 test -d /var/lib/pomnia/vault && echo vault_ok
-test -f /var/lib/pomnia/vault/state/vault-writer.json && echo writer_marker_ok
+# Marker is optional: --read-only + --vault-owner covers seeded replicas.
+if [[ -f /var/lib/pomnia/vault/state/vault-writer.json ]]; then
+  echo writer_marker_ok
+else
+  echo writer_marker_absent_ok
+fi
