@@ -296,6 +296,16 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
   const [pass, setPass] = useState('')
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
+  const [pathPlaceholder, setPathPlaceholder] = useState(labels.vaultPathPlaceholder)
+
+  useEffect(() => {
+    void api
+      .appDataLocations()
+      .then((loc) => {
+        if (loc.defaultVaultExample) setPathPlaceholder(loc.defaultVaultExample)
+      })
+      .catch(() => {})
+  }, [])
 
   const mismatch = mode === 'create' && !!pass && !!confirm && pass !== confirm
   const valid = !!path && !!pass && !mismatch && (mode === 'unlock' || !!confirm)
@@ -337,7 +347,7 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
       <div className="space-y-3.5">
         <Field label={mode === 'create' ? labels.onboardingVaultNewFolder : labels.onboardingVaultFolder}>
           <div className="flex gap-2">
-            <Input value={path} onChange={(e) => setPath(e.target.value)} placeholder="C:\Vault" />
+            <Input value={path} onChange={(e) => setPath(e.target.value)} placeholder={pathPlaceholder} />
             <Button variant="soft" onClick={pick}>
               <FolderOpen className="h-4 w-4" />
             </Button>

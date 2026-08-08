@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
 import { useCallback, useEffect, useState } from 'react'
-import { Activity, Brain, Clock, FileArchive, FolderOpen, Handshake, Languages, Lock, Minimize2, Palette, Plug, RefreshCw, RotateCcw, Shield, ShieldCheck, Vault } from 'lucide-react'
+import { Activity, Brain, Clock, FileArchive, FolderOpen, Handshake, HardDrive, Languages, Lock, Minimize2, Palette, Plug, RefreshCw, RotateCcw, Shield, ShieldCheck, Vault } from 'lucide-react'
 import {
   isValidHandshakePhraseSetting,
 } from '@core/handshakePhrase'
@@ -263,6 +263,9 @@ export default function Settings() {
   const [appVersion, setAppVersion] = useState('')
   const [update, setUpdate] = useState<Awaited<ReturnType<typeof api.appUpdateCheck>> | null>(null)
   const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [dataLoc, setDataLoc] = useState<Awaited<ReturnType<typeof api.appDataLocations>> | null>(null)
+  const isLinux = api.platform === 'linux'
+  const isWindows = api.platform === 'win32'
 
   async function runUpdateCheck() {
     setCheckingUpdate(true)
@@ -295,6 +298,13 @@ export default function Settings() {
       .then((r) => setAppVersion(r.identity || r.version))
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    void api
+      .appDataLocations()
+      .then(setDataLoc)
+      .catch(() => {})
+  }, [vault.open, vault.path])
 
   async function saveHandshakePhrase() {
     const trimmed = phraseDraft.trim()
@@ -406,6 +416,71 @@ export default function Settings() {
             </Button>
           </div>
         </div>
+        {isLinux ? (
+          <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">{labels.updateLinuxHint}</p>
+        ) : null}
+      </GlassCard>
+
+      <GlassCard className="mb-4 p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+          <HardDrive className="h-4 w-4 text-mint" /> {labels.dataLocationsTitle}
+        </div>
+        <p className="mb-3 text-xs text-ink-dim">{labels.dataLocationsLead}</p>
+        {dataLoc ? (
+          <div className="space-y-2.5 text-xs">
+            <div>
+              <div className="text-ink-faint">{labels.dataLocationsUserData}</div>
+              <div className="mt-0.5 break-all font-mono text-[11px] text-ink">{dataLoc.userDataDir}</div>
+            </div>
+            <div>
+              <div className="text-ink-faint">{labels.dataLocationsIndex}</div>
+              <div className="mt-0.5 break-all font-mono text-[11px] text-ink">{dataLoc.libraryDbPath}</div>
+            </div>
+            <div>
+              <div className="text-ink-faint">{labels.dataLocationsVault}</div>
+              <div className="mt-0.5 break-all font-mono text-[11px] text-ink">
+                {dataLoc.vaultPath ?? labels.dataLocationsVaultLocked}
+              </div>
+            </div>
+            <p className="text-[11px] text-ink-faint">{labels.dataLocationsInstallForm(dataLoc.installForm)}</p>
+            <p className="text-[11px] leading-relaxed text-ink-dim">{labels.dataLocationsPlaintext}</p>
+            <p className="text-[11px] leading-relaxed text-ink-dim">{labels.dataLocationsOwnership}</p>
+            <p className="text-[11px] leading-relaxed text-ink-faint">{labels.dataLocationsWipe}</p>
+            {!isMock && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="soft"
+                  onClick={() => {
+                    void api.openUserData().catch(() => {})
+                  }}
+                >
+                  <FolderOpen className="h-4 w-4" /> {labels.dataLocationsOpenUserData}
+                </Button>
+                <Button
+                  type="button"
+                  variant="soft"
+                  onClick={() => {
+                    void api.openBrainData().catch(() => {})
+                  }}
+                >
+                  <FolderOpen className="h-4 w-4" /> {labels.dataLocationsOpenBrain}
+                </Button>
+                <Button
+                  type="button"
+                  variant="soft"
+                  onClick={() => {
+                    void api.openLogs().catch(() => {})
+                  }}
+                >
+                  <FolderOpen className="h-4 w-4" /> {labels.dataLocationsLogs}
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-ink-faint">…</p>
+        )}
       </GlassCard>
 
       <GlassCard className="mb-4 p-5">
@@ -765,25 +840,45 @@ export default function Settings() {
         )}
       </GlassCard>
 
-      <GlassCard className="mb-4 p-5">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
-          <Shield className="h-4 w-4 text-mint" /> {labels.antivirusTitle}
-        </div>
-        <p className="mb-2 text-xs text-ink-dim">{labels.antivirusLead}</p>
-        <p className="mb-3 text-xs text-ink-dim">{labels.antivirusWhy}</p>
-        <p className="mb-3 text-[11px] leading-relaxed text-ink-dim">{labels.antivirusSigningNote}</p>
-        {!isMock && (
-          <Button
-            type="button"
-            variant="soft"
-            onClick={() => {
-              void api.revealInstallDir().catch(() => {})
-            }}
-          >
-            <FolderOpen className="h-4 w-4" /> {labels.antivirusOpenInstallFolder}
-          </Button>
-        )}
-      </GlassCard>
+      {isWindows || isMock ? (
+        <GlassCard className="mb-4 p-5">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+            <Shield className="h-4 w-4 text-mint" /> {labels.antivirusTitle}
+          </div>
+          <p className="mb-2 text-xs text-ink-dim">{labels.antivirusLead}</p>
+          <p className="mb-3 text-xs text-ink-dim">{labels.antivirusWhy}</p>
+          <p className="mb-3 text-[11px] leading-relaxed text-ink-dim">{labels.antivirusSigningNote}</p>
+          {!isMock && (
+            <Button
+              type="button"
+              variant="soft"
+              onClick={() => {
+                void api.revealInstallDir().catch(() => {})
+              }}
+            >
+              <FolderOpen className="h-4 w-4" /> {labels.antivirusOpenInstallFolder}
+            </Button>
+          )}
+        </GlassCard>
+      ) : isLinux ? (
+        <GlassCard className="mb-4 p-5">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+            <Shield className="h-4 w-4 text-mint" /> {labels.linuxUnsignedTitle}
+          </div>
+          <p className="mb-3 text-xs text-ink-dim">{labels.linuxUnsignedLead}</p>
+          {!isMock && (
+            <Button
+              type="button"
+              variant="soft"
+              onClick={() => {
+                void api.revealInstallDir().catch(() => {})
+              }}
+            >
+              <FolderOpen className="h-4 w-4" /> {labels.antivirusOpenInstallFolder}
+            </Button>
+          )}
+        </GlassCard>
+      ) : null}
 
       <GlassCard className="p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">

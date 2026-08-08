@@ -18,10 +18,20 @@ export default function VaultGate() {
   const [pass, setPass] = useState('')
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
+  const [pathPlaceholder, setPathPlaceholder] = useState(labels.vaultPathPlaceholder)
 
   useEffect(() => {
     if (vaultLastPath && !path) setPath(vaultLastPath)
   }, [vaultLastPath, path])
+
+  useEffect(() => {
+    void api
+      .appDataLocations()
+      .then((loc) => {
+        if (loc.defaultVaultExample) setPathPlaceholder(loc.defaultVaultExample)
+      })
+      .catch(() => {})
+  }, [])
 
   async function pick() {
     const dir = await api.pickDirectory()
@@ -97,7 +107,7 @@ export default function VaultGate() {
                   setVaultLastPath(e.target.value)
                 }}
                 onKeyDown={onEnter}
-                placeholder={labels.vaultPathPlaceholder}
+                placeholder={pathPlaceholder}
               />
               <Button variant="soft" onClick={pick}>
                 <FolderOpen className="h-4 w-4" />

@@ -259,6 +259,22 @@ export interface UiLabels {
   updateCheckNow: string
   updateDownload: string
   updateNoConnection: string
+  /** Extra honesty under the update card on Linux (AppImage/deb — no silent install). */
+  updateLinuxHint: string
+  // ── data locations (Settings) ────────────────────────────────────────────
+  dataLocationsTitle: string
+  dataLocationsLead: string
+  dataLocationsUserData: string
+  dataLocationsIndex: string
+  dataLocationsLogs: string
+  dataLocationsVault: string
+  dataLocationsVaultLocked: string
+  dataLocationsPlaintext: string
+  dataLocationsWipe: string
+  dataLocationsOpenUserData: string
+  dataLocationsOpenBrain: string
+  dataLocationsOwnership: string
+  dataLocationsInstallForm: (form: string) => string
   // ── connect: client state ────────────────────────────────────────────────
   clientWired: string
   clientUnreachable: string
@@ -560,6 +576,9 @@ export interface UiLabels {
   antivirusSigningNote: string
   /** Generic open-install-dir utility (not an AV-exclusion affordance). */
   antivirusOpenInstallFolder: string
+  /** Settings — Linux unsigned / SHA honesty (replaces Windows AV card). */
+  linuxUnsignedTitle: string
+  linuxUnsignedLead: string
   previewMode: string
   importTitle: string
   importLead: string
@@ -959,7 +978,7 @@ const PL_LABELS: UiLabels = {
   onboardingValueRecallText: 'Oddaj kontekst dowolnemu AI przez MCP — agenci, którzy Cię pamiętają.',
   onboardingVaultTitle: 'Utwórz vault',
   onboardingVaultLead:
-    'Jeden folder vaultu trzyma wszystko (np. C:\\Vault — nazwa dowolna, też *.pomnia). Wybierz lokalizację i hasło, którego nie zgubisz. Przenośność = skopiuj cały ten folder → Otwórz vault → hasło.',
+    'Jeden folder vaultu trzyma wszystko (np. C:\\Vault lub ~/Vault — nazwa dowolna, też *.pomnia). Wybierz lokalizację i hasło, którego nie zgubisz. Przenośność = skopiuj cały ten folder → Otwórz vault → hasło.',
   onboardingVaultCreateTab: 'Nowy vault',
   onboardingVaultOpenTab: 'Mam już folder',
   onboardingVaultNewFolder: 'Nowy folder vaultu',
@@ -1021,6 +1040,25 @@ const PL_LABELS: UiLabels = {
   updateCheckNow: 'Sprawdź aktualizacje',
   updateDownload: 'Pobierz',
   updateNoConnection: 'brak połączenia',
+  updateLinuxHint:
+    'Linux: brak auto-instalatora. Pobierz nowe .AppImage lub .deb z Releases, nadpisz stary plik (AppImage) albo zainstaluj deb ponownie. Vault i ~/.config/Pomnia zostają.',
+  dataLocationsTitle: 'Gdzie leżą dane',
+  dataLocationsLead:
+    'Vault to folder, który wybierasz. Indeks wyszukiwania i ustawienia to osobny katalog aplikacji (jak AppData na Windows).',
+  dataLocationsUserData: 'Dane aplikacji',
+  dataLocationsIndex: 'Indeks wyszukiwania (library.db)',
+  dataLocationsLogs: 'Logi',
+  dataLocationsVault: 'Folder vaultu',
+  dataLocationsVaultLocked: 'Vault zablokowany — odblokuj, żeby zobaczyć ścieżkę.',
+  dataLocationsPlaintext:
+    'Indeks (chunki + embeddingi) jest plaintext na dysku — hasło vaultu chroni bloby w folderze vaultu, nie library.db.',
+  dataLocationsWipe:
+    'Odinstalowanie nie kasuje vaultu. Żeby wyczyścić indeks/ustawienia: usuń katalog danych aplikacji. Folder vaultu kasujesz osobno, jeśli chcesz.',
+  dataLocationsOpenUserData: 'Otwórz folder danych',
+  dataLocationsOpenBrain: 'Otwórz folder indeksu',
+  dataLocationsOwnership:
+    'Właściciel vaultu = Ty (folder na dysku). Desktop i brain-core server nie mogą pisać do tego samego folderu naraz — zatrzymaj jeden, potem przejmij (Otwórz vault / --vault-root).',
+  dataLocationsInstallForm: (form) => `Forma instalacji: ${form}`,
   clientWired: 'Połączony',
   clientUnreachable: 'Nie odpowiada',
   clientPartial: 'Niepełny',
@@ -1191,8 +1229,8 @@ const PL_LABELS: UiLabels = {
     'Przycisk X chowa aplikację do traya zamiast kończyć proces. Gdy działa lokalna wyszukiwarka — zawsze.',
   minimizeToTray: 'Minimalizuj do zasobnika',
   minimizeToTrayHint: 'Przycisk minimalizacji chowa okno do traya zamiast paska zadań.',
-  openAtLogin: 'Uruchom przy starcie Windows',
-  openAtLoginHint: 'Pomnia startuje automatycznie po zalogowaniu do Windows. Domyślnie wyłączone.',
+  openAtLogin: 'Uruchom przy logowaniu',
+  openAtLoginHint: 'Pomnia startuje automatycznie po zalogowaniu do systemu. Domyślnie wyłączone.',
   colorScheme: 'Kolorystyka',
   colorSchemeHint: 'Wygląd aplikacji — tła, akcenty i szkło paneli. Logo pomarańczowe bez zmian.',
   colorSchemeMint: 'Mint',
@@ -1330,7 +1368,7 @@ const PL_LABELS: UiLabels = {
   moreSnapshots: (n) => `+ ${n} więcej…`,
   securityAbout: 'Bezpieczeństwo i informacje',
   securityPortability:
-    'Skopiuj cały folder vaultu (np. C:\\Vault) na inny komputer → Otwórz vault → hasło.',
+    'Skopiuj cały folder vaultu (np. C:\\Vault lub ~/Vault) na inny komputer → Otwórz vault → hasło.',
   securityAboutCli: (identity) =>
     `${identity} · ten sam silnik działa też w trybie CLI (bez okna).`,
   antivirusTitle: 'Windows / antywirus',
@@ -1341,6 +1379,9 @@ const PL_LABELS: UiLabels = {
   antivirusSigningNote:
     'Cel: Authenticode (OV/EV lub Azure Trusted Signing), żeby instalator „po prostu działał” bez ostrzeżeń. Do tego czasu nie wyłączaj AV i nie budujemy produktu na liście wyjątków.',
   antivirusOpenInstallFolder: 'Otwórz folder instalacji',
+  linuxUnsignedTitle: 'Linux / niepodpisany build',
+  linuxUnsignedLead:
+    'AppImage i deb są niepodpisane jak Windows setup — to uczciwość, nie błąd. Weryfikuj SHA-256 z Releases. Brak auto-update: pobierasz nowy plik ręcznie.',
   previewMode: 'Tryb podglądu (bez backendu Electron) — dane są przykładowe.',
   importTitle: 'Importuj',
   importLead: 'Wgraj eksport z Claude.ai, ChatGPT, Gemini albo Grok — trafi do vaultu.',
@@ -1532,7 +1573,7 @@ const PL_LABELS: UiLabels = {
   guideStep1Where: 'Dashboard → Backup · Import',
   guideStep2Title: 'Krok 2 — Vault Pomnia',
   guideStep2Body:
-    'Folder vaultu, który wybrałeś przy tworzeniu (np. C:\\Vault — nazwa dowolna, czasem *.pomnia). Zaszyfrowane snapshoty + dokumenty. To archiwum, nie wyszukiwarka i nie AppData.',
+    'Folder vaultu, który wybrałeś przy tworzeniu (np. C:\\Vault lub ~/Vault — nazwa dowolna, czasem *.pomnia). Zaszyfrowane snapshoty + dokumenty. To archiwum, nie wyszukiwarka i nie katalog danych aplikacji.',
   guideStep2Where: 'Dashboard · Ustawienia → Vault',
   guideStep3Title: 'Krok 3 — Destylacja',
   guideStep3Body:
@@ -1575,8 +1616,8 @@ const PL_LABELS: UiLabels = {
   flowNodeVaultLabel: 'Folder vaultu',
   flowNodeVaultLabelPip: 'Vault',
   flowNodeVaultHint:
-    'Zaszyfrowane archiwum (header.json, blobs, skills/, USER.md, distilled…) — cały folder, np. C:\\Vault.',
-  flowNodeVaultDisk: 'np. C:\\Vault',
+    'Zaszyfrowane archiwum (header.json, blobs, skills/, USER.md, distilled…) — cały folder, np. C:\\Vault lub ~/Vault.',
+  flowNodeVaultDisk: 'np. C:\\Vault · ~/Vault',
   flowNodeDistillLabel: 'Destylacja',
   flowNodeDistillHint: 'Ollama (qwen) skraca rozmowy do zwięzłych notatek — nie pełne kopie czatów.',
   flowNodeDistillDisk: 'localhost:11434',
@@ -1787,7 +1828,7 @@ const EN_LABELS: UiLabels = {
   onboardingValueRecallText: 'Hand context to any AI via MCP — agents that remember you.',
   onboardingVaultTitle: 'Create a vault',
   onboardingVaultLead:
-    'One vault folder holds everything (e.g. C:\\Vault — any name, including *.pomnia). Pick a location and a passphrase you won’t lose. Portability = copy that whole folder → Open vault → passphrase.',
+    'One vault folder holds everything (e.g. C:\\Vault or ~/Vault — any name, including *.pomnia). Pick a location and a passphrase you won’t lose. Portability = copy that whole folder → Open vault → passphrase.',
   onboardingVaultCreateTab: 'New vault',
   onboardingVaultOpenTab: 'I already have a folder',
   onboardingVaultNewFolder: 'New vault folder',
@@ -1848,6 +1889,25 @@ const EN_LABELS: UiLabels = {
   updateCheckNow: 'Check for updates',
   updateDownload: 'Download',
   updateNoConnection: 'no connection',
+  updateLinuxHint:
+    'Linux: no auto-installer. Download the new .AppImage or .deb from Releases, replace the old AppImage or reinstall the deb. Your vault folder and ~/.config/Pomnia stay put.',
+  dataLocationsTitle: 'Where data lives',
+  dataLocationsLead:
+    'The vault is the folder you pick. The search index and settings live in a separate app data directory (AppData on Windows, ~/.config/Pomnia on Linux).',
+  dataLocationsUserData: 'App data',
+  dataLocationsIndex: 'Search index (library.db)',
+  dataLocationsLogs: 'Logs',
+  dataLocationsVault: 'Vault folder',
+  dataLocationsVaultLocked: 'Vault locked — unlock to see the path.',
+  dataLocationsPlaintext:
+    'The index (chunks + embeddings) is plaintext on disk — the vault passphrase protects blobs in the vault folder, not library.db.',
+  dataLocationsWipe:
+    'Uninstall does not delete your vault. To wipe the index/settings: remove the app data directory. Delete the vault folder separately if you want that gone too.',
+  dataLocationsOpenUserData: 'Open data folder',
+  dataLocationsOpenBrain: 'Open index folder',
+  dataLocationsOwnership:
+    'You own the vault (the folder on disk). Do not let Desktop and a brain-core server write the same folder at once — stop one, then take over (Open vault / --vault-root).',
+  dataLocationsInstallForm: (form) => `Install form: ${form}`,
   clientWired: 'Connected',
   clientUnreachable: 'Not responding',
   clientPartial: 'Incomplete',
@@ -2017,8 +2077,8 @@ const EN_LABELS: UiLabels = {
     'The X button hides the app to the tray instead of quitting. Always on while local search is running.',
   minimizeToTray: 'Minimize to tray',
   minimizeToTrayHint: 'Minimize hides to the tray instead of the taskbar.',
-  openAtLogin: 'Open at Windows login',
-  openAtLoginHint: 'Start Pomnia automatically after Windows sign-in. Off by default.',
+  openAtLogin: 'Open at login',
+  openAtLoginHint: 'Start Pomnia automatically after you sign in. Off by default.',
   colorScheme: 'Color scheme',
   colorSchemeHint: 'App look — backgrounds, accents, and panel glass. Orange logo stays.',
   colorSchemeMint: 'Mint',
@@ -2120,7 +2180,7 @@ const EN_LABELS: UiLabels = {
   unlockVaultForSnapshots: 'Unlock the vault to list snapshots.',
   moreSnapshots: (n) => `…and ${n} more`,
   securityAbout: 'Security',
-  securityPortability: 'Portable unit = the whole vault folder (not AppData).',
+  securityPortability: 'Portable unit = the whole vault folder (not AppData / ~/.config/Pomnia).',
   securityAboutCli: (identity) => identity,
   antivirusTitle: 'Windows / antivirus',
   antivirusLead:
@@ -2130,6 +2190,9 @@ const EN_LABELS: UiLabels = {
   antivirusSigningNote:
     'Goal: Authenticode (OV/EV or Azure Trusted Signing) so the installer just works without warnings. Until then: do not turn off AV, and we do not build the product around exclusion lists.',
   antivirusOpenInstallFolder: 'Open install folder',
+  linuxUnsignedTitle: 'Linux / unsigned build',
+  linuxUnsignedLead:
+    'AppImage and deb are unsigned like the Windows setup — honesty, not a bug. Verify SHA-256 from Releases. No auto-update: you download the new file yourself.',
   previewMode: 'Browser preview — Electron bridge unavailable.',
   cancel: 'Cancel',
   distillEmptyBacklog: 'No new sessions to distill',
@@ -2444,7 +2507,7 @@ const EN_LABELS: UiLabels = {
   guideStep1Where: 'Dashboard → Backup · Import',
   guideStep2Title: 'Step 2 — The Pomnia vault',
   guideStep2Body:
-    'The vault folder you picked when creating it (e.g. C:\\Vault — any name, sometimes *.pomnia). Encrypted snapshots plus documents. An archive, not a search engine, and not AppData.',
+    'The vault folder you picked when creating it (e.g. C:\\Vault or ~/Vault — any name, sometimes *.pomnia). Encrypted snapshots plus documents. An archive, not a search engine, and not the app data directory.',
   guideStep2Where: 'Dashboard · Settings → Vault',
   guideStep3Title: 'Step 3 — Distill',
   guideStep3Body:
@@ -2488,8 +2551,8 @@ const EN_LABELS: UiLabels = {
   flowNodeVaultLabel: 'Vault folder',
   flowNodeVaultLabelPip: 'Vault',
   flowNodeVaultHint:
-    'The encrypted archive (header.json, blobs, skills/, USER.md, distilled…) — the whole folder, e.g. C:\\Vault.',
-  flowNodeVaultDisk: 'e.g. C:\\Vault',
+    'The encrypted archive (header.json, blobs, skills/, USER.md, distilled…) — the whole folder, e.g. C:\\Vault or ~/Vault.',
+  flowNodeVaultDisk: 'e.g. C:\\Vault · ~/Vault',
   flowNodeDistillLabel: 'Distill',
   flowNodeDistillHint:
     'Ollama (qwen) shortens conversations into terse notes — not full copies of the chats.',
