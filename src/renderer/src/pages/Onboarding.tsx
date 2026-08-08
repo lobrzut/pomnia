@@ -121,7 +121,7 @@ export default function Onboarding() {
           <div className="mb-10 flex items-center gap-2.5">
             <AppLogo size="sm" />
             <div className="min-w-0 leading-none">
-              <div className="text-sm font-bold tracking-tight text-grad">POMNIA</div>
+              <div className="text-sm font-bold tracking-tight text-grad text-grad-sheen">POMNIA</div>
               <div className="mt-1.5 text-[9px] font-medium uppercase tracking-[0.22em] text-ink-faint">
                 {labels.onboardingFirstRun}
               </div>

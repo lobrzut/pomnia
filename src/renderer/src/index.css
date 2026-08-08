@@ -124,9 +124,27 @@ html[data-theme='mint'] {
   }
   .text-grad {
     background: linear-gradient(100deg, var(--color-ink), #a8c4b0 50%, var(--color-mint));
+    background-size: 220% 100%;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+  /* Brand wordmark sheen — same motion as pomnia.ai .wordmark (subtle, 9s). */
+  @keyframes brand-sheen {
+    from {
+      background-position: 0% 0;
+    }
+    to {
+      background-position: 220% 0;
+    }
+  }
+  .text-grad-sheen {
+    animation: brand-sheen 9s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .text-grad-sheen {
+      animation: none !important;
+    }
   }
   .accent-grad {
     background: linear-gradient(120deg, #1a5c3a, var(--color-mint) 48%, var(--color-iris));
@@ -678,6 +696,7 @@ html[data-theme='iris'] .glass-hover:hover {
 }
 html[data-theme='iris'] .text-grad {
   background: linear-gradient(100deg, var(--color-ink), #c4b5fd 50%, var(--color-violet));
+  background-size: 220% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -812,6 +831,7 @@ html[data-theme='glass'] .glass-hover:hover {
 }
 html[data-theme='glass'] .text-grad {
   background: linear-gradient(100deg, #ffffff, #bae6fd 48%, #5eead4);
+  background-size: 220% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

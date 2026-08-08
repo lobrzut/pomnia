@@ -81,7 +81,7 @@ export default function FloatingMonitor() {
           <AppLogo size="xs" className="!h-5 !w-5" />
           {isIdle ? (
             <>
-              <span className="shrink-0 text-[10px] font-bold tracking-[0.14em] text-grad">POMNIA</span>
+              <span className="shrink-0 text-[10px] font-bold tracking-[0.14em] text-grad text-grad-sheen">POMNIA</span>
               <span
                 className={clsx(
                   'min-w-0 truncate text-[10px] font-medium',

@@ -51,7 +51,7 @@ export function TitleBar() {
           <>
             <AppLogo size="xs" />
             <div className="flex items-baseline gap-2 leading-none">
-              <span className="text-[15px] font-bold tracking-tight text-grad">POMNIA</span>
+              <span className="text-[15px] font-bold tracking-tight text-grad text-grad-sheen">POMNIA</span>
               <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">vault</span>
             </div>
             <div className="ml-2 flex items-center gap-2">
