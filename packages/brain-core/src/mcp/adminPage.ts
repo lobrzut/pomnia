@@ -66,7 +66,11 @@ export function renderAdminPage(origin: string): string {
   main{width:100%;max-width:46rem}
   h1{margin:0;font-size:1.6rem;font-weight:800;letter-spacing:-.025em;
     background:linear-gradient(120deg,#1a5c3a,var(--mint) 48%,var(--iris));
-    -webkit-background-clip:text;background-clip:text;color:transparent}
+    background-size:220% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    animation:brand-sheen 9s linear infinite}
+  @keyframes brand-sheen{from{background-position:0% 0}to{background-position:220% 0}}
+  @media (prefers-reduced-motion:reduce){h1{animation:none!important}}
   .top{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem}
   .who{margin-left:auto;font-size:.8rem;color:var(--ink-faint);font-family:var(--mono)}
   .card{border:1px solid var(--border);background:var(--panel);backdrop-filter:blur(14px);
