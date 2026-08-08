@@ -108,8 +108,8 @@ export default function Brain() {
   const labels = uiLabels()
   const [advancedOpen, setAdvancedOpen] = useState(!simpleMode)
   const showAdvanced = !simpleMode || advancedOpen
-  /** Simple mode is always embedded; remote-only UI only when advanced + remote target. */
-  const isRemoteTarget = !simpleMode && brainTarget === 'remote'
+  /** Remote Master owns search/MCP — local Ollama is distill-only, never an install gate. */
+  const isRemoteTarget = brainTarget === 'remote'
   const allPipelineStages = [
     { id: 'collect' as const, label: labels.brainPipeCollect, note: labels.brainPipeCollectNote, icon: STAGE_ICONS.collect },
     { id: 'distill' as const, label: labels.brainPipeDistill, note: labels.brainPipeDistillNote, icon: STAGE_ICONS.distill },
@@ -478,9 +478,11 @@ export default function Brain() {
         </button>
       )}
 
-      {/* Simple mode hides VRAM/pull behind Advanced — surface the embed gate here. */}
+      {/* Simple mode hides VRAM/pull behind Advanced — surface the embed gate here.
+          Remote brain: server owns search/embed — no local install/pull CTA. */}
       {simpleMode &&
         !advancedOpen &&
+        !isRemoteTarget &&
         status?.reachable &&
         !installed(PROFILE_EMBED_MODEL) && (
           <GlassCard className="mb-5 border-amber/25 bg-amber/8 p-4">
@@ -759,12 +761,13 @@ export default function Brain() {
       </GlassCard>
       )}
 
-      {/* Ollama status + VRAM profiles — advanced only */}
+      {/* Ollama status + VRAM profiles — advanced only; remote = distill endpoint, not install gate */}
       {showAdvanced && (
       <GlassCard className="mb-5 p-5">
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <Cpu className="h-4 w-4 text-iris" /> Local engine (Ollama)
+            <Cpu className="h-4 w-4 text-iris" />{' '}
+            {isRemoteTarget ? labels.brainOllamaDistillTitle : 'Local engine (Ollama)'}
           </div>
           {status && (
             <div className="flex items-center gap-2">
@@ -790,9 +793,22 @@ export default function Brain() {
         </div>
 
         <p className="mb-3 text-xs text-ink-faint">
-          Pick the profile matching your GPU — it sets which model distills your chats. Missing models can be pulled
-          right here.
+          {isRemoteTarget
+            ? labels.brainOllamaDistillLead
+            : 'Pick the profile matching your GPU — it sets which model distills your chats. Missing models can be pulled right here.'}
         </p>
+
+        {!isRemoteTarget && !status?.reachable && (
+          <div className="mb-3 rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-[11px] text-amber-100">
+            <div className="font-semibold text-ink">{labels.onboardingEngineNotFound}</div>
+            <p className="mt-1 text-ink-dim">{labels.onboardingEngineInstall1}</p>
+          </div>
+        )}
+        {isRemoteTarget && !status?.reachable && (
+          <div className="mb-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-[11px] text-ink-dim">
+            {labels.brainOllamaDistillOfflineHint}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
           {VRAM_PROFILES.map((p) => {
@@ -917,7 +933,8 @@ export default function Brain() {
       </GlassCard>
       )}
 
-      {/* Embedded brain — forked brain-core serving MCP on localhost */}
+      {/* Embedded brain — local MCP only; remote Master owns search on the server. */}
+      {!isRemoteTarget && (
       <GlassCard className="mb-5 p-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
@@ -979,6 +996,7 @@ export default function Brain() {
           {labels.brainEmbeddedProcessHint}
         </p>
       </GlassCard>
+      )}
 
       {/* Run */}
       <GlassCard className="mb-5 p-5">
@@ -986,7 +1004,11 @@ export default function Brain() {
           <span className="text-sm font-semibold text-ink">
             {showAdvanced ? labels.brainAdvancedDistillTitle : labels.distill}
           </span>
-          {showAdvanced && <span className="text-xs text-ink-faint">{labels.brainAdvancedOllamaNeed}</span>}
+          {showAdvanced && (
+            <span className="text-xs text-ink-faint">
+              {isRemoteTarget ? labels.healthOllamaDistillHint : labels.brainAdvancedOllamaNeed}
+            </span>
+          )}
         </div>
         <div className="mb-4 flex flex-wrap gap-2">
           {distillable.map((s) => {

@@ -29,7 +29,7 @@ import { identifyEngine } from '@core/brain/engine'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { getUiLocale } from '../lib/uiLocale'
-import { useStore, dashboardUrlFromBrainUrl } from '../store/useStore'
+import { useStore, dashboardUrlFromBrainUrl, ollamaUrlFromBrainUrl } from '../store/useStore'
 import type { BrainTarget, ClientId, ClientStatus, Snippet, WiredState } from '../lib/types'
 
 const EMBEDDED_URL = EMBEDDED_BRAIN_DEFAULT_URL
@@ -202,6 +202,14 @@ export default function Connect() {
         title: labels.connectStepUrl,
         detail: labels.onboardingEngineRemoteUntested,
       })
+    }
+    // Prefer server Ollama for distill when Master is remote and URL still points
+    // at localhost (or empty) — search does not need a local install.
+    if (next === 'remote' && remoteBrainUrl.trim()) {
+      const current = useStore.getState().ollamaUrl.trim()
+      if (!current || /127\.0\.0\.1:11434|localhost:11434/i.test(current)) {
+        useStore.getState().setOllamaUrl(ollamaUrlFromBrainUrl(remoteBrainUrl.trim()))
+      }
     }
   }
 
