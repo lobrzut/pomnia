@@ -315,6 +315,9 @@ export interface UiLabels {
   onboardingEngineModelsNeeded: string
   onboardingEngineEmbedMissing: (cmd: string) => string
   onboardingEngineDistillMissing: (cmd: string, size: string) => string
+  /** In-app Ollama pull — same IPC path as Brain advanced; first-run must not require the terminal. */
+  onboardingEnginePullBtn: string
+  onboardingEngineCancelPull: string
   onboardingEngineNotFound: string
   onboardingEngineInstall1: string
   onboardingEngineInstall2: string
@@ -1071,13 +1074,16 @@ const PL_LABELS: UiLabels = {
   onboardingEngineDistillHint: (model) =>
     `Model destylacji: ${model} (~9 GB) — skraca rozmowy do notatek.`,
   onboardingEngineModelsNeeded: 'Potrzebne modele Ollama',
-  onboardingEngineEmbedMissing: (cmd) => `Brak modelu embeddingów — uruchom: ${cmd}`,
+  onboardingEngineEmbedMissing: (cmd) =>
+    `Brak modelu embeddingów — pobierz poniżej (albo w terminalu: ${cmd}).`,
   onboardingEngineDistillMissing: (cmd, size) =>
-    `Brak modelu destylacji — uruchom: ${cmd} (ok. ${size}; nie blokuje dalszej konfiguracji).`,
+    `Brak modelu destylacji — pobierz poniżej (albo: ${cmd}, ok. ${size}; nie blokuje dalszej konfiguracji).`,
+  onboardingEnginePullBtn: 'Pobierz w Pomni',
+  onboardingEngineCancelPull: 'Anuluj',
   onboardingEngineNotFound: 'Nie znaleziono Ollama',
   onboardingEngineInstall1: 'Pobierz z ollama.com/download i zainstaluj (~2 min).',
   onboardingEngineInstall2:
-    'Pobierz modele: ollama pull nomic-embed-text (~0,3 GB) oraz ollama pull qwen2.5:14b (~9 GB).',
+    'Po instalacji wróć tutaj — modele pobierzesz przyciskiem w aplikacji (albo: ollama pull nomic-embed-text).',
   onboardingEngineInstall3: 'Wróć i sprawdź ponownie.',
   onboardingEngineRecheck: 'Sprawdź ponownie',
   onboardingEngineRemoteOllamaOptional:
@@ -1895,13 +1901,16 @@ const EN_LABELS: UiLabels = {
   onboardingEngineDistillHint: (model) =>
     `Distill model: ${model} (~9GB) — shortens chats into notes.`,
   onboardingEngineModelsNeeded: 'Ollama models needed',
-  onboardingEngineEmbedMissing: (cmd) => `Embedding model missing — run: ${cmd}`,
+  onboardingEngineEmbedMissing: (cmd) =>
+    `Embedding model missing — pull below (or in a terminal: ${cmd}).`,
   onboardingEngineDistillMissing: (cmd, size) =>
-    `Distill model missing — run: ${cmd} (~${size}; does not block setup).`,
+    `Distill model missing — pull below (or: ${cmd}, ~${size}; does not block setup).`,
+  onboardingEnginePullBtn: 'Pull in Pomnia',
+  onboardingEngineCancelPull: 'Cancel',
   onboardingEngineNotFound: 'Ollama not found',
   onboardingEngineInstall1: 'Download from ollama.com/download and install (2 min).',
   onboardingEngineInstall2:
-    'Pull models: ollama pull nomic-embed-text (~0.3GB) and ollama pull qwen2.5:14b (~9GB).',
+    'After install, come back — pull models with the in-app button (or: ollama pull nomic-embed-text).',
   onboardingEngineInstall3: 'Come back and re-check.',
   onboardingEngineRecheck: 'Re-check',
   onboardingEngineRemoteOllamaOptional:
