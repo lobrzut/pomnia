@@ -27,7 +27,7 @@ import { GuideOverlay } from '../components/GuideMap'
 import { ClientIcon } from '../components/ClientIcon'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
-import { useStore } from '../store/useStore'
+import { useStore, ollamaUrlFromBrainUrl } from '../store/useStore'
 import { identifyEngine } from '@core/brain/engine'
 import { hasOllamaModel } from '@core/brain/modelMatch'
 import { EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from '@core/brain/snippet'
@@ -572,7 +572,14 @@ function EngineStep({
 
   function continueWithMode() {
     setBrainTarget(mode)
-    if (mode === 'remote' && remoteUrlTrimmed) setRemoteBrainUrl(remoteUrlTrimmed)
+    if (mode === 'remote' && remoteUrlTrimmed) {
+      setRemoteBrainUrl(remoteUrlTrimmed)
+      // Distill may need an Ollama endpoint — default to same host :11434, not a local install push.
+      const current = useStore.getState().ollamaUrl.trim()
+      if (!current || /127\.0\.0\.1:11434|localhost:11434/i.test(current)) {
+        useStore.getState().setOllamaUrl(ollamaUrlFromBrainUrl(remoteUrlTrimmed))
+      }
+    }
     onDone(mode)
   }
 

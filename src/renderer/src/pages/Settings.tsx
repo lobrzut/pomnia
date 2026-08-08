@@ -12,7 +12,7 @@ import { humanBytes, relativeTime } from '../lib/format'
 import { uiLabels } from '../lib/labels'
 import { COLOR_SCHEMES, type ColorScheme } from '../lib/theme'
 import { UI_LOCALES, type UiLocale } from '../lib/uiLocale'
-import { useStore } from '../store/useStore'
+import { useStore, ollamaUrlFromBrainUrl } from '../store/useStore'
 import { isMcpClientActive } from '../lib/mcpClientVisibility'
 import { hasOllamaModel as hasModel } from '@core/brain/modelMatch'
 import type { ClientId } from '../lib/types'
@@ -37,6 +37,8 @@ function HealthCheck() {
 
   const effectiveTarget = simpleMode ? 'embedded' : brainTarget
   const brainUrl = effectiveTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
+  /** Ollama gates follow stored Master target — simpleMode must not re-require local install. */
+  const remoteBrain = brainTarget === 'remote'
 
   const refresh = useCallback(async () => {
     setChecking(true)
@@ -55,37 +57,65 @@ function HealthCheck() {
       } catch {
         status = null
       }
-      next.push({
-        id: 'ollama',
-        label: labels.healthOllama,
-        ok: !!status?.reachable,
-        detail: status?.reachable ? status.baseUrl : labels.healthOllamaMissing
-      })
+      // Remote brain: search/MCP live on the server. Local Ollama is distill-only —
+      // never paint install-or-die red when Master is remote.
+      if (remoteBrain) {
+        const suggestedOllama = remoteBrainUrl.trim()
+          ? ollamaUrlFromBrainUrl(remoteBrainUrl.trim())
+          : 'http://HOST:11434'
+        next.push({
+          id: 'ollama',
+          label: labels.healthOllama,
+          ok: status?.reachable ? true : null,
+          detail: status?.reachable
+            ? status.baseUrl
+            : labels.healthOllamaOptionalRemote(suggestedOllama),
+        })
+        next.push({
+          id: 'embed',
+          label: labels.healthEmbedModel,
+          ok: null,
+          detail: labels.healthSkip,
+        })
+        next.push({
+          id: 'chat',
+          label: labels.healthChatModel,
+          ok: null,
+          detail: labels.healthOllamaOptionalRemote(suggestedOllama),
+        })
+      } else {
+        next.push({
+          id: 'ollama',
+          label: labels.healthOllama,
+          ok: !!status?.reachable,
+          detail: status?.reachable ? status.baseUrl : labels.healthOllamaMissing,
+        })
 
-      const models = status?.models ?? []
-      const embedOk = hasModel(models, status?.embedModel ?? 'nomic-embed-text')
-      next.push({
-        id: 'embed',
-        label: labels.healthEmbedModel,
-        ok: status?.reachable ? embedOk : null,
-        detail: embedOk
-          ? status?.embedModel ?? 'nomic-embed-text'
-          : status?.reachable
-            ? labels.healthModelMissing(`ollama pull ${status?.embedModel ?? 'nomic-embed-text'}`)
-            : labels.healthSkip
-      })
+        const models = status?.models ?? []
+        const embedOk = hasModel(models, status?.embedModel ?? 'nomic-embed-text')
+        next.push({
+          id: 'embed',
+          label: labels.healthEmbedModel,
+          ok: status?.reachable ? embedOk : null,
+          detail: embedOk
+            ? status?.embedModel ?? 'nomic-embed-text'
+            : status?.reachable
+              ? labels.healthModelMissing(`ollama pull ${status?.embedModel ?? 'nomic-embed-text'}`)
+              : labels.healthSkip,
+        })
 
-      const chatOk = hasModel(models, status?.chatModel ?? 'qwen2.5:14b')
-      next.push({
-        id: 'chat',
-        label: labels.healthChatModel,
-        ok: status?.reachable ? chatOk : null,
-        detail: chatOk
-          ? status?.chatModel ?? 'qwen2.5:14b'
-          : status?.reachable
-            ? labels.healthModelMissing(`ollama pull ${status?.chatModel ?? 'qwen2.5:14b'}`)
-            : labels.healthSkip
-      })
+        const chatOk = hasModel(models, status?.chatModel ?? 'qwen2.5:14b')
+        next.push({
+          id: 'chat',
+          label: labels.healthChatModel,
+          ok: status?.reachable ? chatOk : null,
+          detail: chatOk
+            ? status?.chatModel ?? 'qwen2.5:14b'
+            : status?.reachable
+              ? labels.healthModelMissing(`ollama pull ${status?.chatModel ?? 'qwen2.5:14b'}`)
+              : labels.healthSkip,
+        })
+      }
 
       if (effectiveTarget === 'embedded') {
         const core = await api.brainCoreStatus()
@@ -147,6 +177,8 @@ function HealthCheck() {
     vault.name,
     ollamaUrl,
     effectiveTarget,
+    remoteBrain,
+    remoteBrainUrl,
     brainUrl,
     connectToken,
     brainDeployTarget,

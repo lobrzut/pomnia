@@ -153,6 +153,10 @@ export interface UiLabels {
   mcpConnect: string
   brainPageTitle: string
   brainPageLead: string
+  /** Advanced Ollama card when Master is remote — distill endpoint, not install gate. */
+  brainOllamaDistillTitle: string
+  brainOllamaDistillLead: string
+  brainOllamaDistillOfflineHint: string
   brainDistillSelectedHint: (model: string, profile: string) => string
   brainAttachExport: string
   brainAttachExportHint: string
@@ -305,6 +309,10 @@ export interface UiLabels {
   // ── settings: health + integrity ─────────────────────────────────────────
   healthVaultAction: string
   healthOllamaMissing: string
+  /** Remote brain: local Ollama is not required for search — hint distill URL. */
+  healthOllamaOptionalRemote: (url: string) => string
+  /** Short distill-only hint when remote brain and Ollama offline. */
+  healthOllamaDistillHint: string
   healthCoreAction: string
   healthMcpUnreachable: string
   vaultIntegrityOk: string
@@ -838,6 +846,11 @@ export interface UiLabels {
   statusOllama: string
   statusOllamaOk: string
   statusOllamaFail: string
+  /** Remote brain: strip must not look like a hard fail for missing local Ollama. */
+  statusOllamaOptional: string
+  statusBrainRemote: string
+  statusBrainRemoteOk: string
+  statusBrainRemoteFail: string
   statusChecking: string
   statusLastDistill: string
   statusNoDistill: string
@@ -1003,11 +1016,11 @@ const PL_LABELS: UiLabels = {
   onboardingBackupNow: 'Backup teraz',
   onboardingEngineTitle: 'Jak ma działać Brain?',
   onboardingEngineLead:
-    'Wybierz lokalną wyszukiwarkę (wbudowaną w Pomnia) albo opcjonalny zdalny serwer Brain. Ollama na tym PC: embeddingi (nomic-embed-text, ~0,3 GB) i destylacja (qwen2.5:14b, ~9 GB).',
+    'Lokalnie: wbudowana wyszukiwarka + Ollama na tym PC (embed + destylacja). Zdalnie (np. Pomnia na Linuxie): search/MCP na serwerze — lokalna instalacja Ollama nie jest wymagana.',
   onboardingEngineLocal: 'Lokalnie (embedded)',
   onboardingEngineLocalHint: (url) => `Jeden .exe, MCP na ${url} — bez zdalnego serwera, bez tokena.`,
   onboardingEngineRemote: 'Zdalny master',
-  onboardingEngineRemoteHint: 'Twój serwer Pomnia w LAN — MCP + Bearer token.',
+  onboardingEngineRemoteHint: 'Serwer Brain w LAN (search/MCP). Ollama na tym PC niepotrzebna do wyszukiwania.',
   onboardingEngineMasterUrl: 'URL Master MCP',
   onboardingEngineTestConn: 'Test połączenia',
   onboardingEngineRemoteOk: 'Serwer odpowiada — brain-core',
@@ -1086,6 +1099,9 @@ const PL_LABELS: UiLabels = {
   snippetRulePath: 'ścieżka reguły',
   healthVaultAction: 'Otwórz lub utwórz vault',
   healthOllamaMissing: 'Ollama niedostępne — zainstaluj i uruchom ollama.com',
+  healthOllamaOptionalRemote: (url) =>
+    `Opcjonalne przy zdalnym Brain — search idzie na serwerze. Do destylacji ustaw URL Ollama (np. ${url}).`,
+  healthOllamaDistillHint: 'Do destylacji: ustaw URL Ollama na serwer :11434 (search nie wymaga lokalnej instalacji).',
   healthCoreAction: 'Uruchom w zakładce Brain',
   healthMcpUnreachable: 'Brain MCP nieosiągalny',
   vaultIntegrityOk: 'Integralność vaultu OK',
@@ -1125,7 +1141,7 @@ const PL_LABELS: UiLabels = {
   onboardingEngineInstall3: 'Wróć i sprawdź ponownie.',
   onboardingEngineRecheck: 'Sprawdź ponownie',
   onboardingEngineRemoteOllamaOptional:
-    'W trybie zdalnym Ollama na tym PC jest opcjonalna — destylacja idzie na serwerze master.',
+    'Search/MCP: serwer Brain (ma własne Ollama lub fastembed). Destylacja w Desktop nadal potrzebuje URL Ollama — domyślnie ten sam host :11434; lokalna instalacja nie jest wymagana, dopóki nie destylujesz.',
   onboardingEngineSkip: 'Pomiń — wybierz później w Connect',
   onboardingContinue: 'Dalej',
   onboardingSimpleBrainTitle: 'Uruchom lokalną wyszukiwarkę',
@@ -1206,6 +1222,11 @@ const PL_LABELS: UiLabels = {
     'Brak trafień. Indeks obejmuje tylko zdestylowane notatki — najpierw uruchom pipeline powyżej.',
   brainAdvancedDistillTitle: 'Zaawansowane · destylacja na tym hoście',
   brainAdvancedOllamaNeed: 'opcjonalne — wymaga lokalnej Ollamy',
+  brainOllamaDistillTitle: 'Ollama do destylacji',
+  brainOllamaDistillLead:
+    'Zdalny Brain obsługuje search/MCP. Tu ustawiasz URL Ollama tylko pod destylację — domyślnie ten sam host co Master :11434. Bez lokalnej instalacji, dopóki nie destylujesz.',
+  brainOllamaDistillOfflineHint:
+    'Brak Ollama pod tym URL — search nadal działa przez zdalny Brain. Przed destylacją wskaż Ollama na serwerze (:11434) albo lokalną.',
   brainEmbeddedProcessHint:
     'Uruchamia brain-core jako proces potomny — klienci MCP na tej maszynie (Claude Code, Cursor, Antigravity…) dostają search_library / save_conversation z 127.0.0.1 bez serwera. Destylacja odświeża indeks automatycznie.',
   vaultGateTitle: 'Pomnia Vault',
@@ -1664,6 +1685,10 @@ const PL_LABELS: UiLabels = {
   statusOllama: 'Ollama',
   statusOllamaOk: 'OK',
   statusOllamaFail: 'brak połączenia',
+  statusOllamaOptional: 'opcjonalne (zdalny Brain)',
+  statusBrainRemote: 'zdalny',
+  statusBrainRemoteOk: 'serwer OK',
+  statusBrainRemoteFail: 'serwer nieosiągalny',
   statusChecking: 'sprawdzam…',
   statusLastDistill: 'Ostatnia destylacja',
   statusNoDistill: 'jeszcze nie było',
@@ -1853,11 +1878,11 @@ const EN_LABELS: UiLabels = {
   onboardingBackupNow: 'Backup now',
   onboardingEngineTitle: 'How will Brain run?',
   onboardingEngineLead:
-    'Pick local embedded brain (built into Pomnia) or an optional remote Brain server. Ollama on this machine: embeddings (nomic-embed-text, ~0.3GB) and distill (qwen2.5:14b, ~9GB).',
+    'Local: embedded search + Ollama on this PC (embed + distill). Remote (e.g. Pomnia on Linux): search/MCP on the server — no local Ollama install required for search.',
   onboardingEngineLocal: 'Local embedded',
   onboardingEngineLocalHint: (url) => `One .exe, MCP on ${url} — no remote server, no token.`,
   onboardingEngineRemote: 'Remote master',
-  onboardingEngineRemoteHint: 'Your Pomnia server on the LAN — MCP + Bearer token.',
+  onboardingEngineRemoteHint: 'LAN Brain server (search/MCP). Local Ollama not needed for search.',
   onboardingEngineMasterUrl: 'Master MCP URL',
   onboardingEngineTestConn: 'Test connection',
   onboardingEngineRemoteOk: 'Server responding — brain-core',
@@ -1935,6 +1960,9 @@ const EN_LABELS: UiLabels = {
   snippetRulePath: 'rule path',
   healthVaultAction: 'Open or create a vault',
   healthOllamaMissing: 'Ollama unreachable — install and start it from ollama.com',
+  healthOllamaOptionalRemote: (url) =>
+    `Optional with remote Brain — search runs on the server. For distill, set Ollama URL (e.g. ${url}).`,
+  healthOllamaDistillHint: 'For distill: set Ollama URL to server :11434 (search needs no local install).',
   healthCoreAction: 'Start it in the Brain tab',
   healthMcpUnreachable: 'Brain MCP unreachable',
   vaultIntegrityOk: 'Vault integrity OK',
@@ -1974,7 +2002,7 @@ const EN_LABELS: UiLabels = {
   onboardingEngineInstall3: 'Come back and re-check.',
   onboardingEngineRecheck: 'Re-check',
   onboardingEngineRemoteOllamaOptional:
-    'Ollama on this PC is optional in remote mode — distillation runs on your master server.',
+    'Search/MCP: remote Brain (server has its own Ollama or fastembed). Distill in Desktop still needs an Ollama URL — default is the same host :11434; no local install until you distill.',
   onboardingEngineSkip: 'Skip — pick later in Connect tab',
   onboardingContinue: 'Continue',
   onboardingSimpleBrainTitle: 'Start local search',
@@ -2055,6 +2083,11 @@ const EN_LABELS: UiLabels = {
     "No matches. The index only covers distilled notes — run the pipeline above first if you haven't yet.",
   brainAdvancedDistillTitle: 'Advanced · distill on this host',
   brainAdvancedOllamaNeed: 'optional — needs local Ollama',
+  brainOllamaDistillTitle: 'Ollama for distill',
+  brainOllamaDistillLead:
+    'Remote Brain owns search/MCP. Set an Ollama URL here only for distill — default is the same Master host :11434. No local install until you distill.',
+  brainOllamaDistillOfflineHint:
+    'No Ollama at this URL — search still works via remote Brain. Before distill, point at server Ollama (:11434) or a local one.',
   brainEmbeddedProcessHint:
     'Runs brain-core as a child process — MCP clients on this machine (Claude Code, Cursor, Antigravity…) get search_library / save_conversation from 127.0.0.1 without any server. Distill runs refresh its index automatically.',
   vaultGateTitle: 'Pomnia Vault',
@@ -2270,6 +2303,10 @@ const EN_LABELS: UiLabels = {
   statusOllama: 'Ollama',
   statusOllamaOk: 'OK',
   statusOllamaFail: 'unreachable',
+  statusOllamaOptional: 'optional (remote Brain)',
+  statusBrainRemote: 'remote',
+  statusBrainRemoteOk: 'server OK',
+  statusBrainRemoteFail: 'server unreachable',
   statusChecking: 'checking…',
   statusLastDistill: 'Last distill',
   statusNoDistill: 'none yet',

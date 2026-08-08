@@ -1561,13 +1561,35 @@ function registerIpc(): void {
   ipcMain.handle('vault:health', async () => runVaultHealthCheck({ silentOk: true }))
   ipcMain.handle('doctor:run', async (_e, opts?: { distillModel?: string; ollamaUrl?: string }) => {
     const settings = getAppSettings()
+    const brainTarget = settings.brainTarget ?? 'embedded'
+    const remoteUrl = settings.brainMcpUrl?.trim()
+    const brainUrl =
+      brainTarget === 'remote' && remoteUrl
+        ? remoteUrl.replace(/\/+$/, '')
+        : 'http://127.0.0.1:7862'
+    // Remote search does not need local Ollama. If the user never set a URL,
+    // prefer the same host as Master MCP on :11434 so Distill can hit server GPU.
+    let ollamaUrl = opts?.ollamaUrl || settings.ollamaUrl
+    if (brainTarget === 'remote' && !ollamaUrl && remoteUrl) {
+      try {
+        const u = new URL(remoteUrl)
+        u.port = '11434'
+        u.pathname = ''
+        u.search = ''
+        u.hash = ''
+        ollamaUrl = u.toString().replace(/\/$/, '')
+      } catch {
+        ollamaUrl = remoteUrl.replace(/:\d+(\/.*)?$/, ':11434')
+      }
+    }
     return runDoctor({
       vaultPath: vaultPath ?? settings.lastIndexedVaultRoot,
       vaultOpen: !!vault,
       userDataDir: app.getPath('userData'),
-      ollamaUrl: opts?.ollamaUrl || settings.ollamaUrl,
+      ollamaUrl,
       distillModel: opts?.distillModel,
-      brainUrl: 'http://127.0.0.1:7862',
+      brainUrl,
+      brainTarget,
     })
   })
   ipcMain.handle('app:settings', () => getAppSettings())
