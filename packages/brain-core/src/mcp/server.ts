@@ -329,11 +329,16 @@ export async function createBrainServer(
             : `[brain-core] vault owner: ${describeOwner(me)} — writes enabled`,
         )
       } else {
+        // Prefer the marker; fall back to --vault-owner so a pinned replica
+        // without state/vault-writer.json still names who holds writes.
+        const heldBy = ownership.owner
+          ? describeOwner(ownership.owner)
+          : config.authoritativeVaultHint
         console.error(
           `[brain-core] READ-ONLY — save_conversation and checkpoint_session will refuse (` +
             (ownership.reason === 'read-only-flag'
-              ? `--read-only${ownership.owner ? `; vault held by ${describeOwner(ownership.owner)}` : ''}`
-              : `vault held by ${describeOwner(ownership.owner)}`) +
+              ? `--read-only${heldBy ? `; vault held by ${heldBy}` : ''}`
+              : `vault held by ${heldBy ?? 'unknown'}`) +
             ')',
         )
       }
@@ -480,7 +485,7 @@ export async function createBrainServer(
                 uptimeSec: health.uptimeSec,
                 ...(authed
                   ? {
-                      index: health.index,
+                      ...(health.index ? { index: health.index } : {}),
                       checks: [
                         { name: 'Database', ...health.checks.db },
                         { name: 'Index', ...health.checks.index },
@@ -829,6 +834,20 @@ export async function createBrainServer(
               : (ctx?.authoritativeVaultHint ?? null),
             readOnlyFlag: config.readOnly === true,
           }),
+          health: () =>
+            collectHealth({
+              db: ctx?.db ?? null,
+              embedder: ctx?.embedder ?? null,
+              vaultRoot: ctx?.vaultRoot ?? '',
+              dataDir: config.dataDir,
+              version: BRAIN_CORE_VERSION,
+              authRequired: gate.required,
+              writable: vaultOwnership?.writable ?? false,
+              vaultOwner: vaultOwnership?.owner
+                ? describeOwner(vaultOwnership.owner)
+                : (ctx?.authoritativeVaultHint ?? null),
+              startedAt,
+            }),
         }
       }
 
@@ -864,9 +883,14 @@ export async function createBrainServer(
         }
         if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' })
         if (vaultOwnership?.writable) {
+          const who = vaultOwnership.owner
+            ? describeOwner(vaultOwnership.owner)
+            : 'this instance'
           return json(409, {
             error: 'not_a_replica',
-            hint: 'This instance owns the vault; replication only writes to replicas.',
+            hint:
+              `Vault is writable here (held by ${who}). ` +
+              'Replication only writes to read-only replicas — push to a host with --read-only, not to the source of truth.',
           })
         }
         try {

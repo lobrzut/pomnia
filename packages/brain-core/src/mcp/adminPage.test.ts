@@ -40,10 +40,11 @@ describe('the panel script', () => {
     const script = inlineScript()
     // Every id the script reaches for must exist in the markup, and every
     // button the markup declares must be reachable from the script.
-    for (const id of ['login-form', 'logout', 'adduser', 'save-behaviour', 'save-engine', 'add', 'claim', 'refresh', 'dash-refresh', 'tiles']) {
+    for (const id of ['login-form', 'logout', 'adduser', 'save-behaviour', 'save-engine', 'probe-ollama', 'add', 'claim', 'refresh', 'dash-refresh', 'tiles', 'vault-banner']) {
       expect(page, `markup is missing #${id}`).toContain(`id="${id}"`)
       expect(script, `script never touches #${id}`).toContain(`'${id}'`)
     }
+    expect(script).toContain('/admin/health')
   })
 
   it('reaches every tab section the nav offers', () => {

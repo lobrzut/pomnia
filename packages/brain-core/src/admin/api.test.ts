@@ -51,6 +51,14 @@ beforeEach(async () => {
     claimVault: vi.fn(async () => ({ previous: 'Pomnia Desktop', owner: 'pomnia-server' })),
     startReindex: vi.fn(() => ({ started: true })),
     vaultState: () => ({ writable: !readOnlyFlag, owner: 'Pomnia Desktop', readOnlyFlag }),
+    health: vi.fn(async () => ({
+      ok: true,
+      status: 'ok',
+      index: { files: 10, chunks: 44 },
+      checks: { ollama: { state: 'ok' } },
+      writable: false,
+      vaultOwner: 'Pomnia Desktop',
+    })),
   }
 })
 afterEach(async () => {
@@ -150,6 +158,20 @@ describe('tokens', () => {
     const r = await call('DELETE', '/admin/tokens/only')
     expect(r.status).toBe(400)
     expect(await readTokens(tokensFile)).toHaveLength(1)
+  })
+})
+
+describe('health', () => {
+  it('returns the full report the panel Stan tab needs', async () => {
+    const r = await call('GET', '/admin/health')
+    expect(r.status).toBe(200)
+    expect(r.body).toMatchObject({
+      status: 'ok',
+      index: { files: 10, chunks: 44 },
+      vaultOwner: 'Pomnia Desktop',
+      writable: false,
+    })
+    expect(deps.health).toHaveBeenCalled()
   })
 })
 
@@ -288,5 +310,18 @@ describe('accounts are always admins', () => {
     })
     expect(r.status).toBe(201)
     expect((r.body as { role: string }).role).toBe('admin')
+  })
+})
+
+describe('health', () => {
+  it('returns the full report the panel needs (not the redacted probe)', async () => {
+    const r = await call('GET', '/admin/health')
+    expect(r.status).toBe(200)
+    expect(r.body).toMatchObject({
+      status: 'ok',
+      index: { files: 10, chunks: 44 },
+      vaultOwner: 'Pomnia Desktop',
+    })
+    expect(deps.health).toHaveBeenCalled()
   })
 })

@@ -53,6 +53,12 @@ export interface AdminDeps {
   claimVault(): Promise<{ previous: string | null; owner: string }>
   startReindex(): { started: boolean; reason?: string }
   vaultState(): { writable: boolean; owner: string | null; readOnlyFlag: boolean }
+  /**
+   * Full health report for the panel. `/healthz` redacts counts and reasons
+   * without a bearer token; the session cookie is not one, so the Stan tab
+   * must not curl the public probe.
+   */
+  health(): Promise<unknown>
 }
 
 export interface RuntimeSettings {
@@ -252,6 +258,11 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
     if (!r.ok) return j(400, { error: 'revoke_failed', detail: r.detail })
     audit(req.actor, `revoked token "${name}"`)
     return j(200, { ok: true, name })
+  }
+
+  // ── health (full — panel session, not the public probe) ─────────────────
+  if (path === '/admin/health' && method === 'GET') {
+    return j(200, await deps.health())
   }
 
   // ── vault ───────────────────────────────────────────────────────────────

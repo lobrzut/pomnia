@@ -46,7 +46,7 @@ describe('read-only replica', () => {
   it('refusal says nothing was written and names where to save', () => {
     const msg = readOnlyRefusal('desktop C:\\Vault')
     expect(msg).toContain('Nothing was written')
-    expect(msg).toContain('desktop C:\\Vault')
+    expect(msg).toContain('held by desktop C:\\Vault')
     expect(msg).toMatch(/NOT saved/)
   })
 

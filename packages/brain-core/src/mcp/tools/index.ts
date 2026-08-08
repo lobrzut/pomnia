@@ -88,7 +88,7 @@ export function readOnlyRefusal(hint?: string): string {
   return (
     'This Pomnia instance is a READ-ONLY replica — it serves a copy of the vault and does not own it. ' +
     'Nothing was written. Saving here would be lost at the next sync from the authoritative vault' +
-    (hint ? `: ${hint}` : '') +
+    (hint ? ` (held by ${hint})` : '') +
     '. Tell the user their note was NOT saved and to run this on the machine holding the vault.'
   )
 }

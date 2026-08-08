@@ -29,6 +29,17 @@ still serves skills, profile and note reads; only semantic search stops, and
 `/healthz` reports `degraded` instead of pretending. Refusing to start would
 turn a partial outage into a full one.
 
+**Embeddings honesty:** this Node daemon talks to Ollama only
+(`POST /api/embed`). The zero-Ollama ONNX/fastembed path lives in the older
+Python Brain hub Docker image (`BRAIN_EMBED_BACKEND=fastembed`) — see
+`docs/BRAIN-SERVER-EMBEDDED-MODEL.md`. The Dockerfile in this folder does
+**not** bake an ONNX model; do not expect `docker run` of brain-core to search
+without a reachable Ollama (or a future Node ONNX backend).
+
+Public `/healthz` without a Bearer token redacts index counts (`index: null`)
+and check *reasons*. The overall `status` stays public. Full numbers: Bearer
+on `/healthz`, or the panel at `/admin` (Stan / Silnik).
+
 ## Endpoints
 
 | Path | Auth | What it is |
@@ -158,7 +169,16 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:7865/healthz | jq
 ```
 
 Authenticated health names the reason for every failing check — which path,
-which model, which URL. Read that first.
+which model, which URL. Read that first. Without a Bearer token, `/healthz`
+still returns the verdict (`ok` / `degraded` / `down`) but sets `index` to
+`null` and strips check reasons — zeroes used to look like an empty index
+while `checks.index` said `ok`. Panel **Stan** uses `/admin/health` (session)
+for the full numbers.
+
+**First run honesty:** this host is usually a read-only replica (`--read-only`
+in the unit). Desktop owns the vault (SoT); agents that `save_conversation`
+against `:7865` will be refused with *held by …*. Push from Desktop Connect
+to refresh the copy; do not `--claim-vault` unless you mean to steal ownership.
 
 A crash loop stops after five restarts in a minute and leaves the unit
 `failed`, deliberately: a stopped service someone notices beats a restart

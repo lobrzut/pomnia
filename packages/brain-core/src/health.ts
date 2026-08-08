@@ -95,8 +95,13 @@ export interface HealthReport {
     disk: Check
     ollama: Check
   }
-  /** Chunk/file counts — cheap, and the number people actually ask for. */
-  index: { files: number; chunks: number }
+  /**
+   * Chunk/file counts — cheap, and the number people actually ask for.
+   * `null` on the public (redacted) response: zeroes used to look like an
+   * empty index while `checks.index` said `ok`, which is how "0/0 mystery"
+   * was born. Counts require a token (or `/admin/health`).
+   */
+  index: { files: number; chunks: number } | null
 }
 
 /**
@@ -108,12 +113,15 @@ export interface HealthReport {
  * model, and the counts say how much material is in there. Those go to whoever
  * holds a token, which is the same person who could ask the server anything
  * else anyway.
+ *
+ * Index counts become `null`, never `{files:0,chunks:0}` — a redacted empty
+ * object reads as "the index is empty" while the check state still says ok.
  */
 export function redactHealth(h: HealthReport): HealthReport {
   const bare = (c: Check): Check => ({ state: c.state })
   return {
     ...h,
-    index: { files: 0, chunks: 0 },
+    index: null,
     checks: {
       db: bare(h.checks.db),
       index: bare(h.checks.index),
