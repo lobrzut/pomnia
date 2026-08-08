@@ -898,7 +898,8 @@ export default function Brain() {
           })}
         </div>
 
-        {/* Shared embedding model — one for every profile, changing it = full reindex */}
+        {/* Shared embedding model — embedded search only; remote Brain embeds on the server. */}
+        {!isRemoteTarget && (
         <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
           <span className="text-[11px] font-medium text-ink-dim">{labels.brainEmbedModelShared}</span>
           <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-cyan">{PROFILE_EMBED_MODEL}</code>
@@ -930,6 +931,7 @@ export default function Brain() {
             same for every profile — switching it would force a full reindex
           </span>
         </div>
+        )}
       </GlassCard>
       )}
 
