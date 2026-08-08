@@ -42,7 +42,8 @@ export interface StatusPageInfo {
   uptimeSec: number
   /** Per-check detail. Only rendered for a request that carried a token. */
   checks?: Array<{ name: string; state: PageState; detail?: string }>
-  index?: { files: number; chunks: number }
+  /** Absent or null when redacted — never fake `{files:0,chunks:0}`. */
+  index?: { files: number; chunks: number } | null
 }
 
 const esc = (s: string): string =>

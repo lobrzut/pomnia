@@ -136,8 +136,17 @@ async function post(
   }
   if (!r.ok) {
     const p = parsed as { error?: string; hint?: string; detail?: string }
+    const err = p?.error ?? ''
+    // Surface ownership refusals in plain language — "409" alone looks like a
+    // network glitch, and "not_a_replica" is jargon for "you pushed at the SoT".
+    if (err === 'not_a_replica') {
+      throw new Error(
+        p?.hint ??
+          'Target owns the vault (writable) — push only to a read-only replica, not the source of truth.',
+      )
+    }
     throw new Error(
-      `${path} → ${r.status} ${p?.error ?? ''}${p?.hint ? ` — ${p.hint}` : ''}${p?.detail ? ` — ${p.detail}` : ''}`.trim(),
+      `${path} → ${r.status} ${err}${p?.hint ? ` — ${p.hint}` : ''}${p?.detail ? ` — ${p.detail}` : ''}`.trim(),
     )
   }
   return parsed

@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { collectHealth, worstOf } from './health.js'
+import { collectHealth, redactHealth, worstOf } from './health.js'
 import type { EmbedClient } from './rag/embed.js'
 
 let vaultRoot: string
@@ -112,6 +112,28 @@ describe('collectHealth', () => {
     const h = await collectHealth({ ...base, db: db({ files: 1, chunks: 1 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot })
     expect(h.writable).toBe(false)
     expect(h.vaultOwner).toBe('Pomnia Desktop')
+  })
+})
+
+describe('redactHealth', () => {
+  /**
+   * Public /healthz used to zero the counts. With checks.index=ok that read as
+   * "healthy empty brain" — the 0/0 mystery on every unauthenticated curl.
+   */
+  it('nulls index counts instead of pretending the vault is empty', async () => {
+    const h = await collectHealth({
+      ...base,
+      db: db({ files: 10, chunks: 44 }),
+      embedder: okEmbedder,
+      vaultRoot,
+      dataDir: vaultRoot,
+    })
+    const r = redactHealth(h)
+    expect(r.index).toBeNull()
+    expect(r.checks.index.state).toBe('ok')
+    expect(r.checks.index.detail).toBeUndefined()
+    expect(r.status).toBe(h.status)
+    expect(r.vaultOwner).toBe('Pomnia Desktop')
   })
 })
 

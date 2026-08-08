@@ -103,6 +103,15 @@ export function renderAdminPage(origin: string): string {
   .msg.ok{background:color-mix(in srgb,var(--mint) 12%,transparent);color:var(--mint)}
   .msg.err{background:color-mix(in srgb,var(--rose) 12%,transparent);color:var(--rose)}
   .msg.warn{background:color-mix(in srgb,var(--amber) 12%,transparent);color:var(--amber)}
+  .banner{margin-bottom:1rem;padding:.85rem 1rem;border-radius:14px;border:1px solid var(--border);
+    font-size:.85rem;display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center}
+  .banner.ro{background:color-mix(in srgb,var(--amber) 10%,transparent);border-color:color-mix(in srgb,var(--amber) 35%,var(--border))}
+  .banner.rw{background:color-mix(in srgb,var(--mint) 10%,transparent);border-color:color-mix(in srgb,var(--mint) 35%,var(--border))}
+  .banner .badge{font-weight:800;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;
+    padding:.15rem .55rem;border-radius:999px}
+  .banner.ro .badge{background:color-mix(in srgb,var(--amber) 22%,transparent);color:var(--amber)}
+  .banner.rw .badge{background:color-mix(in srgb,var(--mint) 22%,transparent);color:var(--mint)}
+  .banner .detail{color:var(--ink-dim);flex:1 1 12rem}
   .secret{font-family:var(--mono);font-size:.8rem;word-break:break-all;
     background:rgba(0,0,0,.3);padding:.6rem .8rem;border-radius:10px;margin-top:.5rem}
   @media (prefers-color-scheme:light){.secret{background:rgba(0,0,0,.06)}}
@@ -149,6 +158,10 @@ export function renderAdminPage(origin: string): string {
 
   <!-- ── panel ──────────────────────────────────────────────────────────── -->
   <div id="panel" class="hidden">
+    <div id="vault-banner" class="banner ro" role="status">
+      <span class="badge" id="vault-badge">…</span>
+      <span class="detail" id="vault-banner-detail">ładowanie stanu vaultu…</span>
+    </div>
     <nav>
       <button data-tab="dash" aria-current="true">Pulpit</button>
       <button data-tab="status">Stan</button>
@@ -191,14 +204,17 @@ export function renderAdminPage(origin: string): string {
       <p class="lead">
         Gdzie stoi Ollama i jakim modelem liczone są embeddingi. Adres jest
         walidowany — serwer odmówi pobierania z adresów link-local i metadanych
-        chmury.
+        chmury. brain-core Node wymaga Ollamy; obraz Docker z ONNX/fastembed
+        to osobna ścieżka Python hub (edge), nie ten daemon.
       </p>
+      <div id="ollama-status" class="msg" style="margin:0 0 1rem"></div>
       <label for="ollama">Adres Ollamy</label>
       <input id="ollama" type="url" spellcheck="false" placeholder="http://127.0.0.1:11434">
       <label for="model">Model embeddingów</label>
       <input id="model" spellcheck="false" placeholder="nomic-embed-text">
       <div class="row">
         <button id="save-engine">Zapisz</button>
+        <button id="probe-ollama" class="ghost">Sprawdź Ollamę</button>
         <button id="reindex" class="ghost">Przebuduj indeks</button>
       </div>
       <div id="engine-msg"></div>
@@ -494,12 +510,11 @@ export function renderAdminPage(origin: string): string {
     tb.innerHTML = ''
     let h
     try {
-      // /healthz answers 503 precisely when something is wrong — which is the
-      // case whose reasons you most want on screen. Treating it as a failed
-      // request blanked the tab exactly when it mattered.
-      const r = await fetch('/healthz', { credentials: 'same-origin', cache: 'no-store' })
-      h = await r.json()
-      if (!h || !h.checks) throw new Error('HTTP ' + r.status)
+      // Session cookie ≠ Bearer. Public /healthz redacts counts and reasons,
+      // so the Stan tab must use the authed admin route — otherwise it shows
+      // the same misleading empty index the anonymous probe used to.
+      h = await api('GET', '/admin/health')
+      if (!h || !h.checks) throw new Error('brak checks w odpowiedzi')
     } catch (e) {
       msg($('status-msg'), 'err', 'Nie udało się odczytać stanu: ' + e.message)
       return
@@ -513,11 +528,43 @@ export function renderAdminPage(origin: string): string {
     }
     add('Ogólnie', STATE_PL[h.status] || h.status)
     add('Wersja', 'brain-core ' + h.version)
-    add('Indeks', h.index.files.toLocaleString('pl') + ' plików · ' + h.index.chunks.toLocaleString('pl') + ' fragmentów')
+    add('Zapis', h.writable ? 'ten serwer jest właścicielem' : 'tylko odczyt (replika)')
+    add('Właściciel vaultu', h.vaultOwner || '—')
+    if (h.index && typeof h.index.files === 'number') {
+      add('Indeks', h.index.files.toLocaleString('pl') + ' plików · ' + h.index.chunks.toLocaleString('pl') + ' fragmentów')
+    } else {
+      add('Indeks', 'liczniki niedostępne')
+    }
     for (const key of ['db', 'index', 'vault', 'disk', 'ollama']) {
       const c = h.checks[key]
       add(NAMES[key], STATE_PL[c.state] + (c.detail ? ' — ' + c.detail : ''))
     }
+    paintOllamaStatus(h)
+  }
+
+  function paintOllamaStatus(h) {
+    const box = $('ollama-status')
+    if (!box || !h?.checks?.ollama) return
+    const c = h.checks.ollama
+    const kind = c.state === 'ok' ? 'ok' : c.state === 'degraded' ? 'warn' : 'err'
+    const label = c.state === 'ok'
+      ? 'Ollama OK — embeddingi dostępne'
+      : (STATE_PL[c.state] || c.state) + (c.detail ? ' — ' + c.detail : '')
+    msg(box, kind, label)
+  }
+
+  async function probeOllama() {
+    const box = $('engine-msg')
+    msg(box, 'ok', 'sprawdzam…')
+    try {
+      const h = await api('GET', '/admin/health')
+      paintOllamaStatus(h)
+      const c = h.checks?.ollama
+      msg(box, c?.state === 'ok' ? 'ok' : 'warn',
+        c?.state === 'ok'
+          ? 'Ollama odpowiada; model embed gotowy.'
+          : (c?.detail || 'Ollama niedostępna — search semantyczny będzie pusty.'))
+    } catch (e) { msg(box, 'err', e.message) }
   }
 
   // ── engine ──────────────────────────────────────────────────────────────
@@ -676,10 +723,32 @@ export function renderAdminPage(origin: string): string {
   }
 
   // ── vault ───────────────────────────────────────────────────────────────
+  function paintVaultBanner(v) {
+    const ban = $('vault-banner')
+    const badge = $('vault-badge')
+    const detail = $('vault-banner-detail')
+    if (!ban || !badge || !detail) return
+    if (v.writable) {
+      ban.className = 'banner rw'
+      badge.textContent = 'Zapis'
+      detail.textContent = 'Ten serwer jest właścicielem vaultu' +
+        (v.owner ? ' (' + v.owner + ').' : '.')
+    } else {
+      ban.className = 'banner ro'
+      badge.textContent = 'Tylko odczyt'
+      const pin = v.readOnlyFlag ? ' · przypięty --read-only w systemd' : ''
+      detail.textContent = (v.owner
+        ? 'Replika — właściciel: ' + v.owner
+        : 'Replika — właściciel nieznany') + pin +
+        '. Push z Desktop (Connect) aktualizuje kopię; ten host nie zapisuje notatek agentów.'
+    }
+  }
+
   async function loadVault() {
     const tb = $('vault-info')
     tb.innerHTML = ''
     const v = await api('GET', '/admin/vault')
+    paintVaultBanner(v)
     const add = (k, val) => {
       const tr = document.createElement('tr')
       const a = document.createElement('td'); a.textContent = k; a.style.color = 'var(--ink-faint)'
@@ -722,6 +791,7 @@ export function renderAdminPage(origin: string): string {
   $('refresh').onclick = loadStatus
   $('dash-refresh').onclick = loadDash
   $('save-engine').onclick = saveEngine
+  $('probe-ollama').onclick = probeOllama
   $('reindex').onclick = reindex
   $('add').onclick = addToken
   $('claim').onclick = claim
