@@ -478,6 +478,48 @@ export default function Brain() {
         </button>
       )}
 
+      {/* Simple mode hides VRAM/pull behind Advanced — surface the embed gate here. */}
+      {simpleMode &&
+        !advancedOpen &&
+        status?.reachable &&
+        !installed(PROFILE_EMBED_MODEL) && (
+          <GlassCard className="mb-5 border-amber/25 bg-amber/8 p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-ink">{labels.onboardingEngineModelsNeeded}</div>
+                <p className="mt-1 text-[11px] leading-relaxed text-ink-dim">
+                  {labels.onboardingEngineEmbedMissing(`ollama pull ${PROFILE_EMBED_MODEL}`)}
+                </p>
+              </div>
+              {pull?.model === PROFILE_EMBED_MODEL ? (
+                <div className="flex min-w-40 flex-1 items-center gap-2">
+                  <span className="flex-1">
+                    <ProgressBar
+                      value={pull.total ? Math.round(((pull.completed ?? 0) / pull.total) * 100) : 8}
+                    />
+                  </span>
+                  <button
+                    type="button"
+                    className="no-drag shrink-0 text-[11px] font-semibold text-rose hover:underline"
+                    onClick={() => void api.ollamaPullCancel()}
+                  >
+                    {labels.onboardingEngineCancelPull}
+                  </button>
+                </div>
+              ) : (
+                <Button
+                  variant="soft"
+                  onClick={() => void pullModel(PROFILE_EMBED_MODEL)}
+                  disabled={pull !== null}
+                  className="!px-2.5 !py-1.5 !text-[11px]"
+                >
+                  <Download className="h-3.5 w-3.5" /> {labels.onboardingEnginePullBtn}
+                </Button>
+              )}
+            </div>
+          </GlassCard>
+        )}
+
       {/* Brain state — live chats vs distill ledger, the "what's left to do" panel */}
       <GlassCard className="mb-5 p-5">
         <ActivityBanner className="mb-3 !rounded-xl !border-amber/30 !bg-amber/8" />
