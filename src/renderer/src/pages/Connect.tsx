@@ -78,8 +78,11 @@ export default function Connect() {
   const simpleMode = useStore((s) => s.simpleMode)
   const agentBrainMode = useStore((s) => s.agentBrainMode)
   const setAgentBrainMode = useStore((s) => s.setAgentBrainMode)
+  const connectLegacyHub = useStore((s) => s.connectLegacyHub)
+  const setConnectLegacyHub = useStore((s) => s.setConnectLegacyHub)
   const labels = uiLabels()
   const effectiveTarget: BrainTarget = simpleMode ? 'embedded' : brainTarget
+  const remoteHub = effectiveTarget === 'remote' && connectLegacyHub ? 'legacy-hub' : 'brain-core'
   const brainUrl = effectiveTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
   const [loading, setLoading] = useState(true)
   const [clients, setClients] = useState<ClientStatus[]>([])
@@ -118,7 +121,7 @@ export default function Connect() {
         setSnippetLoading(true)
         try {
           setSnippet(
-            await api.connectSnippet(picked, brainUrl, r.token, effectiveTarget, agentBrainMode)
+            await api.connectSnippet(picked, brainUrl, r.token, effectiveTarget, agentBrainMode, remoteHub)
           )
         } catch {
           /* ignore — user can re-pick */
@@ -231,7 +234,7 @@ export default function Connect() {
     setSnippet(null)
     setSnippetLoading(true)
     try {
-      setSnippet(await api.connectSnippet(id, brainUrl, effectiveTarget === 'remote' ? connectToken || undefined : undefined, effectiveTarget, agentBrainMode))
+      setSnippet(await api.connectSnippet(id, brainUrl, effectiveTarget === 'remote' ? connectToken || undefined : undefined, effectiveTarget, agentBrainMode, remoteHub))
     } catch (e) {
       toast({ kind: 'error', title: labels.snippetBuildFailed, detail: (e as Error).message })
     } finally {
@@ -248,7 +251,7 @@ export default function Connect() {
   useEffect(() => {
     if (picked) void pick(picked)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentBrainMode])
+  }, [agentBrainMode, connectLegacyHub])
 
   async function copy(text: string, key: string, label: string) {
     // A rejected clipboard write used to leave no trace at all — no tick, no
@@ -532,6 +535,19 @@ export default function Connect() {
                 : labels.urlChangeHint}
           </span>
         </div>
+        {!simpleMode && brainTarget === 'remote' && (
+          <div className="mt-4 flex items-start justify-between gap-4 border-t border-white/8 pt-4">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-ink">{labels.connectLegacyHubToggle}</div>
+              <p className="mt-1 text-xs leading-relaxed text-ink-dim">{labels.connectLegacyHubHint}</p>
+            </div>
+            <Toggle
+              checked={connectLegacyHub}
+              onChange={setConnectLegacyHub}
+              aria-label={labels.connectLegacyHubToggle}
+            />
+          </div>
+        )}
       </GlassCard>
 
       <GlassCard className="mb-5 p-5">
@@ -811,9 +827,11 @@ export default function Connect() {
                 <p className="text-[11px] leading-relaxed text-ink-faint">
                   {brainTarget === 'embedded'
                     ? labels.snippetLocalModeHint
-                    : connectToken
-                      ? labels.snippetTokenInHeaders
-                      : labels.connectTokenRequired}
+                    : connectLegacyHub
+                      ? labels.snippetLegacyHubHint
+                      : connectToken
+                        ? labels.snippetRemoteBrainCoreHint
+                        : labels.connectTokenRequired}
                 </p>
               </div>
             </>

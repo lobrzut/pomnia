@@ -331,6 +331,13 @@ export interface UiLabels {
   skillsNoneOnServer: string
   snippetLocalModeHint: string
   snippetTokenInHeaders: string
+  /** Remote brain-core default: one pomnia → /mcp + Bearer. */
+  snippetRemoteBrainCoreHint: string
+  /** Legacy Python hub 3×SSE snippet note. */
+  snippetLegacyHubHint: string
+  /** Connect Remote advanced toggle label. */
+  connectLegacyHubToggle: string
+  connectLegacyHubHint: string
   onboardingEngineLooking: string
   onboardingEngineRunning: string
   onboardingEngineMoreModels: (n: number) => string
@@ -1120,6 +1127,13 @@ const PL_LABELS: UiLabels = {
   skillsNoneOnServer: 'Serwer Brain nie ma jeszcze skilli.',
   snippetLocalModeHint: 'Tryb lokalny: jeden serwer pomnia na /mcp — bez Bearer tokena.',
   snippetTokenInHeaders: 'Token jest w headers — trzymaj plik prywatny (chmod 600).',
+  snippetRemoteBrainCoreHint:
+    'Remote brain-core: jeden serwer `pomnia` → /mcp + Bearer — nie stare 3×SSE.',
+  snippetLegacyHubHint:
+    'Legacy Python hub: trzy serwery SSE (pomnia + vault + library). Token w headers — trzymaj plik prywatny.',
+  connectLegacyHubToggle: 'Legacy Python hub (3× SSE)',
+  connectLegacyHubHint:
+    'Zaawansowane: stary hub z pomnia + pomnia-vault + pomnia-library na /sse. Domyślnie Connect emituje brain-core (jeden /mcp).',
   onboardingEngineLooking: 'Szukam Ollama na tym komputerze…',
   onboardingEngineRunning: 'Ollama działa',
   onboardingEngineMoreModels: (n) => `+${n} więcej`,
@@ -1322,17 +1336,17 @@ const PL_LABELS: UiLabels = {
   connectPageLead:
     'Skopiuj konfigurację MCP i wklej u klienta (Cursor, Claude, Antigravity…) — Pomnia nigdy nie dotyka Twoich plików.',
   connectChecklistTitle: 'Pierwsze podłączenie (4 kroki)',
-  connectStepUrl: 'URL Brain MCP (:7862)',
-  connectStepToken: 'Token Bearer z dashboardu (:7860)',
-  connectStepCopy: 'Kopiuj pełny mcp.json (3 serwery)',
+  connectStepUrl: 'URL Brain MCP (brain-core :7865)',
+  connectStepToken: 'Token Bearer (wymagany dla remote)',
+  connectStepCopy: 'Kopiuj mcp.json (jeden pomnia → /mcp)',
   connectStepReload: 'Przeładuj klienta MCP (np. Reload Window)',
   connectCopyForClient: (name) => `Kopiuj mcp.json dla ${name}`,
   connectTokenPlaceholder: 'Bearer token (wymagany dla remote)',
   connectTokenRequired: 'Bez tokena remote MCP zwykle nie zadziała — wklej lub utwórz poniżej.',
   connectOpenDashboard: 'Otwórz dashboard tokenów',
-  connectPartialTitle: 'Niepełny mcp.json — brak vault/library',
+  connectPartialTitle: 'Niepełny mcp.json',
   connectPartialDetail:
-    'Wykryto tylko część serwerów Pomnia. Remote wymaga pomnia + pomnia-vault + pomnia-library.',
+    'brain-core: wystarczy `pomnia` → /mcp. Legacy hub: pomnia + pomnia-vault + pomnia-library. Skopiuj świeży snippet poniżej.',
   connectPartialFix: 'Skopiuj pełny config poniżej i nadpisz / zmerguj mcp.json',
   connectMacNoAppHint:
     'Bez aplikacji Desktop: docs/CURSOR-MCP.md — ten sam pełny JSON MCP (przykład Cursor; kształt dla innych klientów w Connect).',
@@ -1981,6 +1995,13 @@ const EN_LABELS: UiLabels = {
   skillsNoneOnServer: 'The Brain server has no skills yet.',
   snippetLocalModeHint: 'Local mode: one pomnia server on /mcp — no bearer token.',
   snippetTokenInHeaders: 'The token sits in headers — keep this file private (chmod 600).',
+  snippetRemoteBrainCoreHint:
+    'Remote brain-core: one `pomnia` server → /mcp + Bearer — not the old 3×SSE hub.',
+  snippetLegacyHubHint:
+    'Legacy Python hub: three SSE servers (pomnia + vault + library). Token in headers — keep the file private.',
+  connectLegacyHubToggle: 'Legacy Python hub (3× SSE)',
+  connectLegacyHubHint:
+    'Advanced: old hub with pomnia + pomnia-vault + pomnia-library on /sse. By default Connect emits brain-core (single /mcp).',
   onboardingEngineLooking: 'Looking for Ollama on this machine…',
   onboardingEngineRunning: 'Ollama is running',
   onboardingEngineMoreModels: (n) => `+${n} more`,
@@ -2494,16 +2515,16 @@ const EN_LABELS: UiLabels = {
 
   // ── Connect: first-run checklist ──────────────────────────────────────────
   connectChecklistTitle: 'First connection (4 steps)',
-  connectStepUrl: 'Brain MCP URL (:7862)',
-  connectStepToken: 'Bearer token from the dashboard (:7860)',
-  connectStepCopy: 'Copy the full mcp.json (3 servers)',
+  connectStepUrl: 'Brain MCP URL (brain-core :7865)',
+  connectStepToken: 'Bearer token (required for remote)',
+  connectStepCopy: 'Copy mcp.json (one pomnia → /mcp)',
   connectCopyForClient: (name) => `Copy mcp.json for ${name}`,
   connectTokenPlaceholder: 'Bearer token (required for remote)',
   connectTokenRequired: 'Remote MCP usually will not work without a token — paste or create one below.',
   connectOpenDashboard: 'Open the token dashboard',
-  connectPartialTitle: 'Incomplete mcp.json — vault/library missing',
+  connectPartialTitle: 'Incomplete mcp.json',
   connectPartialDetail:
-    'Only some Pomnia servers were found. Remote needs pomnia + pomnia-vault + pomnia-library.',
+    'brain-core: `pomnia` → /mcp is enough. Legacy hub: pomnia + pomnia-vault + pomnia-library. Copy a fresh snippet below.',
   connectPartialFix: 'Copy the full config below and overwrite or merge mcp.json',
   embeddedBrainNotRunning: 'The local search engine is not running. Open the tab',
   embeddedBrainNotRunningLink: 'Brain',

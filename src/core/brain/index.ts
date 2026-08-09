@@ -61,7 +61,16 @@ export {
   REMOTE_BRAIN_DEFAULT_URL,
   REMOTE_BRAIN_URL_PLACEHOLDER,
 } from './snippet.js'
-export type { ClientId, ClientSpec, Snippet, SnippetBrief, BrainTarget, BuildSnippetOptions, BrainBriefOptions } from './snippet.js'
+export type {
+  ClientId,
+  ClientSpec,
+  Snippet,
+  SnippetBrief,
+  BrainTarget,
+  RemoteHubKind,
+  BuildSnippetOptions,
+  BrainBriefOptions,
+} from './snippet.js'
 export { checkClient, checkAllClients, pingBrain, probeMcpUrl, fetchMcpActivity } from './status.js'
 export { identifyEngine } from './engine.js'
 export type { BrainEngine, EngineInfo } from './engine.js'

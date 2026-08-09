@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { buildSnippet, MCP_POMNIA_KEY, MCP_POMNIA_LIBRARY_KEY, MCP_POMNIA_VAULT_KEY } from './snippet.js'
 
 describe('brain/snippet — Cursor remote mcp.json', () => {
-  it('emits all three Pomnia servers with Bearer headers', () => {
+  it('default remote (brain-core) emits single pomnia → /mcp with Bearer', () => {
     const s = buildSnippet(
       'cursor',
-      'http://127.0.0.1:7862',
+      'http://192.168.1.201:7865',
       'darwin',
       '/Users/Alice',
       'btk_test_token',
-      'remote'
+      'remote',
     )
     expect(s.filePath).toBe('/Users/Alice/.cursor/mcp.json')
     expect(s.mcpKey).toBe('mcpServers')
@@ -18,22 +18,47 @@ describe('brain/snippet — Cursor remote mcp.json', () => {
       mcpServers: Record<string, { url: string; headers?: { Authorization: string } }>
     }
     const servers = full.mcpServers
-    expect(Object.keys(servers).sort()).toEqual([MCP_POMNIA_KEY, MCP_POMNIA_LIBRARY_KEY, MCP_POMNIA_VAULT_KEY].sort())
+    expect(Object.keys(servers)).toEqual([MCP_POMNIA_KEY])
+    expect(servers[MCP_POMNIA_KEY].url).toBe('http://192.168.1.201:7865/mcp')
+    expect(servers[MCP_POMNIA_KEY].headers?.Authorization).toBe('Bearer btk_test_token')
+    expect(servers[MCP_POMNIA_VAULT_KEY]).toBeUndefined()
+    expect(servers[MCP_POMNIA_LIBRARY_KEY]).toBeUndefined()
+    expect(s.instructions).toContain('brain-core')
+    expect(s.instructions).not.toContain('three SSE')
+  })
+
+  it('mergeJson is the single-server map for brain-core remote', () => {
+    const s = buildSnippet('cursor', 'https://brain.example:7865', 'win32', 'C:\\Users\\Alice', 'tok', 'remote')
+    const merge = JSON.parse(s.mergeJson) as Record<string, unknown>
+    expect(merge[MCP_POMNIA_KEY]).toBeTruthy()
+    expect(merge[MCP_POMNIA_VAULT_KEY]).toBeUndefined()
+    expect(Object.keys(merge)).toHaveLength(1)
+  })
+
+  it('legacy-hub remote still emits three SSE servers with Bearer', () => {
+    const s = buildSnippet(
+      'cursor',
+      'http://127.0.0.1:7862',
+      'darwin',
+      '/Users/Alice',
+      'btk_test_token',
+      'remote',
+      { remoteHub: 'legacy-hub' },
+    )
+    const full = JSON.parse(s.fullFileJson) as {
+      mcpServers: Record<string, { url: string; headers?: { Authorization: string } }>
+    }
+    const servers = full.mcpServers
+    expect(Object.keys(servers).sort()).toEqual(
+      [MCP_POMNIA_KEY, MCP_POMNIA_LIBRARY_KEY, MCP_POMNIA_VAULT_KEY].sort(),
+    )
     expect(servers[MCP_POMNIA_KEY].url).toBe('http://127.0.0.1:7862/sse')
     expect(servers[MCP_POMNIA_VAULT_KEY].url).toBe('http://127.0.0.1:7862/servers/brain-vault/sse')
     expect(servers[MCP_POMNIA_LIBRARY_KEY].url).toBe('http://127.0.0.1:7862/servers/brain-library/sse')
     for (const key of [MCP_POMNIA_KEY, MCP_POMNIA_VAULT_KEY, MCP_POMNIA_LIBRARY_KEY] as const) {
       expect(servers[key].headers?.Authorization).toBe('Bearer btk_test_token')
     }
-  })
-
-  it('mergeJson is the three-server map (not a single-server stub)', () => {
-    const s = buildSnippet('cursor', 'https://brain.example:7862', 'win32', 'C:\\Users\\Alice', 'tok', 'remote')
-    const merge = JSON.parse(s.mergeJson) as Record<string, unknown>
-    expect(merge[MCP_POMNIA_KEY]).toBeTruthy()
-    expect(merge[MCP_POMNIA_VAULT_KEY]).toBeTruthy()
-    expect(merge[MCP_POMNIA_LIBRARY_KEY]).toBeTruthy()
-    expect(Object.keys(merge)).toHaveLength(3)
+    expect(s.instructions).toContain('Legacy Python hub')
   })
 
   it('embedded Cursor uses single /mcp pomnia without token', () => {
@@ -135,14 +160,14 @@ describe('brain/snippet — Cursor remote mcp.json', () => {
 })
 
 describe('brain/snippet — Antigravity remote mcp_config.json', () => {
-  it('uses serverUrl + streamable-http (not Cursor url shape)', () => {
+  it('default remote uses single streamable-http /mcp (brain-core)', () => {
     const s = buildSnippet(
       'antigravity',
-      'http://127.0.0.1:7862',
+      'http://192.168.1.201:7865',
       'win32',
       'C:\\Users\\Alice',
       'btk_test_token',
-      'remote'
+      'remote',
     )
     expect(s.client).toBe('antigravity')
     expect(s.label).toBe('Antigravity (Google IDE)')
@@ -154,9 +179,10 @@ describe('brain/snippet — Antigravity remote mcp_config.json', () => {
         { type?: string; serverUrl?: string; url?: string; headers?: { Authorization: string } }
       >
     }
+    expect(Object.keys(full.mcpServers)).toEqual([MCP_POMNIA_KEY])
     const rag = full.mcpServers[MCP_POMNIA_KEY]
     expect(rag.type).toBe('streamable-http')
-    expect(rag.serverUrl).toBe('http://127.0.0.1:7862/mcp')
+    expect(rag.serverUrl).toBe('http://192.168.1.201:7865/mcp')
     expect(rag.url).toBeUndefined()
     expect(rag.headers?.Authorization).toBe('Bearer btk_test_token')
   })

@@ -4,9 +4,9 @@
  * Pomnia MCP "is it wired?" diagnostic.
  *
  * Walks each known MCP client (from snippet.ts CLIENTS), reads its config
- * file if present, and reports whether `pomnia` (+ vault/library for remote)
- * are configured and where they point. Accepts legacy `brain-rag` keys.
- * No writes, no auto-fix.
+ * file if present, and reports whether `pomnia` is configured (brain-core
+ * single `/mcp`) or the legacy trio (`pomnia` + vault + library). Accepts
+ * legacy `brain-rag` keys. No writes, no auto-fix.
  *
  * Companion to snippet.ts: snippet generates the config to paste, status
  * confirms the paste landed.
@@ -241,26 +241,27 @@ export async function checkClient(spec: ClientSpec, opts?: CheckClientOptions): 
   ]
   const present = servers.filter((s) => s.present).length
   const rag = servers.find((s) => s.key === MCP_POMNIA_KEY)
-  const embeddedLocal =
-    rag?.present &&
-    !!rag.url &&
-    /127\.0\.0\.1|localhost/i.test(rag.url) &&
-    rag.url.includes('/mcp')
-  let state: WiredState = embeddedLocal
+  // brain-core (embedded or remote): single `pomnia` → `/mcp` is complete.
+  // Legacy Python hub: all three keys required.
+  const brainCoreComplete =
+    rag?.present && !!rag.url && rag.url.includes('/mcp')
+  const legacyHubComplete = present === POMNIA_KEYS.length
+  const complete = brainCoreComplete || legacyHubComplete
+  let state: WiredState = complete
     ? 'wired'
-    : present === POMNIA_KEYS.length
-      ? 'wired'
-      : present === 0
-        ? 'not_wired'
-        : 'partial'
+    : present === 0
+      ? 'not_wired'
+      : 'partial'
 
   const issues: string[] = []
   for (const s of servers) {
     if (s.present && !s.url) issues.push(`${s.key}: no URL detected (config shape unknown)`)
-    if (!embeddedLocal && !s.present) issues.push(`${s.key}: missing`)
+    if (!brainCoreComplete && !s.present) issues.push(`${s.key}: missing`)
   }
-  if (!embeddedLocal && present > 0 && present < POMNIA_KEYS.length) {
-    issues.unshift('incomplete: need pomnia + pomnia-vault + pomnia-library (remote)')
+  if (!brainCoreComplete && present > 0 && present < POMNIA_KEYS.length) {
+    issues.unshift(
+      'incomplete: brain-core needs pomnia → /mcp; legacy hub needs pomnia + pomnia-vault + pomnia-library',
+    )
   }
 
   // Reading the file only proves the paste landed. Asking the URL proves the
