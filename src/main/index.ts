@@ -1952,11 +1952,13 @@ function registerIpc(): void {
       token?: string,
       target?: 'embedded' | 'remote',
       brainMode?: boolean,
+      remoteHub?: 'brain-core' | 'legacy-hub',
     ) =>
       buildSnippet(clientId, brainUrl, currentOS(), homeDir(), token, target ?? 'remote', {
         brainMode: !!brainMode,
         handshakePhrase: getHandshakePhrase(),
         handshakeEnabled: isHandshakeEnabled(),
+        remoteHub: remoteHub === 'legacy-hub' ? 'legacy-hub' : 'brain-core',
       }),
   )
 

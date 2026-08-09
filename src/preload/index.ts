@@ -122,7 +122,9 @@ const bridge = {
     token?: string,
     target?: string,
     brainMode?: boolean,
-  ) => ipcRenderer.invoke('connect:snippet', clientId, brainUrl, token, target, brainMode),
+    remoteHub?: string,
+  ) =>
+    ipcRenderer.invoke('connect:snippet', clientId, brainUrl, token, target, brainMode, remoteHub),
   connectWriteBrief: (clientId: string) =>
     ipcRenderer.invoke('connect:write-brief', clientId) as Promise<
       | { ok: true; path: string; bytes: number; handshakePath?: string; agentsPath?: string }

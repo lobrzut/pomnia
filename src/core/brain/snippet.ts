@@ -25,12 +25,17 @@ export const MCP_POMNIA_LIBRARY_KEY = 'pomnia-library'
 export const MCP_LEGACY_RAG_KEY = 'brain-rag'
 
 export const EMBEDDED_BRAIN_DEFAULT_URL = 'http://127.0.0.1:7862'
-/** Placeholder shown in URL fields — user must configure their own remote Brain. */
-export const REMOTE_BRAIN_URL_PLACEHOLDER = 'https://brain.example.com:7862'
+/** Placeholder shown in URL fields — user must configure their own remote Brain (brain-core :7865). */
+export const REMOTE_BRAIN_URL_PLACEHOLDER = 'https://brain.example.com:7865'
 /** No default remote URL — each user saves their own in app-settings / localStorage. */
 export const REMOTE_BRAIN_DEFAULT_URL = ''
 
 export type BrainTarget = 'embedded' | 'remote'
+/**
+ * Remote MCP shape. Default `brain-core` = one `pomnia` → `/mcp` + Bearer.
+ * `legacy-hub` = old Python mcp-proxy: three SSE servers (pomnia + vault + library).
+ */
+export type RemoteHubKind = 'brain-core' | 'legacy-hub'
 
 export type ClientId =
   | 'claude-code'
@@ -48,7 +53,10 @@ export interface ClientSpec {
   configPath: (os: OS, home: string) => string
   /** Top-level JSON key under which MCP servers live. */
   mcpKey: string
-  /** Builds the `{pomnia,pomnia-vault,pomnia-library}` map for this client (remote). Embedded uses only `pomnia`. */
+  /**
+   * Legacy Python hub only: `{pomnia,pomnia-vault,pomnia-library}` SSE (or /mcp split).
+   * Default remote brain-core uses `brainCoreRemoteServers` instead — do not call this for new remotes.
+   */
   buildServers: (brainUrl: string, token?: string) => Record<string, Record<string, unknown>>
   /** Human notes — what file, anything quirky, multi-location warnings. */
   notes: string
@@ -83,8 +91,8 @@ function trimBase(url: string): string {
 }
 
 /**
- * URL paths exposed by the supergateway. Behind the Bearer auth proxy these
- * keep the same shape — the proxy just gates on the Authorization header.
+ * URL paths for the legacy Python hub (supergateway + auth proxy).
+ * Default remote brain-core uses a single `/mcp` — see brainCoreRemoteServers.
  */
 const PATHS = {
   rag:     (base: string) => `${base}/sse`,
@@ -101,34 +109,54 @@ function withHeaders(token: string | undefined, server: Record<string, unknown>)
 }
 
 /**
- * Embedded brain-core exposes ONE unified MCP at `/mcp` (all tools on one server).
- * Remote master uses supergateway with three split servers — see buildServers below.
+ * brain-core (embedded or remote): ONE unified MCP at `/mcp` (all tools on one server).
+ * Remote may include Bearer; embedded never does.
  */
-function embeddedServers(spec: ClientSpec, brainUrl: string): Record<string, Record<string, unknown>> {
+function brainCoreServers(
+  spec: ClientSpec,
+  brainUrl: string,
+  token?: string,
+): Record<string, Record<string, unknown>> {
   const mcp = `${trimBase(brainUrl)}/mcp`
   switch (spec.id) {
     case 'claude-code':
-      return { [MCP_POMNIA_KEY]: { type: 'http', url: mcp } }
+      return { [MCP_POMNIA_KEY]: withHeaders(token, { type: 'http', url: mcp }) }
     case 'cursor':
-      return { [MCP_POMNIA_KEY]: { url: mcp } }
+      return { [MCP_POMNIA_KEY]: withHeaders(token, { url: mcp }) }
     case 'antigravity':
-      return { [MCP_POMNIA_KEY]: { type: 'streamable-http', serverUrl: mcp } }
-    case 'claude-desktop':
+      return { [MCP_POMNIA_KEY]: withHeaders(token, { type: 'streamable-http', serverUrl: mcp }) }
+    case 'claude-desktop': {
+      const authArgs = token ? ['--header', `Authorization: Bearer ${token}`] : []
       return {
         [MCP_POMNIA_KEY]: {
           command: 'npx',
-          args: ['-y', 'mcp-remote', mcp, '--allow-http'],
+          args: ['-y', 'mcp-remote', mcp, '--allow-http', ...authArgs],
         },
       }
+    }
     case 'vscode':
-      return { [MCP_POMNIA_KEY]: { type: 'http', url: mcp } }
+      return { [MCP_POMNIA_KEY]: withHeaders(token, { type: 'http', url: mcp }) }
     case 'windsurf':
-      return { [MCP_POMNIA_KEY]: { serverUrl: mcp } }
+      return { [MCP_POMNIA_KEY]: withHeaders(token, { serverUrl: mcp }) }
     case 'hermes':
-      return { [MCP_POMNIA_KEY]: { url: mcp } }
+      return { [MCP_POMNIA_KEY]: withHeaders(token, { url: mcp }) }
     default:
-      return { [MCP_POMNIA_KEY]: { url: mcp } }
+      return { [MCP_POMNIA_KEY]: withHeaders(token, { url: mcp }) }
   }
+}
+
+/** Embedded = brain-core with no auth. */
+function embeddedServers(spec: ClientSpec, brainUrl: string): Record<string, Record<string, unknown>> {
+  return brainCoreServers(spec, brainUrl)
+}
+
+/** Default remote = brain-core `/mcp` + optional Bearer. */
+function brainCoreRemoteServers(
+  spec: ClientSpec,
+  brainUrl: string,
+  token?: string,
+): Record<string, Record<string, unknown>> {
+  return brainCoreServers(spec, brainUrl, token)
 }
 
 /* ---------------------------------------------------------------------- */
@@ -582,11 +610,11 @@ export interface Snippet {
  * Build the snippet bundle for one client.
  *
  * @param clientId  one of CLIENTS
- * @param brainUrl  base URL of the brain MCP proxy (e.g. http://127.0.0.1:7862 or https://brain.example.com)
+ * @param brainUrl  base URL of the brain MCP (e.g. http://127.0.0.1:7862 or http://host:7865)
  * @param os        target OS for path resolution
  * @param home      target home dir for path resolution
- * @param token     optional Bearer token from /api/mcp/tokens (remote only)
- * @param target    embedded = single local /mcp, no auth; remote = three supergateway servers
+ * @param token     optional Bearer token (remote only)
+ * @param target    embedded = local /mcp no auth; remote = brain-core /mcp + Bearer (default) or legacy 3×SSE
  */
 export interface BuildSnippetOptions {
   /**
@@ -598,6 +626,11 @@ export interface BuildSnippetOptions {
   handshakePhrase?: string
   /** When false, Brain Mode rule omits Handshake greeting. Default true. */
   handshakeEnabled?: boolean
+  /**
+   * Remote only. Default `brain-core` = single `pomnia` → `/mcp` + Bearer.
+   * Pass `legacy-hub` for the old Python hub (pomnia + vault + library SSE).
+   */
+  remoteHub?: RemoteHubKind
 }
 
 export function buildSnippet(
@@ -611,23 +644,31 @@ export function buildSnippet(
 ): Snippet {
   const spec = getClient(clientId)
   const brainMode = !!opts.brainMode
+  const remoteHub: RemoteHubKind = opts.remoteHub === 'legacy-hub' ? 'legacy-hub' : 'brain-core'
   const briefOpts: BrainBriefOptions = {
     handshakePhrase: opts.handshakePhrase,
     handshakeEnabled: opts.handshakeEnabled,
   }
   const ruleMd = brainMode ? buildBrainBriefMd(briefOpts) : undefined
+  const base = trimBase(brainUrl)
   const servers =
-    target === 'embedded' ? embeddedServers(spec, brainUrl) : spec.buildServers(trimBase(brainUrl), token)
+    target === 'embedded'
+      ? embeddedServers(spec, brainUrl)
+      : remoteHub === 'legacy-hub'
+        ? spec.buildServers(base, token)
+        : brainCoreRemoteServers(spec, base, token)
   const filePath = spec.configPath(os, home)
 
   const fullFileObj = { [spec.mcpKey]: servers }
   const fullFileJson = JSON.stringify(fullFileObj, null, 2) + '\n'
   const mergeJson = JSON.stringify(servers, null, 2) + '\n'
 
-  const embeddedNote =
+  const targetNote =
     target === 'embedded'
       ? 'Embedded Pomnia: one MCP server (`pomnia`) at /mcp — no Bearer token. Start it in Pomnia → Brain tab first.'
-      : null
+      : remoteHub === 'legacy-hub'
+        ? 'Legacy Python hub: three SSE servers (`pomnia` + `pomnia-vault` + `pomnia-library`). Prefer brain-core (`/mcp`) unless you still run the old hub.'
+        : 'Remote brain-core: one MCP server (`pomnia`) at /mcp with Bearer token — not the old 3×SSE hub.'
 
   const brief =
     brainMode && spec.brief
@@ -667,7 +708,7 @@ export function buildSnippet(
     handshakeBrief ? `5. Also write Handshake rule: ${handshakeBrief.filePath}` : null,
     ``,
     `Notes: ${spec.notes}`,
-    embeddedNote,
+    targetNote,
     brainMode
       ? handshakeOn
         ? `Brain Mode PRIORITY 0/1/2: MUST first-line handshake "${phrase}"; MUST get_user_profile + search_library and/or latest checkpoints/; MUST checkpoint_session on milestones when autoCheckpointEnabled; conscious save only on "zapisz do Pomnia". Pomnia does not silently capture chats.`

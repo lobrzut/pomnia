@@ -116,6 +116,8 @@ const BACKUP_NOTE_KEY = 'pomnia.backup.note'
 const SETTINGS_EXPORT_DIR_KEY = 'pomnia.settings.exportDir'
 const SIMPLE_MODE_KEY = 'pomnia.settings.simpleMode'
 const AGENT_BRAIN_MODE_KEY = 'pomnia.settings.agentBrainMode'
+/** Connect Remote: opt into legacy Python hub 3×SSE snippets (default = brain-core /mcp). */
+const CONNECT_LEGACY_HUB_KEY = 'pomnia.connect.legacyHub'
 
 function loadBrainAutoDeploy(): boolean {
   try {
@@ -278,6 +280,13 @@ interface State {
    */
   agentBrainMode: boolean
   setAgentBrainMode: (on: boolean) => void
+
+  /**
+   * Connect Remote advanced: emit legacy Python hub 3×SSE (pomnia + vault + library).
+   * Default off → brain-core single `/mcp` + Bearer.
+   */
+  connectLegacyHub: boolean
+  setConnectLegacyHub: (on: boolean) => void
 
   /** Tray — main-process settings mirrored here for the Settings UI. */
   minimizeToTray: boolean
@@ -632,6 +641,12 @@ export const useStore = create<State>((set, get) => ({
   setAgentBrainMode: (agentBrainMode) => {
     saveBool(AGENT_BRAIN_MODE_KEY, agentBrainMode)
     set({ agentBrainMode })
+  },
+
+  connectLegacyHub: loadBool(CONNECT_LEGACY_HUB_KEY, false),
+  setConnectLegacyHub: (connectLegacyHub) => {
+    saveBool(CONNECT_LEGACY_HUB_KEY, connectLegacyHub)
+    set({ connectLegacyHub })
   },
 
   minimizeToTray: false,
