@@ -311,12 +311,13 @@ async function cmdBrain(p: Parsed): Promise<void> {
       const list = listClients()
       console.log(C.bold('\n  Available clients:\n'))
       for (const c of list) console.log(`  ${C.cyan(c.id.padEnd(16))} ${c.label}`)
-      console.log(C.dim('\n  Usage: brain snippet --client <id> --url http://brain:7862 [--token btk_…]\n'))
+      console.log(C.dim('\n  Usage: brain snippet --client <id> --url http://brain:7865 [--token btk_…] [--legacy-hub]\n'))
+      console.log(C.dim('  Default remote = brain-core single /mcp. --legacy-hub = old 3×SSE Python hub.\n'))
       return
     }
     const url = typeof p.flags.url === 'string' ? String(p.flags.url).replace(/\/$/, '') : ''
     if (!url) {
-      console.log(C.red('\n  --url required (np. http://twoj-serwer:7862)\n'))
+      console.log(C.red('\n  --url required (np. http://twoj-serwer:7865)\n'))
       return
     }
     const token = typeof p.flags.token === 'string' ? p.flags.token : process.env.BRAIN_TOKEN
@@ -325,7 +326,8 @@ async function cmdBrain(p: Parsed): Promise<void> {
       | 'darwin'
       | 'linux'
     const home = process.env.HOME || process.env.USERPROFILE || ''
-    const snip = buildSnippet(client, url, targetOS, home, token)
+    const remoteHub = p.flags['legacy-hub'] || p.flags.legacyHub ? 'legacy-hub' as const : 'brain-core' as const
+    const snip = buildSnippet(client, url, targetOS, home, token, 'remote', { remoteHub })
 
     console.log(C.bold(`\n  ${snip.label}\n`))
     console.log(snip.instructions)
