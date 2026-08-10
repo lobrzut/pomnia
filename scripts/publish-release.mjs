@@ -87,12 +87,33 @@ Pomnia checks for newer releases and tells you — it never installs anything by
 `
 
 // Optional Linux packages (from CI / Linux host) — attach without blocking Windows path.
+//
+// Version-matched, and that is the whole point. This used to take any .AppImage
+// or .deb sitting in release/, so publishing 0.1.59 from a directory that still
+// held 0.1.58 Linux builds attached 0.1.58 binaries to the 0.1.59 release —
+// exactly the "the download is not the version it claims" defect the Windows
+// path above already refuses ("stale build directory"). The asymmetry was the
+// bug: one side checked, the other globbed.
 const linuxExtras = []
+const belongsToThisVersion = (name) => name.includes(`-${version}.`) || name.includes(`_${version}_`)
+const strayLinux = []
 for (const name of readdirSync(releaseDir)) {
-  if (name.endsWith('.AppImage') || name.endsWith('.deb') || name === 'latest-linux.yml') {
-    linuxExtras.push(join(releaseDir, name))
+  const isLinuxPkg = /\.(AppImage|deb)(\.sha256)?$/i.test(name)
+  if (isLinuxPkg) {
+    if (belongsToThisVersion(name)) linuxExtras.push(join(releaseDir, name))
+    else strayLinux.push(name)
+    continue
   }
-  if (/\.(AppImage|deb)\.sha256$/i.test(name)) linuxExtras.push(join(releaseDir, name))
+  // latest-linux.yml is the update manifest; it must name this version's package
+  // or it points Linux clients at a build that is not in this release.
+  if (name === 'latest-linux.yml') {
+    const body = readFileSync(join(releaseDir, name), 'utf8')
+    if (body.includes(version)) linuxExtras.push(join(releaseDir, name))
+    else strayLinux.push(name)
+  }
+}
+if (strayLinux.length) {
+  console.warn(`! skipping ${strayLinux.length} Linux file(s) from another version: ${strayLinux.join(', ')}`)
 }
 // Deduplicate paths (sha may match both filters).
 const seen = new Set()
