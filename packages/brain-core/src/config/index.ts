@@ -19,6 +19,12 @@ export interface BrainConfig {
   /** MCP HTTP port. 7862 matches the current Python deploy so clients don't have to reconfigure. */
   port: number
 
+  /**
+   * Set when the configured Ollama URL was refused. The daemon still starts —
+   * see loadConfig — but embeddings are off and this is the reason to show.
+   */
+  ollamaUrlError?: string
+
   /** Root data dir. Vault, DB, logs live under here. */
   dataDir: string
 
@@ -115,6 +121,47 @@ export function defaultConfig(): BrainConfig {
  * Parse CLI args + env vars into a full BrainConfig.
  * File-based override (TOML/JSON) intentionally not implemented yet — YAGNI.
  */
+/**
+ * Every flag the daemon understands, including the ones handled in daemon.ts
+ * rather than here — this set decides what counts as a typo, so a flag missing
+ * from it would produce a warning about an argument that actually works.
+ */
+const KNOWN_FLAGS = new Set([
+  '--port',
+  '--host',
+  '--data-dir',
+  '--ollama-url',
+  '--embed-model',
+  '--vault-root',
+  '--skills-root',
+  '--read-only',
+  '--vault-owner',
+  '--instance-label',
+  '--tokens-file',
+  // daemon.ts one-shot modes
+  '--add-token',
+  '--add-user',
+  '--claim-vault',
+  '--reindex',
+  '--role',
+])
+
+/**
+ * A port is either a real port or a mistake worth stopping for.
+ *
+ * `Number('abc')` is NaN and `Number('99999')` is out of range; both reach
+ * `listen()` and come back as ERR_SOCKET_BAD_PORT, which names no flag and no
+ * value. Since the whole 7862/7865 confusion was about a port nobody could see,
+ * this says which input was wrong.
+ */
+function parsePort(raw: string, source: string): number {
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n < 1 || n > 65535) {
+    throw new Error(`${source} must be an integer between 1 and 65535, got ${JSON.stringify(raw)}`)
+  }
+  return n
+}
+
 export async function loadConfig(
   argv: string[],
   env: NodeJS.ProcessEnv,
@@ -123,7 +170,7 @@ export async function loadConfig(
 
   // Env overrides
   if (env.BRAIN_HOST) cfg.host = env.BRAIN_HOST
-  if (env.BRAIN_PORT) cfg.port = Number(env.BRAIN_PORT)
+  if (env.BRAIN_PORT) cfg.port = parsePort(env.BRAIN_PORT, 'BRAIN_PORT')
   if (env.BRAIN_OLLAMA_URL) cfg.ollamaUrl = env.BRAIN_OLLAMA_URL
   if (env.BRAIN_EMBED_MODEL) cfg.embedModel = env.BRAIN_EMBED_MODEL
   if (env.BRAIN_VAULT_ROOT) cfg.vaultRoot = env.BRAIN_VAULT_ROOT
@@ -138,7 +185,19 @@ export async function loadConfig(
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     const next = argv[i + 1]
-    if (arg === '--port' && next) cfg.port = Number(next)
+    if (arg.startsWith('--') && !KNOWN_FLAGS.has(arg)) {
+      // A misspelt flag is silently ignored, which makes it indistinguishable
+      // from one you never passed — and the daemon then starts on a default you
+      // did not choose. Warn rather than throw: refusing to boot over a stray
+      // argument would take the memory server down for a typo.
+      console.error(`[brain-core] ignoring unknown argument: ${arg}`)
+      continue
+    }
+    // `next !== undefined`, not `next`: an empty value is a mistake, and the
+    // truthiness test quietly turned `--port ""` into "no port given" — which
+    // leaves the default in place, which is the outage this whole guard exists
+    // to prevent.
+    if (arg === '--port' && next !== undefined) cfg.port = parsePort(next, '--port')
     else if (arg === '--host' && next) cfg.host = next
     else if (arg === '--data-dir' && next) cfg.dataDir = next
     else if (arg === '--ollama-url' && next) cfg.ollamaUrl = next
@@ -166,11 +225,26 @@ export async function loadConfig(
 
   // Same SSRF gate as the admin panel — refuse link-local / credentialed /
   // non-http Ollama URLs before the daemon ever fetches them.
+  //
+  // Rejected, not fatal. Throwing here stopped the daemon from starting, and
+  // with Restart=on-failure + StartLimitBurst=5 the unit then gave up for good
+  // — over one bad URL. The unit file argues the opposite case in its own
+  // comments: it deliberately declares no ordering on Ollama because "refusing
+  // to start would turn a partial outage into a full one". A bad embedder URL
+  // costs semantic search; skills, the profile, note reads and the panel all
+  // still work, and /healthz already reports the degradation.
   const ollama = validateOllamaUrl(cfg.ollamaUrl)
-  if (!ollama.ok) {
-    throw new Error(`invalid Ollama URL (${ollama.reason}): ${ollama.detail}`)
+  if (ollama.ok) {
+    cfg.ollamaUrl = ollama.url
+  } else {
+    cfg.ollamaUrlError = `${ollama.reason}: ${ollama.detail}`
+    // Blank it so nothing can fetch the address we just refused.
+    cfg.ollamaUrl = ''
+    console.error(
+      `[brain-core] REFUSED Ollama URL (${cfg.ollamaUrlError}) — starting without embeddings; ` +
+        'semantic search will return nothing until this is fixed',
+    )
   }
-  cfg.ollamaUrl = ollama.url
 
   return cfg
 }

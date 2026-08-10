@@ -59,6 +59,13 @@ StartLimitBurst=5
 TimeoutStopSec=15
 
 ; ── sandbox ────────────────────────────────────────────────────────────────
+; The token and account files are created 0600 by the code itself, but the
+; search index is not: library.db holds chunks and embeddings in the clear —
+; vault content, by design, as Settings says out loud. Under the default umask
+; it lands 0644 and every local account can read the memory this product exists
+; to protect. ProtectSystem does not help; it governs what the service may
+; write, not who may read what it wrote.
+UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
 PrivateDevices=true
