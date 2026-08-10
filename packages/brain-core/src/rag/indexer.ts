@@ -187,9 +187,10 @@ export async function indexFiles(
       const batch = chunks.slice(i, i + BATCH)
       // Embedding happens OUTSIDE the write transaction — Ollama can take
       // seconds per batch and holding a write lock that long is rude to
-      // any concurrent search. No nomic prefixes here: Ollama's model
-      // template adds them itself (see embed.ts header, verified Phase 0).
-      const vecs = await embedder.embedBatch(batch, signal)
+      // any concurrent search. The `search_document: ` prefix is applied by
+      // EmbedClient; Ollama's template does NOT add it, contrary to what this
+      // comment used to claim (measured: cosine 0.92 between prefixed and bare).
+      const vecs = await embedder.embedBatch(batch, 'document', signal)
       if (vecs.length !== batch.length) {
         throw new Error(`embed count mismatch: got ${vecs.length} for ${batch.length} chunks (${name})`)
       }
@@ -272,7 +273,7 @@ export async function indexDocument(
     if (signal?.aborted) throwIfAborted(signal, 'index aborted')
     const batch = pending.slice(i, i + BATCH)
     const texts = batch.map((b) => b.text)
-    const vecs = await embedder.embedBatch(texts, signal)
+    const vecs = await embedder.embedBatch(texts, 'document', signal)
     if (vecs.length !== texts.length) {
       throw new Error(`embed count mismatch: got ${vecs.length} for ${texts.length} chunks (${name})`)
     }
@@ -308,7 +309,7 @@ export async function indexDocument(
  * - `blobs` / `snapshots`: encrypted vault sidecar (not markdown knowledge)
  * - `node_modules` / `.git`: deps / VCS (`.git` also caught by dot-prefix skip)
  */
-const SKIP_DIRS = new Set([
+export const SKIP_DIRS = new Set([
   '_review',
   '_quarantine_stubs',
   'skills',
@@ -323,7 +324,7 @@ const SKIP_DIRS = new Set([
  * walked (plus any loose `.md`/`.txt` at the root, e.g. USER.md).
  * Skills live next to distilled/ but must never enter RAG.
  */
-const INDEX_SUBDIRS = new Set(['distilled', 'sessions', 'library'])
+export const INDEX_SUBDIRS = new Set(['distilled', 'sessions', 'library'])
 
 /** Basenames never indexed even if they appear outside skills/ (belt-and-suspenders). */
 const SKIP_BASENAMES = new Set(['example_usage.md'])
@@ -477,12 +478,34 @@ export async function indexDir(
   const stats = await indexFiles(db, embedder, toIndex, embedProgress, signal)
   stats.skipped = skipped
 
-  // Prune: missing files under current root + any path outside current root.
-  const present = new Set(paths.map(normalizeIndexPathKey))
+  stats.prunedFiles = pruneIndex(db, rootDir, { paths, signal })
+  return stats
+}
+
+/**
+ * Drop rows whose file is gone from disk, plus anything left behind by an
+ * earlier vault root.
+ *
+ * Split out of indexDir because it needs no embedder — it is a path walk
+ * against the DB, cheap enough to run after an incremental pass. Without that,
+ * the only thing that ever pruned was a full reindex, so notes deleted or
+ * renamed by redistillation piled up as dead entries (50 → 53 across runs that
+ * each reported success) and kept surfacing in search.
+ *
+ * @param paths pre-walked file list; omit and it walks `rootDir` itself.
+ */
+export function pruneIndex(
+  db: Database.Database,
+  rootDir: string,
+  opts?: { paths?: string[]; signal?: AbortSignal },
+): number {
+  const signal = opts?.signal
+  const present = new Set((opts?.paths ?? listTextFiles(rootDir)).map(normalizeIndexPathKey))
   const known = db.prepare('SELECT DISTINCT pdf_path AS p FROM chunks').all() as { p: string }[]
   const delVec = db.prepare('DELETE FROM chunks_vec WHERE rowid = ?')
   const selIds = db.prepare('SELECT id FROM chunks WHERE pdf_path = ?')
   const delChunks = db.prepare('DELETE FROM chunks WHERE pdf_path = ?')
+  let pruned = 0
   for (const { p } of known) {
     if (signal?.aborted) throwIfAborted(signal, 'reindex aborted')
     const underRoot = isIndexPathUnderRoot(p, rootDir)
@@ -498,7 +521,7 @@ export async function indexDir(
       deleteFileMeta(db, p)
     })
     wipe()
-    stats.prunedFiles += 1
+    pruned += 1
   }
 
   // Drop fingerprints for paths no longer on disk / outside root (even if chunks
@@ -514,5 +537,5 @@ export async function indexDir(
     }
   }
 
-  return stats
+  return pruned
 }

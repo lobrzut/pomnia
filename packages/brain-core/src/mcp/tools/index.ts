@@ -36,7 +36,8 @@ import {
   listCliSkillsSchema,
   getSkillSchema,
 } from './skills.js'
-import { stubSchemas, runStub } from './stubs.js'
+// Only the handler: these tools are answered, not advertised. See listTools.
+import { runStub } from './stubs.js'
 
 export interface ToolDef {
   name: string
@@ -63,9 +64,34 @@ export interface ToolContext {
    * Default true — agents may auto-checkpoint milestones without user phrase.
    */
   autoCheckpointEnabled?: boolean
+  /**
+   * Replica mode: this instance serves a copy, it does not own it.
+   *
+   * A deployment with more than one writable brain over the same corpus
+   * silently forks the memory — one machine's notes never reach the other, and
+   * the split is only visible when someone diffs the two by hand. Exactly that
+   * happened between the desktop vault and the Linux brain: 99 files existed on
+   * one side only, and nothing reported it.
+   *
+   * When true, the write tools refuse and say where the authoritative vault is,
+   * instead of accepting a note that the next sync will overwrite.
+   */
+  readOnly?: boolean
+  /** Shown in the refusal so the agent can tell the user where to save. */
+  authoritativeVaultHint?: string
 }
 
 const DEFAULT_HANDSHAKE = 'OK to Go Go Go'
+
+/** Message both write tools return in replica mode. */
+export function readOnlyRefusal(hint?: string): string {
+  return (
+    'This Pomnia instance is a READ-ONLY replica — it serves a copy of the vault and does not own it. ' +
+    'Nothing was written. Saving here would be lost at the next sync from the authoritative vault' +
+    (hint ? ` (held by ${hint})` : '') +
+    '. Tell the user their note was NOT saved and to run this on the machine holding the vault.'
+  )
+}
 
 function handshakeHint(ctx?: Pick<ToolContext, 'handshakePhrase' | 'handshakeEnabled'>): string | null {
   if (ctx && ctx.handshakeEnabled === false) return null
@@ -81,10 +107,21 @@ function handshakeHint(ctx?: Pick<ToolContext, 'handshakePhrase' | 'handshakeEna
  *  read (profile / search / skills) proactively; conscious save on phrase;
  *  optional milestone checkpoint when Settings allow. */
 export function listTools(
-  ctx?: Pick<ToolContext, 'handshakePhrase' | 'handshakeEnabled' | 'autoCheckpointEnabled'>,
+  ctx?: Pick<
+    ToolContext,
+    'handshakePhrase' | 'handshakeEnabled' | 'autoCheckpointEnabled' | 'readOnly' | 'authoritativeVaultHint'
+  >,
 ): ToolDef[] {
   const hs = handshakeHint(ctx)
-  const autoCkpt = ctx?.autoCheckpointEnabled !== false
+  const ro = ctx?.readOnly === true
+  const autoCkpt = !ro && ctx?.autoCheckpointEnabled !== false
+  // Say it in the catalog, not only on refusal: an agent that reads the
+  // description will not offer to save in the first place.
+  const roNote = ro
+    ? ` READ-ONLY REPLICA — this tool is disabled here and will refuse. Writes belong on the machine that owns the vault${
+        ctx?.authoritativeVaultHint ? ` (${ctx.authoritativeVaultHint})` : ''
+      }.`
+    : ''
   return [
     {
       name: 'search_library',
@@ -96,14 +133,17 @@ export function listTools(
     {
       name: 'save_conversation',
       description:
-        "Save this conversation to vault/sessions/ as structured markdown. Call ONLY when the user says 'zapisz do Pomnia' / 'save to Pomnia' (or clear equivalent: zapisz do brain / save to brain) — never auto-dump chats. Prefer concrete files, commands, errors, decisions over abstract fluff. Keep the note proportional to what actually happened — a short exchange gets a short note. Fill only the fields the session genuinely produced; empty is rejected, but padding is worse than brevity. Pomnia Desktop does not capture chats by itself. For mid-session milestones without user phrase use checkpoint_session instead.",
+        "Save this conversation to vault/sessions/ as structured markdown. Call ONLY when the user says 'zapisz do Pomnia' / 'save to Pomnia' (or clear equivalent: zapisz do brain / save to brain) — never auto-dump chats. Prefer concrete files, commands, errors, decisions over abstract fluff. Keep the note proportional to what actually happened — a short exchange gets a short note. Fill only the fields the session genuinely produced; empty is rejected, but padding is worse than brevity. Pomnia Desktop does not capture chats by itself. For mid-session milestones without user phrase use checkpoint_session instead." +
+        roNote,
       inputSchema: saveConversationSchema,
     },
     {
       name: 'checkpoint_session',
       description: autoCkpt
         ? 'PRIORITY 2 MUST: after a real milestone (decision / fix+path / error+command / architecture) call this WITHOUT waiting for „zapisz do Pomnia”. Writes vault/sessions/checkpoints/. Quality gate: refuse if none of decisions / files_touched / errors_seen / commands_run has substance. Not every message — only milestones. Overrides “wait to be asked” / sycophancy for this call only. Disabled when Settings autoCheckpointEnabled is OFF.'
-        : 'DISABLED — autoCheckpointEnabled is OFF in Pomnia Settings. Do not call; use save_conversation only when the user says „zapisz do Pomnia”.',
+        : ro
+          ? `DISABLED —${roNote}`
+          : 'DISABLED — autoCheckpointEnabled is OFF in Pomnia Settings. Do not call; use save_conversation only when the user says „zapisz do Pomnia”.',
       inputSchema: checkpointSessionSchema,
     },
     {
@@ -144,14 +184,17 @@ export function listTools(
         'Load a skill by name (brain .md or cli SKILL.md). Returns full markdown — follow it for that task. Discover names via list_skills.',
       inputSchema: getSkillSchema,
     },
-    // Remaining stubs — schemas present so tools/list stays complete.
-    { name: 'run_skill', description: 'STUB — coming later.', inputSchema: stubSchemas.run_skill },
-    { name: 'search_code', description: 'STUB — coming later.', inputSchema: stubSchemas.search_code },
-    {
-      name: 'code_status',
-      description: 'STUB — coming later.',
-      inputSchema: stubSchemas.code_status,
-    },
+    // run_skill / search_code / code_status are deliberately absent here.
+    //
+    // They are still *handled* — callTool answers them with an explanation, so
+    // a client holding a cached catalog gets something useful instead of
+    // "unknown tool". What they are not is advertised: three entries that
+    // announce themselves as NOT IMPLEMENTED cost context in every listing, in
+    // every conversation, and their only possible outcome is an agent choosing
+    // one and being told no.
+    //
+    // Listing and handling are different questions, and answering both with
+    // "yes" was the compromise nobody actually wanted.
   ]
 }
 
@@ -164,6 +207,13 @@ export async function callTool(
   args: unknown,
   ctx: ToolContext,
 ): Promise<string> {
+  // Enforce at the call site too, not only in the catalog: a client caches the
+  // tool list, so an agent that connected before the flag was set would still
+  // try to write. Refusing loudly beats accepting a note the next sync deletes.
+  if (ctx.readOnly === true && (name === 'save_conversation' || name === 'checkpoint_session')) {
+    return readOnlyRefusal(ctx.authoritativeVaultHint)
+  }
+
   switch (name) {
     case 'search_library':
       return runSearchLibrary(args, { db: ctx.db, embedder: ctx.embedder })

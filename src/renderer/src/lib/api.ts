@@ -116,6 +116,8 @@ export interface PomniaBridge {
   brainCoreStart(ollamaUrl?: string): Promise<EmbeddedBrainStatus>
   brainCoreStop(): Promise<EmbeddedBrainStatus>
   brainCoreReindex(): Promise<{ stats: { files: number; chunks: number; empty: number; prunedFiles: number } }>
+  /** Abort the index pass in flight; the pending reindex rejects with `reindex aborted`. */
+  brainCoreCancelIndex(): Promise<EmbeddedBrainStatus>
   vaultHealth(): Promise<{
     level: string
     code: string
@@ -160,7 +162,8 @@ export interface PomniaBridge {
     reindex?: boolean
     token?: string
     sources?: SourceId[]
-  }): Promise<{ detail: string }>
+    /** `ok` is false when any sub-step failed — deploy can partly succeed. */
+  }): Promise<{ detail: string; ok: boolean; problems: string[] }>
   connectStatus(
     brainUrl?: string,
     token?: string,
@@ -172,6 +175,7 @@ export interface PomniaBridge {
     token?: string,
     target?: 'embedded' | 'remote',
     brainMode?: boolean,
+    remoteHub?: 'brain-core' | 'legacy-hub',
   ): Promise<Snippet>
   connectWriteBrief(clientId: ClientId): Promise<
     | { ok: true; path: string; bytes: number; handshakePath?: string; agentsPath?: string }
@@ -179,6 +183,56 @@ export interface PomniaBridge {
   >
   connectSkillsList(brainUrl: string, token?: string): Promise<SkillListEntry[]>
   connectSkillsSync(brainUrl: string, token?: string): Promise<SkillSyncResult>
+  appUpdateCheck(): Promise<{
+    current: string
+    checkedAt: string
+    state: 'current' | 'available' | 'unreachable'
+    latest?: string | null
+    releaseUrl?: string
+    detail?: string
+  }>
+  appDataLocations(): Promise<{
+    platform: 'win32' | 'darwin' | 'linux'
+    installForm: 'appimage' | 'deb' | 'nsis' | 'dmg' | 'dev' | 'unknown'
+    userDataDir: string
+    brainCoreDataDir: string
+    libraryDbPath: string
+    logsDir: string
+    defaultVaultExample: string
+    vaultPath: string | null
+    indexIsPlaintext: true
+  }>
+  openUserData(): Promise<string>
+  openBrainData(): Promise<string>
+  vaultReplicaState(): Promise<{
+    url: string
+    hasToken: boolean
+    autoSync: boolean
+    last: {
+      at: string
+      ok: boolean
+      uploaded: number
+      unchanged: number
+      failed: number
+      error?: string
+    } | null
+  }>
+  vaultReplicaConfig(patch: {
+    url?: string
+    token?: string
+    autoSync?: boolean
+  }): Promise<{ url: string; hasToken: boolean; autoSync: boolean }>
+  vaultSyncToReplica(
+    target: string,
+    token?: string,
+  ): Promise<{
+    unchanged: number
+    uploaded: number
+    failed: Array<{ path: string; reason: string }>
+    skipped: Array<{ path: string; reason: string }>
+    extraOnReplica: string[]
+    bytesUploaded: number
+  }>
   connectMcpTokenCreate(
     brainUrl: string,
     name: string,
@@ -635,6 +689,10 @@ function mockBridge(): PomniaBridge {
       mockEmbedded.indexing = false
       return { stats: { files: 38, chunks: 121, empty: 2, prunedFiles: 1 } }
     },
+    async brainCoreCancelIndex() {
+      mockEmbedded.indexing = false
+      return { ...mockEmbedded }
+    },
     async vaultHealth() {
       return {
         level: 'ok',
@@ -677,7 +735,7 @@ function mockBridge(): PomniaBridge {
       ]
     },
     async brainDeploy() {
-      return { detail: 'Deployed 38 notes to Brain vault; reindex triggered.' }
+      return { detail: 'Deployed 38 notes to Brain vault; reindex triggered.', ok: true, problems: [] }
     },
     async ollamaPull(model) {
       // Simulated download: ~4s of progress events, then success.
@@ -747,17 +805,24 @@ function mockBridge(): PomniaBridge {
         ]
       } as { clients: ClientStatus[]; brain: BrainPing }
     },
-    async connectSnippet(clientId, brainUrl, _token?, _target?, brainMode?) {
+    async connectSnippet(clientId, brainUrl, _token?, _target?, brainMode?, remoteHub?) {
+      const legacy = remoteHub === 'legacy-hub'
+      const auth = _token ? `, "headers": { "Authorization": "Bearer …" }` : ''
+      const servers = legacy
+        ? `{\n    "pomnia": { "url": "${brainUrl}/sse"${auth} },\n    "pomnia-vault": { "url": "${brainUrl}/servers/brain-vault/sse"${auth} },\n    "pomnia-library": { "url": "${brainUrl}/servers/brain-library/sse"${auth} }\n  }`
+        : `{\n    "pomnia": { "url": "${brainUrl}/mcp"${auth} }\n  }`
       return {
         client: clientId,
         label: clientId,
         filePath: '~/.example/mcp.json',
         mcpKey: 'mcpServers',
-        fullFileJson: `{\n  "mcpServers": {\n    "pomnia": { "url": "${brainUrl}/sse", "headers": { "Authorization": "Bearer …" } },\n    "pomnia-vault": { "url": "${brainUrl}/servers/brain-vault/sse", "headers": { "Authorization": "Bearer …" } },\n    "pomnia-library": { "url": "${brainUrl}/servers/brain-library/sse", "headers": { "Authorization": "Bearer …" } }\n  }\n}\n`,
-        mergeJson: `{\n  "pomnia": { "url": "${brainUrl}/sse" },\n  "pomnia-vault": { "url": "${brainUrl}/servers/brain-vault/sse" },\n  "pomnia-library": { "url": "${brainUrl}/servers/brain-library/sse" }\n}\n`,
-        instructions: `▶ ${clientId}\n\n1. Open or create the config file.\n2. Paste the FULL 3-server snippet.\n3. Restart the client.`,
+        fullFileJson: `{\n  "mcpServers": ${servers}\n}\n`,
+        mergeJson: `${servers}\n`,
+        instructions: `▶ ${clientId}\n\n1. Open or create the config file.\n2. Paste the snippet.\n3. Restart the client.`,
         restartHint: 'Restart the client to pick up the new config.',
-        notes: 'Mock snippet (browser preview). Remote always includes pomnia + pomnia-vault + pomnia-library.',
+        notes: legacy
+          ? 'Mock snippet (browser preview). Legacy hub: pomnia + pomnia-vault + pomnia-library SSE.'
+          : 'Mock snippet (browser preview). Remote brain-core: one pomnia → /mcp + Bearer.',
         agentRuleMarkdown: brainMode
           ? '<!-- pomnia-brain-start -->\n# Pomnia (preview)\n<!-- pomnia-brain-end -->\n'
           : undefined,
@@ -774,6 +839,65 @@ function mockBridge(): PomniaBridge {
         ok: true as const,
         path,
         bytes: 420,
+      }
+    },
+    async appUpdateCheck() {
+      return {
+        current: '0.1.54',
+        checkedAt: new Date().toISOString(),
+        state: 'current' as const,
+        latest: '0.1.54',
+      }
+    },
+    async appDataLocations() {
+      return {
+        platform: 'linux' as const,
+        installForm: 'appimage' as const,
+        userDataDir: '/home/alice/.config/Pomnia',
+        brainCoreDataDir: '/home/alice/.config/Pomnia/brain-core-data',
+        libraryDbPath: '/home/alice/.config/Pomnia/brain-core-data/vectordb/library.db',
+        logsDir: '/home/alice/.config/Pomnia/logs',
+        defaultVaultExample: '/home/alice/Vault',
+        vaultPath: '/home/alice/Vault',
+        indexIsPlaintext: true as const,
+      }
+    },
+    async openUserData() {
+      return '/home/alice/.config/Pomnia'
+    },
+    async openBrainData() {
+      return '/home/alice/.config/Pomnia/brain-core-data'
+    },
+    async vaultReplicaState() {
+      return {
+        url: 'https://brain.example.com',
+        hasToken: true,
+        autoSync: true,
+        // The interesting mock is a *failure*: a success tells you nothing
+        // about whether the failure path renders.
+        last: {
+          at: new Date(Date.now() - 40 * 60_000).toISOString(),
+          ok: false,
+          uploaded: 0,
+          unchanged: 0,
+          failed: 0,
+          error: 'fetch failed',
+        },
+      }
+    },
+    async vaultReplicaConfig(patch: { url?: string; token?: string; autoSync?: boolean }) {
+      return { url: patch.url ?? '', hasToken: !!patch.token, autoSync: patch.autoSync === true }
+    },
+    async vaultSyncToReplica() {
+      // Browser mock: the interesting shape is "already up to date", because
+      // that is what a second run looks like and it must not read as failure.
+      return {
+        unchanged: 2864,
+        uploaded: 0,
+        failed: [],
+        skipped: [],
+        extraOnReplica: [],
+        bytesUploaded: 0,
       }
     },
     async connectSkillsList() {

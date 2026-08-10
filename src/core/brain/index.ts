@@ -61,9 +61,45 @@ export {
   REMOTE_BRAIN_DEFAULT_URL,
   REMOTE_BRAIN_URL_PLACEHOLDER,
 } from './snippet.js'
-export type { ClientId, ClientSpec, Snippet, SnippetBrief, BrainTarget, BuildSnippetOptions, BrainBriefOptions } from './snippet.js'
-export { checkClient, checkAllClients, pingBrain, fetchMcpActivity } from './status.js'
-export type { ClientStatus, WiredState, BrainPing, McpActivityRecord, McpActivityResponse } from './status.js'
+export type {
+  ClientId,
+  ClientSpec,
+  Snippet,
+  SnippetBrief,
+  BrainTarget,
+  RemoteHubKind,
+  BuildSnippetOptions,
+  BrainBriefOptions,
+} from './snippet.js'
+export { checkClient, checkAllClients, pingBrain, probeMcpUrl, fetchMcpActivity } from './status.js'
+export { identifyEngine } from './engine.js'
+export type { BrainEngine, EngineInfo } from './engine.js'
+export type {
+  ClientStatus,
+  WiredState,
+  BrainPing,
+  McpProbe,
+  CheckClientOptions,
+  McpActivityRecord,
+  McpActivityResponse,
+} from './status.js'
+export {
+  DEFAULT_OWNER,
+  LEDGER_SCHEMA_VERSION,
+  emptyLedger,
+  ledgerPathInVault,
+  loadLedgerForVault,
+  markProcessedIn,
+  ownerProcessed,
+  parseLedger,
+  readLedgerFile,
+  reconcileWithNotes,
+  sessionIdsFromNotes,
+  writeLedgerFile,
+} from './ledgerStore.js'
+export type { DistillLedgerFile, LedgerOwner, LoadLedgerResult, ProcessedMap } from './ledgerStore.js'
+export { buildVaultManifest, syncVaultToReplica, SYNCED_DIRS, SYNCED_ROOT_FILES } from './vaultSync.js'
+export type { VaultSyncResult, VaultSyncOptions, SyncManifestEntry } from './vaultSync.js'
 export { createMcpToken } from './mcpTokens.js'
 export type { McpTokenEntry } from './mcpTokens.js'
 

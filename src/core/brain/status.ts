@@ -4,9 +4,9 @@
  * Pomnia MCP "is it wired?" diagnostic.
  *
  * Walks each known MCP client (from snippet.ts CLIENTS), reads its config
- * file if present, and reports whether `pomnia` (+ vault/library for remote)
- * are configured and where they point. Accepts legacy `brain-rag` keys.
- * No writes, no auto-fix.
+ * file if present, and reports whether `pomnia` is configured (brain-core
+ * single `/mcp`) or the legacy trio (`pomnia` + vault + library). Accepts
+ * legacy `brain-rag` keys. No writes, no auto-fix.
  *
  * Companion to snippet.ts: snippet generates the config to paste, status
  * confirms the paste landed.
@@ -23,7 +23,13 @@ import {
 } from './snippet.js'
 import { dashboardUrlFromBrainUrl } from './deploy.js'
 
-export type WiredState = 'wired' | 'partial' | 'not_wired' | 'not_installed' | 'config_error'
+/**
+ * `wired` means the config points at Pomnia — NOT that anything answers there.
+ * `unreachable` is the config-is-right-but-nobody-home case: it is what a
+ * machine move looks like, and reporting it as `wired` is how three clients
+ * spent a session pointing at a brain host that no longer existed.
+ */
+export type WiredState = 'wired' | 'unreachable' | 'partial' | 'not_wired' | 'not_installed' | 'config_error'
 
 /** Canonical keys written by new snippets. */
 const POMNIA_KEYS = [MCP_POMNIA_KEY, MCP_POMNIA_VAULT_KEY, MCP_POMNIA_LIBRARY_KEY] as const
@@ -42,8 +48,10 @@ export interface ClientStatus {
     transport?: string
     hasToken?: boolean
   }>
-  /** Issues found (missing keys, parse error, wrong shape). */
+  /** Issues found (missing keys, parse error, wrong shape, host not answering). */
   issues: string[]
+  /** Present only when the caller asked for a reachability probe. */
+  probe?: McpProbe
 }
 
 export interface BrainPing {
@@ -52,6 +60,54 @@ export interface BrainPing {
   status?: number
   data?: Record<string, unknown>
   error?: string
+}
+
+export interface McpProbe {
+  url: string
+  /** The host answered. A 401/404/405 still counts — something is listening. */
+  reachable: boolean
+  status?: number
+  /** It answered as an MCP server (JSON-RPC `initialize` came back). */
+  speaksMcp?: boolean
+  error?: string
+}
+
+/**
+ * Ask the URL a client is configured with whether anything is actually there.
+ *
+ * Deliberately POSTs `initialize` rather than probing /healthz: this is the
+ * exact request the agent will make, so a pass here means the agent will
+ * connect. A transport error (DNS, refused, timeout) is the interesting case —
+ * that is a host that went away, which no amount of config reading can detect.
+ */
+export async function probeMcpUrl(url: string, token?: string, timeoutMs = 4_000): Promise<McpProbe> {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    accept: 'application/json, text/event-stream',
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+  const body = JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'initialize',
+    params: {
+      protocolVersion: '2024-11-05',
+      capabilities: {},
+      clientInfo: { name: 'pomnia-status-probe', version: '1' },
+    },
+  })
+  try {
+    const r = await fetch(url, { method: 'POST', headers, body, signal: AbortSignal.timeout(timeoutMs) })
+    const text = await r.text().catch(() => '')
+    return {
+      url,
+      reachable: true,
+      status: r.status,
+      speaksMcp: r.ok && /"result"|"protocolVersion"/.test(text),
+    }
+  } catch (e) {
+    return { url, reachable: false, error: e instanceof Error ? e.message : String(e) }
+  }
 }
 
 export interface McpActivityRecord {
@@ -125,7 +181,7 @@ async function exists(p: string): Promise<boolean> {
 }
 
 /** Status for one client. Pure I/O, no exceptions thrown. */
-export async function checkClient(spec: ClientSpec): Promise<ClientStatus> {
+export async function checkClient(spec: ClientSpec, opts?: CheckClientOptions): Promise<ClientStatus> {
   const targetOS = (process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'darwin' : 'linux') as
     | 'win32'
     | 'darwin'
@@ -185,33 +241,54 @@ export async function checkClient(spec: ClientSpec): Promise<ClientStatus> {
   ]
   const present = servers.filter((s) => s.present).length
   const rag = servers.find((s) => s.key === MCP_POMNIA_KEY)
-  const embeddedLocal =
-    rag?.present &&
-    !!rag.url &&
-    /127\.0\.0\.1|localhost/i.test(rag.url) &&
-    rag.url.includes('/mcp')
-  const state: WiredState = embeddedLocal
+  // brain-core (embedded or remote): single `pomnia` → `/mcp` is complete.
+  // Legacy Python hub: all three keys required.
+  const brainCoreComplete =
+    rag?.present && !!rag.url && rag.url.includes('/mcp')
+  const legacyHubComplete = present === POMNIA_KEYS.length
+  const complete = brainCoreComplete || legacyHubComplete
+  let state: WiredState = complete
     ? 'wired'
-    : present === POMNIA_KEYS.length
-      ? 'wired'
-      : present === 0
-        ? 'not_wired'
-        : 'partial'
+    : present === 0
+      ? 'not_wired'
+      : 'partial'
 
   const issues: string[] = []
   for (const s of servers) {
     if (s.present && !s.url) issues.push(`${s.key}: no URL detected (config shape unknown)`)
-    if (!embeddedLocal && !s.present) issues.push(`${s.key}: missing`)
+    if (!brainCoreComplete && !s.present) issues.push(`${s.key}: missing`)
   }
-  if (!embeddedLocal && present > 0 && present < POMNIA_KEYS.length) {
-    issues.unshift('incomplete: need pomnia + pomnia-vault + pomnia-library (remote)')
+  if (!brainCoreComplete && present > 0 && present < POMNIA_KEYS.length) {
+    issues.unshift(
+      'incomplete: brain-core needs pomnia → /mcp; legacy hub needs pomnia + pomnia-vault + pomnia-library',
+    )
   }
 
-  return { id: spec.id, label: spec.label, configPath, configExists: true, state, servers, issues }
+  // Reading the file only proves the paste landed. Asking the URL proves the
+  // agent will get an answer — the two diverge the moment a machine or network
+  // changes, and that gap is invisible to every check above.
+  let probe: McpProbe | undefined
+  if (opts?.probe && rag?.present && rag.url) {
+    probe = await probeMcpUrl(rag.url, opts.token, opts.probeTimeoutMs)
+    if (!probe.reachable) {
+      state = 'unreachable'
+      issues.unshift(`${rag.url} is not answering (${probe.error ?? 'no response'})`)
+    }
+  }
+
+  return { id: spec.id, label: spec.label, configPath, configExists: true, state, servers, issues, probe }
 }
 
-export async function checkAllClients(): Promise<ClientStatus[]> {
-  return Promise.all(CLIENTS.map((c) => checkClient(c)))
+export interface CheckClientOptions {
+  /** Also ask each configured URL whether anything answers. Costs one request per client. */
+  probe?: boolean
+  /** Bearer token for probing a remote, auth-gated brain. */
+  token?: string
+  probeTimeoutMs?: number
+}
+
+export async function checkAllClients(opts?: CheckClientOptions): Promise<ClientStatus[]> {
+  return Promise.all(CLIENTS.map((c) => checkClient(c, opts)))
 }
 
 /**

@@ -17,30 +17,57 @@
 export const CHUNK_CHAR = 1800
 export const CHUNK_OVERLAP = 200
 
+/** Backwards search for a code-point sequence, mirroring Python `str.rfind`. */
+function lastIndexOfCodePoints(hay: readonly string[], needle: readonly string[], from: number): number {
+  for (let i = Math.min(from, hay.length - needle.length); i >= 0; i--) {
+    let hit = true
+    for (let j = 0; j < needle.length; j++) {
+      if (hay[i + j] !== needle[j]) {
+        hit = false
+        break
+      }
+    }
+    if (hit) return i
+  }
+  return -1
+}
+
+const SEPARATORS = ['. ', '; ', '\n', ' '].map((s) => Array.from(s))
+
 export function chunkText(text: string, size = CHUNK_CHAR, overlap = CHUNK_OVERLAP): string[] {
   // Collapse whitespace: same semantics as Python `" ".join(text.split())`.
   const collapsed = text.split(/\s+/).filter(Boolean).join(' ')
   if (collapsed.length === 0) return []
-  if (collapsed.length <= size) return [collapsed]
+
+  // Python measures length in Unicode code points; a JS string indexes UTF-16
+  // units, so one emoji shifts every downstream boundary by one and the two
+  // implementations cut different text. Work on a code-point array to keep both
+  // on the same ruler.
+  const cp = Array.from(collapsed)
+  if (cp.length <= size) return [collapsed]
 
   const chunks: string[] = []
   let i = 0
-  while (i < collapsed.length) {
-    let end = Math.min(i + size, collapsed.length)
+  while (i < cp.length) {
+    let end = Math.min(i + size, cp.length)
     // Try to break at a sentence boundary in the second half of the window.
-    if (end < collapsed.length) {
-      const halfway = i + Math.floor(size / 2)
-      for (const sep of ['. ', '; ', '\n', ' ']) {
-        const cut = collapsed.lastIndexOf(sep, end)
-        if (cut > halfway) {
+    if (end < cp.length) {
+      const start = i + Math.floor(size / 2)
+      for (const sep of SEPARATORS) {
+        // Mirror Python `rfind(sep, start, end)`: the separator must fit
+        // *inside* the window, hence `end - sep.length`. Searching from `end`
+        // let a separator sitting on the boundary spill past it and produced a
+        // full-width chunk where Python backs up to an earlier break.
+        const cut = lastIndexOfCodePoints(cp, sep, end - sep.length)
+        if (cut > 0 && cut >= start) {
           end = cut + sep.length
           break
         }
       }
     }
-    const piece = collapsed.slice(i, end).trim()
+    const piece = cp.slice(i, end).join('').trim()
     if (piece.length > 0) chunks.push(piece)
-    if (end === collapsed.length) break
+    if (end === cp.length) break
     i = end - overlap
   }
   return chunks

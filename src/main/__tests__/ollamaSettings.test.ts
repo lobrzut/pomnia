@@ -44,7 +44,11 @@ describe('probeOllama', () => {
     getAppSettings.mockReturnValue({ ollamaUrl: 'http://127.0.0.1:11434' })
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: true, status: 200 }),
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ models: [{ name: 'nomic-embed-text:latest' }, { name: 'qwen2.5:14b' }] }),
+      }),
     )
   })
 
@@ -56,5 +60,44 @@ describe('probeOllama', () => {
       'http://127.0.0.1:11434/api/tags',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
+  })
+
+  it('returns the installed tags — reachable alone does not mean usable', async () => {
+    const { probeOllama } = await import('../ollamaSettings.js')
+    const r = await probeOllama()
+    expect(r.ok && r.models).toEqual(['nomic-embed-text:latest', 'qwen2.5:14b'])
+  })
+
+  it('still reports up when the body cannot be parsed', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => {
+          throw new Error('not json')
+        },
+      }),
+    )
+    const { probeOllama } = await import('../ollamaSettings.js')
+    const r = await probeOllama()
+    expect(r.ok).toBe(true)
+    expect(r.ok && r.models).toEqual([])
+  })
+})
+
+describe('missingEmbedModelMessage', () => {
+  /**
+   * The regression: the embed model was pulled after an index pass ran, so the
+   * whole vault came back as 26 files with nothing but WARN lines to show why.
+   */
+  it('names the pull command when the embed model is absent', async () => {
+    const { missingEmbedModelMessage } = await import('../ollamaSettings.js')
+    expect(missingEmbedModelMessage(['qwen2.5:14b'])).toContain('ollama pull nomic-embed-text')
+  })
+
+  it('is silent when the model is installed under its :latest tag', async () => {
+    const { missingEmbedModelMessage } = await import('../ollamaSettings.js')
+    expect(missingEmbedModelMessage(['nomic-embed-text:latest'])).toBeNull()
   })
 })

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
 import { useCallback, useEffect, useState } from 'react'
-import { Activity, Brain, Clock, FileArchive, FolderOpen, Handshake, Languages, Lock, Minimize2, Palette, Plug, RefreshCw, RotateCcw, Shield, ShieldCheck, Vault } from 'lucide-react'
+import { Activity, Brain, Clock, FileArchive, FolderOpen, Handshake, HardDrive, Languages, Lock, Minimize2, Palette, Plug, RefreshCw, RotateCcw, Shield, ShieldCheck, Vault } from 'lucide-react'
 import {
   isValidHandshakePhraseSetting,
 } from '@core/handshakePhrase'
@@ -12,17 +12,14 @@ import { humanBytes, relativeTime } from '../lib/format'
 import { uiLabels } from '../lib/labels'
 import { COLOR_SCHEMES, type ColorScheme } from '../lib/theme'
 import { UI_LOCALES, type UiLocale } from '../lib/uiLocale'
-import { useStore } from '../store/useStore'
+import { useStore, ollamaUrlFromBrainUrl } from '../store/useStore'
 import { isMcpClientActive } from '../lib/mcpClientVisibility'
+import { hasOllamaModel as hasModel } from '@core/brain/modelMatch'
 import type { ClientId } from '../lib/types'
 
 const ALL_CLIENTS: ClientId[] = ['claude-code', 'cursor', 'antigravity', 'claude-desktop', 'vscode', 'windsurf', 'hermes']
 
 const EMBEDDED_URL = 'http://127.0.0.1:7862'
-
-function hasModel(models: string[], want: string): boolean {
-  return models.some((m) => m === want || m === `${want}:latest` || m.replace(/:latest$/, '') === want)
-}
 
 type HealthRow = { id: string; label: string; ok: boolean | null; detail: string }
 
@@ -40,6 +37,8 @@ function HealthCheck() {
 
   const effectiveTarget = simpleMode ? 'embedded' : brainTarget
   const brainUrl = effectiveTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
+  /** Ollama gates follow stored Master target — simpleMode must not re-require local install. */
+  const remoteBrain = brainTarget === 'remote'
 
   const refresh = useCallback(async () => {
     setChecking(true)
@@ -49,7 +48,7 @@ function HealthCheck() {
         id: 'vault',
         label: labels.healthVault,
         ok: vault.open,
-        detail: vault.open ? vault.path ?? vault.name ?? labels.healthOk : 'Otwórz lub utwórz vault'
+        detail: vault.open ? vault.path ?? vault.name ?? labels.healthOk : labels.healthVaultAction
       })
 
       let status = null
@@ -58,37 +57,65 @@ function HealthCheck() {
       } catch {
         status = null
       }
-      next.push({
-        id: 'ollama',
-        label: labels.healthOllama,
-        ok: !!status?.reachable,
-        detail: status?.reachable ? status.baseUrl : 'Ollama niedostępne — zainstaluj i uruchom ollama.com'
-      })
+      // Remote brain: search/MCP live on the server. Local Ollama is distill-only —
+      // never paint install-or-die red when Master is remote.
+      if (remoteBrain) {
+        const suggestedOllama = remoteBrainUrl.trim()
+          ? ollamaUrlFromBrainUrl(remoteBrainUrl.trim())
+          : 'http://HOST:11434'
+        next.push({
+          id: 'ollama',
+          label: labels.healthOllama,
+          ok: status?.reachable ? true : null,
+          detail: status?.reachable
+            ? status.baseUrl
+            : labels.healthOllamaOptionalRemote(suggestedOllama),
+        })
+        next.push({
+          id: 'embed',
+          label: labels.healthEmbedModel,
+          ok: null,
+          detail: labels.healthSkip,
+        })
+        next.push({
+          id: 'chat',
+          label: labels.healthChatModel,
+          ok: null,
+          detail: labels.healthOllamaOptionalRemote(suggestedOllama),
+        })
+      } else {
+        next.push({
+          id: 'ollama',
+          label: labels.healthOllama,
+          ok: !!status?.reachable,
+          detail: status?.reachable ? status.baseUrl : labels.healthOllamaMissing,
+        })
 
-      const models = status?.models ?? []
-      const embedOk = hasModel(models, status?.embedModel ?? 'nomic-embed-text')
-      next.push({
-        id: 'embed',
-        label: labels.healthEmbedModel,
-        ok: status?.reachable ? embedOk : null,
-        detail: embedOk
-          ? status?.embedModel ?? 'nomic-embed-text'
-          : status?.reachable
-            ? `Brak modelu — ollama pull ${status?.embedModel ?? 'nomic-embed-text'}`
-            : labels.healthSkip
-      })
+        const models = status?.models ?? []
+        const embedOk = hasModel(models, status?.embedModel ?? 'nomic-embed-text')
+        next.push({
+          id: 'embed',
+          label: labels.healthEmbedModel,
+          ok: status?.reachable ? embedOk : null,
+          detail: embedOk
+            ? status?.embedModel ?? 'nomic-embed-text'
+            : status?.reachable
+              ? labels.healthModelMissing(`ollama pull ${status?.embedModel ?? 'nomic-embed-text'}`)
+              : labels.healthSkip,
+        })
 
-      const chatOk = hasModel(models, status?.chatModel ?? 'qwen2.5:14b')
-      next.push({
-        id: 'chat',
-        label: labels.healthChatModel,
-        ok: status?.reachable ? chatOk : null,
-        detail: chatOk
-          ? status?.chatModel ?? 'qwen2.5:14b'
-          : status?.reachable
-            ? `Brak modelu — ollama pull ${status?.chatModel ?? 'qwen2.5:14b'}`
-            : labels.healthSkip
-      })
+        const chatOk = hasModel(models, status?.chatModel ?? 'qwen2.5:14b')
+        next.push({
+          id: 'chat',
+          label: labels.healthChatModel,
+          ok: status?.reachable ? chatOk : null,
+          detail: chatOk
+            ? status?.chatModel ?? 'qwen2.5:14b'
+            : status?.reachable
+              ? labels.healthModelMissing(`ollama pull ${status?.chatModel ?? 'qwen2.5:14b'}`)
+              : labels.healthSkip,
+        })
+      }
 
       if (effectiveTarget === 'embedded') {
         const core = await api.brainCoreStatus()
@@ -98,7 +125,7 @@ function HealthCheck() {
           ok: core.running,
           detail: core.running
             ? core.url ?? labels.healthOk
-            : core.lastError || 'Uruchom w zakładce Brain'
+            : core.lastError || labels.healthCoreAction
         })
       } else {
         next.push({
@@ -121,7 +148,7 @@ function HealthCheck() {
           ok: conn.brain.reachable,
           detail: conn.brain.reachable
             ? conn.brain.url
-            : conn.brain.error || 'Brain MCP nieosiągalny'
+            : conn.brain.error || labels.healthMcpUnreachable
         })
       } catch (e) {
         next.push({
@@ -137,7 +164,7 @@ function HealthCheck() {
           id: 'deploy',
           label: labels.healthDeployPath,
           ok: null,
-          detail: brainDeployTarget?.trim() || 'Nie skonfigurowano (opcjonalnie)'
+          detail: brainDeployTarget?.trim() || labels.healthDeployNotSet
         })
       }
     } finally {
@@ -150,6 +177,8 @@ function HealthCheck() {
     vault.name,
     ollamaUrl,
     effectiveTarget,
+    remoteBrain,
+    remoteBrainUrl,
     brainUrl,
     connectToken,
     brainDeployTarget,
@@ -259,9 +288,34 @@ export default function Settings() {
     pl: labels.uiLocalePl,
     en: labels.uiLocaleEn,
   }
+  // Simple mode pins the engine local regardless of the saved target.
+  const engineIsLocal = simpleMode || brainTarget === 'embedded'
   const [exportSnap, setExportSnap] = useState(snapshots[0]?.id ?? '')
   const [verifying, setVerifying] = useState(false)
   const [appVersion, setAppVersion] = useState('')
+  const [update, setUpdate] = useState<Awaited<ReturnType<typeof api.appUpdateCheck>> | null>(null)
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [dataLoc, setDataLoc] = useState<Awaited<ReturnType<typeof api.appDataLocations>> | null>(null)
+  const isLinux = api.platform === 'linux'
+  const isWindows = api.platform === 'win32'
+
+  async function runUpdateCheck() {
+    setCheckingUpdate(true)
+    try {
+      setUpdate(await api.appUpdateCheck())
+    } catch (e) {
+      // The check failing is itself an answer, and a silent button is the one
+      // thing this card exists to stop being.
+      setUpdate({
+        current: appVersion,
+        checkedAt: new Date().toISOString(),
+        state: 'unreachable',
+        detail: (e as Error).message,
+      })
+    } finally {
+      setCheckingUpdate(false)
+    }
+  }
   const [phraseDraft, setPhraseDraft] = useState(handshakePhrase)
   const [phraseError, setPhraseError] = useState<string | null>(null)
   const [phraseSaving, setPhraseSaving] = useState(false)
@@ -276,6 +330,13 @@ export default function Settings() {
       .then((r) => setAppVersion(r.identity || r.version))
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    void api
+      .appDataLocations()
+      .then(setDataLoc)
+      .catch(() => {})
+  }, [vault.open, vault.path])
 
   async function saveHandshakePhrase() {
     const trimmed = phraseDraft.trim()
@@ -308,8 +369,8 @@ export default function Settings() {
       const r = await api.verify()
       toast({
         kind: r.ok ? 'success' : 'error',
-        title: r.ok ? 'Integralność vaultu OK' : `${r.errors.length} błąd(ów) integralności`,
-        detail: `Sprawdzono ${r.checked} zaszyfrowanych blobów`,
+        title: r.ok ? labels.vaultIntegrityOk : labels.vaultIntegrityErrors(r.errors.length),
+        detail: labels.vaultIntegrityChecked(r.checked),
       })
     } finally {
       setVerifying(false)
@@ -329,9 +390,14 @@ export default function Settings() {
     if (!exportSnap || !settingsExportDir) return
     try {
       const r = await api.brainExport(exportSnap, settingsExportDir)
-      toast({ kind: 'success', title: `Wyeksportowano ${r.count} notatek`, detail: r.dir })
+      // Zero notes exported is not a success — the folder is empty either way.
+      toast(
+        r.count > 0
+          ? { kind: 'success', title: labels.exportOk(r.count), detail: r.dir }
+          : { kind: 'warn', title: labels.exportNoNotes, detail: labels.exportSnapshotEmptyDetail(r.dir) },
+      )
     } catch (e) {
-      toast({ kind: 'error', title: 'Eksport nieudany', detail: (e as Error).message })
+      toast({ kind: 'error', title: labels.exportFailed, detail: (e as Error).message })
     }
   }
 
@@ -339,6 +405,115 @@ export default function Settings() {
     <div className="mx-auto max-w-3xl">
       <h1 className="mb-1 text-[26px] font-bold tracking-tight text-grad">{labels.settingsTitle}</h1>
       <p className="mb-6 text-sm text-ink-dim">{labels.settingsLead}</p>
+
+      {/*
+        Version and updates, first thing on the page.
+        The startup check only ever spoke when a newer build existed, so on the
+        overwhelmingly common day — you are current — the feature was invisible
+        and indistinguishable from one that does not work.
+      */}
+      <GlassCard className="mb-4 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-ink">
+              Pomnia {appVersion || '—'}
+            </div>
+            <p className="mt-1 text-xs text-ink-dim">
+              {update === null
+                ? labels.updateIdle
+                : update.state === 'available'
+                  ? labels.updateAvailable(update.latest ?? '')
+                  : update.state === 'unreachable'
+                    ? labels.updateUnreachable(update.detail ?? labels.updateNoConnection)
+                    : labels.updateCurrent}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {update?.state === 'available' && update.releaseUrl && (
+              // A plain anchor rather than an IPC round-trip: Electron's
+              // setWindowOpenHandler already sends target=_blank to the system
+              // browser, so there is nothing to add and one less channel.
+              <a
+                href={update.releaseUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="no-drag rounded-xl border border-white/10 bg-mint/15 px-3.5 py-2 text-[13px] font-semibold text-mint"
+              >
+                {labels.updateDownload}
+              </a>
+            )}
+            <Button variant="soft" onClick={() => void runUpdateCheck()} disabled={checkingUpdate}>
+              {checkingUpdate ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              {labels.updateCheckNow}
+            </Button>
+          </div>
+        </div>
+        {isLinux ? (
+          <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">{labels.updateLinuxHint}</p>
+        ) : null}
+      </GlassCard>
+
+      <GlassCard className="mb-4 p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+          <HardDrive className="h-4 w-4 text-mint" /> {labels.dataLocationsTitle}
+        </div>
+        <p className="mb-3 text-xs text-ink-dim">{labels.dataLocationsLead}</p>
+        {dataLoc ? (
+          <div className="space-y-2.5 text-xs">
+            <div>
+              <div className="text-ink-faint">{labels.dataLocationsUserData}</div>
+              <div className="mt-0.5 break-all font-mono text-[11px] text-ink">{dataLoc.userDataDir}</div>
+            </div>
+            <div>
+              <div className="text-ink-faint">{labels.dataLocationsIndex}</div>
+              <div className="mt-0.5 break-all font-mono text-[11px] text-ink">{dataLoc.libraryDbPath}</div>
+            </div>
+            <div>
+              <div className="text-ink-faint">{labels.dataLocationsVault}</div>
+              <div className="mt-0.5 break-all font-mono text-[11px] text-ink">
+                {dataLoc.vaultPath ?? labels.dataLocationsVaultLocked}
+              </div>
+            </div>
+            <p className="text-[11px] text-ink-faint">{labels.dataLocationsInstallForm(dataLoc.installForm)}</p>
+            <p className="text-[11px] leading-relaxed text-ink-dim">{labels.dataLocationsPlaintext}</p>
+            <p className="text-[11px] leading-relaxed text-ink-dim">{labels.dataLocationsOwnership}</p>
+            <p className="text-[11px] leading-relaxed text-ink-faint">{labels.dataLocationsWipe}</p>
+            {!isMock && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="soft"
+                  onClick={() => {
+                    void api.openUserData().catch(() => {})
+                  }}
+                >
+                  <FolderOpen className="h-4 w-4" /> {labels.dataLocationsOpenUserData}
+                </Button>
+                <Button
+                  type="button"
+                  variant="soft"
+                  onClick={() => {
+                    void api.openBrainData().catch(() => {})
+                  }}
+                >
+                  <FolderOpen className="h-4 w-4" /> {labels.dataLocationsOpenBrain}
+                </Button>
+                <Button
+                  type="button"
+                  variant="soft"
+                  onClick={() => {
+                    void api.openLogs().catch(() => {})
+                  }}
+                >
+                  <FolderOpen className="h-4 w-4" /> {labels.dataLocationsLogs}
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-ink-faint">…</p>
+        )}
+      </GlassCard>
 
       <GlassCard className="mb-4 p-5">
         <div className="mb-1 flex items-center justify-between gap-3">
@@ -562,10 +737,10 @@ export default function Settings() {
               onChange={(e) => setExportSnap(e.target.value)}
               className="no-drag w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-ink outline-none"
             >
-              {snapshots.length === 0 && <option value="">— brak —</option>}
+              {snapshots.length === 0 && <option value="">{labels.snapshotEmptyOption}</option>}
               {snapshots.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.source.label} · {s.stats.conversations} czatów · {s.id.slice(0, 8)}
+                  {labels.snapshotChatsOption(s.source.label, s.stats.conversations, s.id.slice(0, 8))}
                 </option>
               ))}
             </select>
@@ -588,7 +763,21 @@ export default function Settings() {
         <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
           <Plug className="h-4 w-4 text-cyan" /> {labels.mcpClients}
         </div>
-        <p className="mb-4 text-xs text-ink-dim">{labels.mcpClientsLead}</p>
+        <p className="mb-3 text-xs text-ink-dim">{labels.mcpClientsLead}</p>
+        {/* The switch itself lives in Connect, but Settings is where people
+            look for it — asked outright whether going server-side meant
+            reinstalling. Say what is running and where to change it. */}
+        <div className="mb-4 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5 text-xs">
+          <span className="text-ink">
+            {labels.settingsEngineNow(
+              engineIsLocal ? labels.settingsEngineLocal : labels.settingsEngineRemote,
+            )}
+          </span>
+          <span className="ml-2 font-mono text-ink-faint">
+            {(engineIsLocal ? EMBEDDED_URL : remoteBrainUrl.trim()) || '—'}
+          </span>
+          <div className="mt-1 text-ink-faint">{labels.settingsEngineWhereToSwitch}</div>
+        </div>
         <div className="space-y-2">
           {ALL_CLIENTS.map((id) => {
             const c = mcpClients.find((x) => x.id === id)
@@ -622,7 +811,7 @@ export default function Settings() {
                 <Toggle
                   checked={visible}
                   onChange={(v) => setConnectClientVisible(id, v)}
-                  aria-label={`Pokaż ${c?.label ?? id} w Connect`}
+                  aria-label={labels.showClientInConnect(c?.label ?? id)}
                 />
               </div>
             )
@@ -668,7 +857,7 @@ export default function Settings() {
                       <Clock className="h-3 w-3" /> {relativeTime(s.createdAt)}
                     </span>
                     <span>
-                      {s.stats.files} plików · {humanBytes(s.stats.bytes)}
+                      {labels.snapshotFilesBytes(s.stats.files, humanBytes(s.stats.bytes))}
                     </span>
                   </div>
                 </div>
@@ -683,34 +872,54 @@ export default function Settings() {
         )}
       </GlassCard>
 
-      <GlassCard className="mb-4 p-5">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
-          <Shield className="h-4 w-4 text-mint" /> {labels.antivirusTitle}
-        </div>
-        <p className="mb-2 text-xs text-ink-dim">{labels.antivirusLead}</p>
-        <p className="mb-3 text-xs text-ink-dim">{labels.antivirusWhy}</p>
-        <p className="mb-3 text-[11px] leading-relaxed text-ink-dim">{labels.antivirusSigningNote}</p>
-        {!isMock && (
-          <Button
-            type="button"
-            variant="soft"
-            onClick={() => {
-              void api.revealInstallDir().catch(() => {})
-            }}
-          >
-            <FolderOpen className="h-4 w-4" /> {labels.antivirusOpenInstallFolder}
-          </Button>
-        )}
-      </GlassCard>
+      {isWindows || isMock ? (
+        <GlassCard className="mb-4 p-5">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+            <Shield className="h-4 w-4 text-mint" /> {labels.antivirusTitle}
+          </div>
+          <p className="mb-2 text-xs text-ink-dim">{labels.antivirusLead}</p>
+          <p className="mb-3 text-xs text-ink-dim">{labels.antivirusWhy}</p>
+          <p className="mb-3 text-[11px] leading-relaxed text-ink-dim">{labels.antivirusSigningNote}</p>
+          {!isMock && (
+            <Button
+              type="button"
+              variant="soft"
+              onClick={() => {
+                void api.revealInstallDir().catch(() => {})
+              }}
+            >
+              <FolderOpen className="h-4 w-4" /> {labels.antivirusOpenInstallFolder}
+            </Button>
+          )}
+        </GlassCard>
+      ) : isLinux ? (
+        <GlassCard className="mb-4 p-5">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+            <Shield className="h-4 w-4 text-mint" /> {labels.linuxUnsignedTitle}
+          </div>
+          <p className="mb-3 text-xs text-ink-dim">{labels.linuxUnsignedLead}</p>
+          {!isMock && (
+            <Button
+              type="button"
+              variant="soft"
+              onClick={() => {
+                void api.revealInstallDir().catch(() => {})
+              }}
+            >
+              <FolderOpen className="h-4 w-4" /> {labels.antivirusOpenInstallFolder}
+            </Button>
+          )}
+        </GlassCard>
+      ) : null}
 
       <GlassCard className="p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
           <ShieldCheck className="h-4 w-4 text-mint" /> {labels.securityAbout}
         </div>
         <ul className="space-y-1.5 text-xs text-ink-dim">
-          <li>• AES-256-GCM — szyfrowanie uwierzytelnione, losowy IV na blob.</li>
-          <li>• scrypt (N=2¹⁷) — pochodna klucza z hasła.</li>
-          <li>• Content-addressed blob store — identyczne pliki trzymane raz.</li>
+          <li>• {labels.securityAesBullet}</li>
+          <li>• {labels.securityScryptBullet}</li>
+          <li>• {labels.securityContentAddressedBullet}</li>
           <li>• {labels.securityPortability}</li>
           {appVersion && (
             <li className="text-ink-faint">{labels.securityAboutCli(appVersion)}</li>

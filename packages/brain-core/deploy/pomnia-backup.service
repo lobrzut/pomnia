@@ -1,0 +1,35 @@
+; SPDX-License-Identifier: AGPL-3.0-only
+; One run of the credential backup. Driven by pomnia-backup.timer.
+
+[Unit]
+Description=Pomnia — back up the credentials that cannot be rebuilt
+Documentation=https://pomnia.ai
+
+[Service]
+Type=oneshot
+User=pomnia
+Group=pomnia
+ExecStart=/opt/pomnia-brain-core/deploy/backup-credentials.sh /var/lib/pomnia
+
+; Same sandbox as the server: this touches four small files and needs nothing
+; else. ProtectSystem=strict makes the whole filesystem read-only bar the one
+; path below, so a bug here cannot reach anything but its own backups.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+ReadWritePaths=/var/lib/pomnia
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pomnia-backup

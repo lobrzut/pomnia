@@ -28,6 +28,7 @@ import { Badge, Button, GlassCard, Input, ProgressBar, Spinner } from '../compon
 import { relativeTime, sourceMeta } from '../lib/format'
 import { api } from '../lib/api'
 import { VRAM_PROFILES, PROFILE_EMBED_MODEL, PROFILE_EMBED_SIZE } from '@core/brain/profiles'
+import { hasOllamaModel as hasModel } from '@core/brain/modelMatch'
 import { isDistillableSource } from '@core/brain/distillSources'
 import type { BrainHit, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent, QuarantineBucket, QuarantineNoteMeta } from '../lib/types'
 import { uiLabels } from '../lib/labels'
@@ -68,11 +69,6 @@ function doctorLevelClass(level: DoctorCheckRow['level']): string {
 
 const PROFILE_KEY = 'pomnia.brain.profile'
 
-/** "qwen2.5:14b" and "qwen2.5:14b" match; "nomic-embed-text" matches "nomic-embed-text:latest". */
-function hasModel(models: string[], want: string): boolean {
-  return models.some((m) => m === want || m === `${want}:latest` || m.replace(/:latest$/, '') === want)
-}
-
 const STAGE_ICONS = {
   collect: Database,
   distill: Sparkles,
@@ -112,8 +108,8 @@ export default function Brain() {
   const labels = uiLabels()
   const [advancedOpen, setAdvancedOpen] = useState(!simpleMode)
   const showAdvanced = !simpleMode || advancedOpen
-  /** Simple mode is always embedded; remote-only UI only when advanced + remote target. */
-  const isRemoteTarget = !simpleMode && brainTarget === 'remote'
+  /** Remote Master owns search/MCP — local Ollama is distill-only, never an install gate. */
+  const isRemoteTarget = brainTarget === 'remote'
   const allPipelineStages = [
     { id: 'collect' as const, label: labels.brainPipeCollect, note: labels.brainPipeCollectNote, icon: STAGE_ICONS.collect },
     { id: 'distill' as const, label: labels.brainPipeDistill, note: labels.brainPipeDistillNote, icon: STAGE_ICONS.distill },
@@ -157,9 +153,17 @@ export default function Brain() {
   async function pullModel(model: string) {
     try {
       await api.ollamaPull(model, ollamaUrl || undefined)
+      // Ask Ollama what it actually has rather than trusting that pull returned.
+      // Marking the model installed on the strength of "we called pull" is how a
+      // vault gets indexed with no embedder: the badge said ready, the tag list
+      // never had it, and every embed 404'd in silence.
+      const after = await check()
+      if (!hasModel(after?.models ?? [], model)) {
+        toast({ kind: 'error', title: labels.toastPullFailed, detail: labels.toastModelStillMissing(model) })
+        return
+      }
       setJustPulled((s) => new Set(s).add(model))
       toast({ kind: 'success', title: labels.toastModelReady, detail: model })
-      void check() // refresh the installed list
     } catch (e) {
       toast({ kind: 'error', title: labels.toastPullFailed, detail: (e as Error).message })
     } finally {
@@ -322,6 +326,18 @@ export default function Brain() {
     }
   }
 
+  async function cancelIndexEmbedded() {
+    // Cancels the pass only. stopEmbedded() would take the whole brain down and
+    // every connected agent's MCP with it — too blunt for "this reindex is taking
+    // too long".
+    try {
+      setEmbedded(await api.brainCoreCancelIndex())
+    } catch (e) {
+      useStore.getState().toast({ kind: 'error', title: labels.embeddedBrain, detail: (e as Error).message })
+      void refreshEmbedded()
+    }
+  }
+
   // Honest pipeline state — live chats vs the distill ledger (global store).
   useEffect(() => {
     void loadBrainState()
@@ -352,6 +368,7 @@ export default function Brain() {
     }
     setStatus(best)
     setChecking(false)
+    return best
   }
   useEffect(() => {
     void check()
@@ -408,7 +425,12 @@ export default function Brain() {
         sources: distillable.map((d) => d.id)
       })
       setDeployMsg(r.detail)
-      useStore.getState().toast({ kind: 'success', title: labels.toastDeployed, detail: r.detail })
+      useStore.getState().toast({
+        // Partial failure is not success. `detail` already spells out what broke.
+        kind: r.ok ? 'success' : 'warn',
+        title: r.ok ? labels.toastDeployed : labels.toastDeployPartial,
+        detail: r.detail,
+      })
     } catch (e) {
       useStore.getState().toast({ kind: 'error', title: labels.toastDeployFailed, detail: (e as Error).message })
     } finally {
@@ -455,6 +477,50 @@ export default function Brain() {
           <span className="text-[11px] text-ink-faint">{advancedOpen ? '▲' : '▼'}</span>
         </button>
       )}
+
+      {/* Simple mode hides VRAM/pull behind Advanced — surface the embed gate here.
+          Remote brain: server owns search/embed — no local install/pull CTA. */}
+      {simpleMode &&
+        !advancedOpen &&
+        !isRemoteTarget &&
+        status?.reachable &&
+        !installed(PROFILE_EMBED_MODEL) && (
+          <GlassCard className="mb-5 border-amber/25 bg-amber/8 p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-ink">{labels.onboardingEngineModelsNeeded}</div>
+                <p className="mt-1 text-[11px] leading-relaxed text-ink-dim">
+                  {labels.onboardingEngineEmbedMissing(`ollama pull ${PROFILE_EMBED_MODEL}`)}
+                </p>
+              </div>
+              {pull?.model === PROFILE_EMBED_MODEL ? (
+                <div className="flex min-w-40 flex-1 items-center gap-2">
+                  <span className="flex-1">
+                    <ProgressBar
+                      value={pull.total ? Math.round(((pull.completed ?? 0) / pull.total) * 100) : 8}
+                    />
+                  </span>
+                  <button
+                    type="button"
+                    className="no-drag shrink-0 text-[11px] font-semibold text-rose hover:underline"
+                    onClick={() => void api.ollamaPullCancel()}
+                  >
+                    {labels.onboardingEngineCancelPull}
+                  </button>
+                </div>
+              ) : (
+                <Button
+                  variant="soft"
+                  onClick={() => void pullModel(PROFILE_EMBED_MODEL)}
+                  disabled={pull !== null}
+                  className="!px-2.5 !py-1.5 !text-[11px]"
+                >
+                  <Download className="h-3.5 w-3.5" /> {labels.onboardingEnginePullBtn}
+                </Button>
+              )}
+            </div>
+          </GlassCard>
+        )}
 
       {/* Brain state — live chats vs distill ledger, the "what's left to do" panel */}
       <GlassCard className="mb-5 p-5">
@@ -695,12 +761,13 @@ export default function Brain() {
       </GlassCard>
       )}
 
-      {/* Ollama status + VRAM profiles — advanced only */}
+      {/* Ollama status + VRAM profiles — advanced only; remote = distill endpoint, not install gate */}
       {showAdvanced && (
       <GlassCard className="mb-5 p-5">
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <Cpu className="h-4 w-4 text-iris" /> Local engine (Ollama)
+            <Cpu className="h-4 w-4 text-iris" />{' '}
+            {isRemoteTarget ? labels.brainOllamaDistillTitle : 'Local engine (Ollama)'}
           </div>
           {status && (
             <div className="flex items-center gap-2">
@@ -726,9 +793,22 @@ export default function Brain() {
         </div>
 
         <p className="mb-3 text-xs text-ink-faint">
-          Pick the profile matching your GPU — it sets which model distills your chats. Missing models can be pulled
-          right here.
+          {isRemoteTarget
+            ? labels.brainOllamaDistillLead
+            : 'Pick the profile matching your GPU — it sets which model distills your chats. Missing models can be pulled right here.'}
         </p>
+
+        {!isRemoteTarget && !status?.reachable && (
+          <div className="mb-3 rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-[11px] text-amber-100">
+            <div className="font-semibold text-ink">{labels.onboardingEngineNotFound}</div>
+            <p className="mt-1 text-ink-dim">{labels.onboardingEngineInstall1}</p>
+          </div>
+        )}
+        {isRemoteTarget && !status?.reachable && (
+          <div className="mb-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-[11px] text-ink-dim">
+            {labels.brainOllamaDistillOfflineHint}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
           {VRAM_PROFILES.map((p) => {
@@ -818,9 +898,10 @@ export default function Brain() {
           })}
         </div>
 
-        {/* Shared embedding model — one for every profile, changing it = full reindex */}
+        {/* Shared embedding model — embedded search only; remote Brain embeds on the server. */}
+        {!isRemoteTarget && (
         <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
-          <span className="text-[11px] font-medium text-ink-dim">Embedding model (shared)</span>
+          <span className="text-[11px] font-medium text-ink-dim">{labels.brainEmbedModelShared}</span>
           <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-cyan">{PROFILE_EMBED_MODEL}</code>
           <span className="text-[10px] text-ink-faint">{PROFILE_EMBED_SIZE}</span>
           {pull?.model === PROFILE_EMBED_MODEL ? (
@@ -850,10 +931,12 @@ export default function Brain() {
             same for every profile — switching it would force a full reindex
           </span>
         </div>
+        )}
       </GlassCard>
       )}
 
-      {/* Embedded brain — forked brain-core serving MCP on localhost */}
+      {/* Embedded brain — local MCP only; remote Master owns search on the server. */}
+      {!isRemoteTarget && (
       <GlassCard className="mb-5 p-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
@@ -882,16 +965,22 @@ export default function Brain() {
               <User className="h-3.5 w-3.5" />
               {labels.profilePreview}
             </Button>
-            {embedded?.running && showAdvanced && (
-              <Button
-                variant="soft"
-                onClick={() => void reindexEmbedded()}
-                disabled={embeddedBusy || embeddedStopping || embedded.indexing}
-              >
-                {embedded.indexing || embeddedBusy ? <Spinner className="h-3.5 w-3.5" /> : <Layers className="h-3.5 w-3.5" />}
-                {labels.reindex}
-              </Button>
-            )}
+            {embedded?.running && showAdvanced &&
+              (embedded.indexing ? (
+                <Button variant="soft" onClick={() => void cancelIndexEmbedded()} disabled={embeddedStopping}>
+                  <Square className="h-3.5 w-3.5 fill-current" />
+                  {labels.reindexCancel}
+                </Button>
+              ) : (
+                <Button
+                  variant="soft"
+                  onClick={() => void reindexEmbedded()}
+                  disabled={embeddedBusy || embeddedStopping}
+                >
+                  {embeddedBusy ? <Spinner className="h-3.5 w-3.5" /> : <Layers className="h-3.5 w-3.5" />}
+                  {labels.reindex}
+                </Button>
+              ))}
             {embedded?.running || embedded?.starting || embedded?.indexing ? (
               <Button variant="soft" onClick={() => void stopEmbedded()} disabled={embeddedStopping}>
                 {embeddedStopping ? <Spinner className="h-4 w-4" /> : <Square className="h-3.5 w-3.5 fill-current" />}
@@ -909,6 +998,7 @@ export default function Brain() {
           {labels.brainEmbeddedProcessHint}
         </p>
       </GlassCard>
+      )}
 
       {/* Run */}
       <GlassCard className="mb-5 p-5">
@@ -916,7 +1006,11 @@ export default function Brain() {
           <span className="text-sm font-semibold text-ink">
             {showAdvanced ? labels.brainAdvancedDistillTitle : labels.distill}
           </span>
-          {showAdvanced && <span className="text-xs text-ink-faint">{labels.brainAdvancedOllamaNeed}</span>}
+          {showAdvanced && (
+            <span className="text-xs text-ink-faint">
+              {isRemoteTarget ? labels.healthOllamaDistillHint : labels.brainAdvancedOllamaNeed}
+            </span>
+          )}
         </div>
         <div className="mb-4 flex flex-wrap gap-2">
           {distillable.map((s) => {
@@ -1071,7 +1165,7 @@ export default function Brain() {
           </span>
         </div>
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-medium text-ink-dim">Dashboard URL</span>
+          <span className="text-[11px] font-medium text-ink-dim">{labels.brainDashboardUrlLabel}</span>
           <Input
             value={brainDeployUrl}
             onChange={(e) => setBrainDeployUrl(e.target.value)}
@@ -1080,7 +1174,7 @@ export default function Brain() {
           />
         </div>
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-medium text-ink-dim">Distilled folder (optional SMB)</span>
+          <span className="text-[11px] font-medium text-ink-dim">{labels.brainDistilledFolderLabel}</span>
           <Input
             value={brainDeployTarget}
             onChange={(e) => setBrainDeployTarget(e.target.value)}

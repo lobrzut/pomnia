@@ -21,6 +21,7 @@ import {
   ensureBrainForIndexing,
   type LibraryIndexProgress,
 } from './libraryIndex.js'
+import { m } from './mainStrings.js'
 import type { DocOcrResult } from './docImportTypes.js'
 
 export async function runDocumentOcr(
@@ -60,7 +61,7 @@ export async function runDocumentOcr(
         }),
     })
     if (ocr.method === 'none' || ocr.pages.length === 0) {
-      throw new Error('OCR nie zwrócił tekstu — sprawdź tessdata (eng/pol) i @napi-rs/canvas')
+      throw new Error(m().ocrNoText)
     }
 
     const merged = applyOcrToDocument(tier1, ocr)

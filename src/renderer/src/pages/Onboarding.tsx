@@ -21,15 +21,25 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { AppLogo } from '../components/AppLogo'
-import { Button, Field, Input, Spinner } from '../components/ui'
+import { Button, Field, Input, ProgressBar, Spinner } from '../components/ui'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { GuideOverlay } from '../components/GuideMap'
 import { ClientIcon } from '../components/ClientIcon'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
-import { useStore } from '../store/useStore'
+import { useStore, ollamaUrlFromBrainUrl } from '../store/useStore'
+import { identifyEngine } from '@core/brain/engine'
+import { hasOllamaModel } from '@core/brain/modelMatch'
 import { EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from '@core/brain/snippet'
-import type { BrainStatus, BrainTarget, ClientId, ClientStatus, EmbeddedBrainStatus, Snippet } from '../lib/types'
+import type {
+  BrainStatus,
+  BrainTarget,
+  ClientId,
+  ClientStatus,
+  EmbeddedBrainStatus,
+  OllamaPullEvent,
+  Snippet,
+} from '../lib/types'
 
 const EMBEDDED_URL = EMBEDDED_BRAIN_DEFAULT_URL
 const REMOTE_URL_PLACEHOLDER = REMOTE_BRAIN_URL_PLACEHOLDER
@@ -45,14 +55,6 @@ const REMOTE_URL_PLACEHOLDER = REMOTE_BRAIN_URL_PLACEHOLDER
  */
 
 type StepId = 'welcome' | 'vault' | 'backup' | 'engine' | 'connect' | 'ready'
-
-function hasOllamaModel(models: string[], want: string): boolean {
-  const w = want.toLowerCase()
-  return models.some((m) => {
-    const ml = m.toLowerCase()
-    return ml === w || ml === `${w}:latest` || ml.replace(/:latest$/, '') === w
-  })
-}
 
 interface Outcomes {
   vault: 'done' | null
@@ -294,6 +296,16 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
   const [pass, setPass] = useState('')
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
+  const [pathPlaceholder, setPathPlaceholder] = useState(labels.vaultPathPlaceholder)
+
+  useEffect(() => {
+    void api
+      .appDataLocations()
+      .then((loc) => {
+        if (loc.defaultVaultExample) setPathPlaceholder(loc.defaultVaultExample)
+      })
+      .catch(() => {})
+  }, [])
 
   const mismatch = mode === 'create' && !!pass && !!confirm && pass !== confirm
   const valid = !!path && !!pass && !mismatch && (mode === 'unlock' || !!confirm)
@@ -335,7 +347,7 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
       <div className="space-y-3.5">
         <Field label={mode === 'create' ? labels.onboardingVaultNewFolder : labels.onboardingVaultFolder}>
           <div className="flex gap-2">
-            <Input value={path} onChange={(e) => setPath(e.target.value)} placeholder="C:\Vault" />
+            <Input value={path} onChange={(e) => setPath(e.target.value)} placeholder={pathPlaceholder} />
             <Button variant="soft" onClick={pick}>
               <FolderOpen className="h-4 w-4" />
             </Button>
@@ -463,7 +475,15 @@ function EngineStep({
   const [remoteTesting, setRemoteTesting] = useState(false)
   const [remoteOk, setRemoteOk] = useState<boolean | null>(null)
   const [remoteDetail, setRemoteDetail] = useState('')
+  const [pull, setPull] = useState<OllamaPullEvent | null>(null)
+  const [pullError, setPullError] = useState<string | null>(null)
 
+  /**
+   * "Reachable" is not the question. A saved URL from an older machine pointed
+   * at the legacy Python brain, which answers every probe — the test would have
+   * gone green while the agents got a different brain over a different vault.
+   * So the pass condition is the engine naming itself, not the socket opening.
+   */
   async function testRemote() {
     const url = remoteUrl.trim()
     if (!url) return
@@ -471,11 +491,17 @@ function EngineStep({
     setRemoteOk(null)
     try {
       const r = await api.connectStatus(url, undefined, 'remote')
-      setRemoteOk(r.brain.reachable)
+      if (!r.brain.reachable) {
+        setRemoteOk(false)
+        setRemoteDetail(r.brain.error || labels.onboardingEngineRemoteFail)
+        return
+      }
+      const engine = identifyEngine(r.brain.data as Record<string, unknown> | undefined)
+      setRemoteOk(engine.compatible)
       setRemoteDetail(
-        r.brain.reachable
+        engine.compatible
           ? labels.onboardingEngineRemoteOk
-          : r.brain.error || labels.onboardingEngineRemoteFail,
+          : labels.onboardingEngineRemoteWrongEngine(engine.label),
       )
     } catch (e) {
       setRemoteOk(false)
@@ -500,6 +526,33 @@ function EngineStep({
     void check()
   }, [])
 
+  useEffect(() => api.onOllamaPullProgress(setPull), [])
+
+  /**
+   * Same IPC as Brain advanced profiles. First-run used to only print
+   * `ollama pull …` — Linux premiere users hit that wall hardest because they
+   * never discovered the advanced Brain card. Verify tags after pull; success
+   * alone is how empty indexes used to look green.
+   */
+  async function pullModel(model: string) {
+    if (pull) return
+    setPullError(null)
+    setPull({ model, status: 'starting' })
+    try {
+      await api.ollamaPull(model)
+      const after = await api.brainStatus()
+      setStatus(after)
+      if (!hasOllamaModel(after.models ?? [], model)) {
+        setPullError(labels.toastModelStillMissing(model))
+        return
+      }
+    } catch (e) {
+      setPullError((e as Error).message || labels.toastPullFailed)
+    } finally {
+      setPull(null)
+    }
+  }
+
   const found = !!status?.reachable
   const models = status?.models ?? []
   const embedModel = status?.embedModel ?? 'nomic-embed-text'
@@ -507,12 +560,68 @@ function EngineStep({
   const hasEmbed = hasOllamaModel(models, embedModel)
   const hasDistill = hasOllamaModel(models, distillModel)
   const remoteUrlTrimmed = remoteUrl.trim()
-  const canContinue = mode === 'embedded' ? found : remoteUrlTrimmed.length > 0
+  // The embed model is not a nice-to-have: without it the local brain indexes
+  // nothing and every agent search comes back empty, while the app still looks
+  // healthy. Finishing setup in that state is the failure we keep paying for.
+  // The distill model stays optional — search works without it.
+  //
+  // Remote gets the same bar for the same reason: a URL that was typed but
+  // never verified is setup that reports done while nothing is wired. The step
+  // is skippable, so a user whose server is down still has a way past.
+  const canContinue = mode === 'embedded' ? found && hasEmbed : remoteOk === true
 
   function continueWithMode() {
     setBrainTarget(mode)
-    if (mode === 'remote' && remoteUrlTrimmed) setRemoteBrainUrl(remoteUrlTrimmed)
+    if (mode === 'remote' && remoteUrlTrimmed) {
+      setRemoteBrainUrl(remoteUrlTrimmed)
+      // Distill may need an Ollama endpoint — default to same host :11434, not a local install push.
+      const current = useStore.getState().ollamaUrl.trim()
+      if (!current || /127\.0\.0\.1:11434|localhost:11434/i.test(current)) {
+        useStore.getState().setOllamaUrl(ollamaUrlFromBrainUrl(remoteUrlTrimmed))
+      }
+    }
     onDone(mode)
+  }
+
+  function pullRow(model: string, missingCopy: string) {
+    const active = pull?.model === model
+    const pct =
+      active && pull.total ? Math.round(((pull.completed ?? 0) / pull.total) * 100) : null
+    return (
+      <div key={model} className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="min-w-0 flex-1">{missingCopy}</p>
+          {active ? (
+            <button
+              type="button"
+              className="no-drag shrink-0 text-[11px] font-semibold text-rose hover:underline"
+              onClick={() => void api.ollamaPullCancel()}
+            >
+              {labels.onboardingEngineCancelPull}
+            </button>
+          ) : (
+            <Button
+              variant="soft"
+              className="!px-2.5 !py-1 !text-[11px]"
+              disabled={pull !== null}
+              onClick={() => void pullModel(model)}
+            >
+              <Download className="h-3 w-3" /> {labels.onboardingEnginePullBtn}
+            </Button>
+          )}
+        </div>
+        {active && (
+          <div className="space-y-1">
+            <ProgressBar value={pct ?? 8} />
+            <span className="text-[10px] text-ink-faint">
+              {pct !== null && pull.total
+                ? `${pct}% · ${((pull.completed ?? 0) / 1e9).toFixed(2)} / ${(pull.total / 1e9).toFixed(2)} GB`
+                : pull.status}
+            </span>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -569,6 +678,9 @@ function EngineStep({
             {remoteOk === false && (
               <span className="text-[11px] text-amber">{remoteDetail}</span>
             )}
+            {remoteOk === null && !remoteTesting && remoteUrlTrimmed.length > 0 && (
+              <span className="text-[11px] text-ink-faint">{labels.onboardingEngineRemoteUntested}</span>
+            )}
           </div>
         </div>
       )}
@@ -610,14 +722,16 @@ function EngineStep({
               {labels.onboardingEngineDistillHint(distillModel)}
             </p>
             {(!hasEmbed || !hasDistill) && (
-              <div className="mt-3 space-y-1.5 rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-[11px] text-amber-100">
+              <div className="mt-3 space-y-2.5 rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-[11px] text-amber-100">
                 <div className="font-semibold text-ink">{labels.onboardingEngineModelsNeeded}</div>
-                {!hasEmbed && (
-                  <p>{labels.onboardingEngineEmbedMissing(`ollama pull ${embedModel}`)}</p>
-                )}
-                {!hasDistill && (
-                  <p>{labels.onboardingEngineDistillMissing(`ollama pull ${distillModel}`, '~9 GB')}</p>
-                )}
+                {!hasEmbed &&
+                  pullRow(embedModel, labels.onboardingEngineEmbedMissing(`ollama pull ${embedModel}`))}
+                {!hasDistill &&
+                  pullRow(
+                    distillModel,
+                    labels.onboardingEngineDistillMissing(`ollama pull ${distillModel}`, '~9 GB'),
+                  )}
+                {pullError && <p className="text-rose">{pullError}</p>}
               </div>
             )}
           </motion.div>

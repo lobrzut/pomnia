@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   analyzeIndexConsistency,
+  buildOllamaDoctorCheck,
   findDuplicateSessionGroups,
   formatDoctorLines,
   normalizeDoctorPath,
@@ -86,5 +87,54 @@ describe('formatDoctorLines', () => {
     expect(lines[0]).toBe('OK build clean')
     expect(lines[1]).toBe('WARN dupes — run dedupe')
     expect(lines.at(-1)).toBe('1 OK · 1 WARN · 0 FAIL')
+  })
+})
+
+describe('buildOllamaDoctorCheck', () => {
+  it('FAIL when embedded brain and Ollama unreachable', () => {
+    const c = buildOllamaDoctorCheck({
+      remoteBrain: false,
+      reachable: false,
+      baseUrl: 'http://127.0.0.1:11434',
+      embedModel: 'nomic-embed-text',
+      distillModel: 'qwen2.5:14b',
+      models: [],
+    })
+    expect(c.level).toBe('FAIL')
+  })
+
+  it('WARN (not FAIL) when remote brain and Ollama unreachable', () => {
+    const c = buildOllamaDoctorCheck({
+      remoteBrain: true,
+      reachable: false,
+      baseUrl: 'http://192.168.1.201:11434',
+      embedModel: 'nomic-embed-text',
+      distillModel: 'qwen2.5:14b',
+      models: [],
+    })
+    expect(c.level).toBe('WARN')
+    expect(c.message).toMatch(/optional for remote/)
+    expect(c.action).toMatch(/:11434/)
+  })
+
+  it('WARN missing embed when remote; FAIL when embedded', () => {
+    const remote = buildOllamaDoctorCheck({
+      remoteBrain: true,
+      reachable: true,
+      baseUrl: 'http://192.168.1.201:11434',
+      embedModel: 'nomic-embed-text',
+      distillModel: 'qwen2.5:14b',
+      models: ['qwen2.5:14b'],
+    })
+    const local = buildOllamaDoctorCheck({
+      remoteBrain: false,
+      reachable: true,
+      baseUrl: 'http://127.0.0.1:11434',
+      embedModel: 'nomic-embed-text',
+      distillModel: 'qwen2.5:14b',
+      models: ['qwen2.5:14b'],
+    })
+    expect(remote.level).toBe('WARN')
+    expect(local.level).toBe('FAIL')
   })
 })

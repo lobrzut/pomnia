@@ -1,10 +1,11 @@
 {
   "name": "pomnia",
-  "version": "0.1.48",
+  "version": "0.1.58",
   "description": "Pomnia — one encrypted memory your AI agents share. Local-first, MCP-native: encrypted vault, distill pipeline, embedded Brain.",
   "homepage": "https://pomnia.ai",
   "author": {
     "name": "Pomnia",
+    "email": "hello@pomnia.ai",
     "url": "https://pomnia.ai"
   },
   "license": "AGPL-3.0-only",
@@ -24,9 +25,11 @@
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
     "cli": "tsx src/cli/index.ts",
-    "typecheck": "npm run generate:build-info && tsc --noEmit -p tsconfig.node.json",
+    "typecheck": "npm run generate:build-info && npm run typecheck:node && npm run typecheck:web",
     "test": "npm run generate:build-info && vitest run",
     "test:golden": "node scripts/golden-path.mjs",
+    "test:e2e:smoke": "node e2e/smoke-first-window.mjs",
+    "test:e2e:walkthrough": "node e2e/smoke-walkthrough.mjs",
     "build:brain-core": "npm run build --prefix packages/brain-core",
     "build:doc-parser": "npm run build --prefix packages/doc-parser",
     "stage:brain-core": "node scripts/stage-brain-core.mjs",
@@ -34,7 +37,13 @@
     "build:win": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && npm run stage:tessdata && npm run generate:build-info && electron-vite build && npm run test:golden && electron-builder --win",
     "pack:win": "npm run build:win",
     "pack:mac": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && npm run stage:tessdata && npm run generate:build-info && electron-vite build && npm run test:golden && electron-builder --mac",
-    "release:win": "node scripts/release-win.mjs"
+    "build:linux": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && npm run stage:tessdata && npm run generate:build-info && electron-vite build && npm run test:golden && electron-builder --linux --publish never",
+    "pack:linux": "npm run build:linux",
+    "release:win": "node scripts/release-win.mjs",
+    "publish:release": "node scripts/publish-release.mjs",
+    "attach:linux-release": "node scripts/attach-linux-release.mjs",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:web": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.80",
@@ -49,6 +58,7 @@
     "unpdf": "^1.6.2"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.7.1",
     "@tailwindcss/vite": "^4.1.5",
     "@types/node": "^22.13.0",
     "@types/react": "^19.0.0",
@@ -57,12 +67,12 @@
     "@vitejs/plugin-react": "^4.3.4",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
-    "@electron/rebuild": "^3.7.1",
     "electron": "^33.0.0",
     "electron-builder": "^25.1.8",
     "electron-vite": "^3.1.0",
     "framer-motion": "^11.18.0",
     "lucide-react": "^0.469.0",
+    "playwright-core": "^1.62.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwindcss": "^4.1.5",

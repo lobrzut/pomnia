@@ -216,19 +216,23 @@ async function cmdBrain(p: Parsed): Promise<void> {
     }
 
     // 3) MCP clients — what's actually wired
-    const clients = await checkAllClients()
+    const clients = await checkAllClients({ probe: true })
     console.log(`\n  MCP clients on this machine:`)
     const dot = (s: string) =>
-      s === 'wired' ? C.green('●') : s === 'partial' ? C.yellow('●') : s === 'config_error' ? C.red('●') : C.dim('○')
+      s === 'wired' ? C.green('●')
+      : s === 'partial' ? C.yellow('●')
+      : s === 'config_error' || s === 'unreachable' ? C.red('●')
+      : C.dim('○')
     for (const c of clients) {
       const tag =
         c.state === 'wired'         ? C.green('wired') :
+        c.state === 'unreachable'   ? C.red('unreachable') :
         c.state === 'partial'       ? C.yellow('partial') :
         c.state === 'config_error'  ? C.red('config error') :
         C.dim('not wired')
       const tokenBit = c.servers.some((s) => s.hasToken) ? C.dim(' [token]') : ''
       console.log(`  ${dot(c.state)} ${c.label.padEnd(28)} ${tag}${tokenBit}`)
-      if (c.state === 'wired' || c.state === 'partial') {
+      if (c.state === 'wired' || c.state === 'partial' || c.state === 'unreachable') {
         for (const s of c.servers.filter((s) => s.present)) {
           console.log(`      ${C.dim(s.key.padEnd(14))} ${s.url || C.dim('(no url detected)')} ${s.transport ? C.dim('[' + s.transport + ']') : ''}`)
         }
@@ -307,12 +311,13 @@ async function cmdBrain(p: Parsed): Promise<void> {
       const list = listClients()
       console.log(C.bold('\n  Available clients:\n'))
       for (const c of list) console.log(`  ${C.cyan(c.id.padEnd(16))} ${c.label}`)
-      console.log(C.dim('\n  Usage: brain snippet --client <id> --url http://brain:7862 [--token btk_…]\n'))
+      console.log(C.dim('\n  Usage: brain snippet --client <id> --url http://brain:7865 [--token btk_…] [--legacy-hub]\n'))
+      console.log(C.dim('  Default remote = brain-core single /mcp. --legacy-hub = old 3×SSE Python hub.\n'))
       return
     }
     const url = typeof p.flags.url === 'string' ? String(p.flags.url).replace(/\/$/, '') : ''
     if (!url) {
-      console.log(C.red('\n  --url required (np. http://twoj-serwer:7862)\n'))
+      console.log(C.red('\n  --url required (np. http://twoj-serwer:7865)\n'))
       return
     }
     const token = typeof p.flags.token === 'string' ? p.flags.token : process.env.BRAIN_TOKEN
@@ -321,7 +326,8 @@ async function cmdBrain(p: Parsed): Promise<void> {
       | 'darwin'
       | 'linux'
     const home = process.env.HOME || process.env.USERPROFILE || ''
-    const snip = buildSnippet(client, url, targetOS, home, token)
+    const remoteHub = p.flags['legacy-hub'] || p.flags.legacyHub ? 'legacy-hub' as const : 'brain-core' as const
+    const snip = buildSnippet(client, url, targetOS, home, token, 'remote', { remoteHub })
 
     console.log(C.bold(`\n  ${snip.label}\n`))
     console.log(snip.instructions)

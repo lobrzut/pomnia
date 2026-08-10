@@ -54,6 +54,7 @@ const bridge = {
   brainCoreStart: (ollamaUrl?: string) => ipcRenderer.invoke('brainCore:start', ollamaUrl),
   brainCoreStop: () => ipcRenderer.invoke('brainCore:stop'),
   brainCoreReindex: () => ipcRenderer.invoke('brainCore:reindex'),
+  brainCoreCancelIndex: () => ipcRenderer.invoke('brainCore:cancelIndex'),
   vaultHealth: () => ipcRenderer.invoke('vault:health'),
   doctorRun: (opts?: { distillModel?: string; ollamaUrl?: string }) =>
     ipcRenderer.invoke('doctor:run', opts),
@@ -104,6 +105,15 @@ const bridge = {
     return () => ipcRenderer.removeListener('activity:idle', l)
   },
   brainDeploy: (opts: unknown) => ipcRenderer.invoke('brain:deploy', opts),
+  appUpdateCheck: () => ipcRenderer.invoke('app:updateCheck'),
+  openUserData: () => ipcRenderer.invoke('app:openUserData') as Promise<string>,
+  openBrainData: () => ipcRenderer.invoke('app:openBrainData') as Promise<string>,
+  appDataLocations: () => ipcRenderer.invoke('app:dataLocations'),
+  vaultReplicaState: () => ipcRenderer.invoke('vault:replicaState'),
+  vaultReplicaConfig: (patch: { url?: string; token?: string; autoSync?: boolean }) =>
+    ipcRenderer.invoke('vault:replicaConfig', patch),
+  vaultSyncToReplica: (target: string, token?: string) =>
+    ipcRenderer.invoke('vault:syncToReplica', target, token),
   connectStatus: (brainUrl?: string, token?: string, target?: string) =>
     ipcRenderer.invoke('connect:status', brainUrl, token, target),
   connectSnippet: (
@@ -112,7 +122,9 @@ const bridge = {
     token?: string,
     target?: string,
     brainMode?: boolean,
-  ) => ipcRenderer.invoke('connect:snippet', clientId, brainUrl, token, target, brainMode),
+    remoteHub?: string,
+  ) =>
+    ipcRenderer.invoke('connect:snippet', clientId, brainUrl, token, target, brainMode, remoteHub),
   connectWriteBrief: (clientId: string) =>
     ipcRenderer.invoke('connect:write-brief', clientId) as Promise<
       | { ok: true; path: string; bytes: number; handshakePath?: string; agentsPath?: string }

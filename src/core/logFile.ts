@@ -31,5 +31,8 @@ export function writeFileLog(level: Level, msg: string): void {
       await mkdir(logDir!, { recursive: true })
       await appendFile(file, line, 'utf8')
     })
+    // Deliberate, not an oversight: this *is* the logger. Reporting a failed
+    // log write can only be done by writing a log, so a swallow here is the
+    // only thing that does not recurse.
     .catch(() => {})
 }

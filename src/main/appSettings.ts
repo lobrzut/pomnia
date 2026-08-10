@@ -36,6 +36,34 @@ export interface AppSettings {
   brainTarget?: BrainTargetSetting
   /** Bearer token for remote Brain MCP (synced from renderer). */
   connectToken?: string
+  /**
+   * Where to mirror this vault, and whether to do it automatically.
+   *
+   * Deliberately separate from `brainMcpUrl`. That address answers "which brain
+   * am I using"; this one answers "where do I keep a copy". Reusing it would
+   * make replication possible only while *not* using the local brain — exactly
+   * backwards, since the machine that owns the vault is the one with something
+   * to replicate.
+   */
+  replicaUrl?: string
+  replicaToken?: string
+  /** Push after every distillation. Off until asked for. */
+  replicaAutoSync?: boolean
+  /**
+   * Outcome of the last replication, persisted.
+   *
+   * An auto-sync that fails quietly is worse than no auto-sync: it leaves you
+   * believing the server is current. This is what makes it visible, so it is
+   * written on failure as well as success.
+   */
+  lastReplication?: {
+    at: string
+    ok: boolean
+    uploaded: number
+    unchanged: number
+    failed: number
+    error?: string
+  }
   /** Auto-start embedded brain on vault open when the user had it running last session. */
   embeddedBrainAutoStart?: boolean
   /** First-run wizard completed — floating monitor skips onboarding. */
@@ -127,6 +155,10 @@ export async function loadAppSettings(): Promise<AppSettings> {
       brainDeployUrl: parsed.brainDeployUrl,
       brainTarget: parsed.brainTarget,
       connectToken: parsed.connectToken,
+      replicaUrl: parsed.replicaUrl,
+      replicaToken: parsed.replicaToken,
+      replicaAutoSync: parsed.replicaAutoSync ?? false,
+      lastReplication: parsed.lastReplication,
       embeddedBrainAutoStart: parsed.embeddedBrainAutoStart ?? DEFAULTS.embeddedBrainAutoStart,
       onboarded: parsed.onboarded,
       floatingMonitorOnMinimize: parsed.floatingMonitorOnMinimize ?? DEFAULTS.floatingMonitorOnMinimize,

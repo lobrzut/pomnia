@@ -3,6 +3,8 @@
 import { Component, type ReactNode } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 
+import { uiLabels } from '../lib/labels'
+
 interface Props {
   children: ReactNode
 }
@@ -30,25 +32,28 @@ export class ErrorBoundary extends Component<Props, State> {
   render(): ReactNode {
     const { error } = this.state
     if (!error) return this.props.children
+    // Read per render, not per construction: this component is mounted once at
+    // startup and must not answer in the language the user has since left.
+    const labels = uiLabels()
     return (
       <div className="mx-auto mt-24 max-w-md text-center">
         <div className="glass rounded-[var(--radius-xl)] p-7">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose/15">
             <AlertTriangle className="h-7 w-7 text-rose" />
           </div>
-          <h2 className="text-lg font-semibold text-ink">Ta strona się wysypała</h2>
+          <h2 className="text-lg font-semibold text-ink">{labels.errorBoundaryTitle}</h2>
           <p className="mt-2 break-words rounded-lg bg-black/30 p-3 text-left font-mono text-[11px] text-rose">
             {error.message || String(error)}
           </p>
           <p className="mt-3 text-sm text-ink-dim">
-            Kliknij inną zakładkę w menu, albo przeładuj aplikację.
+            {labels.errorBoundaryHint}
           </p>
           <button
             onClick={() => location.reload()}
             className="no-drag mt-4 inline-flex items-center gap-2 rounded-xl accent-grad px-4 py-2.5 text-sm font-semibold text-white"
           >
             <RefreshCw className="h-4 w-4" />
-            Przeładuj
+            {labels.errorBoundaryReload}
           </button>
         </div>
       </div>
