@@ -140,10 +140,16 @@ async function post(
     // Surface ownership refusals in plain language — "409" alone looks like a
     // network glitch, and "not_a_replica" is jargon for "you pushed at the SoT".
     if (err === 'not_a_replica') {
-      throw new Error(
-        p?.hint ??
-          'Target owns the vault (writable) — push only to a read-only replica, not the source of truth.',
+      // Plain language leads, but the code stays in the message and on the error.
+      // Two reasons it cannot be dropped: it is what someone greps out of a log
+      // when a user reports this, and the wording is ours to reword any time.
+      // The server's hint is deliberately not the whole message — it is remote
+      // text, so it goes after our sentence rather than replacing it.
+      const e: Error & { code?: string } = new Error(
+        'Target owns the vault (writable) — push only to a read-only replica, not the source of truth. [not_a_replica]',
       )
+      e.code = 'not_a_replica'
+      throw e
     }
     throw new Error(
       `${path} → ${r.status} ${err}${p?.hint ? ` — ${p.hint}` : ''}${p?.detail ? ` — ${p.detail}` : ''}`.trim(),

@@ -824,7 +824,11 @@ export const useStore = create<State>((set, get) => ({
   },
   async runBrainPipeline(opts) {
     if (get().brainRunning) return
-    set({ brainRunning: true, brainProgress: { label: 'uruchamianie…', pct: 4, phase: 'start' }, brainResult: null })
+    set({
+      brainRunning: true,
+      brainProgress: { label: uiLabels().brainPipelineStarting, pct: 4, phase: 'start' },
+      brainResult: null,
+    })
     const off = api.onBrainProgress((e) => {
       if (e.phase === 'idle') {
         set({ brainProgress: null })

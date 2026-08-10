@@ -21,6 +21,7 @@
 
 import { getAppSettings } from './appSettings.js'
 
+
 export interface MainStrings {
   // ── ledger / startup ─────────────────────────────────────────────────────
   ledgerTravels: (known: number) => string
@@ -47,6 +48,10 @@ export interface MainStrings {
   reindexMatchedTitle: string
   reindexPruned: (pruned: number) => string
   reindexFailedDetail: (why: string) => string
+  reindexCounts: (files: number, chunks: number) => string
+  reindexAfterOpenFailedTitle: string
+  vaultNotOpen: string
+  updateCheckHttp: (status: number) => string
 
   // ── replication ──────────────────────────────────────────────────────────
   replicaUrlScheme: string
@@ -78,6 +83,15 @@ export interface MainStrings {
   trayStopBrainCancelIndex: string
   trayStopBrain: string
   trayQuit: string
+  trayBrainStarting: string
+  trayBrainStopped: string
+  trayBrainStoppedWith: (why: string) => string
+  trayProfile: string
+
+  // ── update check ─────────────────────────────────────────────────────────
+  updateAvailableTitle: (version: string) => string
+  updateAvailableDetail: (current: string) => string
+  checkingOllama: string
 
   // ── ollama ───────────────────────────────────────────────────────────────
   ollamaMissingModel: (model: string, cmd: string) => string
@@ -126,6 +140,10 @@ const PL: MainStrings = {
   reindexMatchedTitle: 'Indeks dopasowany do vaultu',
   reindexPruned: (pruned) => ` · usunięto ${pruned} starych ścieżek`,
   reindexFailedDetail: (why) => `${why} — kliknij „Odśwież indeks” w Brain.`,
+  reindexCounts: (files, chunks) => `${files} plików · ${chunks} chunków`,
+  reindexAfterOpenFailedTitle: 'Reindex po otwarciu vaultu nieudany',
+  vaultNotOpen: 'Vault nie jest otwarty.',
+  updateCheckHttp: (status) => `GitHub odpowiedział ${status}`,
 
   replicaUrlScheme: 'Adres repliki musi zaczynać się od http:// lub https://',
   replicaNoTarget: 'Podaj adres serwera (zakładka Podłącz).',
@@ -154,6 +172,15 @@ const PL: MainStrings = {
   trayStopBrainCancelIndex: 'Zatrzymaj lokalną wyszukiwarkę (anuluj indeks)',
   trayStopBrain: 'Zatrzymaj lokalną wyszukiwarkę',
   trayQuit: 'Zakończ',
+  trayBrainStarting: 'Lokalna wyszukiwarka: uruchamianie…',
+  trayBrainStopped: 'Lokalna wyszukiwarka: zatrzymana',
+  trayBrainStoppedWith: (why) => `Lokalna wyszukiwarka: zatrzymana (${why})`,
+  trayProfile: 'Profil',
+
+  updateAvailableTitle: (version) => `Jest nowsza wersja: ${version}`,
+  updateAvailableDetail: (current) =>
+    `Masz ${current}. Pobierz z GitHuba — Pomnia nie instaluje aktualizacji sama.`,
+  checkingOllama: 'sprawdzam Ollama…',
 
   ollamaMissingModel: (model, cmd) =>
     `Brak modelu embeddingów „${model}" — wyszukiwanie i indeksowanie nie zadziałają. Uruchom: ${cmd}`,
@@ -207,6 +234,10 @@ const EN: MainStrings = {
   reindexMatchedTitle: 'Index matched to the vault',
   reindexPruned: (pruned) => ` · removed ${pruned} stale paths`,
   reindexFailedDetail: (why) => `${why} — click “Refresh index” in Brain.`,
+  reindexCounts: (files, chunks) => `${files} file(s) · ${chunks} chunk(s)`,
+  reindexAfterOpenFailedTitle: 'Reindex after opening the vault failed',
+  vaultNotOpen: 'The vault is not open.',
+  updateCheckHttp: (status) => `GitHub answered ${status}`,
 
   replicaUrlScheme: 'The replica address must start with http:// or https://',
   replicaNoTarget: 'Set the server address first (Connect tab).',
@@ -235,6 +266,15 @@ const EN: MainStrings = {
   trayStopBrainCancelIndex: 'Stop the local search engine (cancel indexing)',
   trayStopBrain: 'Stop the local search engine',
   trayQuit: 'Quit',
+  trayBrainStarting: 'Local search engine: starting…',
+  trayBrainStopped: 'Local search engine: stopped',
+  trayBrainStoppedWith: (why) => `Local search engine: stopped (${why})`,
+  trayProfile: 'Profile',
+
+  updateAvailableTitle: (version) => `A newer version is available: ${version}`,
+  updateAvailableDetail: (current) =>
+    `You have ${current}. Download it from GitHub — Pomnia never installs updates by itself.`,
+  checkingOllama: 'checking Ollama…',
 
   ollamaMissingModel: (model, cmd) =>
     `Embedding model “${model}” is missing — search and indexing will not work. Run: ${cmd}`,
@@ -262,6 +302,11 @@ const EN: MainStrings = {
 }
 
 /** Read per call: Settings can change the language while the app is running. */
+/** Shared by modules that keep their own lookup tables (see activity.ts). */
+export function isEnLocale(): boolean {
+  return getAppSettings().uiLocale === 'en'
+}
+
 export function m(): MainStrings {
-  return getAppSettings().uiLocale === 'en' ? EN : PL
+  return isEnLocale() ? EN : PL
 }

@@ -35,14 +35,30 @@ export interface ActivityState {
   detail?: string
 }
 
-const TRAY_KIND: Record<Exclude<ActivityKind, 'idle'>, string> = {
-  distill: 'destylacja',
-  'doc-import': 'import dokumentu',
-  'brain-start': 'uruchamianie Brain',
-  indexing: 'indeksowanie',
-  embed: 'embeddingi',
-  'mcp-query': 'zapytanie MCP',
-  finale: 'indeks gotowy',
+/**
+ * What the tray says the app is busy with. Kept here rather than in
+ * mainStrings because these are keyed by ActivityKind — the table belongs next
+ * to the type it indexes, and electron-vite mis-splices its CommonJS shim into
+ * a hyphenated key when this literal sits inside the big strings module.
+ */
+/**
+ * Twins side by side so a missing translation is visible in one glance.
+ *
+ * Do not phrase an English value to END with the word "import". electron-vite
+ * finds the end of the import block with a pattern that also matches inside
+ * string literals, so `en: 'document import'` looked like the tail of an import
+ * statement and its CommonJS shim was spliced in right after it — mid-object.
+ * The build then fails with "Unterminated string literal" pointing at the *next*
+ * key, and nothing in the source is actually malformed. Cost: about an hour.
+ */
+const TRAY_KIND: Record<Exclude<ActivityKind, 'idle'>, { pl: string; en: string }> = {
+  distill: { pl: 'destylacja', en: 'distillation' },
+  'doc-import': { pl: 'import dokumentu', en: 'importing a document' },
+  'brain-start': { pl: 'uruchamianie Brain', en: 'starting Brain' },
+  indexing: { pl: 'indeksowanie', en: 'indexing' },
+  embed: { pl: 'embeddingi', en: 'embeddings' },
+  'mcp-query': { pl: 'zapytanie MCP', en: 'MCP query' },
+  finale: { pl: 'indeks gotowy', en: 'index ready' },
 }
 
 function truncate(s: string, max: number): string {
@@ -51,18 +67,24 @@ function truncate(s: string, max: number): string {
   return `${t.slice(0, max - 1)}…`
 }
 
-export function activityTrayTooltip(state: ActivityState): string {
+/**
+ * The locale is a parameter, not a lookup: this module holds state and the
+ * caller owns presentation. It also keeps activity.ts free of the settings
+ * import, which matters because it is already in a cycle with
+ * activityReplayStore.
+ */
+export function activityTrayTooltip(state: ActivityState, en = false): string {
   if (state.kind === 'idle') return 'Pomnia'
-  const label = TRAY_KIND[state.kind]
+  const label = TRAY_KIND[state.kind][en ? 'en' : 'pl']
   const progress =
     state.done != null && state.total != null && state.total > 0 ? ` ${state.done}/${state.total}` : ''
   const detail = state.detail ? ` — ${truncate(state.detail, 36)}` : ''
   return `Pomnia — ${label}${progress}${detail}`
 }
 
-export function activityMenuLabel(state: ActivityState): string | null {
+export function activityMenuLabel(state: ActivityState, en = false): string | null {
   if (state.kind === 'idle') return null
-  return activityTrayTooltip(state).replace(/^Pomnia — /, 'Trwa: ')
+  return activityTrayTooltip(state, en).replace(/^Pomnia — /, en ? 'In progress: ' : 'Trwa: ')
 }
 
 type BroadcastFn = (channel: 'activity:update' | 'activity:idle', payload?: ActivityState) => void
@@ -169,12 +191,12 @@ class ActivityManager {
     }, PIPELINE_FINALE_MS)
   }
 
-  tooltip(): string {
-    return activityTrayTooltip(this.state)
+  tooltip(en = false): string {
+    return activityTrayTooltip(this.state, en)
   }
 
-  menuLine(): string | null {
-    return activityMenuLabel(this.state)
+  menuLine(en = false): string | null {
+    return activityMenuLabel(this.state, en)
   }
 }
 

@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// Pulled in transitively via activity.ts → mainStrings → appSettings.
+vi.mock('electron', () => ({ app: { getPath: () => '/tmp/pomnia-test' } }))
+
 import { buildReplayFromSession, type LastActivityReplay } from '../activityReplayStore.js'
 import { PIPELINE_FINALE_MS } from '../activity.js'
 

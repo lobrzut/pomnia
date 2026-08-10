@@ -66,7 +66,7 @@ export async function ensureBrainForIndexing(
     }
   }
 
-  onProgress?.({ phase: 'brain-start', done: 0, total: 1, detail: 'sprawdzam Ollama…' })
+  onProgress?.({ phase: 'brain-start', done: 0, total: 1, detail: m().checkingOllama })
   const probe = await probeOllama(baseUrl)
   if (!probe.ok) {
     return {

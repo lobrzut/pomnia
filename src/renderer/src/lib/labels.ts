@@ -471,6 +471,8 @@ export interface UiLabels {
   /** Idle PiP status when embedded Brain is stopped. */
   floatingMonitorBrainOff: string
   floatingMonitorBrainStarting: string
+  /** Pipeline progress bar, first tick — before the main process reports a phase. */
+  brainPipelineStarting: string
   floatingMonitorBrainReady: string
   floatingMonitorBrainError: string
   floatingMonitorClose: string
@@ -1283,6 +1285,7 @@ const PL_LABELS: UiLabels = {
   floatingMonitorIdleBadge: 'Na żywo',
   floatingMonitorBrainOff: 'Brain wyłączony',
   floatingMonitorBrainStarting: 'Brain startuje…',
+  brainPipelineStarting: 'uruchamianie…',
   floatingMonitorBrainReady: 'Brain gotowy',
   floatingMonitorBrainError: 'Brain: błąd',
   floatingMonitorClose: 'Zamknij pływający diagram',
@@ -1344,7 +1347,7 @@ const PL_LABELS: UiLabels = {
   connectTokenPlaceholder: 'Bearer token (wymagany dla remote)',
   connectTokenRequired: 'Bez tokena remote MCP zwykle nie zadziała — wklej lub utwórz poniżej.',
   connectOpenDashboard: 'Otwórz dashboard tokenów',
-  connectPartialTitle: 'Niepełny mcp.json',
+  connectPartialTitle: 'Niepełny mcp.json — brak vault/library',
   connectPartialDetail:
     'brain-core: wystarczy `pomnia` → /mcp. Legacy hub: pomnia + pomnia-vault + pomnia-library. Skopiuj świeży snippet poniżej.',
   connectPartialFix: 'Skopiuj pełny config poniżej i nadpisz / zmerguj mcp.json',
@@ -2150,6 +2153,7 @@ const EN_LABELS: UiLabels = {
   floatingMonitorIdleBadge: 'Live',
   floatingMonitorBrainOff: 'Brain off',
   floatingMonitorBrainStarting: 'Brain starting…',
+  brainPipelineStarting: 'starting…',
   floatingMonitorBrainReady: 'Brain ready',
   floatingMonitorBrainError: 'Brain: error',
   floatingMonitorClose: 'Close floating diagram',
@@ -2522,7 +2526,7 @@ const EN_LABELS: UiLabels = {
   connectTokenPlaceholder: 'Bearer token (required for remote)',
   connectTokenRequired: 'Remote MCP usually will not work without a token — paste or create one below.',
   connectOpenDashboard: 'Open the token dashboard',
-  connectPartialTitle: 'Incomplete mcp.json',
+  connectPartialTitle: 'Incomplete mcp.json — vault/library missing',
   connectPartialDetail:
     'brain-core: `pomnia` → /mcp is enough. Legacy hub: pomnia + pomnia-vault + pomnia-library. Copy a fresh snippet below.',
   connectPartialFix: 'Copy the full config below and overwrite or merge mcp.json',

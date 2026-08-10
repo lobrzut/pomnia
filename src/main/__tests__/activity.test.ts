@@ -1,4 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
+
+// activity.ts reads its labels through mainStrings, which reads the saved UI
+// locale, which imports electron. Nothing here touches Electron at runtime —
+// the package's entry point just refuses to load outside an Electron process.
+vi.mock('electron', () => ({ app: { getPath: () => '/tmp/pomnia-test' } }))
+
 import { promises as fs } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
