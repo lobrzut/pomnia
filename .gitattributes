@@ -1,0 +1,36 @@
+# Line endings for files that a Linux machine executes or parses.
+#
+# The repo had no .gitattributes and the Windows dev box runs core.autocrlf=true,
+# so install.sh, the systemd units and the Dockerfile sat in the working copy
+# with CRLF. Git stored LF, which hides the problem from `git diff` — but the
+# documented deploy path is "clone the repo, copy these to the server", and the
+# upgrade script ships a tarball built on Windows on purpose. A shell script with
+# CRLF fails on Linux as `/usr/bin/env: 'bash\r': No such file or directory`,
+# which reads like a missing interpreter rather than a line ending.
+#
+# eol=lf is checkout behaviour: these files are LF on every machine regardless of
+# the platform default.
+
+*.sh        text eol=lf
+*.bash      text eol=lf
+*.service   text eol=lf
+*.timer     text eol=lf
+*.socket    text eol=lf
+Dockerfile  text eol=lf
+*.dockerfile text eol=lf
+
+# Windows-side scripts stay CRLF — PowerShell is fine either way, but a .ps1 with
+# LF confuses some older hosts and there is no reason to change them.
+*.ps1       text eol=crlf
+*.cmd       text eol=crlf
+*.bat       text eol=crlf
+
+# Binary: never touched, never diffed as text.
+*.png       binary
+*.ico       binary
+*.icns      binary
+*.exe       binary
+*.dll       binary
+*.node      binary
+*.db        binary
+*.traineddata binary
