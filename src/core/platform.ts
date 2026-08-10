@@ -27,18 +27,32 @@ export function userName(): string {
   }
 }
 
-/** Per-OS application-data roots, resolved against a given home directory. */
+/**
+ * Per-OS application-data roots, resolved against a given home directory.
+ *
+ * Ambient environment counts only when we are describing *this* machine's real
+ * home. Asking "where would data live for /home/alice on Linux" must answer
+ * from /home/alice, not from the host's XDG_CONFIG_HOME — the docs and the UI
+ * ask exactly that when they describe another platform.
+ *
+ * The old version consulted the variable unconditionally, which is why its test
+ * passed here and failed on CI: Windows has no XDG_CONFIG_HOME, a GitHub Linux
+ * runner sets it, and the function quietly ignored the home it was handed.
+ */
 export function appDataRoot(targetOS: OS, home: string): string {
+  const describingHost = targetOS === currentOS() && home === homeDir()
   switch (targetOS) {
     case 'win32':
       // %APPDATA%
-      return process.platform === 'win32' && process.env.APPDATA
+      return describingHost && process.env.APPDATA
         ? process.env.APPDATA
         : path.win32.join(home, 'AppData', 'Roaming')
     case 'darwin':
       return path.posix.join(home, 'Library', 'Application Support')
     case 'linux':
-      return process.env.XDG_CONFIG_HOME || path.posix.join(home, '.config')
+      return describingHost && process.env.XDG_CONFIG_HOME
+        ? process.env.XDG_CONFIG_HOME
+        : path.posix.join(home, '.config')
   }
 }
 
