@@ -193,9 +193,20 @@ docker build -f packages/brain-core/deploy/Dockerfile -t pomnia/brain-core .
 docker run -d --name brain-core -p 7865:7865 \
   -v /srv/pomnia:/var/lib/pomnia \
   --add-host host.docker.internal:host-gateway \
-  pomnia/brain-core --host 0.0.0.0 --data-dir /var/lib/pomnia \
+  pomnia/brain-core --host 0.0.0.0 --port 7865 --data-dir /var/lib/pomnia \
                     --vault-root /var/lib/pomnia/vault \
                     --ollama-url http://host.docker.internal:11434
+```
+
+`--port` is spelled out because arguments after the image name replace `CMD`
+entirely. Leaving it off used to hand the daemon its own default (7862) while
+`-p` published 7865, so the container listened on a port nobody had mapped —
+and the healthcheck, probing from inside, called it healthy throughout. The
+image now also sets `BRAIN_PORT=7865`, which survives a `CMD` override, so the
+default is right even when the flag is forgotten. Check the first log line:
+
+```bash
+docker logs brain-core | head -1     # [brain-core] listening on http://0.0.0.0:7865 …
 ```
 
 `better-sqlite3` is compiled inside the image. Copying `node_modules` from a

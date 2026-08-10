@@ -992,6 +992,13 @@ export async function createBrainServer(
           }
           const onListening = (): void => {
             http?.off('error', onErr)
+            // Say the address out loud. The port can come from a flag, an env
+            // var or a default, and when a published port and a listening port
+            // disagree the container is simultaneously healthy and unreachable
+            // — the log is the only place that difference is visible.
+            const a = http?.address()
+            const bound = a && typeof a === 'object' ? `${a.address}:${a.port}` : `${config.host}:${config.port}`
+            console.error(`[brain-core] listening on http://${bound} (MCP /mcp · panel /admin)`)
             resolve()
           }
           http?.once('error', onErr)
