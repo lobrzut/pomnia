@@ -22,6 +22,7 @@
  * act on. The result is logged either way.
  */
 import { log } from '@core/log.js'
+import { m } from './mainStrings.js'
 
 export interface UpdateInfo {
   version: string
@@ -82,7 +83,7 @@ export async function describeUpdate(
     // 404 is the ordinary state of a repo with no releases yet — that is
     // "nothing published", not a broken check.
     if (r.status === 404) return { state: 'current', latest: null }
-    if (!r.ok) return { state: 'unreachable', detail: `GitHub odpowiedział ${r.status}` }
+    if (!r.ok) return { state: 'unreachable', detail: m().updateCheckHttp(r.status) }
     const j = (await r.json()) as {
       tag_name?: string
       html_url?: string

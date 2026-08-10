@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@core/log.js', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
+// updateCheck.ts phrases its failures through mainStrings, which reads the UI
+// locale from appSettings, which imports electron.
+vi.mock('electron', () => ({ app: { getPath: () => '/tmp/pomnia-test' } }))
+
 import { checkForUpdate, isNewerVersion } from '../updateCheck.js'
 
 /**

@@ -580,7 +580,7 @@ async function maybeHygieneReindexAfterVaultChange(): Promise<void> {
     sendAppToast({
       kind: indexedFiles > 0 ? 'success' : 'warn',
       title: indexedFiles > 0 ? m().reindexMatchedTitle : m().reindexNothingTitle,
-      detail: `${indexedFiles} plików · ${stats?.chunks ?? 0} chunków${
+      detail: `${m().reindexCounts(indexedFiles, stats?.chunks ?? 0)}${
         pruned ? m().reindexPruned(pruned) : ''
       }`,
     })
@@ -588,7 +588,7 @@ async function maybeHygieneReindexAfterVaultChange(): Promise<void> {
     log.warn('vault hygiene reindex failed:', (e as Error).message)
     sendAppToast({
       kind: 'warn',
-      title: 'Reindex po otwarciu vaultu nieudany',
+      title: m().reindexAfterOpenFailedTitle,
       detail: m().reindexFailedDetail((e as Error).message),
     })
   } finally {
@@ -1334,7 +1334,7 @@ function registerIpc(): void {
   )
 
   ipcMain.handle('vault:syncToReplica', async (_e, target: string, token?: string) => {
-    if (!vaultPath) throw new Error('Vault nie jest otwarty.')
+    if (!vaultPath) throw new Error(m().vaultNotOpen)
     const url = (target ?? '').trim()
     if (!url) throw new Error(m().replicaNoTarget)
     const root = brainVaultRoot(vaultPath)
@@ -1495,7 +1495,7 @@ function registerIpc(): void {
   ipcMain.handle('brainCore:status', () => brainCore.status())
   ipcMain.handle('brainCore:start', async (_e, ollamaUrl?: string) => {
     const url = resolveOllamaUrl(ollamaUrl)
-    activity.update({ kind: 'brain-start', phase: 'start', detail: 'sprawdzam Ollama…' })
+    activity.update({ kind: 'brain-start', phase: 'start', detail: m().checkingOllama })
     const probe = await probeOllama(url)
     if (!probe.ok) throw new Error(ollamaUnreachableMessage(probe))
     // Reachable is not the same as usable. Start anyway — agents still get the
@@ -2075,8 +2075,8 @@ app.whenReady().then(async () => {
       log.info(`update available: ${info.version} (running ${app.getVersion()})`)
       sendAppToast({
         kind: 'info',
-        title: `Jest nowsza wersja: ${info.version}`,
-        detail: `Masz ${app.getVersion()}. Pobierz z GitHuba — Pomnia nie instaluje aktualizacji sama.`,
+        title: m().updateAvailableTitle(info.version),
+        detail: m().updateAvailableDetail(app.getVersion()),
       })
     })
   }, 20_000)
