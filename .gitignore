@@ -22,6 +22,10 @@ build/brain-core-runtime/
 assets/generated/*
 !assets/generated/.gitkeep
 
+# Electron UI E2E screenshots (keep e2e/artifacts/.gitkeep)
+e2e/artifacts/*
+!e2e/artifacts/.gitkeep
+
 # Local agent / pack artifacts (never publish)
 _agent_out.txt
 _icon.txt

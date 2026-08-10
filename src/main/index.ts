@@ -35,10 +35,20 @@ import {
   classifyImportConversations,
   conversationFingerprint,
   pingBrain,
+  probeMcpUrl,
+  identifyEngine,
+  emptyLedger,
+  ledgerPathInVault,
+  loadLedgerForVault,
+  markProcessedIn,
+  ownerProcessed,
+  readLedgerFile,
+  writeLedgerFile,
   runBackup,
   runDoctor,
   saveIndex,
   searchIndex,
+  syncVaultToReplica,
   setLogSink,
   initFileLog,
   syncSkills,
@@ -51,10 +61,13 @@ import {
   type SourceId,
   localizePipelineProgress,
 } from '@core/index'
+import { m } from './mainStrings.js'
 import { formatBuildIdentity } from '../buildInfo.js'
 
 import { brainCore, killLeftoverBrainHelpers } from './brainCore.js'
 import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused } from './mcpActivityPoll.js'
+import { checkForUpdate, describeUpdate } from './updateCheck.js'
+import { buildDataLocationsSnapshot, detectInstallForm } from '@core/dataLocations.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { runDocumentOcr } from './docOcr.js'
 import { removeLibraryDocumentWithIndex } from './libraryDocRemove.js'
@@ -134,7 +147,13 @@ import {
   listLocalSkillsAt,
   writeSkillsIndexAt,
 } from './skillsScan.js'
-import { brainProcessFailedMessage, ollamaUnreachableMessage, probeOllama, resolveOllamaUrl } from './ollamaSettings.js'
+import {
+  brainProcessFailedMessage,
+  missingEmbedModelMessage,
+  ollamaUnreachableMessage,
+  probeOllama,
+  resolveOllamaUrl,
+} from './ollamaSettings.js'
 
 function vaultSkillsFields(path: string | null | undefined) {
   if (!path) {
@@ -175,6 +194,11 @@ function requestQuit(): void {
 /** `?.` on BrowserWindow does not protect against a destroyed window / webContents. */
 function canSendToWindow(w: BrowserWindow | null | undefined): w is BrowserWindow {
   return !!w && !w.isDestroyed() && !w.webContents.isDestroyed()
+}
+
+/** UI language for anything the main process phrases before sending it out. */
+function uiLocale(): 'pl' | 'en' {
+  return getAppSettings().uiLocale === 'en' ? 'en' : 'pl'
 }
 
 function safeSend(wc: WebContents | null | undefined, channel: string, ...args: unknown[]): void {
@@ -221,12 +245,15 @@ function emitBrainProgress(p: { phase: string; done?: number; total?: number; de
   const kind: ActivityUpdate['kind'] =
     p.phase === 'index' ? 'embed' : p.phase === 'distill' || p.phase === 'collect' || p.phase === 'deploy' ? 'distill' : 'distill'
   activity.update({ kind, phase: p.phase, done: p.done, total: p.total, detail: p.detail })
-  const payload = localizePipelineProgress({
-    phase: p.phase,
-    done: p.done ?? 0,
-    total: p.total ?? 0,
-    detail: p.detail,
-  })
+  const payload = localizePipelineProgress(
+    {
+      phase: p.phase,
+      done: p.done ?? 0,
+      total: p.total ?? 0,
+      detail: p.detail,
+    },
+    uiLocale(),
+  )
   safeSendMain('brain:progress', payload)
 }
 
@@ -245,7 +272,7 @@ function emitDocImportProgress(ev: { phase: string; done: number; total: number;
           ? 'doc-import'
           : 'doc-import'
   activity.update({ kind, phase: ev.phase, done: ev.done, total: ev.total, detail: ev.detail })
-  safeSendMain('doc:import-progress', localizePipelineProgress(ev))
+  safeSendMain('doc:import-progress', localizePipelineProgress(ev, uiLocale()))
 }
 
 const brainDir = (): string => join(app.getPath('userData'), 'brain-notes')
@@ -255,26 +282,64 @@ const brainIndexFile = (): string => join(brainDir(), '.pomnia-index.json')
    Which conversation ids have been through the pipeline. This is what lets
    the UI show an honest backlog ("N chats not distilled yet") instead of
    guessing — and lets "distill backlog" run incrementally. */
-const ledgerFile = (): string => join(app.getPath('userData'), 'distill-ledger.json')
+/** Pre-vault location. Read once for migration; never written to again. */
+const legacyLedgerFile = (): string => join(app.getPath('userData'), 'distill-ledger.json')
+
+/** Current vault's ledger file. Moves with the vault, unlike the legacy path. */
+const vaultLedgerFile = (): string => ledgerPathInVault(brainVaultRoot(vaultPath))
 
 interface DistillLedger {
   /** conversation id → ISO timestamp of the run that processed it */
   processed: Record<string, string>
 }
 
+/**
+ * Cheap read — the file only. Rebuilding from notes costs a scan of every
+ * distilled note, so it happens once per vault open in healLedgerForVault().
+ */
 async function readLedger(): Promise<DistillLedger> {
-  try {
-    return JSON.parse(await fs.readFile(ledgerFile(), 'utf8')) as DistillLedger
-  } catch {
-    return { processed: {} }
-  }
+  const f = await readLedgerFile(vaultLedgerFile())
+  return { processed: f ? ownerProcessed(f) : {} }
 }
 
 async function markProcessed(ids: string[]): Promise<void> {
-  const l = await readLedger()
-  const now = new Date().toISOString()
-  for (const id of ids) if (!l.processed[id]) l.processed[id] = now
-  await fs.writeFile(ledgerFile(), JSON.stringify(l), 'utf8')
+  const path = vaultLedgerFile()
+  const current = (await readLedgerFile(path)) ?? emptyLedger()
+  await writeLedgerFile(path, markProcessedIn(current, ids))
+}
+
+/**
+ * Bring the vault's ledger up to date on open: migrate the legacy AppData copy
+ * if this vault has none, then top it up from `session:` ids in distilled note
+ * frontmatter. Losing the ledger now costs a folder scan instead of re-milling
+ * every conversation on the local LLM.
+ */
+async function healLedgerForVault(): Promise<void> {
+  try {
+    const root = brainVaultRoot(vaultPath)
+    const before = await readLedgerFile(ledgerPathInVault(root))
+    const { ledger, origin, recovered } = await loadLedgerForVault(root, legacyLedgerFile())
+    if (!before || recovered > 0) {
+      await writeLedgerFile(ledgerPathInVault(root), ledger)
+    }
+    const known = Object.keys(ownerProcessed(ledger)).length
+    log.info(`distill ledger: ${known} id(s) known · origin=${origin} · recovered=${recovered}`)
+    if (origin === 'migrated-from-appdata') {
+      sendAppToast({
+        kind: 'info',
+        title: 'Rejestr destylacji przeniesiony do vaultu',
+        detail: m().ledgerTravels(known),
+      })
+    } else if (origin === 'rebuilt-from-notes' && recovered > 0) {
+      sendAppToast({
+        kind: 'info',
+        title: 'Rejestr destylacji odbudowany z notatek',
+        detail: m().ledgerRecovered(recovered),
+      })
+    }
+  } catch (e) {
+    log.warn('distill ledger heal failed:', (e as Error).message)
+  }
 }
 
 function ollamaFor(url?: string, model?: string): Ollama {
@@ -307,7 +372,7 @@ async function flushPendingLibraryDocs(ollamaUrl?: string): Promise<PendingIndex
   }
   if (vault.getPendingIndexDocuments().length === 0) return null
   const url = resolveOllamaUrl(ollamaUrl)
-  activity.update({ kind: 'indexing', phase: 'index', detail: 'oczekujące dokumenty…' })
+  activity.update({ kind: 'indexing', phase: 'index', detail: m().pendingDocs })
   try {
     const flush = await indexPendingLibraryDocuments(vault, vaultPath, {
       ollamaUrl: url,
@@ -326,23 +391,36 @@ async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
   if (brainCore.status().running) {
     await flushPendingLibraryDocs(url)
     await maybeHygieneReindexAfterVaultChange()
-    void runVaultHealthCheck({ silentOk: true })
+    checkVaultHealthInBackground({ silentOk: true })
     return
   }
   if (brainCore.status().starting) return
   if (!getAppSettings().embeddedBrainAutoStart) {
-    void runVaultHealthCheck({ silentOk: true })
+    checkVaultHealthInBackground({ silentOk: true })
     return
   }
   const ensured = await ensureBrainForIndexing(url, undefined, vaultPath)
+  if (!ensured.running) {
+    // ensureBrainForIndexing returns a ready sentence ("Ollama niedostępne pod
+    // …") and this used to drop it on the floor: with Ollama stopped the brain
+    // simply did not start, no toast, no log line, and the health check below
+    // runs with silentOk so it says nothing either. The vault opened, MCP was
+    // absent, and nothing on screen connected the two.
+    log.warn('embedded brain autostart failed:', ensured.error ?? 'unknown')
+    sendAppToast({
+      kind: 'error',
+      title: m().brainStartFailedTitle,
+      detail: m().brainStartFailedDetail(ensured.error ?? '?'),
+    })
+  }
   if (!ensured.running || !vault || !vaultPath) {
-    void runVaultHealthCheck({ silentOk: true })
+    checkVaultHealthInBackground({ silentOk: true })
     return
   }
   refreshTrayMenu(win, requestQuit)
   await flushPendingLibraryDocs(url)
   await maybeHygieneReindexAfterVaultChange()
-  void runVaultHealthCheck({ silentOk: true })
+  checkVaultHealthInBackground({ silentOk: true })
 }
 
 /** Slash-normalize vault roots so AppData vs portable switches compare reliably. */
@@ -397,6 +475,72 @@ async function runVaultHealthCheck(opts?: { silentOk?: boolean }): Promise<Vault
 }
 
 /**
+ * Fire-and-forget health check.
+ *
+ * `silentOk` only ever silenced the healthy case — a warn or critical report
+ * always toasts. What did not survive was the check *itself* failing: every
+ * caller wrote `void runVaultHealthCheck(...)`, so a throw from the fingerprint
+ * write or the assessment became an unhandled rejection and the check simply
+ * never reported anything, indefinitely and without a line anywhere.
+ */
+function checkVaultHealthInBackground(opts?: { silentOk?: boolean }): void {
+  runVaultHealthCheck(opts).catch((e: unknown) =>
+    log.warn('vault health check failed:', (e as Error).message),
+  )
+}
+
+/**
+ * A remote Brain that stopped existing is invisible from inside Pomnia: the URL
+ * is still saved, the target is still 'remote', and nothing on this machine
+ * notices. That is what a machine move looks like — say it once per run instead
+ * of letting every agent quietly get nothing back.
+ *
+ * The second half of the same problem is a URL that answers but isn't ours, so
+ * the guard checks who replied, not only that somebody did.
+ *
+ * Reset by `resetRemoteBrainWarning` whenever the user edits the target or URL.
+ */
+let warnedRemoteBrain = false
+
+function resetRemoteBrainWarning(): void {
+  warnedRemoteBrain = false
+}
+
+async function warnIfRemoteBrainUnusable(): Promise<void> {
+  if (warnedRemoteBrain) return
+  const s = getAppSettings()
+  if ((s.brainTarget ?? 'embedded') !== 'remote') return
+  const base = s.brainMcpUrl?.trim()
+  if (!base) return
+  const root = base.replace(/\/+$/, '').replace(/\/mcp$/, '')
+  const url = `${root}/mcp`
+  const probe = await probeMcpUrl(url, s.connectToken)
+  if (!probe.reachable) {
+    warnedRemoteBrain = true
+    sendAppToast({
+      kind: 'error',
+      title: m().remoteUnreachableTitle,
+      detail: m().remoteUnreachableDetail(url, probe.error ?? '?'),
+    })
+    return
+  }
+
+  // Answering is not the same as being the right server. A URL saved on an
+  // older machine pointed at the legacy Python brain: it replies to `initialize`
+  // exactly like brain-core does, so reachability alone would have kept quiet
+  // while every agent read a different vault.
+  const ping = await pingBrain(root, s.connectToken)
+  const engine = identifyEngine(ping.data)
+  if (engine.compatible) return
+  warnedRemoteBrain = true
+  sendAppToast({
+    kind: 'warn',
+    title: m().remoteNotBrainCoreTitle,
+    detail: m().remoteNotBrainCoreDetail(root, engine.label),
+  })
+}
+
+/**
  * After portable vault open: reindex current vault root and prune orphan AppData
  * paths from library.db. Toasts once when a full hygiene pass is needed.
  */
@@ -409,9 +553,9 @@ async function maybeHygieneReindexAfterVaultChange(): Promise<void> {
   if (!brainCore.status().running) {
     sendAppToast({
       kind: 'info',
-      title: 'Pełny reindex indeksu',
+      title: m().fullReindexTitle,
       detail:
-        'Vault przenośny — po starcie lokalnej wyszukiwarki kliknij „Odśwież indeks” (raz), żeby usunąć stare ścieżki AppData z wyszukiwania.',
+        m().fullReindexDetail,
     })
     return
   }
@@ -429,20 +573,23 @@ async function maybeHygieneReindexAfterVaultChange(): Promise<void> {
     if (typeof stats?.files === 'number' && typeof stats?.chunks === 'number') {
       writeLibraryStatsSidecar({ files: stats.files, chunks: stats.chunks, vaultRoot: root })
     }
-    void runVaultHealthCheck({ silentOk: true })
+    checkVaultHealthInBackground({ silentOk: true })
+    // An index that came back empty is the failure this whole pass exists to
+    // prevent — reporting it green is how 1886 notes were once shown as 26.
+    const indexedFiles = stats?.files ?? 0
     sendAppToast({
-      kind: 'success',
-      title: 'Indeks dopasowany do vaultu',
-      detail: `${stats?.files ?? 0} plików · ${stats?.chunks ?? 0} chunków${
-        pruned ? ` · usunięto ${pruned} starych ścieżek` : ''
+      kind: indexedFiles > 0 ? 'success' : 'warn',
+      title: indexedFiles > 0 ? m().reindexMatchedTitle : m().reindexNothingTitle,
+      detail: `${m().reindexCounts(indexedFiles, stats?.chunks ?? 0)}${
+        pruned ? m().reindexPruned(pruned) : ''
       }`,
     })
   } catch (e) {
     log.warn('vault hygiene reindex failed:', (e as Error).message)
     sendAppToast({
       kind: 'warn',
-      title: 'Reindex po otwarciu vaultu nieudany',
-      detail: `${(e as Error).message} — kliknij „Odśwież indeks” w Brain.`,
+      title: m().reindexAfterOpenFailedTitle,
+      detail: m().reindexFailedDetail((e as Error).message),
     })
   } finally {
     activity.idle('indexing')
@@ -525,9 +672,11 @@ function createWindow(): void {
         fs.writeFile(
           join(app.getPath('userData'), 'launch-check.json'),
           JSON.stringify({ ts: new Date().toISOString(), bridge, version: app.getVersion() }, null, 2)
-        ).catch(() => {})
+        ).catch((e: unknown) => log.warn('launch-check marker not written:', (e as Error).message))
       })
-      .catch(() => {})
+      // This probe is how we learn the preload bridge failed to load — the
+      // failure it exists to report must not be the one it swallows.
+      .catch((e: unknown) => log.warn('renderer bridge check failed:', (e as Error).message))
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
@@ -584,8 +733,10 @@ function registerIpc(): void {
     const skillsRoot = brainSkillsDir(vaultPath)
     try {
       writeSkillsIndexAt(skillsRoot)
-    } catch {
-      /* ignore */
+    } catch (e) {
+      // The list below still renders from disk, so this is not fatal — but a
+      // stale index is what agents read, so the divergence needs a trace.
+      log.warn('skills index not written:', (e as Error).message)
     }
     const all = listLocalSkillsAt(skillsRoot)
     return {
@@ -696,6 +847,8 @@ function registerIpc(): void {
     brainCore.setSkillsRoot(skillsRoot)
     brainCore.setVaultRoot(knowledgeRoot)
     void maybeAutoStartEmbeddedBrain()
+    void warnIfRemoteBrainUnusable()
+    void healLedgerForVault()
     // When autostart is off, still prompt for one-shot index hygiene.
     if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
     return {
@@ -722,6 +875,8 @@ function registerIpc(): void {
     const m = vault.getManifest()
     const pendingLibraryIndex = vault.getPendingIndexDocuments().length
     void maybeAutoStartEmbeddedBrain()
+    void warnIfRemoteBrainUnusable()
+    void healLedgerForVault()
     if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
     return {
       open: true,
@@ -1047,7 +1202,10 @@ function registerIpc(): void {
             const root = brainVaultRoot()
             const newPaths = okNotes.map((n) => join(vaultDistilled, noteFilename(n)))
             if (newPaths.length > 0) {
-              await brainCore.indexFiles(newPaths)
+              const stats = (await brainCore.indexFiles(newPaths)) as { prunedFiles?: number }
+              if (stats?.prunedFiles) {
+                log.info(`indexFiles after distill: pruned ${stats.prunedFiles} dead path(s)`)
+              }
             }
             reindexed = true
             await setAppSettings({ lastIndexedVaultRoot: root })
@@ -1083,6 +1241,11 @@ function registerIpc(): void {
               : `${dep.copied} note(s) via ${dep.method}${dep.reindex ? ' · reindex ok' : ' · reindex failed'}`
           })
         }
+
+        // Notes are in the vault by now, so the replica is out of date. Fire
+        // and forget: replication must never hold up the pipeline's result,
+        // and its own outcome is recorded regardless.
+        if (okNotes.length > 0) void autoReplicate('distillation')
 
         triggerFinale = true
         return {
@@ -1131,12 +1294,217 @@ function registerIpc(): void {
       refreshTrayMenu(win, requestQuit)
     }
   }
+  /**
+   * Push this machine's vault to a replica.
+   *
+   * Until now "the server has a copy" meant a tar somebody ran once, which
+   * started rotting with the next saved conversation and never said so.
+   */
+  /** What the panel shows about replication: where, whether automatic, and how it went. */
+  ipcMain.handle('vault:replicaState', () => {
+    const s = getAppSettings()
+    return {
+      url: s.replicaUrl ?? '',
+      hasToken: !!s.replicaToken?.trim(),
+      autoSync: s.replicaAutoSync === true,
+      last: s.lastReplication ?? null,
+    }
+  })
+
+  ipcMain.handle(
+    'vault:replicaConfig',
+    async (_e, patch: { url?: string; token?: string; autoSync?: boolean }) => {
+      const next: Parameters<typeof setAppSettings>[0] = {}
+      if (patch.url !== undefined) {
+        const url = patch.url.trim()
+        // Same shape the sync itself accepts, checked before it is stored:
+        // saving a bad address means the first failure arrives at 3am after a
+        // distillation, not now while someone is looking.
+        if (url && !/^https?:\/\//i.test(url)) {
+          throw new Error(m().replicaUrlScheme)
+        }
+        next.replicaUrl = url
+      }
+      if (patch.token !== undefined) next.replicaToken = patch.token.trim()
+      if (patch.autoSync !== undefined) next.replicaAutoSync = patch.autoSync === true
+      await setAppSettings(next)
+      const s = getAppSettings()
+      return { url: s.replicaUrl ?? '', hasToken: !!s.replicaToken?.trim(), autoSync: s.replicaAutoSync === true }
+    },
+  )
+
+  ipcMain.handle('vault:syncToReplica', async (_e, target: string, token?: string) => {
+    if (!vaultPath) throw new Error(m().vaultNotOpen)
+    const url = (target ?? '').trim()
+    if (!url) throw new Error(m().replicaNoTarget)
+    const root = brainVaultRoot(vaultPath)
+    activity.update({ kind: 'indexing', phase: 'reindex', detail: m().replicaComparing })
+    try {
+      const r = await syncVaultToReplica({
+        vaultRoot: root,
+        target: url,
+        token: token?.trim() || undefined,
+        onProgress: (done, total, path) =>
+          activity.update({
+            kind: 'indexing',
+            phase: 'reindex',
+            detail: m().replicaSending(done, total, basename(path)),
+          }),
+      })
+      // Uploading files a replica does not index changes nothing an agent can
+      // find, so the count that matters is the one after the reindex, not the
+      // one after the upload.
+      const toast =
+        r.failed.length > 0
+          ? {
+              kind: 'warn' as const,
+              title: m().replicaPartialTitle(r.uploaded, r.failed.length),
+              detail: r.failed
+                .slice(0, 3)
+                .map((f) => `${basename(f.path)}: ${f.reason}`)
+                .join(' · '),
+            }
+          : r.uploaded === 0
+            ? {
+                kind: 'info' as const,
+                title: m().replicaUpToDateTitle,
+                detail: m().replicaUpToDateDetail(r.unchanged),
+              }
+            : {
+                kind: 'success' as const,
+                title: m().replicaSyncedTitle(r.uploaded),
+                detail:
+                  `${r.unchanged} bez zmian · ${r.bytesUploaded > 0 ? `${(r.bytesUploaded / 1024).toFixed(0)} kB` : '0 kB'}` +
+                  (r.extraOnReplica.length
+                    ? m().replicaExtraSuffix(r.extraOnReplica.length)
+                    : ''),
+              }
+      sendAppToast(toast)
+      if (r.failed.length) log.warn('vault sync failures:', r.failed.slice(0, 10))
+      if (r.skipped.length) log.warn('vault sync skipped locally:', r.skipped.slice(0, 10))
+      return r
+    } finally {
+      activity.idle('indexing')
+    }
+  })
+
+  /**
+   * Mirror the vault to the configured replica after new notes land.
+   *
+   * Only when asked for, and never silently: the outcome is written to settings
+   * whether it worked or not, because an auto-sync that fails quietly is worse
+   * than none — it leaves you believing the server is current. Toasts only on
+   * failure; a working sync after every distillation would be noise.
+   */
+  async function autoReplicate(reason: string): Promise<void> {
+    const s = getAppSettings()
+    const target = s.replicaUrl?.trim()
+    if (!s.replicaAutoSync || !target || !vaultPath) return
+
+    try {
+      const r = await syncVaultToReplica({
+        vaultRoot: brainVaultRoot(vaultPath),
+        target,
+        token: s.replicaToken?.trim() || undefined,
+      })
+      await setAppSettings({
+        lastReplication: {
+          at: new Date().toISOString(),
+          ok: r.failed.length === 0,
+          uploaded: r.uploaded,
+          unchanged: r.unchanged,
+          failed: r.failed.length,
+          ...(r.failed.length ? { error: r.failed[0].reason } : {}),
+        },
+      })
+      log.info(`auto-replication after ${reason}: ${r.uploaded} uploaded, ${r.failed.length} failed`)
+      if (r.failed.length) {
+        sendAppToast({
+          kind: 'warn',
+          title: m().replicaAutoFailedTitle(r.failed.length),
+          detail: m().replicaAutoFailedDetail(r.uploaded, r.failed[0].reason),
+        })
+      }
+    } catch (e) {
+      // The server being off is the ordinary case, not an emergency — but it
+      // must still be recorded, or the next glance at "last replication" shows
+      // a stale success and reads as current.
+      await setAppSettings({
+        lastReplication: {
+          at: new Date().toISOString(),
+          ok: false,
+          uploaded: 0,
+          unchanged: 0,
+          failed: 0,
+          error: (e as Error).message,
+        },
+      })
+      log.warn(`auto-replication after ${reason} failed:`, (e as Error).message)
+      sendAppToast({
+        kind: 'warn',
+        title: m().replicaOfflineTitle,
+        detail: m().replicaOfflineDetail((e as Error).message),
+      })
+    }
+  }
+
+  /**
+   * Version and update state, on demand.
+   *
+   * The startup check only ever produced a toast when a newer build existed —
+   * so on the overwhelmingly common day, when you are current, the feature was
+   * invisible and there was no way to tell it from a feature that does not
+   * work. "Up to date, checked just now" is the answer people are looking for,
+   * and it has to be askable.
+   */
+  ipcMain.handle('app:updateCheck', async () => {
+    const current = app.getVersion()
+    const r = await describeUpdate(current)
+    if (r.state === 'unreachable') log.warn('manual update check failed:', r.detail)
+    return { current, checkedAt: new Date().toISOString(), ...r }
+  })
+
+  /** Live vault + XDG/AppData paths for Settings honesty (Linux self-hosted). */
+  ipcMain.handle('app:openUserData', async () => {
+    const dir = app.getPath('userData')
+    await fs.mkdir(dir, { recursive: true })
+    await shell.openPath(dir)
+    return dir
+  })
+
+  ipcMain.handle('app:openBrainData', async () => {
+    const dir = brainCoreDataDir()
+    await fs.mkdir(dir, { recursive: true })
+    await shell.openPath(dir)
+    return dir
+  })
+
+  /**
+   * Where vault / Brain data actually live on this machine.
+   * Linux must not inherit Windows AppData copy — XDG + ~/Vault honesty.
+   */
+  ipcMain.handle('app:dataLocations', () =>
+    buildDataLocationsSnapshot({
+      userDataDir: app.getPath('userData'),
+      vaultPath,
+      platform: currentOS(),
+      installForm: app.isPackaged ? detectInstallForm() : 'dev',
+    }),
+  )
+
   ipcMain.handle('brainCore:status', () => brainCore.status())
   ipcMain.handle('brainCore:start', async (_e, ollamaUrl?: string) => {
     const url = resolveOllamaUrl(ollamaUrl)
-    activity.update({ kind: 'brain-start', phase: 'start', detail: 'sprawdzam Ollama…' })
+    activity.update({ kind: 'brain-start', phase: 'start', detail: m().checkingOllama })
     const probe = await probeOllama(url)
     if (!probe.ok) throw new Error(ollamaUnreachableMessage(probe))
+    // Reachable is not the same as usable. Start anyway — agents still get the
+    // skills tools — but say it out loud instead of looking healthy while every
+    // search comes back empty.
+    const missingEmbed = missingEmbedModelMessage(probe.models)
+    if (missingEmbed) {
+      sendAppToast({ kind: 'error', title: m().brainNoEmbedTitle, detail: missingEmbed })
+    }
     activity.update({ kind: 'brain-start', phase: 'start', detail: 'uruchamiam…' })
     try {
       await brainCore.start({
@@ -1151,7 +1519,7 @@ function registerIpc(): void {
       await setAppSettings({ embeddedBrainAutoStart: true, ollamaUrl: url })
       await flushPendingLibraryDocs(url)
       void maybeHygieneReindexAfterVaultChange()
-      void runVaultHealthCheck()
+      checkVaultHealthInBackground()
       refreshTrayMenu(win, requestQuit)
       return brainCore.status()
     } catch (err) {
@@ -1178,22 +1546,50 @@ function registerIpc(): void {
       }
       // Also rebuild encrypted library docs missing from library.db (not covered by indexDir).
       const flush = await flushPendingLibraryDocs()
-      void runVaultHealthCheck({ silentOk: true })
+      checkVaultHealthInBackground({ silentOk: true })
       return { stats, libraryFlush: flush }
     } finally {
       activity.idle('indexing')
     }
   })
+  ipcMain.handle('brainCore:cancelIndex', () => {
+    // The awaiting reindex settles on the child's own 'reindex aborted' reply,
+    // so there is nothing to unwind here.
+    brainCore.cancelIndexing()
+    return brainCore.status()
+  })
   ipcMain.handle('vault:health', async () => runVaultHealthCheck({ silentOk: true }))
   ipcMain.handle('doctor:run', async (_e, opts?: { distillModel?: string; ollamaUrl?: string }) => {
     const settings = getAppSettings()
+    const brainTarget = settings.brainTarget ?? 'embedded'
+    const remoteUrl = settings.brainMcpUrl?.trim()
+    const brainUrl =
+      brainTarget === 'remote' && remoteUrl
+        ? remoteUrl.replace(/\/+$/, '')
+        : 'http://127.0.0.1:7862'
+    // Remote search does not need local Ollama. If the user never set a URL,
+    // prefer the same host as Master MCP on :11434 so Distill can hit server GPU.
+    let ollamaUrl = opts?.ollamaUrl || settings.ollamaUrl
+    if (brainTarget === 'remote' && !ollamaUrl && remoteUrl) {
+      try {
+        const u = new URL(remoteUrl)
+        u.port = '11434'
+        u.pathname = ''
+        u.search = ''
+        u.hash = ''
+        ollamaUrl = u.toString().replace(/\/$/, '')
+      } catch {
+        ollamaUrl = remoteUrl.replace(/:\d+(\/.*)?$/, ':11434')
+      }
+    }
     return runDoctor({
       vaultPath: vaultPath ?? settings.lastIndexedVaultRoot,
       vaultOpen: !!vault,
       userDataDir: app.getPath('userData'),
-      ollamaUrl: opts?.ollamaUrl || settings.ollamaUrl,
+      ollamaUrl,
       distillModel: opts?.distillModel,
-      brainUrl: 'http://127.0.0.1:7862',
+      brainUrl,
+      brainTarget,
     })
   })
   ipcMain.handle('app:settings', () => getAppSettings())
@@ -1231,6 +1627,10 @@ function registerIpc(): void {
       },
     ) => {
       const next = await setAppSettings(patch)
+      // Editing where the brain lives makes the earlier verdict stale.
+      if (patch.brainMcpUrl !== undefined || patch.brainTarget !== undefined) {
+        resetRemoteBrainWarning()
+      }
       if (Object.prototype.hasOwnProperty.call(patch, 'colorScheme')) {
         const scheme = next.colorScheme ?? 'mint'
         for (const w of BrowserWindow.getAllWindows()) {
@@ -1473,6 +1873,10 @@ function registerIpc(): void {
       opts: { to: 'filesystem' | 'dashboard'; target?: string; url?: string; reindex?: boolean; token?: string; sources?: SourceId[] }
     ) => {
       let detail = ''
+      // Sub-steps here fail independently of the whole call. Collecting them lets
+      // the caller colour the toast honestly — this used to render green while
+      // `detail` literally read "embedded reindex failed: …".
+      const problems: string[] = []
       if (opts.to === 'filesystem') {
         if (!opts.target) throw new Error('target dir required')
         await fs.mkdir(opts.target, { recursive: true })
@@ -1494,19 +1898,23 @@ function registerIpc(): void {
             await setAppSettings({ lastIndexedVaultRoot: root })
             detail += ' · embedded reindex ok'
           } catch (e) {
-            detail += ` · embedded reindex failed: ${(e as Error).message}`
+            const msg = `embedded reindex failed: ${(e as Error).message}`
+            detail += ` · ${msg}`
+            problems.push(msg)
           }
         }
       } else {
         const convs = await collectLive(opts.sources ?? [])
         const r = await deployDashboard(convs, opts.url || 'http://localhost:7860')
         detail = `Pushed to Brain: ${r.ok} ok, ${r.failed} failed`
+        if (r.failed > 0) problems.push(`${r.failed} note(s) failed to push`)
       }
       if (opts.reindex && opts.url) {
         const ok = await triggerReindex(opts.url, opts.token)
         detail += ok ? ' · reindex triggered' : ' · reindex failed'
+        if (!ok) problems.push('remote reindex trigger failed')
       }
-      return { detail }
+      return { detail, ok: problems.length === 0, problems }
     }
   )
 
@@ -1518,15 +1926,18 @@ function registerIpc(): void {
       (target === 'embedded'
         ? 'http://127.0.0.1:7862'
         : saved.brainMcpUrl?.trim() || '')
+    // Probe rather than trust the file: a config can be word-perfect and still
+    // point at a machine that is no longer on the network.
+    const probeOpts = { probe: true, token: target === 'embedded' ? undefined : token }
     if (!url) {
-      const [clients] = await Promise.all([checkAllClients()])
+      const clients = await checkAllClients(probeOpts)
       return {
         clients,
         brain: { url: '', reachable: false, error: 'Brak skonfigurowanego URL serwera Brain' },
       }
     }
     const [clients, brain] = await Promise.all([
-      checkAllClients(),
+      checkAllClients(probeOpts),
       pingBrain(url, target === 'embedded' ? undefined : token),
     ])
     return { clients, brain }
@@ -1541,11 +1952,13 @@ function registerIpc(): void {
       token?: string,
       target?: 'embedded' | 'remote',
       brainMode?: boolean,
+      remoteHub?: 'brain-core' | 'legacy-hub',
     ) =>
       buildSnippet(clientId, brainUrl, currentOS(), homeDir(), token, target ?? 'remote', {
         brainMode: !!brainMode,
         handshakePhrase: getHandshakePhrase(),
         handshakeEnabled: isHandshakeEnabled(),
+        remoteHub: remoteHub === 'legacy-hub' ? 'legacy-hub' : 'brain-core',
       }),
   )
 
@@ -1581,8 +1994,12 @@ function registerIpc(): void {
         let existing = ''
         try {
           existing = await fs.readFile(filePath, 'utf8')
-        } catch {
-          /* create new */
+        } catch (e) {
+          // Only "there is no file yet" means create. Any other read failure —
+          // a lock, a permission denial — used to land here too, and the write
+          // below would then upsert into an empty string and replace whatever
+          // the user actually had in their CLAUDE.md or rules file.
+          if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
         }
         next = upsertPomniaBrainBrief(existing, snippet.brief.content)
       }
@@ -1648,17 +2065,48 @@ app.whenReady().then(async () => {
   await fs.mkdir(brainDir(), { recursive: true })
   await migrateBrainIndexFile(brainDir())
   await loadAppSettings()
+
+  // Delayed so it never competes with startup, and never blocks it. Until this
+  // existed, whoever installed a build stayed on it forever — every fix we ship
+  // reached nobody who already had the app.
+  setTimeout(() => {
+    void checkForUpdate(app.getVersion()).then((info) => {
+      if (!info) return
+      log.info(`update available: ${info.version} (running ${app.getVersion()})`)
+      sendAppToast({
+        kind: 'info',
+        title: m().updateAvailableTitle(info.version),
+        detail: m().updateAvailableDetail(app.getVersion()),
+      })
+    })
+  }, 20_000)
   applyLoginItemSettings()
   initActivityReplayStore(app.getPath('userData'))
   await loadLastActivityReplay()
   registerIpc()
   createWindow()
-  if (win) void initTray(win, requestQuit)
+  if (win) {
+    void initTray(win, requestQuit).catch((e: unknown) =>
+      log.warn('tray not initialised:', (e as Error).message),
+    )
+  }
   // Ephemeral profile preview — Ctrl+Shift+U (avoid P clash with print / other apps).
   const hkProfile = globalShortcut.register('CommandOrControl+Shift+U', () => {
-    void showProfilePreview().then(() => {
-      if (win) refreshTrayMenu(win, requestQuit)
-    })
+    // A hotkey that does nothing and says nothing is indistinguishable from a
+    // hotkey that is not registered — and this one builds a preview from the
+    // brain index, which has plenty of ways to fail.
+    void showProfilePreview()
+      .then(() => {
+        if (win) refreshTrayMenu(win, requestQuit)
+      })
+      .catch((e: unknown) => {
+        log.warn('profile preview failed:', (e as Error).message)
+        sendAppToast({
+          kind: 'error',
+          title: m().profilePreviewFailed,
+          detail: (e as Error).message,
+        })
+      })
   })
   if (!hkProfile) log.warn('profile preview hotkey Ctrl+Shift+U not registered (conflict?)')
   app.on('will-quit', () => {

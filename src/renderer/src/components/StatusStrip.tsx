@@ -30,10 +30,14 @@ let stripCache: {
 
 export function StatusStrip() {
   const labels = uiLabels()
-  const { vault, setRoute, ollamaUrl, loadBrainState, brainState } = useStore()
+  const { vault, setRoute, ollamaUrl, loadBrainState, brainState, brainTarget, remoteBrainUrl } =
+    useStore()
+  /** Honor stored remote even if simpleMode hides the Connect toggle — Ollama must not go red. */
+  const isRemoteBrain = brainTarget === 'remote'
   const [checking, setChecking] = useState(() => stripCache === null)
   const [ollama, setOllama] = useState<BrainStatus | null>(() => stripCache?.ollama ?? null)
   const [core, setCore] = useState<EmbeddedBrainStatus | null>(() => stripCache?.core ?? null)
+  const [remoteOk, setRemoteOk] = useState<boolean | null>(null)
   const [localBrainState, setLocalBrainState] = useState<BrainStateInfo | null>(
     () => stripCache?.state ?? brainState
   )
@@ -45,19 +49,29 @@ export function StatusStrip() {
     setChecking(true)
     setDoctorHasFail(loadDoctorLastResult()?.hasFail === true)
     try {
-      const [status, coreStatus, state] = await Promise.all([
-        api.brainStatus(ollamaUrl || undefined).catch(() => null),
-        api.brainCoreStatus().catch(() => null),
-        api.brainState().catch(() => null)
+      const remote = brainTarget === 'remote'
+      const [status, coreStatus, state, conn] = await Promise.all([
+        // Skip probing local Ollama when remote brain owns search — avoid red strip noise.
+        remote
+          ? Promise.resolve(null)
+          : api.brainStatus(ollamaUrl || undefined).catch(() => null),
+        remote ? Promise.resolve(null) : api.brainCoreStatus().catch(() => null),
+        api.brainState().catch(() => null),
+        remote && remoteBrainUrl.trim()
+          ? api
+              .connectStatus(remoteBrainUrl.trim(), undefined, 'remote')
+              .catch(() => null)
+          : Promise.resolve(null),
       ])
       setOllama(status)
       setCore(coreStatus)
+      setRemoteOk(conn ? !!conn.brain.reachable : remote ? false : null)
       setLocalBrainState(state)
       stripCache = { ollama: status, core: coreStatus, state }
     } finally {
       setChecking(false)
     }
-  }, [ollamaUrl])
+  }, [ollamaUrl, brainTarget, remoteBrainUrl])
 
   useEffect(() => {
     void refresh()
@@ -74,8 +88,10 @@ export function StatusStrip() {
       ? relativeTime(localBrainState?.lastRun ?? brainState?.lastRun ?? '')
       : labels.statusNoDistill
 
-  const brainPending = checking && core === null
-  const ollamaPending = checking && ollama === null
+  const brainPending = isRemoteBrain
+    ? checking && remoteOk === null
+    : checking && core === null
+  const ollamaPending = !isRemoteBrain && checking && ollama === null
 
   const items: StripItem[] = [
     {
@@ -93,23 +109,36 @@ export function StatusStrip() {
       label: labels.statusBrain,
       value: brainPending
         ? labels.statusChecking
-        : core?.running
-          ? labels.statusBrainRunning
-          : labels.statusBrainStopped,
-      ok: brainPending ? null : (core?.running ?? false),
-      tab: 'brain'
+        : isRemoteBrain
+          ? labels.statusBrainRemote
+          : core?.running
+            ? labels.statusBrainRunning
+            : labels.statusBrainStopped,
+      detail: isRemoteBrain && remoteBrainUrl.trim()
+        ? shortPath(remoteBrainUrl.trim(), 28)
+        : undefined,
+      ok: brainPending ? null : isRemoteBrain ? remoteOk : (core?.running ?? false),
+      tab: isRemoteBrain ? 'connect' : 'brain'
     },
     {
       id: 'ollama',
       icon: Sparkles,
       label: labels.statusOllama,
-      value: ollamaPending
-        ? labels.statusChecking
-        : ollama?.reachable
-          ? labels.statusOllamaOk
-          : labels.statusOllamaFail,
-      detail: ollamaPending ? undefined : ollama?.baseUrl ? shortPath(ollama.baseUrl, 28) : undefined,
-      ok: ollamaPending ? null : (ollama?.reachable ?? false),
+      value: isRemoteBrain
+        ? labels.statusOllamaOptional
+        : ollamaPending
+          ? labels.statusChecking
+          : ollama?.reachable
+            ? labels.statusOllamaOk
+            : labels.statusOllamaFail,
+      detail: isRemoteBrain
+        ? undefined
+        : ollamaPending
+          ? undefined
+          : ollama?.baseUrl
+            ? shortPath(ollama.baseUrl, 28)
+            : undefined,
+      ok: isRemoteBrain ? null : ollamaPending ? null : (ollama?.reachable ?? false),
       tab: 'brain'
     },
     {

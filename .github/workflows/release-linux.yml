@@ -1,0 +1,114 @@
+name: Release Linux (AppImage + deb)
+
+# Fastest path to a downloadable Linux desktop build from a Windows-only
+# machine: dispatch this workflow, then attach artifacts to the GH Release
+# (npm run attach:linux-release, or the tag upload step below).
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      # Until this workflow lands on the default branch, workflow_dispatch 404s.
+      # Branch pushes still run the workflow file from this commit.
+      - fix/machine-move-honesty
+      - master
+      - main
+    tags:
+      - 'v*'
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Linux pack tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            python3 \
+            rpm \
+            fakeroot \
+            dpkg \
+            libfuse2
+
+      - name: Build workspace packages
+        run: npm run build:brain-core && npm run build:doc-parser
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Linux AppImage + deb
+        run: |
+          rm -rf release/linux-unpacked release/*.AppImage release/*.deb release/latest-linux.yml || true
+          npm run pack:linux
+        env:
+          # CI runners have no operator vault — skip the local memory gate.
+          GOLDEN_PATH_SKIP: '1'
+          # Honest unsigned build (same stance as Windows/macOS early public).
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # Avoid EEXIST hardlink collisions when canvas is listed both as an
+          # explicit files: copy and as a resolved dependency (Linux CI).
+          USE_HARD_LINKS: 'false'
+
+      - name: SHA-256 checksums
+        run: |
+          cd release
+          for f in *.AppImage *.deb; do
+            [ -f "$f" ] || continue
+            sha256sum "$f" | tee "${f}.sha256"
+          done
+          ls -lah *.AppImage *.deb *.sha256 2>/dev/null || true
+
+      - name: Upload Actions artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pomnia-linux
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.sha256
+            release/latest-linux.yml
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release (tag pushes)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          shopt -s nullglob
+          ASSETS=(release/*.AppImage release/*.deb release/*.sha256)
+          if [ -f release/latest-linux.yml ]; then
+            ASSETS+=(release/latest-linux.yml)
+          fi
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "No Linux packages to upload"
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Existing release (often Windows-first): upload only — do not flip draft/published.
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+            echo "Attached Linux assets to existing $TAG"
+          else
+            # No release yet — create draft; Windows publish:release owns going live.
+            gh release create "$TAG" "${ASSETS[@]}" \
+              --title "Pomnia ${TAG#v}" \
+              --notes "Linux AppImage/deb (unsigned). Windows installer may follow via publish:release." \
+              --draft
+            echo "Created draft release $TAG with Linux assets"
+          fi

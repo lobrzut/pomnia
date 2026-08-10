@@ -146,7 +146,7 @@ export function Sidebar() {
                 {n.label}
                 {n.id === 'brain' && pendingLibrary > 0 && (
                   <span className="rounded-full border border-amber/40 bg-amber/15 px-1.5 py-px text-[10px] font-medium leading-none text-amber">
-                    {pendingLibrary} indeksów czeka
+                    {labels.pendingIndexesWaiting(pendingLibrary)}
                   </span>
                 )}
                 {n.id === 'brain' && busy && <Spinner className="h-3 w-3 shrink-0 text-mint" />}

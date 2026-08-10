@@ -56,3 +56,42 @@ export function toPortable(p: string): string {
 export function fromPortable(p: string, targetOS: OS = currentOS()): string {
   return targetOS === 'win32' ? p.replace(/\//g, '\\') : p
 }
+
+/**
+ * Example Pomnia userData for docs/UI — not a live resolve.
+ * Linux = XDG config (`~/.config/Pomnia`); Windows = `%AppData%\\Pomnia`.
+ */
+export function pomniaUserDataExample(targetOS: OS = currentOS()): string {
+  switch (targetOS) {
+    case 'win32':
+      return '%AppData%\\Pomnia'
+    case 'darwin':
+      return '~/Library/Application Support/Pomnia'
+    case 'linux':
+      return '~/.config/Pomnia'
+  }
+}
+
+/** Example vault folder path for labels (operator picks the real path). */
+export function vaultFolderExample(targetOS: OS = currentOS()): string {
+  switch (targetOS) {
+    case 'win32':
+      return 'C:\\Vault'
+    case 'darwin':
+      return '~/Vault'
+    case 'linux':
+      return '~/Vault'
+  }
+}
+
+/** Short label for the machine-local data root (AppData / XDG). */
+export function machineDataRootLabel(targetOS: OS = currentOS()): string {
+  switch (targetOS) {
+    case 'win32':
+      return 'AppData'
+    case 'darwin':
+      return 'Application Support'
+    case 'linux':
+      return '~/.config'
+  }
+}

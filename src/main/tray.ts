@@ -6,6 +6,8 @@
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { isEnLocale, m } from './mainStrings.js'
 import { app, Menu, Tray, nativeImage, type BrowserWindow, type NativeImage } from 'electron'
 import { activity } from './activity.js'
 import { brainCore } from './brainCore.js'
@@ -30,25 +32,25 @@ async function resolveIcon(): Promise<NativeImage> {
 
 function brainStatusLabel(): string {
   const s = brainCore.status()
-  if (s.starting) return 'Lokalna wyszukiwarka: uruchamianie…'
-  if (s.running) return `Lokalna wyszukiwarka: działa (${s.url ?? '127.0.0.1:7862'})`
-  if (s.lastError) return `Lokalna wyszukiwarka: zatrzymana (${s.lastError})`
-  return 'Lokalna wyszukiwarka: zatrzymana'
+  if (s.starting) return m().trayBrainStarting
+  if (s.running) return m().trayBrainRunning(s.url ?? '127.0.0.1:7862')
+  if (s.lastError) return m().trayBrainStoppedWith(s.lastError)
+  return m().trayBrainStopped
 }
 
 function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
   const embedded = brainCore.status()
-  const busyLine = activity.menuLine()
+  const busyLine = activity.menuLine(isEnLocale())
   return Menu.buildFromTemplate([
     {
-      label: 'Otwórz Pomnię',
+      label: m().trayOpen,
       click: () => {
         win?.show()
         win?.focus()
       },
     },
     {
-      label: 'Pływający diagram',
+      label: m().trayFloatingMonitor,
       type: 'checkbox',
       checked: isFloatingMonitorVisible(),
       click: () => {
@@ -56,7 +58,7 @@ function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
       },
     },
     {
-      label: 'Profil',
+      label: m().trayProfile,
       click: () => {
         void showProfilePreview().then(() => tray?.setContextMenu(buildMenu(win, onQuit)))
       },
@@ -78,8 +80,8 @@ function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
       ? [
           {
             label: embedded.indexing
-              ? 'Zatrzymaj lokalną wyszukiwarkę (anuluj indeks)'
-              : 'Zatrzymaj lokalną wyszukiwarkę',
+              ? m().trayStopBrainCancelIndex
+              : m().trayStopBrain,
             click: () => {
               void brainCore.stop().then(() => tray?.setContextMenu(buildMenu(win, onQuit)))
             },
@@ -88,14 +90,14 @@ function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
       : []),
     { type: 'separator' },
     {
-      label: 'Zakończ',
+      label: m().trayQuit,
       click: onQuit,
     },
   ])
 }
 
 export function refreshTrayTooltip(): void {
-  tray?.setToolTip(activity.tooltip())
+  tray?.setToolTip(activity.tooltip(isEnLocale()))
 }
 
 export async function initTray(win: BrowserWindow, onQuit: () => void): Promise<void> {

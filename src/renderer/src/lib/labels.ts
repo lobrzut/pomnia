@@ -148,9 +148,15 @@ export interface UiLabels {
   embedded: string
   remote: string
   reindex: string
+  /** Stops just the index pass — the brain (and every agent's MCP) stays up. */
+  reindexCancel: string
   mcpConnect: string
   brainPageTitle: string
   brainPageLead: string
+  /** Advanced Ollama card when Master is remote — distill endpoint, not install gate. */
+  brainOllamaDistillTitle: string
+  brainOllamaDistillLead: string
+  brainOllamaDistillOfflineHint: string
   brainDistillSelectedHint: (model: string, profile: string) => string
   brainAttachExport: string
   brainAttachExportHint: string
@@ -232,6 +238,106 @@ export interface UiLabels {
   onboardingEngineTestConn: string
   onboardingEngineRemoteOk: string
   onboardingEngineRemoteFail: string
+  onboardingEngineRemoteWrongEngine: (engine: string) => string
+  onboardingEngineRemoteUntested: string
+  settingsEngineNow: (where: string) => string
+  settingsEngineLocal: string
+  settingsEngineRemote: string
+  settingsEngineWhereToSwitch: string
+  vaultReplicaTitle: string
+  vaultReplicaBadge: string
+  vaultReplicaLead: string
+  vaultReplicaAction: string
+  vaultReplicaFailed: string
+  vaultReplicaUrl: string
+  vaultReplicaAuto: string
+  vaultReplicaAutoHint: string
+  vaultReplicaLast: string
+  vaultReplicaLastOk: (uploaded: number, unchanged: number) => string
+  vaultReplicaNoUrl: string
+  // ── update card ──────────────────────────────────────────────────────────
+  updateIdle: string
+  updateAvailable: (latest: string) => string
+  updateUnreachable: (detail: string) => string
+  updateCurrent: string
+  updateCheckNow: string
+  updateDownload: string
+  updateNoConnection: string
+  /** Extra honesty under the update card on Linux (AppImage/deb — no silent install). */
+  updateLinuxHint: string
+  // ── data locations (Settings) ────────────────────────────────────────────
+  dataLocationsTitle: string
+  dataLocationsLead: string
+  dataLocationsUserData: string
+  dataLocationsIndex: string
+  dataLocationsLogs: string
+  dataLocationsVault: string
+  dataLocationsVaultLocked: string
+  dataLocationsPlaintext: string
+  dataLocationsWipe: string
+  dataLocationsOpenUserData: string
+  dataLocationsOpenBrain: string
+  dataLocationsOwnership: string
+  dataLocationsInstallForm: (form: string) => string
+  // ── connect: client state ────────────────────────────────────────────────
+  clientWired: string
+  clientUnreachable: string
+  clientPartial: string
+  clientConfigError: string
+  clientNone: string
+  // ── connect: token + snippet ─────────────────────────────────────────────
+  tokenNamePrompt: string
+  tokenSavedDetail: string
+  tokenCreateFailed: string
+  tokenCreateFailedDetail: (msg: string) => string
+  snippetBuildFailed: string
+  copyFailed: string
+  copied: string
+  statusCheckFailed: string
+  skillSyncOk: (n: number) => string
+  skillSyncNone: string
+  skillSyncFailed: string
+  skillSyncErrorsDetail: (n: number) => string
+  skillSyncAvailableOffline: string
+  embeddedSnippetHint: string
+  urlChangeHint: string
+  snippetFilePath: string
+  snippetWholeFile: string
+  snippetPasteWhole: string
+  snippetCreateOverwrite: string
+  snippetRulePath: string
+  // ── settings: health + integrity ─────────────────────────────────────────
+  healthVaultAction: string
+  healthOllamaMissing: string
+  /** Remote brain: local Ollama is not required for search — hint distill URL. */
+  healthOllamaOptionalRemote: (url: string) => string
+  /** Short distill-only hint when remote brain and Ollama offline. */
+  healthOllamaDistillHint: string
+  healthCoreAction: string
+  healthMcpUnreachable: string
+  vaultIntegrityOk: string
+  vaultIntegrityErrors: (n: number) => string
+  vaultIntegrityChecked: (n: number) => string
+  exportNoNotes: string
+  exportOk: (n: number) => string
+  exportFailed: string
+  exportSnapshotEmptyDetail: (dir: string) => string
+  healthDeployNotSet: string
+  tokenCreatedTitle: (name: string) => string
+  showClientInConnect: (name: string) => string
+  brainReadOnly: string
+  brainReadOnlyBy: (owner: string) => string
+  brainStoppedStartInTab: string
+  skillsNoneOnServer: string
+  snippetLocalModeHint: string
+  snippetTokenInHeaders: string
+  /** Remote brain-core default: one pomnia → /mcp + Bearer. */
+  snippetRemoteBrainCoreHint: string
+  /** Legacy Python hub 3×SSE snippet note. */
+  snippetLegacyHubHint: string
+  /** Connect Remote advanced toggle label. */
+  connectLegacyHubToggle: string
+  connectLegacyHubHint: string
   onboardingEngineLooking: string
   onboardingEngineRunning: string
   onboardingEngineMoreModels: (n: number) => string
@@ -240,6 +346,9 @@ export interface UiLabels {
   onboardingEngineModelsNeeded: string
   onboardingEngineEmbedMissing: (cmd: string) => string
   onboardingEngineDistillMissing: (cmd: string, size: string) => string
+  /** In-app Ollama pull — same IPC path as Brain advanced; first-run must not require the terminal. */
+  onboardingEnginePullBtn: string
+  onboardingEngineCancelPull: string
   onboardingEngineNotFound: string
   onboardingEngineInstall1: string
   onboardingEngineInstall2: string
@@ -277,12 +386,47 @@ export interface UiLabels {
   embeddedBrainStop: string
   embeddedBrainStoppedToast: string
   toastModelReady: string
+  /** Pull returned without error but Ollama still does not list the model. */
+  toastModelStillMissing: (model: string) => string
   toastPullFailed: string
   toastLocalIndexRefreshed: string
   toastReindexFailed: string
   toastSearchFailed: string
   toastDeployed: string
+  /** Some notes landed, some sub-step failed — the detail spells out which. */
+  toastDeployPartial: string
   toastDeployFailed: string
+  embeddedBrainStartBeforeConnect: string
+  mintTokenBtn: string
+  connectYourClients: string
+  connectClientsConnected: (connected: number, total: number) => string
+  connectDetectingClients: string
+  connectNoClientsDetected: string
+  connectNoClientsHintPrefix: string
+  connectNoClientsHintLink: string
+  connectNoClientsHintSuffix: string
+  connectSnippetOpenFile: string
+  connectSnippetChooseMode: string
+  connectSnippetNewFile: string
+  connectSnippetMerge: string
+  connectCopyAction: string
+  connectMergeKeysHint: (mcpKey: string) => string
+  connectSkillsTitle: string
+  connectSkillsBadge: string
+  connectSkillsLead: string
+  connectSkillsSync: string
+  guideAltPath: string
+  pendingIndexesWaiting: (n: number) => string
+  healthModelMissing: (pullCmd: string) => string
+  snapshotEmptyOption: string
+  snapshotChatsOption: (label: string, chats: number, shortId: string) => string
+  snapshotFilesBytes: (files: number, bytes: string) => string
+  securityAesBullet: string
+  securityScryptBullet: string
+  securityContentAddressedBullet: string
+  brainEmbedModelShared: string
+  brainDashboardUrlLabel: string
+  brainDistilledFolderLabel: string
   brainSearchPlaceholder: string
   brainSearchButton: string
   brainSearchEmpty: string
@@ -327,6 +471,8 @@ export interface UiLabels {
   /** Idle PiP status when embedded Brain is stopped. */
   floatingMonitorBrainOff: string
   floatingMonitorBrainStarting: string
+  /** Pipeline progress bar, first tick — before the main process reports a phase. */
+  brainPipelineStarting: string
   floatingMonitorBrainReady: string
   floatingMonitorBrainError: string
   floatingMonitorClose: string
@@ -447,6 +593,9 @@ export interface UiLabels {
   antivirusSigningNote: string
   /** Generic open-install-dir utility (not an AV-exclusion affordance). */
   antivirusOpenInstallFolder: string
+  /** Settings — Linux unsigned / SHA honesty (replaces Windows AV card). */
+  linuxUnsignedTitle: string
+  linuxUnsignedLead: string
   previewMode: string
   importTitle: string
   importLead: string
@@ -609,6 +758,15 @@ export interface UiLabels {
   sidebarBusyGeneric: string
   lockVaultBtn: string
   vaultLocked: string
+  vaultToastCreated: string
+  vaultToastCreateFailed: string
+  vaultToastUnlocked: string
+  vaultToastUnlockFailed: string
+  vaultToastLocked: string
+  errorBoundaryTitle: string
+  errorBoundaryHint: string
+  errorBoundaryReload: string
+  unexpectedError: string
   guideTitle: string
   guideSubtitle: string
   guideLead: string
@@ -697,6 +855,11 @@ export interface UiLabels {
   statusOllama: string
   statusOllamaOk: string
   statusOllamaFail: string
+  /** Remote brain: strip must not look like a hard fail for missing local Ollama. */
+  statusOllamaOptional: string
+  statusBrainRemote: string
+  statusBrainRemoteOk: string
+  statusBrainRemoteFail: string
   statusChecking: string
   statusLastDistill: string
   statusNoDistill: string
@@ -771,6 +934,7 @@ const PL_LABELS: UiLabels = {
   embedded: 'Lokalnie',
   remote: 'Na serwerze',
   reindex: 'Odśwież indeks',
+  reindexCancel: 'Przerwij indeksowanie',
   mcpConnect: 'Podłącz agenta',
   brainPageTitle: 'Pamięć i wyszukiwarka',
   brainPageLead:
@@ -836,7 +1000,7 @@ const PL_LABELS: UiLabels = {
   onboardingValueRecallText: 'Oddaj kontekst dowolnemu AI przez MCP — agenci, którzy Cię pamiętają.',
   onboardingVaultTitle: 'Utwórz vault',
   onboardingVaultLead:
-    'Jeden folder vaultu trzyma wszystko (np. C:\\Vault — nazwa dowolna, też *.pomnia). Wybierz lokalizację i hasło, którego nie zgubisz. Przenośność = skopiuj cały ten folder → Otwórz vault → hasło.',
+    'Jeden folder vaultu trzyma wszystko (np. C:\\Vault lub ~/Vault — nazwa dowolna, też *.pomnia). Wybierz lokalizację i hasło, którego nie zgubisz. Przenośność = skopiuj cały ten folder → Otwórz vault → hasło.',
   onboardingVaultCreateTab: 'Nowy vault',
   onboardingVaultOpenTab: 'Mam już folder',
   onboardingVaultNewFolder: 'Nowy folder vaultu',
@@ -861,15 +1025,117 @@ const PL_LABELS: UiLabels = {
   onboardingBackupNow: 'Backup teraz',
   onboardingEngineTitle: 'Jak ma działać Brain?',
   onboardingEngineLead:
-    'Wybierz lokalną wyszukiwarkę (wbudowaną w Pomnia) albo opcjonalny zdalny serwer Brain. Ollama na tym PC: embeddingi (nomic-embed-text, ~0,3 GB) i destylacja (qwen2.5:14b, ~9 GB).',
+    'Lokalnie: wbudowana wyszukiwarka + Ollama na tym PC (embed + destylacja). Zdalnie (np. Pomnia na Linuxie): search/MCP na serwerze — lokalna instalacja Ollama nie jest wymagana.',
   onboardingEngineLocal: 'Lokalnie (embedded)',
   onboardingEngineLocalHint: (url) => `Jeden .exe, MCP na ${url} — bez zdalnego serwera, bez tokena.`,
   onboardingEngineRemote: 'Zdalny master',
-  onboardingEngineRemoteHint: 'Twój serwer Brain w LAN — trzy serwery MCP + Bearer token.',
+  onboardingEngineRemoteHint: 'Serwer Brain w LAN (search/MCP). Ollama na tym PC niepotrzebna do wyszukiwania.',
   onboardingEngineMasterUrl: 'URL Master MCP',
   onboardingEngineTestConn: 'Test połączenia',
-  onboardingEngineRemoteOk: 'Serwer Brain odpowiada',
+  onboardingEngineRemoteOk: 'Serwer odpowiada — brain-core',
   onboardingEngineRemoteFail: 'Brak połączenia — sprawdź URL i sieć',
+  onboardingEngineRemoteWrongEngine: (engine) =>
+    `Coś odpowiada, ale to ${engine}. Ten adres poda agentom inną pamięć niż ta aplikacja.`,
+  onboardingEngineRemoteUntested: 'Przetestuj połączenie — inaczej agenci mogą nie zobaczyć nic.',
+  settingsEngineNow: (where) => `Silnik pamięci: ${where}`,
+  settingsEngineLocal: 'lokalny, w tej aplikacji',
+  settingsEngineRemote: 'zdalny serwer',
+  settingsEngineWhereToSwitch: 'Przełączysz w zakładce Podłącz — bez reinstalacji.',
+  vaultReplicaTitle: 'Replikacja vaultu',
+  vaultReplicaBadge: 'ten komputer jest właścicielem',
+  vaultReplicaLead:
+    'Wysyła na serwer tylko to, co się zmieniło — reszta zostaje na miejscu. Nic nie kasuje: pliki, których tu już nie ma, zostaną wypisane, nie usunięte. Blobów nie wysyła.',
+  vaultReplicaAction: 'Wyślij zmiany na serwer',
+  vaultReplicaFailed: 'Replikacja nieudana',
+  vaultReplicaUrl: 'Adres repliki',
+  vaultReplicaAuto: 'Wysyłaj automatycznie po destylacji',
+  vaultReplicaAutoHint:
+    'Nieudana próba nie zniknie po cichu — wynik jest zawsze zapisany i widoczny niżej.',
+  vaultReplicaLast: 'Ostatnia replikacja:',
+  vaultReplicaLastOk: (u, n) => `wysłano ${u}, bez zmian ${n}`,
+  vaultReplicaNoUrl: 'Najpierw podaj adres repliki.',
+  updateIdle: 'Pomnia sprawdza wydania i mówi, gdy jest nowsze — nigdy nie instaluje nic sama.',
+  updateAvailable: (latest) =>
+    `Jest nowsza wersja: ${latest}. Pobierzesz ją z GitHuba — instalacja zawsze ręczna.`,
+  updateUnreachable: (detail) => `Nie udało się sprawdzić: ${detail}`,
+  updateCurrent: 'Masz najnowszą wersję.',
+  updateCheckNow: 'Sprawdź aktualizacje',
+  updateDownload: 'Pobierz',
+  updateNoConnection: 'brak połączenia',
+  updateLinuxHint:
+    'Linux: brak auto-instalatora. Pobierz nowe .AppImage lub .deb z Releases, nadpisz stary plik (AppImage) albo zainstaluj deb ponownie. Vault i ~/.config/Pomnia zostają.',
+  dataLocationsTitle: 'Gdzie leżą dane',
+  dataLocationsLead:
+    'Vault to folder, który wybierasz. Indeks wyszukiwania i ustawienia to osobny katalog aplikacji (jak AppData na Windows).',
+  dataLocationsUserData: 'Dane aplikacji',
+  dataLocationsIndex: 'Indeks wyszukiwania (library.db)',
+  dataLocationsLogs: 'Logi',
+  dataLocationsVault: 'Folder vaultu',
+  dataLocationsVaultLocked: 'Vault zablokowany — odblokuj, żeby zobaczyć ścieżkę.',
+  dataLocationsPlaintext:
+    'Indeks (chunki + embeddingi) jest plaintext na dysku — hasło vaultu chroni bloby w folderze vaultu, nie library.db.',
+  dataLocationsWipe:
+    'Odinstalowanie nie kasuje vaultu. Żeby wyczyścić indeks/ustawienia: usuń katalog danych aplikacji. Folder vaultu kasujesz osobno, jeśli chcesz.',
+  dataLocationsOpenUserData: 'Otwórz folder danych',
+  dataLocationsOpenBrain: 'Otwórz folder indeksu',
+  dataLocationsOwnership:
+    'Właściciel vaultu = Ty (folder na dysku). Desktop i brain-core server nie mogą pisać do tego samego folderu naraz — zatrzymaj jeden, potem przejmij (Otwórz vault / --vault-root).',
+  dataLocationsInstallForm: (form) => `Forma instalacji: ${form}`,
+  clientWired: 'Połączony',
+  clientUnreachable: 'Nie odpowiada',
+  clientPartial: 'Niepełny',
+  clientConfigError: 'Błąd config',
+  clientNone: 'Brak',
+  tokenNamePrompt: 'Nazwa tokena (np. macbook, windows — ułatwia późniejsze odwołanie):',
+  tokenSavedDetail: 'Zapisany w polu — snippet odświeży się automatycznie.',
+  tokenCreateFailed: 'Nie udało się utworzyć tokena',
+  tokenCreateFailedDetail: (msg) => `${msg} — otwórz dashboard :7860 i wklej token ręcznie.`,
+  snippetBuildFailed: 'Nie udało się zbudować snippeta',
+  copyFailed: 'Nie udało się skopiować',
+  copied: 'Skopiowano',
+  statusCheckFailed: 'Nie udało się sprawdzić statusu',
+  skillSyncOk: (n) => `Zsynchronizowano ${n} skill(i)`,
+  skillSyncNone: 'Brak skilli',
+  skillSyncFailed: 'Sync skilli nieudany',
+  skillSyncErrorsDetail: (n) => `${n} błąd(ów) — konsola`,
+  skillSyncAvailableOffline: 'Dostępne offline.',
+  embeddedSnippetHint: 'Snippety wskazują na localhost — jeden serwer MCP, bez tokena.',
+  urlChangeHint: 'Zmiana URL/tokena odświeża snippet automatycznie.',
+  snippetFilePath: 'ścieżka pliku',
+  snippetWholeFile: 'pełny plik',
+  snippetPasteWhole: 'Wklej jako całą zawartość pliku.',
+  snippetCreateOverwrite: 'Utwórz / nadpisz: ',
+  snippetRulePath: 'ścieżka reguły',
+  healthVaultAction: 'Otwórz lub utwórz vault',
+  healthOllamaMissing: 'Ollama niedostępne — zainstaluj i uruchom ollama.com',
+  healthOllamaOptionalRemote: (url) =>
+    `Opcjonalne przy zdalnym Brain — search idzie na serwerze. Do destylacji ustaw URL Ollama (np. ${url}).`,
+  healthOllamaDistillHint: 'Do destylacji: ustaw URL Ollama na serwer :11434 (search nie wymaga lokalnej instalacji).',
+  healthCoreAction: 'Uruchom w zakładce Brain',
+  healthMcpUnreachable: 'Brain MCP nieosiągalny',
+  vaultIntegrityOk: 'Integralność vaultu OK',
+  vaultIntegrityErrors: (n) => `${n} błąd(ów) integralności`,
+  vaultIntegrityChecked: (n) => `Sprawdzono ${n} zaszyfrowanych blobów`,
+  exportNoNotes: 'Nie wyeksportowano żadnej notatki',
+  exportOk: (n) => `Wyeksportowano ${n} notatek`,
+  exportFailed: 'Eksport nieudany',
+  exportSnapshotEmptyDetail: (dir) => `Snapshot nie zawiera notatek · ${dir}`,
+  healthDeployNotSet: 'Nie skonfigurowano (opcjonalnie)',
+  tokenCreatedTitle: (name) => `Token: ${name}`,
+  showClientInConnect: (name) => `Pokaż ${name} w Connect`,
+  brainReadOnly: 'tylko odczyt',
+  brainReadOnlyBy: (owner) => `tylko odczyt — vault trzyma ${owner}`,
+  brainStoppedStartInTab: 'lokalny brain zatrzymany — uruchom w zakładce Brain',
+  skillsNoneOnServer: 'Serwer Brain nie ma jeszcze skilli.',
+  snippetLocalModeHint: 'Tryb lokalny: jeden serwer pomnia na /mcp — bez Bearer tokena.',
+  snippetTokenInHeaders: 'Token jest w headers — trzymaj plik prywatny (chmod 600).',
+  snippetRemoteBrainCoreHint:
+    'Remote brain-core: jeden serwer `pomnia` → /mcp + Bearer — nie stare 3×SSE.',
+  snippetLegacyHubHint:
+    'Legacy Python hub: trzy serwery SSE (pomnia + vault + library). Token w headers — trzymaj plik prywatny.',
+  connectLegacyHubToggle: 'Legacy Python hub (3× SSE)',
+  connectLegacyHubHint:
+    'Zaawansowane: stary hub z pomnia + pomnia-vault + pomnia-library na /sse. Domyślnie Connect emituje brain-core (jeden /mcp).',
   onboardingEngineLooking: 'Szukam Ollama na tym komputerze…',
   onboardingEngineRunning: 'Ollama działa',
   onboardingEngineMoreModels: (n) => `+${n} więcej`,
@@ -878,17 +1144,20 @@ const PL_LABELS: UiLabels = {
   onboardingEngineDistillHint: (model) =>
     `Model destylacji: ${model} (~9 GB) — skraca rozmowy do notatek.`,
   onboardingEngineModelsNeeded: 'Potrzebne modele Ollama',
-  onboardingEngineEmbedMissing: (cmd) => `Brak modelu embeddingów — uruchom: ${cmd}`,
+  onboardingEngineEmbedMissing: (cmd) =>
+    `Brak modelu embeddingów — pobierz poniżej (albo w terminalu: ${cmd}).`,
   onboardingEngineDistillMissing: (cmd, size) =>
-    `Brak modelu destylacji — uruchom: ${cmd} (ok. ${size}; nie blokuje dalszej konfiguracji).`,
+    `Brak modelu destylacji — pobierz poniżej (albo: ${cmd}, ok. ${size}; nie blokuje dalszej konfiguracji).`,
+  onboardingEnginePullBtn: 'Pobierz w Pomni',
+  onboardingEngineCancelPull: 'Anuluj',
   onboardingEngineNotFound: 'Nie znaleziono Ollama',
   onboardingEngineInstall1: 'Pobierz z ollama.com/download i zainstaluj (~2 min).',
   onboardingEngineInstall2:
-    'Pobierz modele: ollama pull nomic-embed-text (~0,3 GB) oraz ollama pull qwen2.5:14b (~9 GB).',
+    'Po instalacji wróć tutaj — modele pobierzesz przyciskiem w aplikacji (albo: ollama pull nomic-embed-text).',
   onboardingEngineInstall3: 'Wróć i sprawdź ponownie.',
   onboardingEngineRecheck: 'Sprawdź ponownie',
   onboardingEngineRemoteOllamaOptional:
-    'W trybie zdalnym Ollama na tym PC jest opcjonalna — destylacja idzie na serwerze master.',
+    'Search/MCP: serwer Brain (ma własne Ollama lub fastembed). Destylacja w Desktop nadal potrzebuje URL Ollama — domyślnie ten sam host :11434; lokalna instalacja nie jest wymagana, dopóki nie destylujesz.',
   onboardingEngineSkip: 'Pomiń — wybierz później w Connect',
   onboardingContinue: 'Dalej',
   onboardingSimpleBrainTitle: 'Uruchom lokalną wyszukiwarkę',
@@ -922,18 +1191,58 @@ const PL_LABELS: UiLabels = {
   embeddedBrainStop: 'Stop',
   embeddedBrainStoppedToast: 'Lokalna wyszukiwarka zatrzymana',
   toastModelReady: 'Model gotowy',
+  toastModelStillMissing: (model) =>
+    `Pobieranie zakończyło się bez błędu, ale Ollama nadal nie widzi „${model}". Sprawdź: ollama list`,
   toastPullFailed: 'Pobieranie nieudane',
   toastLocalIndexRefreshed: 'Lokalny indeks odświeżony',
   toastReindexFailed: 'Reindeksacja nieudana',
   toastSearchFailed: 'Wyszukiwanie nieudane',
   toastDeployed: 'Wysłano',
+  toastDeployPartial: 'Wysłano częściowo',
   toastDeployFailed: 'Deploy nieudany',
+  embeddedBrainStartBeforeConnect: 'i naciśnij Start, zanim klienci będą mogli się połączyć.',
+  mintTokenBtn: 'Nowy token',
+  connectYourClients: 'Twoi klienci MCP',
+  connectClientsConnected: (connected, total) => `${connected}/${total} połączonych`,
+  connectDetectingClients: 'wykrywam klientów…',
+  connectNoClientsDetected: 'Nie wykryto klientów MCP na tej maszynie.',
+  connectNoClientsHintPrefix: 'Wybierz te, których używasz w',
+  connectNoClientsHintLink: 'Ustawienia → Klienci MCP',
+  connectNoClientsHintSuffix: ', żeby je skonfigurować.',
+  connectSnippetOpenFile: 'Otwórz lub utwórz plik:',
+  connectSnippetChooseMode: 'Wybierz tryb, skopiuj config i wklej:',
+  connectSnippetNewFile: 'Nowy / pusty plik',
+  connectSnippetMerge: 'Merge do istniejącego',
+  connectCopyAction: 'Kopiuj',
+  connectMergeKeysHint: (mcpKey) => `Dodaj te klucze do obiektu "${mcpKey}".`,
+  connectSkillsTitle: 'Skille Brain',
+  connectSkillsBadge: 'offline po synchronizacji',
+  connectSkillsLead:
+    'Pobierz skille workflow i expertise z serwera Brain, żeby były dostępne także poza LAN.',
+  connectSkillsSync: 'Sync skilli',
+  guideAltPath: 'Osobna ścieżka',
+  pendingIndexesWaiting: (n) => `${n} indeksów czeka`,
+  healthModelMissing: (pullCmd) => `Brak modelu — ${pullCmd}`,
+  snapshotEmptyOption: '— brak —',
+  snapshotChatsOption: (label, chats, shortId) => `${label} · ${chats} czatów · ${shortId}`,
+  snapshotFilesBytes: (files, bytes) => `${files} plików · ${bytes}`,
+  securityAesBullet: 'AES-256-GCM — szyfrowanie uwierzytelnione, losowy IV na blob.',
+  securityScryptBullet: 'scrypt (N=2¹⁷) — pochodna klucza z hasła.',
+  securityContentAddressedBullet: 'Content-addressed blob store — identyczne pliki trzymane raz.',
+  brainEmbedModelShared: 'Model embeddingów (wspólny)',
+  brainDashboardUrlLabel: 'URL dashboardu',
+  brainDistilledFolderLabel: 'Folder distilled (opcjonalnie SMB)',
   brainSearchPlaceholder: 'zapytaj o coś, o czym już rozmawiałeś…',
   brainSearchButton: 'Szukaj',
   brainSearchEmpty:
     'Brak trafień. Indeks obejmuje tylko zdestylowane notatki — najpierw uruchom pipeline powyżej.',
   brainAdvancedDistillTitle: 'Zaawansowane · destylacja na tym hoście',
   brainAdvancedOllamaNeed: 'opcjonalne — wymaga lokalnej Ollamy',
+  brainOllamaDistillTitle: 'Ollama do destylacji',
+  brainOllamaDistillLead:
+    'Zdalny Brain obsługuje search/MCP. Tu ustawiasz URL Ollama tylko pod destylację — domyślnie ten sam host co Master :11434. Bez lokalnej instalacji, dopóki nie destylujesz.',
+  brainOllamaDistillOfflineHint:
+    'Brak Ollama pod tym URL — search nadal działa przez zdalny Brain. Przed destylacją wskaż Ollama na serwerze (:11434) albo lokalną.',
   brainEmbeddedProcessHint:
     'Uruchamia brain-core jako proces potomny — klienci MCP na tej maszynie (Claude Code, Cursor, Antigravity…) dostają search_library / save_conversation z 127.0.0.1 bez serwera. Destylacja odświeża indeks automatycznie.',
   vaultGateTitle: 'Pomnia Vault',
@@ -957,8 +1266,8 @@ const PL_LABELS: UiLabels = {
     'Przycisk X chowa aplikację do traya zamiast kończyć proces. Gdy działa lokalna wyszukiwarka — zawsze.',
   minimizeToTray: 'Minimalizuj do zasobnika',
   minimizeToTrayHint: 'Przycisk minimalizacji chowa okno do traya zamiast paska zadań.',
-  openAtLogin: 'Uruchom przy starcie Windows',
-  openAtLoginHint: 'Pomnia startuje automatycznie po zalogowaniu do Windows. Domyślnie wyłączone.',
+  openAtLogin: 'Uruchom przy logowaniu',
+  openAtLoginHint: 'Pomnia startuje automatycznie po zalogowaniu do systemu. Domyślnie wyłączone.',
   colorScheme: 'Kolorystyka',
   colorSchemeHint: 'Wygląd aplikacji — tła, akcenty i szkło paneli. Logo pomarańczowe bez zmian.',
   colorSchemeMint: 'Mint',
@@ -976,6 +1285,7 @@ const PL_LABELS: UiLabels = {
   floatingMonitorIdleBadge: 'Na żywo',
   floatingMonitorBrainOff: 'Brain wyłączony',
   floatingMonitorBrainStarting: 'Brain startuje…',
+  brainPipelineStarting: 'uruchamianie…',
   floatingMonitorBrainReady: 'Brain gotowy',
   floatingMonitorBrainError: 'Brain: błąd',
   floatingMonitorClose: 'Zamknij pływający diagram',
@@ -1029,9 +1339,9 @@ const PL_LABELS: UiLabels = {
   connectPageLead:
     'Skopiuj konfigurację MCP i wklej u klienta (Cursor, Claude, Antigravity…) — Pomnia nigdy nie dotyka Twoich plików.',
   connectChecklistTitle: 'Pierwsze podłączenie (4 kroki)',
-  connectStepUrl: 'URL Brain MCP (:7862)',
-  connectStepToken: 'Token Bearer z dashboardu (:7860)',
-  connectStepCopy: 'Kopiuj pełny mcp.json (3 serwery)',
+  connectStepUrl: 'URL Brain MCP (brain-core :7865)',
+  connectStepToken: 'Token Bearer (wymagany dla remote)',
+  connectStepCopy: 'Kopiuj mcp.json (jeden pomnia → /mcp)',
   connectStepReload: 'Przeładuj klienta MCP (np. Reload Window)',
   connectCopyForClient: (name) => `Kopiuj mcp.json dla ${name}`,
   connectTokenPlaceholder: 'Bearer token (wymagany dla remote)',
@@ -1039,7 +1349,7 @@ const PL_LABELS: UiLabels = {
   connectOpenDashboard: 'Otwórz dashboard tokenów',
   connectPartialTitle: 'Niepełny mcp.json — brak vault/library',
   connectPartialDetail:
-    'Wykryto tylko część serwerów Pomnia. Remote wymaga pomnia + pomnia-vault + pomnia-library.',
+    'brain-core: wystarczy `pomnia` → /mcp. Legacy hub: pomnia + pomnia-vault + pomnia-library. Skopiuj świeży snippet poniżej.',
   connectPartialFix: 'Skopiuj pełny config poniżej i nadpisz / zmerguj mcp.json',
   connectMacNoAppHint:
     'Bez aplikacji Desktop: docs/CURSOR-MCP.md — ten sam pełny JSON MCP (przykład Cursor; kształt dla innych klientów w Connect).',
@@ -1096,7 +1406,7 @@ const PL_LABELS: UiLabels = {
   moreSnapshots: (n) => `+ ${n} więcej…`,
   securityAbout: 'Bezpieczeństwo i informacje',
   securityPortability:
-    'Skopiuj cały folder vaultu (np. C:\\Vault) na inny komputer → Otwórz vault → hasło.',
+    'Skopiuj cały folder vaultu (np. C:\\Vault lub ~/Vault) na inny komputer → Otwórz vault → hasło.',
   securityAboutCli: (identity) =>
     `${identity} · ten sam silnik działa też w trybie CLI (bez okna).`,
   antivirusTitle: 'Windows / antywirus',
@@ -1107,6 +1417,9 @@ const PL_LABELS: UiLabels = {
   antivirusSigningNote:
     'Cel: Authenticode (OV/EV lub Azure Trusted Signing), żeby instalator „po prostu działał” bez ostrzeżeń. Do tego czasu nie wyłączaj AV i nie budujemy produktu na liście wyjątków.',
   antivirusOpenInstallFolder: 'Otwórz folder instalacji',
+  linuxUnsignedTitle: 'Linux / niepodpisany build',
+  linuxUnsignedLead:
+    'AppImage i deb są niepodpisane jak Windows setup — to uczciwość, nie błąd. Weryfikuj SHA-256 z Releases. Brak auto-update: pobierasz nowy plik ręcznie.',
   previewMode: 'Tryb podglądu (bez backendu Electron) — dane są przykładowe.',
   importTitle: 'Importuj',
   importLead: 'Wgraj eksport z Claude.ai, ChatGPT, Gemini albo Grok — trafi do vaultu.',
@@ -1278,6 +1591,15 @@ const PL_LABELS: UiLabels = {
   sidebarBusyGeneric: 'praca w tle…',
   lockVaultBtn: 'Zablokuj vault',
   vaultLocked: 'zablokowany',
+  vaultToastCreated: 'Utworzono vault',
+  vaultToastCreateFailed: 'Nie udało się utworzyć vaultu',
+  vaultToastUnlocked: 'Vault odblokowany',
+  vaultToastUnlockFailed: 'Odblokowanie nieudane',
+  vaultToastLocked: 'Vault zablokowany',
+  errorBoundaryTitle: 'Ta strona się wysypała',
+  errorBoundaryHint: 'Kliknij inną zakładkę w menu, albo przeładuj aplikację.',
+  errorBoundaryReload: 'Przeładuj',
+  unexpectedError: 'Nieoczekiwany błąd',
   guideTitle: 'Mapa Pomnia',
   guideSubtitle: 'Jak to działa',
   guideLead:
@@ -1289,7 +1611,7 @@ const PL_LABELS: UiLabels = {
   guideStep1Where: 'Dashboard → Backup · Import',
   guideStep2Title: 'Krok 2 — Vault Pomnia',
   guideStep2Body:
-    'Folder vaultu, który wybrałeś przy tworzeniu (np. C:\\Vault — nazwa dowolna, czasem *.pomnia). Zaszyfrowane snapshoty + dokumenty. To archiwum, nie wyszukiwarka i nie AppData.',
+    'Folder vaultu, który wybrałeś przy tworzeniu (np. C:\\Vault lub ~/Vault — nazwa dowolna, czasem *.pomnia). Zaszyfrowane snapshoty + dokumenty. To archiwum, nie wyszukiwarka i nie katalog danych aplikacji.',
   guideStep2Where: 'Dashboard · Ustawienia → Vault',
   guideStep3Title: 'Krok 3 — Destylacja',
   guideStep3Body:
@@ -1332,8 +1654,8 @@ const PL_LABELS: UiLabels = {
   flowNodeVaultLabel: 'Folder vaultu',
   flowNodeVaultLabelPip: 'Vault',
   flowNodeVaultHint:
-    'Zaszyfrowane archiwum (header.json, blobs, skills/, USER.md, distilled…) — cały folder, np. C:\\Vault.',
-  flowNodeVaultDisk: 'np. C:\\Vault',
+    'Zaszyfrowane archiwum (header.json, blobs, skills/, USER.md, distilled…) — cały folder, np. C:\\Vault lub ~/Vault.',
+  flowNodeVaultDisk: 'np. C:\\Vault · ~/Vault',
   flowNodeDistillLabel: 'Destylacja',
   flowNodeDistillHint: 'Ollama (qwen) skraca rozmowy do zwięzłych notatek — nie pełne kopie czatów.',
   flowNodeDistillDisk: 'localhost:11434',
@@ -1380,6 +1702,10 @@ const PL_LABELS: UiLabels = {
   statusOllama: 'Ollama',
   statusOllamaOk: 'OK',
   statusOllamaFail: 'brak połączenia',
+  statusOllamaOptional: 'opcjonalne (zdalny Brain)',
+  statusBrainRemote: 'zdalny',
+  statusBrainRemoteOk: 'serwer OK',
+  statusBrainRemoteFail: 'serwer nieosiągalny',
   statusChecking: 'sprawdzam…',
   statusLastDistill: 'Ostatnia destylacja',
   statusNoDistill: 'jeszcze nie było',
@@ -1457,7 +1783,19 @@ const PL_LABELS: UiLabels = {
  * English chrome overlay — critical paths (nav, Settings, Dashboard, common toasts).
  * Missing keys fall back to PL via merge in uiLabels(). Grow over time.
  */
-const EN_LABELS: Partial<UiLabels> = {
+/**
+ * Not `Partial`, and that is the whole point.
+ *
+ * It used to be, which made English an overlay: any key missing here fell back
+ * to the Polish one, silently, and the compiler was happy. 111 of 665 keys were
+ * missing — the entire Import page among them — so an English build showed
+ * Polish headings under an English sidebar and nothing anywhere said so.
+ *
+ * Typed as the full interface, a forgotten key is a build error. The merge
+ * below stays because a spread is still the cheapest way to build the object,
+ * but it no longer has anything to paper over.
+ */
+const EN_LABELS: UiLabels = {
   distill: 'Prepare memory',
   distillBacklog: (n) => `Prepare memory (${n} new)`,
   runPipeline: 'Re-distill everything…',
@@ -1468,6 +1806,7 @@ const EN_LABELS: Partial<UiLabels> = {
   embedded: 'Local',
   remote: 'Remote',
   reindex: 'Refresh index',
+  reindexCancel: 'Stop indexing',
   mcpConnect: 'Connect agent',
   brainPageTitle: 'Memory & search',
   brainPageLead: 'Prepare chats for search and start the local search engine — no cloud server.',
@@ -1531,7 +1870,7 @@ const EN_LABELS: Partial<UiLabels> = {
   onboardingValueRecallText: 'Hand context to any AI via MCP — agents that remember you.',
   onboardingVaultTitle: 'Create a vault',
   onboardingVaultLead:
-    'One vault folder holds everything (e.g. C:\\Vault — any name, including *.pomnia). Pick a location and a passphrase you won’t lose. Portability = copy that whole folder → Open vault → passphrase.',
+    'One vault folder holds everything (e.g. C:\\Vault or ~/Vault — any name, including *.pomnia). Pick a location and a passphrase you won’t lose. Portability = copy that whole folder → Open vault → passphrase.',
   onboardingVaultCreateTab: 'New vault',
   onboardingVaultOpenTab: 'I already have a folder',
   onboardingVaultNewFolder: 'New vault folder',
@@ -1556,15 +1895,116 @@ const EN_LABELS: Partial<UiLabels> = {
   onboardingBackupNow: 'Backup now',
   onboardingEngineTitle: 'How will Brain run?',
   onboardingEngineLead:
-    'Pick local embedded brain (built into Pomnia) or an optional remote Brain server. Ollama on this machine: embeddings (nomic-embed-text, ~0.3GB) and distill (qwen2.5:14b, ~9GB).',
+    'Local: embedded search + Ollama on this PC (embed + distill). Remote (e.g. Pomnia on Linux): search/MCP on the server — no local Ollama install required for search.',
   onboardingEngineLocal: 'Local embedded',
   onboardingEngineLocalHint: (url) => `One .exe, MCP on ${url} — no remote server, no token.`,
   onboardingEngineRemote: 'Remote master',
-  onboardingEngineRemoteHint: 'Your Brain server on the LAN — three MCP servers + Bearer token.',
+  onboardingEngineRemoteHint: 'LAN Brain server (search/MCP). Local Ollama not needed for search.',
   onboardingEngineMasterUrl: 'Master MCP URL',
   onboardingEngineTestConn: 'Test connection',
-  onboardingEngineRemoteOk: 'Brain server is responding',
+  onboardingEngineRemoteOk: 'Server responding — brain-core',
   onboardingEngineRemoteFail: 'Unreachable — check URL and network',
+  onboardingEngineRemoteWrongEngine: (engine) =>
+    `Something answered, but it is ${engine}. This address would hand your agents a different memory than this app.`,
+  onboardingEngineRemoteUntested: 'Test the connection — otherwise your agents may see nothing.',
+  settingsEngineNow: (where) => `Memory engine: ${where}`,
+  settingsEngineLocal: 'local, inside this app',
+  settingsEngineRemote: 'remote server',
+  settingsEngineWhereToSwitch: 'Switch it in the Connect tab — no reinstall needed.',
+  vaultReplicaTitle: 'Vault replication',
+  vaultReplicaBadge: 'this machine owns it',
+  vaultReplicaLead:
+    'Sends only what changed. Deletes nothing: files missing here are listed, not removed. Blobs stay put.',
+  vaultReplicaAction: 'Push changes to the server',
+  vaultReplicaFailed: 'Replication failed',
+  vaultReplicaUrl: 'Replica address',
+  vaultReplicaAuto: 'Push automatically after distillation',
+  vaultReplicaAutoHint: 'A failed attempt is recorded and shown below — it never disappears quietly.',
+  vaultReplicaLast: 'Last replication:',
+  vaultReplicaLastOk: (u, n) => `${u} uploaded, ${n} unchanged`,
+  vaultReplicaNoUrl: 'Set the replica address first.',
+  updateIdle: 'Pomnia checks for releases and tells you — it never installs anything by itself.',
+  updateAvailable: (latest) =>
+    `Version ${latest} is out. Download it from GitHub — installing is always your call.`,
+  updateUnreachable: (detail) => `Could not check: ${detail}`,
+  updateCurrent: 'You are on the latest version.',
+  updateCheckNow: 'Check for updates',
+  updateDownload: 'Download',
+  updateNoConnection: 'no connection',
+  updateLinuxHint:
+    'Linux: no auto-installer. Download the new .AppImage or .deb from Releases, replace the old AppImage or reinstall the deb. Your vault folder and ~/.config/Pomnia stay put.',
+  dataLocationsTitle: 'Where data lives',
+  dataLocationsLead:
+    'The vault is the folder you pick. The search index and settings live in a separate app data directory (AppData on Windows, ~/.config/Pomnia on Linux).',
+  dataLocationsUserData: 'App data',
+  dataLocationsIndex: 'Search index (library.db)',
+  dataLocationsLogs: 'Logs',
+  dataLocationsVault: 'Vault folder',
+  dataLocationsVaultLocked: 'Vault locked — unlock to see the path.',
+  dataLocationsPlaintext:
+    'The index (chunks + embeddings) is plaintext on disk — the vault passphrase protects blobs in the vault folder, not library.db.',
+  dataLocationsWipe:
+    'Uninstall does not delete your vault. To wipe the index/settings: remove the app data directory. Delete the vault folder separately if you want that gone too.',
+  dataLocationsOpenUserData: 'Open data folder',
+  dataLocationsOpenBrain: 'Open index folder',
+  dataLocationsOwnership:
+    'You own the vault (the folder on disk). Do not let Desktop and a brain-core server write the same folder at once — stop one, then take over (Open vault / --vault-root).',
+  dataLocationsInstallForm: (form) => `Install form: ${form}`,
+  clientWired: 'Connected',
+  clientUnreachable: 'Not responding',
+  clientPartial: 'Incomplete',
+  clientConfigError: 'Config error',
+  clientNone: 'None',
+  tokenNamePrompt: 'Token name (e.g. macbook, windows — makes it easier to revoke later):',
+  tokenSavedDetail: 'Saved to the field — the snippet refreshes by itself.',
+  tokenCreateFailed: 'Could not create the token',
+  tokenCreateFailedDetail: (msg) => `${msg} — open the dashboard on :7860 and paste a token by hand.`,
+  snippetBuildFailed: 'Could not build the snippet',
+  copyFailed: 'Could not copy',
+  copied: 'Copied',
+  statusCheckFailed: 'Could not check status',
+  skillSyncOk: (n) => `Synced ${n} skill(s)`,
+  skillSyncNone: 'No skills',
+  skillSyncFailed: 'Skill sync failed',
+  skillSyncErrorsDetail: (n) => `${n} error(s) — see the console`,
+  skillSyncAvailableOffline: 'Available offline.',
+  embeddedSnippetHint: 'Snippets point at localhost — one MCP server, no token.',
+  urlChangeHint: 'Changing the URL or token refreshes the snippet automatically.',
+  snippetFilePath: 'file path',
+  snippetWholeFile: 'whole file',
+  snippetPasteWhole: 'Paste as the entire file contents.',
+  snippetCreateOverwrite: 'Create / overwrite: ',
+  snippetRulePath: 'rule path',
+  healthVaultAction: 'Open or create a vault',
+  healthOllamaMissing: 'Ollama unreachable — install and start it from ollama.com',
+  healthOllamaOptionalRemote: (url) =>
+    `Optional with remote Brain — search runs on the server. For distill, set Ollama URL (e.g. ${url}).`,
+  healthOllamaDistillHint: 'For distill: set Ollama URL to server :11434 (search needs no local install).',
+  healthCoreAction: 'Start it in the Brain tab',
+  healthMcpUnreachable: 'Brain MCP unreachable',
+  vaultIntegrityOk: 'Vault integrity OK',
+  vaultIntegrityErrors: (n) => `${n} integrity error(s)`,
+  vaultIntegrityChecked: (n) => `Checked ${n} encrypted blobs`,
+  exportNoNotes: 'No notes were exported',
+  exportOk: (n) => `Exported ${n} notes`,
+  exportFailed: 'Export failed',
+  exportSnapshotEmptyDetail: (dir) => `Snapshot has no notes · ${dir}`,
+  healthDeployNotSet: 'Not configured (optional)',
+  tokenCreatedTitle: (name) => `Token: ${name}`,
+  showClientInConnect: (name) => `Show ${name} in Connect`,
+  brainReadOnly: 'read-only',
+  brainReadOnlyBy: (owner) => `read-only — the vault is held by ${owner}`,
+  brainStoppedStartInTab: 'local brain stopped — start it in the Brain tab',
+  skillsNoneOnServer: 'The Brain server has no skills yet.',
+  snippetLocalModeHint: 'Local mode: one pomnia server on /mcp — no bearer token.',
+  snippetTokenInHeaders: 'The token sits in headers — keep this file private (chmod 600).',
+  snippetRemoteBrainCoreHint:
+    'Remote brain-core: one `pomnia` server → /mcp + Bearer — not the old 3×SSE hub.',
+  snippetLegacyHubHint:
+    'Legacy Python hub: three SSE servers (pomnia + vault + library). Token in headers — keep the file private.',
+  connectLegacyHubToggle: 'Legacy Python hub (3× SSE)',
+  connectLegacyHubHint:
+    'Advanced: old hub with pomnia + pomnia-vault + pomnia-library on /sse. By default Connect emits brain-core (single /mcp).',
   onboardingEngineLooking: 'Looking for Ollama on this machine…',
   onboardingEngineRunning: 'Ollama is running',
   onboardingEngineMoreModels: (n) => `+${n} more`,
@@ -1573,17 +2013,20 @@ const EN_LABELS: Partial<UiLabels> = {
   onboardingEngineDistillHint: (model) =>
     `Distill model: ${model} (~9GB) — shortens chats into notes.`,
   onboardingEngineModelsNeeded: 'Ollama models needed',
-  onboardingEngineEmbedMissing: (cmd) => `Embedding model missing — run: ${cmd}`,
+  onboardingEngineEmbedMissing: (cmd) =>
+    `Embedding model missing — pull below (or in a terminal: ${cmd}).`,
   onboardingEngineDistillMissing: (cmd, size) =>
-    `Distill model missing — run: ${cmd} (~${size}; does not block setup).`,
+    `Distill model missing — pull below (or: ${cmd}, ~${size}; does not block setup).`,
+  onboardingEnginePullBtn: 'Pull in Pomnia',
+  onboardingEngineCancelPull: 'Cancel',
   onboardingEngineNotFound: 'Ollama not found',
   onboardingEngineInstall1: 'Download from ollama.com/download and install (2 min).',
   onboardingEngineInstall2:
-    'Pull models: ollama pull nomic-embed-text (~0.3GB) and ollama pull qwen2.5:14b (~9GB).',
+    'After install, come back — pull models with the in-app button (or: ollama pull nomic-embed-text).',
   onboardingEngineInstall3: 'Come back and re-check.',
   onboardingEngineRecheck: 'Re-check',
   onboardingEngineRemoteOllamaOptional:
-    'Ollama on this PC is optional in remote mode — distillation runs on your master server.',
+    'Search/MCP: remote Brain (server has its own Ollama or fastembed). Distill in Desktop still needs an Ollama URL — default is the same host :11434; no local install until you distill.',
   onboardingEngineSkip: 'Skip — pick later in Connect tab',
   onboardingContinue: 'Continue',
   onboardingSimpleBrainTitle: 'Start local search',
@@ -1617,18 +2060,58 @@ const EN_LABELS: Partial<UiLabels> = {
   embeddedBrainStop: 'Stop',
   embeddedBrainStoppedToast: 'Local search stopped',
   toastModelReady: 'Model ready',
+  toastModelStillMissing: (model) =>
+    `Pull finished without error but Ollama still does not list "${model}". Check: ollama list`,
   toastPullFailed: 'Pull failed',
   toastLocalIndexRefreshed: 'Local index refreshed',
   toastReindexFailed: 'Reindex failed',
   toastSearchFailed: 'Search failed',
   toastDeployed: 'Deployed',
+  toastDeployPartial: 'Deployed with problems',
   toastDeployFailed: 'Deploy failed',
+  embeddedBrainStartBeforeConnect: 'and press Start before clients can connect.',
+  mintTokenBtn: 'New token',
+  connectYourClients: 'Your MCP clients',
+  connectClientsConnected: (connected, total) => `${connected}/${total} connected`,
+  connectDetectingClients: 'detecting clients…',
+  connectNoClientsDetected: 'No MCP clients detected on this machine.',
+  connectNoClientsHintPrefix: 'Pick the ones you use in',
+  connectNoClientsHintLink: 'Settings → MCP clients',
+  connectNoClientsHintSuffix: ' to set them up.',
+  connectSnippetOpenFile: 'Open or create the file:',
+  connectSnippetChooseMode: 'Pick a mode, copy the config, and paste:',
+  connectSnippetNewFile: 'New / empty file',
+  connectSnippetMerge: 'Merge into existing',
+  connectCopyAction: 'Copy',
+  connectMergeKeysHint: (mcpKey) => `Add these keys to the "${mcpKey}" object.`,
+  connectSkillsTitle: 'Brain skills',
+  connectSkillsBadge: 'offline-capable once synced',
+  connectSkillsLead:
+    "Pull workflow + expertise skills from your Brain server so they're available even when you're not on the LAN.",
+  connectSkillsSync: 'Sync skills',
+  guideAltPath: 'Separate path',
+  pendingIndexesWaiting: (n) => `${n} indexes waiting`,
+  healthModelMissing: (pullCmd) => `Model missing — ${pullCmd}`,
+  snapshotEmptyOption: '— none —',
+  snapshotChatsOption: (label, chats, shortId) => `${label} · ${chats} chats · ${shortId}`,
+  snapshotFilesBytes: (files, bytes) => `${files} files · ${bytes}`,
+  securityAesBullet: 'AES-256-GCM — authenticated encryption, random IV per blob.',
+  securityScryptBullet: 'scrypt (N=2¹⁷) — passphrase key derivation.',
+  securityContentAddressedBullet: 'Content-addressed blob store — identical files stored once.',
+  brainEmbedModelShared: 'Embedding model (shared)',
+  brainDashboardUrlLabel: 'Dashboard URL',
+  brainDistilledFolderLabel: 'Distilled folder (optional SMB)',
   brainSearchPlaceholder: "ask anything you've discussed before…",
   brainSearchButton: 'Search',
   brainSearchEmpty:
     "No matches. The index only covers distilled notes — run the pipeline above first if you haven't yet.",
   brainAdvancedDistillTitle: 'Advanced · distill on this host',
   brainAdvancedOllamaNeed: 'optional — needs local Ollama',
+  brainOllamaDistillTitle: 'Ollama for distill',
+  brainOllamaDistillLead:
+    'Remote Brain owns search/MCP. Set an Ollama URL here only for distill — default is the same Master host :11434. No local install until you distill.',
+  brainOllamaDistillOfflineHint:
+    'No Ollama at this URL — search still works via remote Brain. Before distill, point at server Ollama (:11434) or a local one.',
   brainEmbeddedProcessHint:
     'Runs brain-core as a child process — MCP clients on this machine (Claude Code, Cursor, Antigravity…) get search_library / save_conversation from 127.0.0.1 without any server. Distill runs refresh its index automatically.',
   vaultGateTitle: 'Pomnia Vault',
@@ -1651,13 +2134,13 @@ const EN_LABELS: Partial<UiLabels> = {
     'The X button hides the app to the tray instead of quitting. Always on while local search is running.',
   minimizeToTray: 'Minimize to tray',
   minimizeToTrayHint: 'Minimize hides to the tray instead of the taskbar.',
-  openAtLogin: 'Open at Windows login',
-  openAtLoginHint: 'Start Pomnia automatically after Windows sign-in. Off by default.',
+  openAtLogin: 'Open at login',
+  openAtLoginHint: 'Start Pomnia automatically after you sign in. Off by default.',
   colorScheme: 'Color scheme',
   colorSchemeHint: 'App look — backgrounds, accents, and panel glass. Orange logo stays.',
   colorSchemeMint: 'Mint',
   colorSchemeIris: 'Iris',
-  colorSchemeGlass: 'Szkło',
+  colorSchemeGlass: 'Glass',
   uiLocale: 'Interface language',
   uiLocaleHint:
     'App chrome only (menus, Settings, toasts). Brain stays automatically bilingual — no separate knowledge language setting.',
@@ -1670,6 +2153,7 @@ const EN_LABELS: Partial<UiLabels> = {
   floatingMonitorIdleBadge: 'Live',
   floatingMonitorBrainOff: 'Brain off',
   floatingMonitorBrainStarting: 'Brain starting…',
+  brainPipelineStarting: 'starting…',
   floatingMonitorBrainReady: 'Brain ready',
   floatingMonitorBrainError: 'Brain: error',
   floatingMonitorClose: 'Close floating diagram',
@@ -1754,7 +2238,7 @@ const EN_LABELS: Partial<UiLabels> = {
   unlockVaultForSnapshots: 'Unlock the vault to list snapshots.',
   moreSnapshots: (n) => `…and ${n} more`,
   securityAbout: 'Security',
-  securityPortability: 'Portable unit = the whole vault folder (not AppData).',
+  securityPortability: 'Portable unit = the whole vault folder (not AppData / ~/.config/Pomnia).',
   securityAboutCli: (identity) => identity,
   antivirusTitle: 'Windows / antivirus',
   antivirusLead:
@@ -1764,6 +2248,9 @@ const EN_LABELS: Partial<UiLabels> = {
   antivirusSigningNote:
     'Goal: Authenticode (OV/EV or Azure Trusted Signing) so the installer just works without warnings. Until then: do not turn off AV, and we do not build the product around exclusion lists.',
   antivirusOpenInstallFolder: 'Open install folder',
+  linuxUnsignedTitle: 'Linux / unsigned build',
+  linuxUnsignedLead:
+    'AppImage and deb are unsigned like the Windows setup — honesty, not a bug. Verify SHA-256 from Releases. No auto-update: you download the new file yourself.',
   previewMode: 'Browser preview — Electron bridge unavailable.',
   cancel: 'Cancel',
   distillEmptyBacklog: 'No new sessions to distill',
@@ -1820,6 +2307,15 @@ const EN_LABELS: Partial<UiLabels> = {
   sidebarBusyGeneric: 'working…',
   lockVaultBtn: 'Lock vault',
   vaultLocked: 'locked',
+  vaultToastCreated: 'Vault created',
+  vaultToastCreateFailed: 'Could not create vault',
+  vaultToastUnlocked: 'Vault unlocked',
+  vaultToastUnlockFailed: 'Unlock failed',
+  vaultToastLocked: 'Vault locked',
+  errorBoundaryTitle: 'This page crashed',
+  errorBoundaryHint: 'Click another tab in the menu, or reload the app.',
+  errorBoundaryReload: 'Reload',
+  unexpectedError: 'Unexpected error',
   helpDontKnowStart: 'Not sure where to start →',
   statusStripTitle: 'Where you are now',
   statusDoctorFail: 'Doctor FAIL',
@@ -1832,6 +2328,10 @@ const EN_LABELS: Partial<UiLabels> = {
   statusOllama: 'Ollama',
   statusOllamaOk: 'OK',
   statusOllamaFail: 'unreachable',
+  statusOllamaOptional: 'optional (remote Brain)',
+  statusBrainRemote: 'remote',
+  statusBrainRemoteOk: 'server OK',
+  statusBrainRemoteFail: 'server unreachable',
   statusChecking: 'checking…',
   statusLastDistill: 'Last distill',
   statusNoDistill: 'none yet',
@@ -2016,6 +2516,138 @@ const EN_LABELS: Partial<UiLabels> = {
     'This client has no fixed rules path — paste the block into AGENTS.md or the system prompt.',
   agentBrainModeRefreshHint:
     'After changing the Handshake phrase: save the rule again. Cursor: also copy pomnia.mdc into the project `.cursor/rules/` (Agent loads workspace rules), then Reload Window + NEW chat. Claude / Antigravity: full restart + new chat. Active chats do not reload CLAUDE.md / pomnia.mdc / GEMINI.md.',
+
+  // ── Connect: first-run checklist ──────────────────────────────────────────
+  connectChecklistTitle: 'First connection (4 steps)',
+  connectStepUrl: 'Brain MCP URL (brain-core :7865)',
+  connectStepToken: 'Bearer token (required for remote)',
+  connectStepCopy: 'Copy mcp.json (one pomnia → /mcp)',
+  connectCopyForClient: (name) => `Copy mcp.json for ${name}`,
+  connectTokenPlaceholder: 'Bearer token (required for remote)',
+  connectTokenRequired: 'Remote MCP usually will not work without a token — paste or create one below.',
+  connectOpenDashboard: 'Open the token dashboard',
+  connectPartialTitle: 'Incomplete mcp.json — vault/library missing',
+  connectPartialDetail:
+    'brain-core: `pomnia` → /mcp is enough. Legacy hub: pomnia + pomnia-vault + pomnia-library. Copy a fresh snippet below.',
+  connectPartialFix: 'Copy the full config below and overwrite or merge mcp.json',
+  embeddedBrainNotRunning: 'The local search engine is not running. Open the tab',
+  embeddedBrainNotRunningLink: 'Brain',
+
+  // ── Import ────────────────────────────────────────────────────────────────
+  importTitle: 'Import',
+  importLead: 'Upload an export from Claude.ai, ChatGPT, Gemini or Grok — it lands in the vault.',
+  importPickBusy: 'Importing…',
+  importVaultClosed: 'Unlock the vault first',
+  importFormats: 'ZIP · JSON · JSONL · MD — the source is detected automatically',
+  importSelect: 'Choose a file…',
+  importChatSection: 'Chat exports',
+  importDocSection: 'Documents',
+  importDocBusy: 'Importing the document…',
+  importDocFormats: 'PDF · DOCX · EPUB · MD · TXT — encrypted in the vault, indexed for search',
+  importDocSelect: 'Choose a document…',
+  importDocDrop: 'Drop the file here',
+  importUnsupportedFormat: 'Unsupported format',
+  importDocDone: 'Document imported',
+  importDocBrainOff: 'Start the local search engine (Brain) to index the chunks.',
+  importDocQueuedHint: 'Saved to the vault — it will be indexed once Brain starts.',
+  importDocQueuedDetail: 'The document is in the vault; the index is built when the engine starts.',
+  importDocFailedToast: 'Document import failed',
+  importDocIndexedBadge: (chunks) => `${chunks} chunks`,
+  importDocPagesBadge: (n) => `${n} pp.`,
+  importDocEncryptedBadge: 'encrypted in the vault',
+  importDocProgressParse: 'Parsing',
+  importDocProgressIndex: 'Indexing',
+  importDocProgressEncrypt: 'Encrypting into the vault',
+  importProviders: 'Where to get an export',
+  importLegalNote:
+    'Pomnia imports official exports only — it never signs in to your accounts. Claude Desktop and Gemini need an export from the web version.',
+
+  // ── Guide ─────────────────────────────────────────────────────────────────
+  guideStep1Title: 'Step 1 — Collect',
+  guideStep1Body:
+    'Cursor, Claude Code, Antigravity… — Pomnia reads the live logs off your disk, or imports ZIP/JSON exports.',
+  guideStep1Where: 'Dashboard → Backup · Import',
+  guideStep2Title: 'Step 2 — The Pomnia vault',
+  guideStep2Body:
+    'The vault folder you picked when creating it (e.g. C:\\Vault or ~/Vault — any name, sometimes *.pomnia). Encrypted snapshots plus documents. An archive, not a search engine, and not the app data directory.',
+  guideStep2Where: 'Dashboard · Settings → Vault',
+  guideStep3Title: 'Step 3 — Distill',
+  guideStep3Body:
+    'Ollama (qwen) shortens conversations into notes in brain-notes/ — summaries, NOT full copies of the chats.',
+  guideStep3Where: 'Brain → Prepare memory',
+  guideStep4Title: 'Step 4 — Search engine',
+  guideStep4Body:
+    'The embedded brain builds library.db — chunks plus embeddings, locally on this machine.',
+  guideStep4Where: 'Brain → Local search engine',
+  guideStep5Title: 'Step 5 — Agent over MCP',
+  guideStep5Body:
+    'An MCP client connects the agent to the local search engine. While coding, the agent can call search_library (RAG) and optionally load skills — that is asking a question mid-work, not writing to memory.',
+  guideStep5Where: 'Connect · search_library · get_skill',
+  guideStepOptionalTitle: 'Optional — a Brain server',
+  guideStepOptionalBody:
+    'Deploy a copy of the notes to an optional Brain server on your LAN — shared memory for several machines.',
+  guideStepOptionalWhere: 'Brain → Advanced → Deploy',
+  guideDocsTitle: 'Documents (PDF / EPUB)',
+  guideDocsBody:
+    'Import → vault (encrypted) → straight to the embedding index. NO LLM distillation — chunk and embed only.',
+  guideDocsWhere: 'Import → Documents',
+  guideOpenTab: 'Open the tab',
+  guideDiagramToggle: 'Show the diagram',
+  guideDiagramHide: 'Hide the diagram',
+  guideFlowReplayLastNone: 'Nothing recorded yet — run a distillation, an import or an MCP query.',
+  guideFlowReplayLastBusy: 'Hold on — something is running right now.',
+  guideFlowReplayHint:
+    'A demo of the steps, or a replay of the last real run (distillation, import, MCP)',
+  guideFlowMainLegend: 'Chat path',
+  guideFlowDocsLegend: 'Document path',
+  guideFlowOptionalLegend: 'Optional',
+  guideFlowAgentLegend: 'Agent query',
+  flowAgentConsumptionCaption: 'Reading (not writing):',
+  guideFlowMiniExpand: 'Full map →',
+  flowEdgeMemoryReturn: 'answer from memory',
+
+  // ── Flow diagram nodes ────────────────────────────────────────────────────
+  flowNodeAiLabel: 'AI tools',
+  flowNodeAiHint: 'Cursor, Claude Code, Antigravity — raw session logs on your local disk.',
+  flowNodeAiDisk: 'Cursor · Claude · Antigravity',
+  flowNodeVaultLabel: 'Vault folder',
+  flowNodeVaultLabelPip: 'Vault',
+  flowNodeVaultHint:
+    'The encrypted archive (header.json, blobs, skills/, USER.md, distilled…) — the whole folder, e.g. C:\\Vault or ~/Vault.',
+  flowNodeVaultDisk: 'e.g. C:\\Vault · ~/Vault',
+  flowNodeDistillLabel: 'Distill',
+  flowNodeDistillHint:
+    'Ollama (qwen) shortens conversations into terse notes — not full copies of the chats.',
+  flowNodeDistillDisk: 'localhost:11434',
+  flowNodeNotesLabel: 'brain-notes',
+  flowNodeNotesHint: 'Distilled session summaries, ready to index.',
+  flowNodeNotesDisk: 'notes/distilled',
+  flowNodeLibraryLabel: 'library.db',
+  flowNodeLibraryLabelPip: 'library.db',
+  flowNodeLibraryHint: 'Embedded brain: text chunks plus embedding vectors, locally on this PC.',
+  flowNodeLibraryDisk: 'core-data/library.db',
+  flowNodeMcpLabel: 'Agent over MCP',
+  flowNodeMcpLabelPip: 'MCP agent',
+  flowNodeMcpHint: 'The agent connects over MCP — the bridge to the local Brain search engine.',
+  flowNodeMcpDisk: 'Connect · mcp.json',
+  flowAgentLayerSkills: 'skills',
+  flowAgentLayerSkillsOptional: 'opt.',
+  flowAgentLayerSearch: 'search_library',
+  flowMiniStatus: (state) => (state.kind === 'idle' ? 'Idle' : formatFlowFocusBannerEn(state)),
+  dashboardActivityNow: (state) => formatFlowLiveBadgeEn(state),
+  dashboardActivityLast: (relative) => `Last activity: distillation ${relative}`,
+  dashboardActivityNone: 'No distillation yet — start Brain to prepare your memory',
+  flowIllustrationCaption:
+    'Waiting — the animation starts on a distillation, import, indexing run or MCP query',
+  flowNodeImportLabel: 'Import',
+  flowNodeImportHint: 'PDF, EPUB, ZIP — lands in the vault without LLM distillation.',
+  flowNodeImportDisk: 'vault/library.cvb',
+  flowNodeDocsIndexLabel: 'Index',
+  flowNodeDocsIndexHint: 'Chunk and embed — no distillation.',
+  flowNodeDocsIndexDisk: 'library.db (docs)',
+  flowNodeDeployLabel: 'Deploy',
+  flowNodeDeployHint: 'An optional copy of the notes on a remote Brain server (e.g. LAN :7860).',
+  flowNodeDeployDisk: 'Brain server (opt.)',
 }
 
 let cachedEn: UiLabels | null = null

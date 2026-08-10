@@ -18,7 +18,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve('src/renderer/src'),
-      '@core': resolve('src/core')
+      '@core': resolve('src/core'),
+      // Kept in step with electron.vite.config.ts. Without it the harness dies
+      // on AppLogo's icon import and renders a blank page — which reads as
+      // "the renderer is broken" rather than "the dev server is misconfigured",
+      // and the difference matters most on the day you are checking a release.
+      '@brand': resolve('resources')
     }
   },
   plugins: [react(), tailwindcss()],

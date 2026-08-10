@@ -1,0 +1,98 @@
+; SPDX-License-Identifier: AGPL-3.0-only
+; Pomnia brain-core — MCP + RAG over a vault, on Linux.
+;
+; Install with deploy/install.sh, which creates the user and the directories
+; this unit assumes. Edit ExecStart to match your paths, then:
+;   systemctl daemon-reload && systemctl enable --now pomnia-brain-core
+
+[Unit]
+Description=Pomnia brain-core — MCP memory server (vault + RAG)
+Documentation=https://pomnia.ai
+; Ollama supplies the embeddings, and there is deliberately no ordering on it.
+;
+; It may be a systemd service, a container, or a box across the LAN — on the
+; machine this was written for it is a container with `restart: unless-stopped`,
+; so `Wants=ollama.service` named a unit that does not exist and quietly did
+; nothing. A dependency that cannot be true everywhere is worse than none: it
+; reads as handled.
+;
+; Nothing is needed instead. The embedder is consulted per request, so a late
+; Ollama means /healthz says `degraded` until it appears and `ok` afterwards,
+; with no restart. Refusing to start would turn a partial outage into a full
+; one; declaring a fake ordering would hide that it can happen at all.
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+; Not root. The process parses network input — JSON bodies and base64 file
+; uploads from /sync — and nothing it does needs privilege.
+User=pomnia
+Group=pomnia
+WorkingDirectory=/opt/pomnia-brain-core
+
+; --read-only pins this host as a replica. Ownership is also recorded inside
+; the vault (state/vault-writer.json), so two writable instances over one
+; corpus cannot happen by accident; this flag is the belt to that's braces.
+ExecStart=/usr/bin/node /opt/pomnia-brain-core/dist/daemon.js \
+  --host 0.0.0.0 \
+  --port 7865 \
+  --data-dir /var/lib/pomnia \
+  --vault-root /var/lib/pomnia/vault \
+  --skills-root /var/lib/pomnia/vault/skills \
+  --ollama-url http://127.0.0.1:11434 \
+  --instance-label "pomnia-server" \
+  --read-only \
+  --vault-owner "Pomnia Desktop"
+; --vault-owner is the fallback name shown when the vault carries no
+; state/vault-writer.json yet — a replica seeded from a desktop older than the
+; ownership marker, or from a tar. Without it a client shows "read-only, owner
+; unknown", which tells nobody where their note should have gone.
+
+Restart=on-failure
+RestartSec=5
+; A deterministic crash used to restart every 5s forever, quietly. Give up
+; after five tries in a minute so `systemctl status` shows `failed` — a stopped
+; service someone notices beats a crash loop nobody does.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+TimeoutStopSec=15
+
+; ── sandbox ────────────────────────────────────────────────────────────────
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+; ^ node JITs; denying W+X kills it outright.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+; ProtectSystem=strict makes everything read-only; this is the one exception.
+ReadWritePaths=/var/lib/pomnia
+
+; ── resource ceilings ──────────────────────────────────────────────────────
+; Indexing a large vault is the memory peak. High enough not to trip on real
+; work, low enough that a leak gets killed instead of taking the host with it.
+MemoryMax=2G
+TasksMax=256
+LimitNOFILE=8192
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pomnia-brain-core
+
+[Install]
+WantedBy=multi-user.target

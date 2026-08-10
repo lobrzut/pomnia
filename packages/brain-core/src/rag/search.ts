@@ -22,6 +22,44 @@ import { vecToBlob } from './vec.js'
 
 export type SearchSource = 'all' | 'vault' | 'library'
 
+/** Full boost up to this age, then linear decay to zero at DECAY_END_DAYS. */
+const RECENCY_MAX = 0.25
+const RECENCY_FLAT_DAYS = 30
+const RECENCY_DECAY_END_DAYS = 730
+
+/** `2026-07-18_claude-code_Some_title_ab12cd34.md` → the leading date. */
+const NAME_DATE = /^(\d{4})-(\d{2})-(\d{2})_/
+
+/**
+ * Recency boost for vault notes, matching the Python brain's curve: full boost
+ * under a month old, decaying linearly to nothing at two years. The rationale
+ * is the user's: what you understood recently usually beats what you wrote
+ * about the same topic a year ago.
+ *
+ * Age comes from the date in the filename, NOT from the file's mtime, which
+ * the Python impl used. mtime describes when the bytes last moved, not when
+ * the thinking happened — copying a vault to a new machine, restoring a
+ * backup, or merging notes from another host resets every mtime to now and
+ * would hand a uniform full boost to the entire corpus. Distilled and session
+ * notes are all named `YYYY-MM-DD_…`, so the real date is right there.
+ *
+ * Library documents (PDF/EPUB) get nothing: a 1948 paper is not stale.
+ */
+export function noteRecencyBoost(name: string, now = Date.now()): number {
+  if (!name.toLowerCase().endsWith('.md')) return 0
+  const m = NAME_DATE.exec(name)
+  if (!m) return 0
+  const written = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  if (!Number.isFinite(written)) return 0
+  const ageDays = (now - written) / 86_400_000
+  // A future-dated note is not more relevant than a current one; clamp instead
+  // of rewarding a clock skew or a typo in the filename.
+  if (ageDays <= RECENCY_FLAT_DAYS) return RECENCY_MAX
+  if (ageDays >= RECENCY_DECAY_END_DAYS) return 0
+  const spent = (ageDays - RECENCY_FLAT_DAYS) / (RECENCY_DECAY_END_DAYS - RECENCY_FLAT_DAYS)
+  return Math.round(RECENCY_MAX * (1 - spent) * 10000) / 10000
+}
+
 /** Simple Polish + English stopwords. Match Python impl. */
 const STOPWORDS = new Set([
   'the', 'and', 'for', 'with', 'this', 'that', 'but',
@@ -97,7 +135,7 @@ export async function search(
   const topK = opts.topK ?? 5
   const source: SearchSource = opts.source ?? 'all'
 
-  const emb = await embedder.embedOne(opts.query)
+  const emb = await embedder.embedOne(opts.query, 'query')
   const fetchN = Math.max(topK * 3, 12)
 
   const rows = db
@@ -159,10 +197,13 @@ export async function search(
   // Final score: semantic 1.0, kw_name 0.15, kw_text 0.05, plus path-encoded
   // quality: _weak/ penalty, sessions/ human boost. Quality lives in the path
   // (not a chunks column) so legacy corpus can be re-ranked without re-embed.
+  // Recency is added on top — see noteRecencyBoost.
+  const now = Date.now()
   const scored = [...candidates.values()].map((c) => {
     const p = c.pdf_path
     const weakPenalty = p.includes('_weak') ? 0.15 : 0
     const humanBoost = p.includes('sessions') ? 0.05 : 0
+    const recencyBoost = noteRecencyBoost(c.pdf, now)
     return {
       hit: {
         path: c.pdf_path,
@@ -172,6 +213,7 @@ export async function search(
           c.sem_score -
           weakPenalty +
           humanBoost +
+          recencyBoost +
           c.kw_name_hits * 0.15 +
           c.kw_text_hits * 0.05,
         meta: {
@@ -182,6 +224,7 @@ export async function search(
           kw_text_hits: c.kw_text_hits,
           weakPenalty,
           humanBoost,
+          recencyBoost,
         },
       } satisfies SearchHit,
     }

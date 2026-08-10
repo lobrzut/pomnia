@@ -166,7 +166,7 @@ export function GuideMap({ onOpenTab, compact }: { onOpenTab?: (tab: Route) => v
       <GlassCard delay={0.22} className="p-4">
         <div className="mb-2 flex items-center gap-2">
           <BookOpen className="h-4 w-4 text-amber" />
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Osobna ścieżka</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">{labels.guideAltPath}</span>
         </div>
         <StepCard step={docsStep} index={5} onOpenTab={onOpenTab} />
       </GlassCard>

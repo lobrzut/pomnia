@@ -19,8 +19,10 @@ import {
   formatBuildIdentity,
 } from '../buildInfo.js'
 import { PROFILE_EMBED_MODEL, VRAM_PROFILES } from './brain/profiles.js'
+import { hasOllamaModel as hasModel } from './brain/modelMatch.js'
 import { defaultOllamaConfig, Ollama } from './brain/ollama.js'
 import { isDistillableSource } from './brain/distillSources.js'
+import { ledgerPathInVault, ownerProcessed, parseLedger } from './brain/ledgerStore.js'
 import { pingBrain } from './brain/status.js'
 import { appDataRoot, currentOS, homeDir } from './platform.js'
 import type { SourceId } from './model.js'
@@ -63,6 +65,11 @@ export interface DoctorOptions {
   distillModel?: string
   embedModel?: string
   brainUrl?: string
+  /**
+   * When `remote`, local Ollama is optional (server owns search/embed).
+   * Missing local Ollama must not FAIL the suite — only WARN for distill.
+   */
+  brainTarget?: 'embedded' | 'remote'
   /** Skip live network / adapter scans (unit tests). */
   skipLive?: boolean
   /** Injected index rows for tests (skips opening library.db). */
@@ -262,8 +269,21 @@ export function defaultLibraryDbPath(userDataDir?: string): string {
   return join(resolvePomniaUserData(userDataDir), 'brain-core-data', 'vectordb', 'library.db')
 }
 
+/** Legacy pre-vault location. Migration source only — never the live ledger. */
 export function defaultLedgerPath(userDataDir?: string): string {
   return join(resolvePomniaUserData(userDataDir), 'distill-ledger.json')
+}
+
+/**
+ * The ledger the pipeline actually reads: in the vault when one exists there,
+ * otherwise the legacy AppData copy that has not been migrated yet.
+ */
+export function preferredLedgerPath(vaultPath?: string, userDataDir?: string): string {
+  if (vaultPath) {
+    const inVault = ledgerPathInVault(vaultPath)
+    if (existsSync(inVault)) return inVault
+  }
+  return defaultLedgerPath(userDataDir)
 }
 
 export function resolveVaultPath(explicit?: string, userDataDir?: string): string {
@@ -469,19 +489,14 @@ function readIndexFromDb(
   }
 }
 
-function hasModel(models: string[], want: string): boolean {
-  return models.some((m) => m === want || m === `${want}:latest` || m.replace(/:latest$/, '') === want)
-}
-
 export async function collectDistillQueue(
   ledgerPath: string,
 ): Promise<{ perSource: DistillSourceRow[]; ledgerProcessed: number }> {
+  // parseLedger accepts both the in-vault owner map and the legacy AppData
+  // shape, so doctor reports the same number the pipeline actually uses.
   let processed: Record<string, string> = {}
   try {
-    const raw = JSON.parse(await fs.readFile(ledgerPath, 'utf8')) as {
-      processed?: Record<string, string>
-    }
-    processed = raw.processed ?? {}
+    processed = ownerProcessed(parseLedger(JSON.parse(await fs.readFile(ledgerPath, 'utf8'))))
   } catch {
     processed = {}
   }
@@ -541,6 +556,71 @@ function tally(checks: DoctorCheck[]): Pick<DoctorReport, 'ok' | 'warn' | 'fail'
   return { ok, warn, fail, exitCode: fail > 0 ? 1 : 0 }
 }
 
+/**
+ * Local Ollama severity depends on brain mode.
+ * Remote brain owns search/embed on the server — Desktop Ollama is only for distill.
+ */
+export function buildOllamaDoctorCheck(args: {
+  remoteBrain: boolean
+  reachable: boolean
+  baseUrl: string
+  embedModel: string
+  distillModel: string
+  models: string[]
+}): DoctorCheck {
+  const { remoteBrain, reachable, baseUrl, embedModel, distillModel, models } = args
+  if (!reachable) {
+    return {
+      id: 'ollama',
+      level: remoteBrain ? 'WARN' : 'FAIL',
+      message: remoteBrain
+        ? `ollama unreachable at ${baseUrl} (optional for remote brain — needed only for distill)`
+        : `ollama unreachable at ${baseUrl}`,
+      action: remoteBrain
+        ? 'for distill, point Ollama URL at your server :11434 (same host as Brain); search/MCP do not need a local install'
+        : 'start Ollama (https://ollama.com) then: ollama pull nomic-embed-text',
+      data: { baseUrl, brainTarget: remoteBrain ? 'remote' : 'embedded' },
+    }
+  }
+  const embedOk = hasModel(models, embedModel)
+  const chatOk = hasModel(models, distillModel)
+  if (!embedOk) {
+    return {
+      id: 'ollama',
+      level: remoteBrain ? 'WARN' : 'FAIL',
+      message: remoteBrain
+        ? `ollama reachable · missing embed model ${embedModel} (remote search does not need it locally)`
+        : `ollama reachable · missing embed model ${embedModel}`,
+      action: remoteBrain
+        ? `optional for local distill path: ollama pull ${embedModel} — or use server Ollama URL`
+        : `ollama pull ${embedModel}`,
+      data: { baseUrl, models, embedModel, distillModel, brainTarget: remoteBrain ? 'remote' : 'embedded' },
+    }
+  }
+  if (!chatOk) {
+    return {
+      id: 'ollama',
+      level: 'WARN',
+      message: remoteBrain
+        ? `ollama OK embed=${embedModel} · missing distill model ${distillModel} (distill only)`
+        : `ollama OK embed=${embedModel} · missing distill model ${distillModel}`,
+      action: `ollama pull ${distillModel} (search still works without it)`,
+      data: { baseUrl, models, embedModel, distillModel, brainTarget: remoteBrain ? 'remote' : 'embedded' },
+    }
+  }
+  return {
+    id: 'ollama',
+    level: 'OK',
+    message: `ollama ${baseUrl} · embed=${embedModel} · distill=${distillModel}`,
+    data: {
+      baseUrl,
+      embedModel,
+      distillModel,
+      brainTarget: remoteBrain ? 'remote' : 'embedded',
+    },
+  }
+}
+
 /** One line per check: `OK …` / `WARN …` / `FAIL …` plus summary. */
 export function formatDoctorLines(report: DoctorReport): string[] {
   const lines = report.checks.map((c) => {
@@ -563,7 +643,10 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
   const userData = resolvePomniaUserData(opts.userDataDir)
   const vaultPath = resolveVaultPath(opts.vaultPath, opts.userDataDir)
   const libraryDb = opts.libraryDbPath ?? defaultLibraryDbPath(opts.userDataDir)
-  const ledgerPath = opts.ledgerPath ?? defaultLedgerPath(opts.userDataDir)
+  // Prefer the vault's ledger — that is the one the pipeline reads now. The
+  // AppData copy only survives as a migration source and goes stale the moment
+  // the vault is opened somewhere else.
+  const ledgerPath = opts.ledgerPath ?? preferredLedgerPath(vaultPath, opts.userDataDir)
   const brainUrl = (opts.brainUrl || 'http://127.0.0.1:7862').replace(/\/+$/, '')
   const embedModel = opts.embedModel || PROFILE_EMBED_MODEL
   const distillModel =
@@ -773,6 +856,7 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
   }
 
   // ── 6. Ollama ──────────────────────────────────────────────────────────
+  const remoteBrain = opts.brainTarget === 'remote'
   if (opts.skipLive) {
     checks.push({
       id: 'ollama',
@@ -786,43 +870,16 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
     cfg.chatModel = distillModel
     const ollama = new Ollama(cfg)
     const reachable = await ollama.reachable()
-    if (!reachable) {
-      checks.push({
-        id: 'ollama',
-        level: 'FAIL',
-        message: `ollama unreachable at ${cfg.baseUrl}`,
-        action: 'start Ollama (https://ollama.com) then: ollama pull nomic-embed-text',
-        data: { baseUrl: cfg.baseUrl },
-      })
-    } else {
-      const models = (await ollama.listModels()).map((m) => m.name)
-      const embedOk = hasModel(models, embedModel)
-      const chatOk = hasModel(models, distillModel)
-      if (!embedOk) {
-        checks.push({
-          id: 'ollama',
-          level: 'FAIL',
-          message: `ollama reachable · missing embed model ${embedModel}`,
-          action: `ollama pull ${embedModel}`,
-          data: { baseUrl: cfg.baseUrl, models, embedModel, distillModel },
-        })
-      } else if (!chatOk) {
-        checks.push({
-          id: 'ollama',
-          level: 'WARN',
-          message: `ollama OK embed=${embedModel} · missing distill model ${distillModel}`,
-          action: `ollama pull ${distillModel} (search still works without it)`,
-          data: { baseUrl: cfg.baseUrl, models, embedModel, distillModel },
-        })
-      } else {
-        checks.push({
-          id: 'ollama',
-          level: 'OK',
-          message: `ollama ${cfg.baseUrl} · embed=${embedModel} · distill=${distillModel}`,
-          data: { baseUrl: cfg.baseUrl, embedModel, distillModel },
-        })
-      }
-    }
+    checks.push(
+      buildOllamaDoctorCheck({
+        remoteBrain,
+        reachable,
+        baseUrl: cfg.baseUrl,
+        embedModel,
+        distillModel,
+        models: reachable ? (await ollama.listModels()).map((m) => m.name) : [],
+      }),
+    )
   }
 
   // ── 7. Brain /healthz ──────────────────────────────────────────────────
@@ -849,15 +906,17 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
           id: 'brain',
           level: 'OK',
           message: `brain ${brainUrl}/healthz responding`,
-          data: { url: ping.url, status: ping.status },
+          data: { url: ping.url, status: ping.status, brainTarget: remoteBrain ? 'remote' : 'embedded' },
         })
       } else {
         checks.push({
           id: 'brain',
           level: 'FAIL',
           message: `brain ${brainUrl} unexpected /healthz payload`,
-          action: 'Brain page → start embedded Brain (127.0.0.1:7862)',
-          data: { url: ping.url, data: ping.data },
+          action: remoteBrain
+            ? 'Connect → verify remote Brain URL (brain-core), or fix the server'
+            : 'Brain page → start embedded Brain (127.0.0.1:7862)',
+          data: { url: ping.url, data: ping.data, brainTarget: remoteBrain ? 'remote' : 'embedded' },
         })
       }
     } else {
@@ -865,8 +924,14 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
         id: 'brain',
         level: 'FAIL',
         message: `brain not listening on ${brainUrl} (/healthz)`,
-        action: 'Brain page → start embedded Brain, or: ensure port 7862 is free',
-        data: { error: ping.error, status: ping.status },
+        action: remoteBrain
+          ? 'Connect → set remote Brain URL and confirm the server is up'
+          : 'Brain page → start embedded Brain, or: ensure port 7862 is free',
+        data: {
+          error: ping.error,
+          status: ping.status,
+          brainTarget: remoteBrain ? 'remote' : 'embedded',
+        },
       })
     }
   }

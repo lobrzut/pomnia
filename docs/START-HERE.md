@@ -14,10 +14,10 @@ Nic nie idzie do chmury, dopóki sam nie skonfigurujesz deployu na swój serwer.
 
 | Nazwa | Gdzie | Co trzyma |
 |-------|-------|-----------|
-| **Pomnia Vault** | Folder vaultu, który wybierasz (np. `C:\Vault` — nazwa dowolna, też `*.pomnia`) | Zaszyfrowane czaty + dokumenty (+ skills/, USER.md, distilled…) |
+| **Pomnia Vault** | Folder vaultu, który wybierasz (np. `C:\Vault` — nazwa dowolna, też `*.pomnia`) | Zaszyfrowane czaty + dokumenty; **plaintext** obok: `skills/`, `USER.md`, `sessions/`, distilled |
 | **Brain data** | `%AppData%/Pomnia/brain-core-data/` | Indeks RAG (`library.db`) + notatki distill — **nieszyfrowane** na dysku |
 
-Vault = archiwum i backup. Brain data = silnik wyszukiwania semantycznego.
+Vault = archiwum i backup (AES dla blobów czatów/dokumentów). Sidecary wiedzy i indeks Brain = plaintext na dysku — chroń folder. Brain data = silnik wyszukiwania semantycznego.
 
 ## Dwa tryby Brain
 
@@ -102,10 +102,11 @@ Jeśli Cursor backup pokazuje 0 czatów — użyj Import.
 ## Czego ta beta jeszcze nie ma
 
 - Podpisany instalator (SmartScreen / Gatekeeper)
-- Instalator Linux
 - Pełny OCR wszystkich stron / Ollama vision (jest thin OCR: pierwsze sparse pages)
 - Sync vault do chmury
 - Gwarancja Antigravity na każdej maszynie (adapter w testach)
+
+Linux Desktop (AppImage/deb): budowa na Linux/CI — [LINUX-BUILD.md](./LINUX-BUILD.md).
 
 ---
 

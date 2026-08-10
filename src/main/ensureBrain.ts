@@ -4,6 +4,7 @@ import { brainCore } from './brainCore.js'
 import { brainCoreDataDir, brainSkillsDir, brainVaultRoot } from './brainPaths.js'
 import { getAppSettings } from './appSettings.js'
 import { getHandshakePhrase, isHandshakeEnabled } from './handshake.js'
+import { m } from './mainStrings.js'
 import {
   brainProcessFailedMessage,
   ollamaUnreachableMessage,
@@ -61,11 +62,11 @@ export async function ensureBrainForIndexing(
       running: false,
       autoStarted: false,
       ollamaUrl: baseUrl,
-      error: brainCore.status().lastError || 'Uruchamianie wyszukiwarki trwa zbyt długo',
+      error: brainCore.status().lastError || m().brainStartTooLong,
     }
   }
 
-  onProgress?.({ phase: 'brain-start', done: 0, total: 1, detail: 'sprawdzam Ollama…' })
+  onProgress?.({ phase: 'brain-start', done: 0, total: 1, detail: m().checkingOllama })
   const probe = await probeOllama(baseUrl)
   if (!probe.ok) {
     return {
