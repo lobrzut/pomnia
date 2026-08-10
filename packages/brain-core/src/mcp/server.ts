@@ -490,7 +490,7 @@ export async function createBrainServer(
                         { name: 'Database', ...health.checks.db },
                         { name: 'Index', ...health.checks.index },
                         { name: 'Vault', ...health.checks.vault },
-                        { name: 'Dysk / zapis', ...health.checks.disk },
+                        { name: 'Disk / write', ...health.checks.disk },
                         { name: 'Embeddings (Ollama)', ...health.checks.ollama },
                       ],
                     }
