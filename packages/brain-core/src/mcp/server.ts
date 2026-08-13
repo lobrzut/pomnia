@@ -226,7 +226,19 @@ export async function createBrainServer(
   let ctx: ToolContext | null = null
   let vaultOwnership: OwnershipVerdict | null = null
   let reindexing = false
-  let startedAt = Date.now()
+  /**
+   * When this process started, re-derived on every read.
+   *
+   * A fixed `Date.now()` at boot goes wrong the moment the wall clock moves,
+   * which on a server is routine: NTP corrects a drifted VM or container clock
+   * and every later reading is measured against an instant that has since moved.
+   * The live homelab box reported `uptimeSec: -7028` — nearly two negative
+   * hours — with nothing in the code reassigning the value.
+   *
+   * process.uptime() is monotonic, so deriving the start instant from it keeps
+   * uptime true across a jump and follows the clock instead of fighting it.
+   */
+  const startedAt = (): number => Date.now() - Math.round(process.uptime() * 1000)
   const sessions = createSessionStore()
   /**
    * Failed logins per address. Separate from the bearer gate's counter: a
@@ -385,7 +397,7 @@ export async function createBrainServer(
               vaultOwner: vaultOwnership?.owner
                 ? describeOwner(vaultOwnership.owner)
                 : (ctx?.authoritativeVaultHint ?? null),
-              startedAt,
+              startedAt: startedAt(),
             })
             // The verdict is public — a monitor has to be able to see a broken
             // server. The reasons are not: they name the vault path, the Ollama
@@ -453,7 +465,7 @@ export async function createBrainServer(
               vaultOwner: vaultOwnership?.owner
                 ? describeOwner(vaultOwnership.owner)
                 : (ctx?.authoritativeVaultHint ?? null),
-              startedAt,
+              startedAt: startedAt(),
             })
             // Per-check reasons name paths and models, so they follow the same
             // rule as every other detail: behind the token. The overall verdict
@@ -798,7 +810,7 @@ export async function createBrainServer(
               db: ctx?.db ?? null,
               vaultRoot: ctx?.vaultRoot ?? '',
               ring: activityRing,
-              startedAt,
+              startedAt: startedAt(),
               version: BRAIN_CORE_VERSION,
             }),
           applyOllama(next) {
@@ -846,7 +858,7 @@ export async function createBrainServer(
               vaultOwner: vaultOwnership?.owner
                 ? describeOwner(vaultOwnership.owner)
                 : (ctx?.authoritativeVaultHint ?? null),
-              startedAt,
+              startedAt: startedAt(),
             }),
         }
       }

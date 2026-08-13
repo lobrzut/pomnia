@@ -203,7 +203,7 @@ export async function collectOverview(opts: {
       last24h: opts.ring.countSince(24 * 60 * 60_000),
       actors: opts.ring.actors(24 * 60 * 60_000),
     },
-    uptimeSec: Math.round((Date.now() - opts.startedAt) / 1000),
+    uptimeSec: Math.max(0, Math.round((Date.now() - opts.startedAt) / 1000)),
     version: opts.version,
   }
 }
