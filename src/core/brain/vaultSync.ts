@@ -137,18 +137,29 @@ async function post(
   if (!r.ok) {
     const p = parsed as { error?: string; hint?: string; detail?: string }
     const err = p?.error ?? ''
-    // Surface ownership refusals in plain language — "409" alone looks like a
-    // network glitch, and "not_a_replica" is jargon for "you pushed at the SoT".
-    if (err === 'not_a_replica') {
-      // Plain language leads, but the code stays in the message and on the error.
-      // Two reasons it cannot be dropped: it is what someone greps out of a log
-      // when a user reports this, and the wording is ours to reword any time.
-      // The server's hint is deliberately not the whole message — it is remote
-      // text, so it goes after our sentence rather than replacing it.
-      const e: Error & { code?: string } = new Error(
-        'Target owns the vault (writable) — push only to a read-only replica, not the source of truth. [not_a_replica]',
-      )
-      e.code = 'not_a_replica'
+    // Ownership refusals in plain language — a bare "409" reads as a network
+    // glitch, and the codes are jargon for "you pushed at something that will
+    // not take it".
+    //
+    // Plain language leads, but the code stays in the message and on the error.
+    // It is what someone greps out of a log when a user reports this, and the
+    // wording above it is ours to reword at any time. The server's hint is
+    // deliberately not the whole message — it is remote text, so it follows our
+    // sentence rather than replacing it.
+    //
+    // Both codes are handled because both are live. `write_needs_admin` is what
+    // a current server says; `not_a_replica` is what every server before it
+    // said, and the desktop updates itself from GitHub while a server is
+    // upgraded by hand, so talking to an older one is the ordinary case.
+    const refusal: Record<string, string> = {
+      write_needs_admin:
+        'The target owns this vault, so writing to it needs an admin token — reissue the Connect token with --role admin.',
+      not_a_replica:
+        'The target owns the vault and this version of it accepts pushes only on a read-only replica. Upgrade the server, or point this at a replica.',
+    }
+    if (refusal[err]) {
+      const e: Error & { code?: string } = new Error(`${refusal[err]} [${err}]`)
+      e.code = err
       throw e
     }
     throw new Error(

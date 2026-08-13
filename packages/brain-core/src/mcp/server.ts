@@ -594,7 +594,7 @@ export async function createBrainServer(
           }
 
           if (isSync) {
-            await serveSync(pathOnly, req, res)
+            await serveSync(pathOnly, req, res, auth)
             return
           }
 
@@ -878,15 +878,29 @@ export async function createBrainServer(
       /**
        * Replication intake.
        *
-       * Only a replica accepts a push. The instance that owns the vault must
-       * never be writable over the network — otherwise a misconfigured peer
-       * could overwrite the corpus everything else replicates *from*, which is
-       * the one file set with no other copy.
+       * The question is who may write, not what shape the target happens to be.
+       *
+       * This used to refuse every push whenever the vault was writable here.
+       * That protected the corpus from a misconfigured peer, and it also made
+       * the server useless as the authoritative brain: the desktop authors the
+       * notes, and there was no way for it to put them anywhere the server owns.
+       * "Push only to a replica" makes authority a property of the *target's*
+       * configuration rather than of the caller's credential.
+       *
+       * The invariant that matters is unchanged — one machine owns the files,
+       * recorded in state/vault-writer.json, and that is what stopped the
+       * desktop and the Linux brain from silently drifting 99 files apart.
+       * What changes is that owning them no longer means refusing everyone. It
+       * means refusing everyone who has not been handed an admin token.
+       *
+       * A replica keeps the lower bar it always had. It holds a copy; a bad
+       * push there costs a resync, not the only extant version of a note.
        */
       async function serveSync(
         path: string,
         req: IncomingMessage,
         res: ServerResponse,
+        auth: { role?: 'agent' | 'admin'; name?: string },
       ): Promise<void> {
         const json = (code: number, body: unknown): void => {
           res.statusCode = code
@@ -894,15 +908,16 @@ export async function createBrainServer(
           res.end(JSON.stringify(body))
         }
         if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' })
-        if (vaultOwnership?.writable) {
+        if (vaultOwnership?.writable && auth.role !== 'admin') {
           const who = vaultOwnership.owner
             ? describeOwner(vaultOwnership.owner)
             : 'this instance'
-          return json(409, {
-            error: 'not_a_replica',
+          return json(403, {
+            error: 'write_needs_admin',
             hint:
-              `Vault is writable here (held by ${who}). ` +
-              'Replication only writes to read-only replicas — push to a host with --read-only, not to the source of truth.',
+              `This instance owns the vault (${who}), so a push here writes the source of truth. ` +
+              'That needs an admin token: `brain-core --add-token <name> --role admin`. ' +
+              'An agent token can still push to a read-only replica.',
           })
         }
         try {
