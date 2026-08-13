@@ -226,7 +226,10 @@ export async function collectHealth(opts: {
     auth: opts.authRequired,
     writable: opts.writable,
     vaultOwner: opts.vaultOwner,
-    uptimeSec: Math.round((Date.now() - opts.startedAt) / 1000),
+    // Never negative. The caller derives startedAt monotonically, but this is
+    // read by a panel and by monitors, and "running for minus two hours" is not
+    // a fact any of them can act on — the live server printed -7028.
+    uptimeSec: Math.max(0, Math.round((Date.now() - opts.startedAt) / 1000)),
     checks: { db, index, vault, disk, ollama: effectiveOllama },
     index: counts,
   }
