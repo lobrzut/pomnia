@@ -31,9 +31,29 @@ User=pomnia
 Group=pomnia
 WorkingDirectory=/opt/pomnia-brain-core
 
-; --read-only pins this host as a replica. Ownership is also recorded inside
-; the vault (state/vault-writer.json), so two writable instances over one
-; corpus cannot happen by accident; this flag is the belt to that's braces.
+; This host is the brain: it owns the vault, indexes it once, and serves every
+; agent — including their writes. That is the shape Pomnia is built around now.
+; The desktop authors (distills, holds the passphrase, wires MCP clients) and
+; pushes what it makes here with an admin token.
+;
+; No --read-only, and this is safe rather than reckless: ownership lives in the
+; vault itself, at state/vault-writer.json. A vault already claimed by another
+; machine keeps this host read-only whatever the flag says, so dropping it
+; cannot produce two writers by accident — it only lets this host claim a vault
+; that nobody holds.
+;
+; Two knobs for the other topologies:
+;
+;   pin as a replica       add  --read-only --vault-owner "Pomnia Desktop"
+;                          (--vault-owner is only a label: the name a client
+;                          shows when the vault carries no marker yet, seeded
+;                          from a tar or from a desktop older than the marker.
+;                          Without it clients say "read-only, owner unknown",
+;                          which tells nobody where their note should have gone.)
+;
+;   take a vault over      run once:  brain-core --claim-vault
+;                          The previous owner then refuses writes — sync it
+;                          before it saves anything else.
 ExecStart=/usr/bin/node /opt/pomnia-brain-core/dist/daemon.js \
   --host 0.0.0.0 \
   --port 7865 \
@@ -41,13 +61,7 @@ ExecStart=/usr/bin/node /opt/pomnia-brain-core/dist/daemon.js \
   --vault-root /var/lib/pomnia/vault \
   --skills-root /var/lib/pomnia/vault/skills \
   --ollama-url http://127.0.0.1:11434 \
-  --instance-label "pomnia-server" \
-  --read-only \
-  --vault-owner "Pomnia Desktop"
-; --vault-owner is the fallback name shown when the vault carries no
-; state/vault-writer.json yet — a replica seeded from a desktop older than the
-; ownership marker, or from a tar. Without it a client shows "read-only, owner
-; unknown", which tells nobody where their note should have gone.
+  --instance-label "pomnia-server"
 
 Restart=on-failure
 RestartSec=5

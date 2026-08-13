@@ -48,7 +48,7 @@ on `/healthz`, or the panel at `/admin` (Stan / Silnik).
 | `/healthz` | optional | Health. Verdict public; reasons and counts need a token. |
 | `/mcp` | **required** | The MCP endpoint. Point agents here. |
 | `/mcp/activity` | **required** | Last tool call — echoes query text, so it is gated. |
-| `/sync/plan`, `/sync/file`, `/sync/reindex` | **required** | Replication intake. Replicas only. |
+| `/sync/plan`, `/sync/file`, `/sync/reindex` | **admin** on a vault this host owns, any token on a replica | Write intake. Where the desktop puts what it distils. |
 
 Everything else 404s, including `/.well-known/*` and `/register` — some MCP
 clients probe those for OAuth and stall on anything but a clean 404.
@@ -77,8 +77,27 @@ sudo -u pomnia node dist/daemon.js --data-dir /var/lib/pomnia \
 ```
 
 Not an MCP tool, on purpose: an agent must not be able to seize a corpus
-mid-conversation. `--read-only` in the unit pins this host as a replica
-regardless of the marker — leave it on unless this server owns the vault.
+mid-conversation. `--read-only` pins this host as a replica regardless of the
+marker; the shipped unit no longer sets it, because the default topology is
+that **this server is the brain** — it owns the vault, indexes it once and
+serves every agent, while the desktop authors and pushes here.
+
+Dropping the flag cannot produce two writers: a vault already claimed elsewhere
+keeps this host read-only whatever the flag says. It only lets this host claim
+a vault nobody holds.
+
+Writing into a vault this host owns needs an **admin** token, because such a
+push edits the source of truth:
+
+```bash
+sudo -u pomnia node dist/daemon.js --data-dir /var/lib/pomnia \
+  --add-token "pomnia-desktop" --role admin
+```
+
+An agent token is refused there with `write_needs_admin` — agent tokens go to
+every MCP client on the network, and those must be able to read and to save
+conversations, not to rewrite the corpus everyone reads from. A replica keeps
+the lower bar: any valid token, because a bad push to a copy costs a resync.
 
 ## Getting a vault onto it
 
@@ -175,10 +194,12 @@ still returns the verdict (`ok` / `degraded` / `down`) but sets `index` to
 while `checks.index` said `ok`. Panel **Stan** uses `/admin/health` (session)
 for the full numbers.
 
-**First run honesty:** this host is usually a read-only replica (`--read-only`
-in the unit). Desktop owns the vault (SoT); agents that `save_conversation`
-against `:7865` will be refused with *held by …*. Push from Desktop Connect
-to refresh the copy; do not `--claim-vault` unless you mean to steal ownership.
+**First run honesty:** on a fresh install this host claims the empty vault and
+becomes the writer, so agents can `save_conversation` against `:7865` straight
+away. If you are pointing it at a vault a desktop already owns, it stays
+read-only and names the holder — that is the marker doing its job, not a
+misconfiguration. Push from Desktop Connect to fill it, and `--claim-vault`
+only when you mean to move authority here for good.
 
 A crash loop stops after five restarts in a minute and leaves the unit
 `failed`, deliberately: a stopped service someone notices beats a restart
