@@ -40,6 +40,27 @@ export async function ensureBrainForIndexing(
   encryptedVaultPath?: string | null,
 ): Promise<EnsureBrainResult> {
   const baseUrl = resolveOllamaUrl(ollamaUrl)
+
+  /**
+   * Refuse to build a second index when the brain lives on a server.
+   *
+   * This used to start the local brain-core regardless of the configured
+   * target, so with Pomnia pointed at a server the desktop quietly indexed into
+   * its own library.db — a database no agent ever queries. Importing a document
+   * reported success, the counters moved, and the document was invisible to
+   * every client. Two indexes over one corpus is the waste; an index nobody
+   * reads reporting success is the bug.
+   *
+   * Saying so is the whole fix here. Sending documents to a server is a
+   * capability that does not exist yet — the daemon exposes no import route —
+   * and pretending otherwise is what got us here.
+   */
+  const settings = getAppSettings()
+  if ((settings.brainTarget ?? 'embedded') === 'remote') {
+    const url = settings.brainMcpUrl?.trim() || 'remote'
+    return { running: false, autoStarted: false, ollamaUrl: baseUrl, error: m().indexingIsRemote(url) }
+  }
+
   const skillsRoot = brainSkillsDir(encryptedVaultPath)
   const vaultRoot = brainVaultRoot(encryptedVaultPath)
   const status = brainCore.status()

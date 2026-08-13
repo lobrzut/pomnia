@@ -52,6 +52,8 @@ export interface MainStrings {
   reindexAfterOpenFailedTitle: string
   vaultNotOpen: string
   updateCheckHttp: (status: number) => string
+  /** Refusal when indexing is asked for while the brain lives on a server. */
+  indexingIsRemote: (url: string) => string
 
   // ── replication ──────────────────────────────────────────────────────────
   replicaUrlScheme: string
@@ -144,6 +146,11 @@ const PL: MainStrings = {
   reindexAfterOpenFailedTitle: 'Reindex po otwarciu vaultu nieudany',
   vaultNotOpen: 'Vault nie jest otwarty.',
   updateCheckHttp: (status) => `GitHub odpowiedział ${status}`,
+  indexingIsRemote: (url) =>
+    `Mózg jest na serwerze (${url}) — to on trzyma indeks. Lokalne indeksowanie ` +
+    'zapisałoby do bazy, której żaden agent nie czyta. Wyślij notatki przez ' +
+    'Podłącz → wyślij zmiany, a serwer je zaindeksuje. Dokumenty (PDF/EPUB) ' +
+    'importujesz na razie tylko w trybie lokalnym.',
 
   replicaUrlScheme: 'Adres repliki musi zaczynać się od http:// lub https://',
   replicaNoTarget: 'Podaj adres serwera (zakładka Podłącz).',
@@ -238,6 +245,11 @@ const EN: MainStrings = {
   reindexAfterOpenFailedTitle: 'Reindex after opening the vault failed',
   vaultNotOpen: 'The vault is not open.',
   updateCheckHttp: (status) => `GitHub answered ${status}`,
+  indexingIsRemote: (url) =>
+    `The brain lives on a server (${url}) and holds the index there. Indexing ` +
+    'locally would write to a database no agent reads. Send notes with ' +
+    'Connect → push changes and the server will index them. Documents ' +
+    '(PDF/EPUB) can only be imported in local mode for now.',
 
   replicaUrlScheme: 'The replica address must start with http:// or https://',
   replicaNoTarget: 'Set the server address first (Connect tab).',
