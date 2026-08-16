@@ -30,6 +30,17 @@ The installer creates a system user, writes the unit, starts the service, and
 **checks that it answers before telling you it worked**. It prints the first
 token once. Re-running upgrades in place and never rotates that token.
 
+Search needs an embedding model, and Ollama is where it comes from. If none is
+answering, the installer asks whether to install it and pull `nomic-embed-text`
+(~275 MB), then restarts and checks that the server can actually reach it. Say
+no and everything else still works — skills, the profile, saved notes — only
+meaning-based search is off, and it says so rather than looking broken. Add
+`--with-ollama` to answer yes up front on an unattended run.
+
+Already running Ollama somewhere? Skip that and point the unit at it with
+`--ollama-url http://host:11434`. It is a shared service by design: one model
+serves Pomnia and everything else on the box.
+
 On a fresh install this host claims the empty vault and becomes the writer, so
 an agent can save to it straight away — no desktop required. That loop is
 covered end to end by `tests/selfHostedLifecycle.test.ts`: empty vault, the
