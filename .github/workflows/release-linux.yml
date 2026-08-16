@@ -94,16 +94,32 @@ jobs:
           tar -czf "$TARBALL" -C "$(dirname "$STAGE")" pomnia-brain-core
           echo "packed $TARBALL ($(du -h "$TARBALL" | cut -f1))"
 
-          # Prove the archive is usable rather than merely produced: unpack it
-          # somewhere else and ask the daemon its version. A tarball that cannot
-          # start is the same defect as a green toast over an empty index.
+          # Prove the archive is usable rather than merely produced. Never by
+          # starting the daemon: it has no --version, so `daemon.js --version`
+          # does not print and exit — it boots a server and runs forever, which
+          # is how this step first hung a CI job for two and a half hours.
+          #
+          # Load the entry point instead. Importing it resolves every dependency
+          # the archive claims to carry, so a missing or wrong-ABI native module
+          # fails here rather than on someone's machine, and nothing binds a port.
           VERIFY=$(mktemp -d)
           tar -xzf "$TARBALL" -C "$VERIFY"
-          node "$VERIFY/pomnia-brain-core/dist/daemon.js" --version 2>/dev/null \
-            || node -p "require('$VERIFY/pomnia-brain-core/package.json').version"
-          test -x "$VERIFY/pomnia-brain-core/deploy/install.sh" \
-            || test -f "$VERIFY/pomnia-brain-core/deploy/install.sh"
-          echo "tarball unpacks and carries deploy/install.sh"
+          U="$VERIFY/pomnia-brain-core"
+
+          node -e "
+            const { readFileSync } = require('node:fs')
+            const v = JSON.parse(readFileSync('$U/package.json','utf8')).version
+            if (v !== '$VERSION') { console.error('version mismatch: ' + v); process.exit(1) }
+            console.log('version in archive: ' + v)
+          "
+          NODE_PATH="$U/node_modules" node -e "
+            require('$U/node_modules/better-sqlite3')
+            console.log('native module loads from the archive')
+          "
+          test -f "$U/deploy/install.sh" || { echo 'no deploy/install.sh' >&2; exit 1; }
+          test -f "$U/deploy/pomnia-brain-core.service" || { echo 'no unit file' >&2; exit 1; }
+          test -f "$U/dist/daemon.js" || { echo 'no daemon.js' >&2; exit 1; }
+          echo "tarball unpacks, resolves its native deps, and carries the deploy files"
 
       - name: SHA-256 checksums
         run: |
