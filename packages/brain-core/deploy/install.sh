@@ -7,9 +7,12 @@
 #
 #   sudo ./install.sh                 # install or upgrade
 #   sudo ./install.sh --port 7865     # non-default port
+#   sudo ./install.sh --with-ollama   # say yes up front (unattended runs)
 #
-# What it does NOT do, on purpose: install Ollama, pull models, open firewall
-# ports, or terminate TLS. Those are decisions about someone else's machine.
+# It offers to install Ollama and pull the embedding model, and only with a yes.
+# Everything else stays hands-off on purpose: firewall ports and TLS are
+# decisions about someone else's machine, and guessing them is how an installer
+# becomes something people read before they run.
 set -euo pipefail
 
 PREFIX=/opt/pomnia-brain-core
@@ -24,6 +27,9 @@ while [[ $# -gt 0 ]]; do
     --port) PORT="$2"; shift 2 ;;
     --prefix) PREFIX="$2"; shift 2 ;;
     --data-dir) DATA="$2"; shift 2 ;;
+    # Consent up front, for a run with no terminal attached. There is no
+    # --no-ollama: doing nothing is already the default when nobody says yes.
+    --with-ollama) WITH_OLLAMA=1; shift ;;
     -h|--help) sed -n '3,14p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
@@ -149,17 +155,73 @@ echo
 # of this server; say what it is missing first, whatever the summary says.
 OLLAMA_STATE=$(printf '%s' "$HEALTH" | sed -n 's/.*"ollama":{"state":"\([a-z]*\)".*/\1/p')
 
+EMBED_MODEL=nomic-embed-text
+
+# Offer, then do it. Reading two commands off a screen and pasting them back is
+# not a decision anybody is making thoughtfully — it is the same install, with a
+# gap in it where people give up. Consent stays explicit: a prompt when someone
+# is watching, --with-ollama when nobody is, and nothing at all otherwise.
+offer_ollama() {
+  local answer=""
+  if [[ "${WITH_OLLAMA:-0}" == "1" ]]; then
+    answer=y
+  elif [[ -t 0 ]]; then
+    echo "  Ollama is not answering, so nothing can be embedded — search will find"
+    echo "  nothing until it is."
+    echo
+    read -r -p "  Install Ollama now and pull $EMBED_MODEL (~275 MB)? [y/N] " answer
+  fi
+
+  if [[ ! "$answer" =~ ^[Yy]$ ]]; then
+    echo
+    echo "  Left alone. When you want search, either on this host:"
+    echo "      curl -fsSL https://ollama.com/install.sh | sh && ollama pull $EMBED_MODEL"
+    echo "  or point at one you already run, and restart:"
+    echo "      --ollama-url http://<host>:11434     (in $UNIT)"
+    echo
+    echo "  The server serves without it: skills, the profile and saved notes all"
+    echo "  work. Only meaning-based search is off."
+    return
+  fi
+
+  if ! command -v ollama >/dev/null 2>&1; then
+    echo "  installing Ollama…"
+    # Their installer, run as themselves — not vendored, not mirrored. Pinning a
+    # copy here would mean shipping someone else's install script and owning its
+    # bugs on distributions nobody here has tested.
+    curl -fsSL https://ollama.com/install.sh | sh || {
+      echo "! Ollama install failed — do it yourself, then: ollama pull $EMBED_MODEL" >&2
+      return
+    }
+  fi
+
+  echo "  pulling $EMBED_MODEL…"
+  ollama pull "$EMBED_MODEL" || {
+    echo "! pull failed — retry with: ollama pull $EMBED_MODEL" >&2
+    return
+  }
+
+  # Verify rather than announce, same rule as the rest of this script: the
+  # question is whether the server can embed now, not whether a command exited 0.
+  systemctl restart pomnia-brain-core
+  for _ in $(seq 1 20); do
+    sleep 0.5
+    NEW=$(curl -sS -m 2 "http://127.0.0.1:$PORT/healthz" 2>/dev/null || true)
+    STATE=$(printf '%s' "$NEW" | sed -n 's/.*"ollama":{"state":"\([a-z]*\)".*/\1/p')
+    if [[ "$STATE" == "ok" ]]; then
+      HEALTH="$NEW"
+      STATUS=$(printf '%s' "$NEW" | grep -o '"status":"[a-z]*"' | cut -d'"' -f4)
+      OLLAMA_STATE=ok
+      ok "Ollama answering — embeddings ready"
+      return
+    fi
+  done
+  echo "! Ollama installed but the server still cannot reach it." >&2
+  echo "  journalctl -u pomnia-brain-core -n 30 --no-pager" >&2
+}
+
 if [[ -n "$OLLAMA_STATE" && "$OLLAMA_STATE" != "ok" ]]; then
-  echo "  Ollama is not answering, so nothing can be embedded — search will find"
-  echo "  nothing until it is. Pomnia does not install it for you; on this host:"
-  echo "      curl -fsSL https://ollama.com/install.sh | sh"
-  echo "      ollama pull nomic-embed-text"
-  echo
-  echo "  Already running it elsewhere? Point this server at it and restart:"
-  echo "      --ollama-url http://<host>:11434     (in $UNIT)"
-  echo
-  echo "  The server serves without it: skills, the profile and saved notes all"
-  echo "  work. Only meaning-based search is off."
+  offer_ollama
   echo
 fi
 
