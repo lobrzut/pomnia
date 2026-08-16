@@ -5,15 +5,36 @@ searches a vault, and serves it to any agent that can hold a bearer token. No
 web app, no database server, no queue. It is the same engine Pomnia Desktop
 embeds — same code, different entry point (`dist/daemon.js` instead of a fork).
 
+Download the server tarball from
+[releases](https://github.com/lobrzut/pomnia/releases/latest) — it is built on
+Linux with its native modules already compiled, so there is nothing to build:
+
 ```bash
-git clone https://github.com/lobrzut/pomnia && cd pomnia/packages/brain-core
-npm ci && npm run build
+tar -xzf pomnia-brain-core-*-linux-x64.tar.gz
+cd pomnia-brain-core
 sudo ./deploy/install.sh
+```
+
+The `.AppImage` and `.deb` on that page are the **desktop app**, not this. They
+are a graphical Pomnia with a brain inside it; this is the headless server.
+
+From source instead, if you would rather read it first:
+
+```bash
+git clone https://github.com/lobrzut/pomnia && cd pomnia
+npm ci && npm run build:brain-core
+sudo ./packages/brain-core/deploy/install.sh
 ```
 
 The installer creates a system user, writes the unit, starts the service, and
 **checks that it answers before telling you it worked**. It prints the first
 token once. Re-running upgrades in place and never rotates that token.
+
+On a fresh install this host claims the empty vault and becomes the writer, so
+an agent can save to it straight away — no desktop required. That loop is
+covered end to end by `tests/selfHostedLifecycle.test.ts`: empty vault, the
+server claims it, an agent token saves over MCP, a file lands on disk, the index
+picks it up, and `search_library` returns the words back.
 
 ## What it needs
 

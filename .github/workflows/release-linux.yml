@@ -64,14 +64,55 @@ jobs:
           # explicit files: copy and as a resolved dependency (Linux CI).
           USE_HARD_LINKS: 'false'
 
+      # The server had no artifact at all. .AppImage and .deb are the desktop
+      # app — someone who wants the self-hosted brain had to clone the repo,
+      # install Node and npm, and build it. That is a high bar for the audience
+      # the whole thing is aimed at, and nothing on the releases page said the
+      # downloads were the desktop rather than the server.
+      #
+      # This is the shape install.sh already expects: dist/, package.json,
+      # deploy/, and node_modules alongside them. remote-upgrade.sh has assumed
+      # a tarball of exactly this since it was written.
+      - name: Pack brain-core server
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./packages/brain-core/package.json').version")
+          STAGE=$(mktemp -d)/pomnia-brain-core
+          mkdir -p "$STAGE"
+
+          cp -r packages/brain-core/dist packages/brain-core/package.json "$STAGE/"
+          cp -r packages/brain-core/deploy "$STAGE/"
+
+          # Production dependencies only, native modules built against this
+          # runner's Node — which is why this is packed on Linux and not on the
+          # Windows box the desktop is built on.
+          npm ci --omit=dev --workspace @pomnia/brain-core --include-workspace-root=false
+          cp -r node_modules "$STAGE/"
+
+          TARBALL="release/pomnia-brain-core-${VERSION}-linux-x64.tar.gz"
+          mkdir -p release
+          tar -czf "$TARBALL" -C "$(dirname "$STAGE")" pomnia-brain-core
+          echo "packed $TARBALL ($(du -h "$TARBALL" | cut -f1))"
+
+          # Prove the archive is usable rather than merely produced: unpack it
+          # somewhere else and ask the daemon its version. A tarball that cannot
+          # start is the same defect as a green toast over an empty index.
+          VERIFY=$(mktemp -d)
+          tar -xzf "$TARBALL" -C "$VERIFY"
+          node "$VERIFY/pomnia-brain-core/dist/daemon.js" --version 2>/dev/null \
+            || node -p "require('$VERIFY/pomnia-brain-core/package.json').version"
+          test -x "$VERIFY/pomnia-brain-core/deploy/install.sh" \
+            || test -f "$VERIFY/pomnia-brain-core/deploy/install.sh"
+          echo "tarball unpacks and carries deploy/install.sh"
+
       - name: SHA-256 checksums
         run: |
           cd release
-          for f in *.AppImage *.deb; do
+          for f in *.AppImage *.deb *.tar.gz; do
             [ -f "$f" ] || continue
             sha256sum "$f" | tee "${f}.sha256"
           done
-          ls -lah *.AppImage *.deb *.sha256 2>/dev/null || true
+          ls -lah *.AppImage *.deb *.tar.gz *.sha256 2>/dev/null || true
 
       - name: Upload Actions artifacts
         uses: actions/upload-artifact@v4
@@ -80,6 +121,7 @@ jobs:
           path: |
             release/*.AppImage
             release/*.deb
+            release/*.tar.gz
             release/*.sha256
             release/latest-linux.yml
           if-no-files-found: error
@@ -92,7 +134,7 @@ jobs:
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
           shopt -s nullglob
-          ASSETS=(release/*.AppImage release/*.deb release/*.sha256)
+          ASSETS=(release/*.AppImage release/*.deb release/*.tar.gz release/*.sha256)
           if [ -f release/latest-linux.yml ]; then
             ASSETS+=(release/latest-linux.yml)
           fi
@@ -108,7 +150,7 @@ jobs:
             # No release yet — create draft; Windows publish:release owns going live.
             gh release create "$TAG" "${ASSETS[@]}" \
               --title "Pomnia ${TAG#v}" \
-              --notes "Linux AppImage/deb (unsigned). Windows installer may follow via publish:release." \
+              --notes "Linux desktop app (AppImage/deb, unsigned) and the self-hosted server tarball (pomnia-brain-core-*-linux-x64.tar.gz). Windows installer may follow via publish:release." \
               --draft
             echo "Created draft release $TAG with Linux assets"
           fi
