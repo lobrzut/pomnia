@@ -188,10 +188,30 @@ describe('an agent saves a memory and gets it back', () => {
 })
 
 describe('what the operator is told', () => {
-  it('reports healthy, with a non-negative uptime', async () => {
+  /**
+   * Both branches, because both are real deployments and the interesting claim
+   * is the same either way: the verdict describes whether this server can
+   * actually answer a search, not whether the process is alive.
+   *
+   * CI has no Ollama and caught this — the first version asserted `ok: true`
+   * unconditionally and failed on a machine shaped exactly like a plain VPS.
+   * A server with no embedder reporting healthy would be the bug; saying "down"
+   * is the feature.
+   */
+  it('tells the truth about whether it can serve search', async () => {
     const r = await fetch(`${BASE}/healthz`, { headers: { authorization: `Bearer ${adminToken}` } })
-    const body = (await r.json()) as { ok?: boolean; uptimeSec?: number }
-    expect(body.ok).toBe(true)
+    const body = (await r.json()) as {
+      ok?: boolean
+      uptimeSec?: number
+      checks?: { ollama?: { state?: string } }
+    }
+    if (embedderReady) {
+      expect(body.ok).toBe(true)
+      expect(body.checks?.ollama?.state).toBe('ok')
+    } else {
+      expect(body.ok).toBe(false)
+      expect(body.checks?.ollama?.state, 'no embedder, yet Ollama reported ok').not.toBe('ok')
+    }
     expect(body.uptimeSec).toBeGreaterThanOrEqual(0)
   })
 
