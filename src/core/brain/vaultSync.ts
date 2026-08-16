@@ -37,6 +37,9 @@ export const SYNCED_DIRS = [
 export const SYNCED_ROOT_FILES = ['USER.md', 'AGENTS.md'] as const
 
 const ALLOWED_EXT = /\.(md|markdown|txt|json|ya?ml)$/i
+
+/** Mirrors brain-core's MACHINE_STATE_FILES — see safeVaultPath. */
+const MACHINE_STATE_FILES = new Set(['state/vault-writer.json'])
 const MAX_FILE_BYTES = 8 * 1024 * 1024
 
 export interface SyncManifestEntry {
@@ -71,6 +74,17 @@ export async function buildVaultManifest(
 
   const consider = async (abs: string, rel: string): Promise<void> => {
     if (!ALLOWED_EXT.test(rel)) return
+    // Never offer the ownership marker. state/ replicates because the
+    // distillation ledger belongs with the notes; this file in the same folder
+    // records which machine owns the vault, and sending it would overwrite the
+    // receiver's record of owning its own — leaving a server that reads someone
+    // else's name and demotes itself to read-only over a corpus it holds.
+    //
+    // The replica refuses it too, as 'machine-state'. Refused twice on purpose:
+    // this one keeps it out of the manifest, so it is not reported as a
+    // rejection on every single sync, and a rejection list people learn to
+    // ignore is a rejection list that hides the next real one.
+    if (MACHINE_STATE_FILES.has(rel)) return
     let stat
     try {
       stat = await fs.stat(abs)

@@ -47,6 +47,24 @@ export type PathRejection =
   | 'not-synced-dir'
   | 'bad-extension'
   | 'too-deep'
+  | 'machine-state'
+
+/**
+ * Files that belong to the machine, not to the memory.
+ *
+ * state/ replicates because the distillation ledger lives there and travelling
+ * with the notes is the point of it. The ownership marker is in the same folder
+ * and is the opposite: it records *which machine owns this vault*. Accepting one
+ * over the network hands the sender's answer to the receiver, so a push would
+ * overwrite the receiver's record of owning its own vault — and the server would
+ * then read it, see someone else's name, and quietly demote itself to read-only
+ * against a corpus it holds.
+ *
+ * The marker exists to stop two Pomnias forking one memory, which already
+ * happened here and cost 99 files nobody noticed for months. Letting it
+ * replicate would make that mechanism the cause.
+ */
+const MACHINE_STATE_FILES = new Set(['vault-writer.json'])
 
 export type PathVerdict = { ok: true; relative: string } | { ok: false; reason: PathRejection }
 
@@ -114,6 +132,9 @@ export function safeVaultPath(input: string): PathVerdict {
   if (!isRootFile && segments.length < 2) return { ok: false, reason: 'not-synced-dir' }
   if (!ALLOWED_EXT.test(segments[segments.length - 1])) {
     return { ok: false, reason: 'bad-extension' }
+  }
+  if (head === 'state' && MACHINE_STATE_FILES.has(segments[segments.length - 1])) {
+    return { ok: false, reason: 'machine-state' }
   }
 
   // Belt and braces: after all of the above, normalising must be a no-op.
