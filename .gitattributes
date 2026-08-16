@@ -19,6 +19,13 @@
 Dockerfile  text eol=lf
 *.dockerfile text eol=lf
 
+# Workflow `run:` blocks are shell scripts a Linux runner executes. YAML parsing
+# normalises line breaks so CRLF here has never actually broken a build — but
+# the rule in this file is "what Linux runs is LF", and an exception nobody can
+# explain later is worse than a line of config.
+.github/workflows/*.yml text eol=lf
+.github/workflows/*.yaml text eol=lf
+
 # Windows-side scripts stay CRLF — PowerShell is fine either way, but a .ps1 with
 # LF confuses some older hosts and there is no reason to change them.
 *.ps1       text eol=crlf
