@@ -25,7 +25,7 @@
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
     "cli": "tsx src/cli/index.ts",
-    "typecheck": "npm run generate:build-info && npm run typecheck:node && npm run typecheck:web",
+    "typecheck": "npm run generate:build-info && npm run typecheck:node && npm run typecheck:web && npm run typecheck:brain-core && npm run typecheck:doc-parser",
     "test": "npm run generate:build-info && vitest run",
     "test:golden": "node scripts/golden-path.mjs",
     "test:e2e:smoke": "node e2e/smoke-first-window.mjs",
@@ -43,7 +43,9 @@
     "publish:release": "node scripts/publish-release.mjs",
     "attach:linux-release": "node scripts/attach-linux-release.mjs",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
-    "typecheck:web": "tsc --noEmit -p tsconfig.json"
+    "typecheck:web": "tsc --noEmit -p tsconfig.json",
+    "typecheck:brain-core": "npm run typecheck --prefix packages/brain-core",
+    "typecheck:doc-parser": "npm run typecheck --prefix packages/doc-parser"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.80",

@@ -25,13 +25,13 @@ const page = (): string =>
     writable: false,
     vaultOwner: 'Pomnia Desktop',
     uptimeSec: 42,
-    index: { files: 10, chunks: 44, lastIndexedAt: null },
+    index: { files: 10, chunks: 44 },
     checks: [
-      { name: 'Database', ok: true, detail: 'open' },
-      { name: 'Index', ok: true, detail: '10 files' },
-      { name: 'Vault', ok: true, detail: 'readable' },
-      { name: 'Disk / write', ok: false, detail: 'no space left on device' },
-      { name: 'Embeddings (Ollama)', ok: false, detail: 'connection refused' },
+      { name: 'Database', state: 'ok', detail: 'open' },
+      { name: 'Index', state: 'ok', detail: '10 files' },
+      { name: 'Vault', state: 'ok', detail: 'readable' },
+      { name: 'Disk / write', state: 'down', detail: 'no space left on device' },
+      { name: 'Embeddings (Ollama)', state: 'degraded', detail: 'connection refused' },
     ],
   })
 
