@@ -139,16 +139,42 @@ if [[ -n "${NEW_USER:-}" ]]; then
 fi
 echo
 
+# The embedder decides whether anything else is worth suggesting, so read it
+# directly instead of inferring from the overall verdict.
+#
+# A fresh install on a machine without Ollama lands on "down" — the index is
+# empty, which is true — and the old message told the operator to run --reindex.
+# That refuses without an embedding model, by design, so the advice sent them
+# into a wall and never named the thing in the way. Semantic search is the point
+# of this server; say what it is missing first, whatever the summary says.
+OLLAMA_STATE=$(printf '%s' "$HEALTH" | sed -n 's/.*"ollama":{"state":"\([a-z]*\)".*/\1/p')
+
+if [[ -n "$OLLAMA_STATE" && "$OLLAMA_STATE" != "ok" ]]; then
+  echo "  Ollama is not answering, so nothing can be embedded — search will find"
+  echo "  nothing until it is. Pomnia does not install it for you; on this host:"
+  echo "      curl -fsSL https://ollama.com/install.sh | sh"
+  echo "      ollama pull nomic-embed-text"
+  echo
+  echo "  Already running it elsewhere? Point this server at it and restart:"
+  echo "      --ollama-url http://<host>:11434     (in $UNIT)"
+  echo
+  echo "  The server serves without it: skills, the profile and saved notes all"
+  echo "  work. Only meaning-based search is off."
+  echo
+fi
+
 case "$STATUS" in
   ok) ok "serving" ;;
   degraded)
-    echo "  Degraded — it serves, but semantic search will not work yet."
-    echo "  Usually: Ollama is not running, or the model is missing:"
-    echo "      ollama pull nomic-embed-text"
+    echo "  Degraded — it serves, but not everything it should. See /admin → Stan."
     ;;
   *)
-    echo "  Not serving yet. The index is empty until you build it:"
-    echo "      sudo -u $USER_NAME node $PREFIX/dist/daemon.js --data-dir $DATA --vault-root $DATA/vault --reindex"
-    echo "  Or replicate a vault from Pomnia Desktop (Connect → push changes)."
+    if [[ "$OLLAMA_STATE" == "ok" ]]; then
+      echo "  Not serving yet. The index is empty until you build it:"
+      echo "      sudo -u $USER_NAME node $PREFIX/dist/daemon.js --data-dir $DATA --vault-root $DATA/vault --reindex"
+      echo "  Or push a vault from Pomnia Desktop (Connect → push changes)."
+    else
+      echo "  Not serving yet — start with Ollama above, then build the index."
+    fi
     ;;
 esac
