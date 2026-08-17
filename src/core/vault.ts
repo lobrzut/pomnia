@@ -66,10 +66,47 @@ export interface FileSource {
   reuse?: { sha256: string; bytes: number }
 }
 
+/**
+ * Write a file so it survives losing power, not merely a concurrent reader.
+ *
+ * The rename was already here and it is not the part that was missing. A rename
+ * is a metadata operation: the filesystem journals it and it reaches the disk
+ * almost at once, while the bytes written a line earlier are still in the page
+ * cache waiting for the OS to flush them. Lose power in between and the file
+ * comes back at its full new length with nothing in it.
+ *
+ * That is not a thought experiment. A machine died mid-backup and manifest.cvb
+ * came back as 55088 bytes of zeros, along with four snapshots and 153 blobs —
+ * every file the backup had touched, none of the ones it had not. The vault
+ * then refused to open at all, because the manifest is what open() reads first.
+ *
+ * fsync before the rename is the whole fix: it does not return until the data
+ * is on the platter, so the rename can only ever publish bytes that exist. The
+ * directory sync afterwards makes the rename itself durable; it is best-effort
+ * because not every platform permits opening a directory for it, and the file
+ * sync is the half that mattered here.
+ */
 async function atomicWrite(file: string, data: Buffer): Promise<void> {
   const tmp = `${file}.${crypto.randomBytes(6).toString('hex')}.tmp`
-  await fs.writeFile(tmp, data)
+  const fh = await fs.open(tmp, 'w')
+  try {
+    await fh.writeFile(data)
+    await fh.sync()
+  } finally {
+    await fh.close()
+  }
   await fs.rename(tmp, file)
+  try {
+    const dh = await fs.open(path.dirname(file), 'r')
+    try {
+      await dh.sync()
+    } finally {
+      await dh.close()
+    }
+  } catch {
+    // Windows refuses to open a directory handle this way, and some network
+    // filesystems refuse the sync. The file is already durable by this point.
+  }
 }
 
 /** Stable library.db pdf_path key for an encrypted vault document. */
