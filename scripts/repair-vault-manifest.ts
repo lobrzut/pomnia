@@ -54,6 +54,15 @@ const MAGIC = Buffer.from('CVB1', 'ascii')
 
 const dir = process.argv[2]
 const write = process.argv.includes('--write')
+/**
+ * Survey the damage without the passphrase.
+ *
+ * Whether a file survived is a question about its first four bytes, not about
+ * its contents — so the count, the dates and the size of what is recoverable can
+ * all be established before anyone types a secret. Somebody deciding whether to
+ * attempt a repair on their own memory deserves the numbers first.
+ */
+const inspect = process.argv.includes('--inspect')
 
 if (!dir) {
   console.error('usage: tsx scripts/repair-vault-manifest.ts <vault-dir> [--write]')
@@ -102,6 +111,38 @@ async function durableWrite(file: string, data: Buffer): Promise<void> {
 async function main(): Promise<void> {
   const header: VaultHeader = JSON.parse(await fs.readFile(path.join(dir, 'header.json'), 'utf8'))
   console.log(`vault "${header.name}" · utworzony ${header.createdAt}`)
+
+  if (inspect) {
+    const snapDir = path.join(dir, 'snapshots')
+    const files = (await fs.readdir(snapDir)).filter((f) => f.endsWith('.cvb'))
+    let good = 0
+    const badFiles: string[] = []
+    let oldest = ''
+    let newest = ''
+    let bytes = 0
+    for (const f of files) {
+      const abs = path.join(snapDir, f)
+      const raw = await fs.readFile(abs)
+      const st = await fs.stat(abs)
+      if (raw.length >= 4 && raw.subarray(0, 4).equals(MAGIC)) {
+        good++
+        bytes += st.size
+        const iso = st.mtime.toISOString()
+        if (!oldest || iso < oldest) oldest = iso
+        if (!newest || iso > newest) newest = iso
+      } else {
+        badFiles.push(f)
+      }
+    }
+    console.log(`snapshoty na dysku  : ${files.length}`)
+    console.log(`  do odzyskania     : ${good}  (${(bytes / 1024 / 1024).toFixed(1)} MB)`)
+    console.log(`  nie do odzyskania : ${badFiles.length}`)
+    for (const f of badFiles) console.log(`     ${f}`)
+    if (good) console.log(`zakres dat          : ${oldest.slice(0, 10)} … ${newest.slice(0, 10)}`)
+    console.log('\nTo wszystko, co da się stwierdzić bez hasła — czy plik jest cały,')
+    console.log('a nie co w nim jest. Żeby odbudować manifest, uruchom bez --inspect.')
+    return
+  }
 
   const passphrase = await askPassphrase()
   const key = deriveKey(passphrase, Buffer.from(header.kdf.salt, 'base64'), header.kdf)
