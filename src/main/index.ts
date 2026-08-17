@@ -2058,7 +2058,45 @@ function registerIpc(): void {
   ipcMain.on('win:close', () => win?.close())
 }
 
+/**
+ * One Pomnia per machine, enforced before anything opens.
+ *
+ * The vault records its writer in state/vault-writer.json so two machines
+ * cannot both write one corpus. That identity is stable *per installation*,
+ * which is exactly right for the case it was built for and no help at all
+ * here: two copies of the same install read the marker, each sees its own id,
+ * and both write. The mechanism against split-brain cannot see this kind.
+ *
+ * What two instances actually do to a vault: two indexers on one library.db,
+ * two distill passes over the same sessions, two writers appending notes with
+ * ids each generated without knowing about the other. The second brain-core
+ * finds :7862 taken and adopts the first, so even the port collision — the one
+ * symptom that would have been loud — resolves itself quietly.
+ *
+ * This has to run before whenReady: by the time a window exists, the second
+ * process has already opened files.
+ */
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  log.info('another Pomnia already has the lock — handing the window over and exiting')
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    // Someone clicked the icon again. Show them the Pomnia they already have,
+    // rather than nothing at all — an app that vanishes on launch reads as
+    // broken, and they will click it a third time.
+    if (!win) return
+    if (win.isMinimized()) win.restore()
+    if (!win.isVisible()) win.show()
+    win.focus()
+  })
+}
+
 app.whenReady().then(async () => {
+  // app.quit() asks; it does not stop this callback from running first. Without
+  // this line the losing process would still migrate AppData and open the vault
+  // on its way out — the exact work the lock exists to prevent.
+  if (!gotSingleInstanceLock) return
   await migrateLegacyAppData()
   initFileLog(join(app.getPath('userData'), 'logs'))
   log.info('Pomnia starting', app.getVersion())
