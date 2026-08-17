@@ -192,12 +192,56 @@ export class Vault {
     } catch {
       throw new Error('Wrong passphrase')
     }
-    const manifest = decryptJSON<VaultManifest>(
-      key,
-      await fs.readFile(path.join(dir, 'manifest.cvb'))
-    )
+    const manifest = await Vault.loadManifest(dir, key)
     const library = await Vault.loadLibrary(dir, key, header.vaultId)
     return new Vault(dir, header, key, manifest, library)
+  }
+
+  /**
+   * Read the manifest, and try the spare before giving up.
+   *
+   * By the time this runs the passphrase is already known to be right — the
+   * check token passed — so a failure here is damage, not a wrong password, and
+   * the message has to say so. What a person saw on 17 August was "bad magic —
+   * not a Pomnia blob", which names an internal format detail, blames nothing
+   * in particular, and offers no way forward from a vault whose 137 snapshots
+   * and 1886 notes were all still sitting on disk, readable.
+   *
+   * So: main copy, then .prev, then an error that says what is wrong, what
+   * survived, and the one command that rebuilds it.
+   */
+  private static async loadManifest(dir: string, key: Buffer): Promise<VaultManifest> {
+    const main = path.join(dir, 'manifest.cvb')
+    try {
+      return decryptJSON<VaultManifest>(key, await fs.readFile(main))
+    } catch (primary) {
+      try {
+        const prev = decryptJSON<VaultManifest>(key, await fs.readFile(`${main}.prev`))
+        log.warn(
+          `manifest.cvb unreadable (${(primary as Error).message}) — opened from manifest.cvb.prev instead`,
+        )
+        return prev
+      } catch {
+        // Count what is recoverable before saying anything, so the number in
+        // the message is measured rather than promised.
+        let recoverable = 0
+        try {
+          const snaps = await fs.readdir(path.join(dir, 'snapshots'))
+          for (const f of snaps.filter((n) => n.endsWith('.cvb'))) {
+            const head = await fs.readFile(path.join(dir, 'snapshots', f))
+            if (head.length >= 4 && head.subarray(0, 4).toString('ascii') === 'CVB1') recoverable++
+          }
+        } catch {
+          // Directory unreadable too — the count stays 0 and the message stays true.
+        }
+        throw new Error(
+          `The vault index (manifest.cvb) is damaged and there is no usable spare. ` +
+            `Your notes are not lost: ${recoverable} snapshot(s) are intact, and distilled/ and ` +
+            `sessions/ are plain markdown that was never inside the encrypted store. ` +
+            `Rebuild the index with: npx tsx scripts/repair-vault-manifest.ts "${dir}" --write`,
+        )
+      }
+    }
   }
 
   private static async loadLibrary(
@@ -230,7 +274,32 @@ export class Vault {
     return this.manifest.snapshots.find((s) => s.id === id)
   }
 
+  /**
+   * Keep the version we are replacing, then write the new one.
+   *
+   * manifest.cvb is the only file in the vault with no second copy, and open()
+   * reads it before anything else — so losing it locks a person out of every
+   * snapshot, blob and note behind it, all of which are still perfectly fine on
+   * disk. That is what happened on 17 August: one interrupted write, and a
+   * vault that had been accumulating since June would not open.
+   *
+   * The copy is made before the write, not after, because the moment worth
+   * surviving is the one in the middle. atomicWrite fsyncs now, which makes
+   * this unlikely rather than impossible — a disk can still fail a sector, and
+   * a second copy costs 40 KB.
+   */
   private async saveManifest(): Promise<void> {
+    try {
+      await fs.copyFile(this.manifestPath, `${this.manifestPath}.prev`)
+    } catch (e) {
+      // No manifest yet (vault being created) is the ordinary case. Anything
+      // else is worth a line, and worth carrying on for: refusing to save the
+      // new manifest because the backup copy failed would turn a small problem
+      // into the exact large one this guards against.
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+        log.warn(`could not keep a previous manifest: ${(e as Error).message}`)
+      }
+    }
     await atomicWrite(this.manifestPath, encryptJSON(this.key, this.manifest))
   }
 
