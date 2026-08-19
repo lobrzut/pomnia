@@ -39,10 +39,21 @@ function die(msg) {
 // already how publish-release.mjs and attach-linux-release.mjs talk to GitHub.
 let release
 try {
-  const path = tag
-    ? `repos/lobrzut/pomnia/releases/tags/${tag}`
-    : 'repos/lobrzut/pomnia/releases/latest'
-  release = JSON.parse(execFileSync('gh', ['api', path], { encoding: 'utf8' }))
+  if (tag) {
+    // `gh api releases/tags/<tag>` 404s on a draft, which is exactly when this
+    // check is worth running: assets arrive from three machines over several
+    // minutes, and the point is to know the set is complete *before* the
+    // release goes live. The old path turned "still a draft" into "could not
+    // read the release" and exited 1 without checking a single asset — a guard
+    // that fails for a reason unrelated to what it guards.
+    const raw = execFileSync('gh', ['release', 'view', tag, '--json', 'assets,isDraft,isPrerelease,tagName'], {
+      encoding: 'utf8',
+    })
+    const v = JSON.parse(raw)
+    release = { tag_name: v.tagName, draft: v.isDraft, prerelease: v.isPrerelease, assets: v.assets ?? [] }
+  } else {
+    release = JSON.parse(execFileSync('gh', ['api', 'repos/lobrzut/pomnia/releases/latest'], { encoding: 'utf8' }))
+  }
 } catch (e) {
   die(`could not read the release from GitHub — ${e.message}`)
 }
@@ -60,6 +71,9 @@ const required = [
   ['Linux deb', /\.deb$/, 'Linux desktop download'],
   ['Linux SHA-256', /\.(AppImage|deb)\.sha256$/, 'same checksum promise as Windows'],
   ['Linux latest-linux.yml', /^latest-linux\.yml$/, 'Linux update manifest'],
+  ['macOS Intel DMG', /-x64\.dmg$/, 'Intel Macs — cross-compiled builds shipped arm64 natives and died on first query'],
+  ['macOS Apple Silicon DMG', /-arm64\.dmg$/, 'every Mac sold since 2020'],
+  ['macOS SHA-256', /\.dmg\.sha256$/, 'same checksum promise as Windows and Linux'],
   ['brain-core tarball', /^pomnia-brain-core-.*-linux-x64\.tar\.gz$/, 'curl | sh resolves this from releases/latest'],
   ['brain-core SHA-256', /^pomnia-brain-core-.*-linux-x64\.tar\.gz\.sha256$/, 'bootstrap.sh verifies the tarball with it'],
 ]
@@ -93,4 +107,4 @@ if (missing.length) {
   )
 }
 
-console.log(`✔ ${release.tag_name} serves Windows, Linux desktop and the curl|sh tarball`)
+console.log(`✔ ${release.tag_name} serves Windows, macOS, Linux desktop and the curl|sh tarball`)
