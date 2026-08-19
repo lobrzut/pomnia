@@ -44,6 +44,13 @@ jobs:
           # will warn on first open; the download page says so rather than
           # letting people discover it.
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          # pack:mac runs test:golden, which checks the operator's own vault —
+          # skills under C:\Vault, library.db, app-settings.json. A CI runner has
+          # none of that, and the failure reads absurdly on macOS: it went
+          # looking for /Users/runner/AppData/Roaming/pomnia. The Linux job has
+          # skipped this gate since it was written; macOS never did, which is
+          # what the run failed on once the missing build step was fixed.
+          GOLDEN_PATH_SKIP: '1'
 
       - name: SHA-256 checksum
         run: |
