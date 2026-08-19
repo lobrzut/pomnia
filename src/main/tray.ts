@@ -59,7 +59,7 @@ export function pickTrayPath(
  * Color ICO / getFileIcon on darwin becomes an empty NativeImage → Electron's
  * generic `[...]` placeholder.
  */
-function resolveTrayImage(): string | NativeImage {
+async function resolveTrayImage(): Promise<string | NativeImage> {
   const p = pickTrayPath(process.platform, process.resourcesPath, app.getAppPath())
   if (p) {
     if (process.platform === 'darwin') return p
@@ -69,7 +69,11 @@ function resolveTrayImage(): string | NativeImage {
   if (process.platform === 'darwin') {
     return nativeImage.createEmpty()
   }
-  return app.getFileIcon(process.execPath, { size: 'small' })
+  // getFileIcon is a Promise. This function used to be async, and when it
+  // stopped being one the fallback started handing Tray a pending Promise
+  // instead of an image — on Windows and Linux, and only when icon.ico is
+  // missing, which is the packaged case nobody exercises locally.
+  return await app.getFileIcon(process.execPath, { size: 'small' })
 }
 
 function brainStatusLabel(): string {
@@ -144,7 +148,7 @@ export function refreshTrayTooltip(): void {
 
 export async function initTray(win: BrowserWindow, onQuit: () => void): Promise<void> {
   if (tray) return
-  const icon = resolveTrayImage()
+  const icon = await resolveTrayImage()
   if (process.platform === 'darwin' && typeof icon !== 'string') {
     log.warn('darwin tray: trayIcon.png not found outside asar — menu bar will show Electron placeholder')
   }

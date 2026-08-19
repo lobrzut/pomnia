@@ -1,0 +1,45 @@
+name: CI (typecheck + tests)
+
+# Nothing ran typecheck. Not the Linux release job, not the macOS one, not any
+# hook — the only reference to `npm run typecheck` in the whole repository was
+# the script that defines it. So `resolveTrayImage` could stop being async while
+# still returning `app.getFileIcon()`, hand `new Tray()` a pending Promise on
+# Windows and Linux, and reach a branch with green tests behind it. tsc names
+# that in under a minute; the alternative is finding it in a packaged build.
+#
+# This runs on every branch, not just the release ones, because a check that
+# only fires at tag time reports after the decision it was supposed to inform.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Both packages are imported by the app's own sources and tests, so
+      # without their dist/ tsc reports "cannot find module" for reasons that
+      # have nothing to do with the change under test.
+      - name: Build workspace packages
+        run: npm run build:brain-core && npm run build:doc-parser
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
