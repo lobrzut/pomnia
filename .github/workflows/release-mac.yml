@@ -19,14 +19,16 @@ jobs:
     # "have 'arm64', need 'x86_64'" on a file called skia.darwin-arm64.node,
     # which names the whole problem.
     #
-    # macos-13 is the last Intel image GitHub offers. When it goes, the honest
-    # options are dropping Intel or renting a builder — not cross-compiling and
-    # hoping.
+    # The Intel label is macos-15-intel, not macos-13. macos-13 is retired: a
+    # job targeting it does not fail, it queues forever — the x64 half of run
+    # 32291130994 sat unassigned for over an hour while arm64 finished in two
+    # minutes. A build that never starts reports nothing, which is why this
+    # names the runner explicitly instead of tracking a moving -latest.
     strategy:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-13
+          - runner: macos-15-intel
             arch: x64
             expect: x86_64
           - runner: macos-latest
