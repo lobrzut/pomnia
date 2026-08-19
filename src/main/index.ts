@@ -634,11 +634,11 @@ function createWindow(): void {
     minWidth: 940,
     minHeight: 640,
     show: false,
-    frame: false,
-    titleBarStyle: 'hidden',
+    frame: process.platform !== 'darwin',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
     icon: resolveWindowIcon(),
     backgroundColor: '#060a08',
-    trafficLightPosition: { x: 16, y: 16 },
+    trafficLightPosition: process.platform === 'darwin' ? { x: 12, y: 16 } : undefined,
     webPreferences: {
       // electron-vite emits the preload as ESM (index.mjs) — must match exactly,
       // otherwise the bridge never loads and the renderer falls back to its mock.
