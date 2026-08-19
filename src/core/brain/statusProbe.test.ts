@@ -115,4 +115,15 @@ describe('checkClient reachability', () => {
     expect(s.state).toBe('wired')
     expect(s.probe?.speaksMcp).toBe(true)
   })
+
+  it('treats a live LAN Brain as unreachable when this app is embedded localhost', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => mcpOk()))
+    const s = await checkClient(getClient('claude-code'), {
+      probe: true,
+      expectedBaseUrl: 'http://127.0.0.1:7862',
+    })
+    expect(s.state).toBe('unreachable')
+    expect(s.issues[0]).toContain('192.168.1.201:7862')
+    expect(s.issues[0]).toContain('127.0.0.1:7862')
+  })
 })

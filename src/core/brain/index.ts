@@ -72,6 +72,8 @@ export type {
   BrainBriefOptions,
 } from './snippet.js'
 export { checkClient, checkAllClients, pingBrain, probeMcpUrl, fetchMcpActivity } from './status.js'
+export { urlsPointAtSameBrain } from './mcpUrl.js'
+export { syncManagedMcpConfigs, mergeManagedServers } from './mcpSync.js'
 export { identifyEngine } from './engine.js'
 export type { BrainEngine, EngineInfo } from './engine.js'
 export type {

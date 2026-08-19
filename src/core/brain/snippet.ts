@@ -3,13 +3,12 @@
 /**
  * Per-client MCP snippet generator.
  *
- * Pomnia's "Connect to Brain" flow does NOT auto-modify any client's config
- * file — we generate a copy-paste snippet plus the path where it goes plus
- * a short instruction. The user pastes. See [[snippet-not-autodeploy]] in
- * project memory for the rationale.
+ * Pomnia rewrites the managed `pomnia` / legacy `brain-rag` block to THIS
+ * app's Brain when brainTarget is embedded (or the chosen remote). Other
+ * servers in the same file are left alone. Snippets remain available to paste.
  *
  * Adding a new client = add one entry to CLIENTS. Fixing a client's format
- * change = edit one entry. No deployer logic to debug.
+ * change = edit one entry.
  */
 import path from 'node:path'
 import { DEFAULT_HANDSHAKE_PHRASE } from '../handshakePhrase.js'
