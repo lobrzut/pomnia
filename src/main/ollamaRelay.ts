@@ -6,7 +6,7 @@
  * to LAN Ollama; Pomnia only connects to 127.0.0.1.
  */
 import { execFile } from 'node:child_process'
-import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { app } from 'electron'
@@ -57,6 +57,21 @@ async function sourceRelayScript(): Promise<string> {
   throw new Error('ollama-relay.py not found in app resources')
 }
 
+/**
+ * A plist is XML, and the target comes from app-settings.json. Interpolating it
+ * raw means a URL containing `&` writes a malformed plist launchd refuses, and
+ * one containing `</string>` writes whatever ProgramArguments it likes into an
+ * agent with RunAtLoad and KeepAlive — a login-persistent process chosen by a
+ * settings file. Neither is reachable today; both stop being possible here.
+ */
+export function xmlEscape(v: string): string {
+  return v
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
 function plistBody(target: string): string {
   const script = relayScriptPath()
   const logFile = relayLogPath()
@@ -68,17 +83,17 @@ function plistBody(target: string): string {
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/python3</string>
-    <string>${script}</string>
+    <string>${xmlEscape(script)}</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>POMNIA_OLLAMA_TARGET</key><string>${target}</string>
+    <key>POMNIA_OLLAMA_TARGET</key><string>${xmlEscape(target)}</string>
     <key>POMNIA_OLLAMA_RELAY_PORT</key><string>${OLLAMA_RELAY_PORT}</string>
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>${logFile}</string>
-  <key>StandardErrorPath</key><string>${logFile}</string>
+  <key>StandardOutPath</key><string>${xmlEscape(logFile)}</string>
+  <key>StandardErrorPath</key><string>${xmlEscape(logFile)}</string>
 </dict>
 </plist>
 `
@@ -177,10 +192,34 @@ async function ensureOllamaTransportUrlUnlocked(base: string): Promise<string> {
   return OLLAMA_RELAY_URL
 }
 
+/**
+ * Point Ollama back at a local daemon and the agent installed for the LAN one
+ * keeps running at every login, forever, proxying to a host the app no longer
+ * uses. Nothing surfaces it: no window, no tray entry, no setting. Standing
+ * state that outlives its reason is the failure this project keeps finding, so
+ * no longer needing the relay has to include taking it away.
+ */
+async function removeRelayAgent(): Promise<void> {
+  const plist = agentPlistPath()
+  try {
+    await stat(plist)
+  } catch {
+    return
+  }
+  const uid = String(process.getuid?.() ?? 501)
+  await launchctl(['bootout', `gui/${uid}/${LABEL}`])
+  await unlink(plist).catch(() => undefined)
+  lastEnsuredTarget = null
+  log.info('ollama relay removed — the configured Ollama no longer needs it')
+}
+
 /** Ensure launchd relay is running for a remote Ollama URL; return loopback base URL. */
 export async function ensureOllamaTransportUrl(configuredBaseUrl: string): Promise<string> {
   const base = configuredBaseUrl.replace(/\/$/, '')
-  if (!needsOllamaRelay(base)) return base
+  if (!needsOllamaRelay(base)) {
+    if (process.platform === 'darwin') await removeRelayAgent()
+    return base
+  }
 
   if (!ensureLock) {
     ensureLock = ensureOllamaTransportUrlUnlocked(base).finally(() => {
