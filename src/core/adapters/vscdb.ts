@@ -15,12 +15,11 @@ function fmtBytes(n: number): string {
 /** Lazy-load sql.js (WASM). Returns null if unavailable. */
 export async function loadSql(): Promise<any | null> {
   try {
-    const mod: any = await import('sql.js')
-    const initSqlJs = mod.default ?? mod
     const { createRequire } = await import('node:module')
     const require = createRequire(import.meta.url)
-    require.resolve('sql.js/dist/sql-wasm.wasm')
-    return await initSqlJs({ locateFile: () => require.resolve('sql.js/dist/sql-wasm.wasm') })
+    const initSqlJs = require('sql.js')
+    const wasmPath = require.resolve('sql.js/dist/sql-wasm.wasm')
+    return await initSqlJs({ locateFile: () => wasmPath })
   } catch (e) {
     log.warn('sql.js unavailable — vscdb extraction skipped:', (e as Error).message)
     return null
