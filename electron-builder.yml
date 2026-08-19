@@ -127,18 +127,13 @@ nsis:
   include: installer.nsh
   # Quit running app before replacing files (see installer.nsh customCheckAppRunning).
   deleteAppDataOnUninstall: false
-# macOS: both architectures, named apart.
-#
-# `macos-latest` on GitHub is Apple Silicon, and with no arch declared
-# electron-builder quietly builds for the runner only. That produced a file
-# called Pomnia-<version>.dmg that an Intel Mac cannot open at all — the worst
-# shape of wrong, because the name promises macOS and the failure arrives after
-# the download. Naming the arch in the artifact makes the choice the visitor's
-# instead of a surprise.
+# macOS: one architecture per pack. CI runs two jobs (`--arm64` / `--x64`) so
+# native modules (better-sqlite3, sqlite-vec, canvas) match the DMG. Packing
+# both archs from one Apple Silicon stage copied arm64 .node into the Intel
+# app — it launched, then died on the first library.db query.
 mac:
   target:
     - target: dmg
-      arch: [arm64, x64]
   category: public.app-category.utilities
   artifactName: ${productName}-${version}-${arch}.${ext}
   # Sonoma/Sequoia: without this, LAN fetch to Ollama/Brain can fail while curl works.

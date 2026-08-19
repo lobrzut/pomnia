@@ -24,6 +24,11 @@ const bcPkg = JSON.parse(readFileSync(join(root, 'packages', 'brain-core', 'pack
 const electronVer = JSON.parse(
   readFileSync(join(root, 'node_modules', 'electron', 'package.json'), 'utf8')
 ).version
+/** x64 | arm64 — must match the electron-builder --x64/--arm64 flag on CI. */
+const nativeArch = process.env.POMNIA_NATIVE_ARCH || process.arch
+if (nativeArch !== 'x64' && nativeArch !== 'arm64') {
+  throw new Error(`POMNIA_NATIVE_ARCH/process.arch must be x64 or arm64, got ${nativeArch}`)
+}
 
 function clearStage(dir) {
   if (!existsSync(dir)) return
@@ -60,15 +65,29 @@ writeFileSync(
 console.log('[stage-brain-core] npm install production deps…')
 execSync('npm install --omit=dev --no-package-lock --no-audit --no-fund', {
   cwd: stage,
-  stdio: 'inherit'
+  stdio: 'inherit',
+  env: {
+    ...process.env,
+    npm_config_arch: nativeArch,
+    npm_config_target_arch: nativeArch,
+  },
 })
 
-console.log(`[stage-brain-core] electron-rebuild better-sqlite3 for Electron ${electronVer}…`)
+if (process.platform === 'darwin') {
+  const vecOpt = `sqlite-vec-darwin-${nativeArch}`
+  console.log(`[stage-brain-core] ensure ${vecOpt}…`)
+  execSync(
+    `npm install ${vecOpt}@${bcPkg.dependencies['sqlite-vec'] || '0.1.9'} --omit=dev --no-package-lock --no-audit --no-fund`,
+    { cwd: stage, stdio: 'inherit' },
+  )
+}
+
+console.log(`[stage-brain-core] electron-rebuild better-sqlite3 ${nativeArch} for Electron ${electronVer}…`)
 const stageModules = join(stage, 'node_modules')
 const electronDir = join(root, 'node_modules', 'electron')
 try {
   execSync(
-    `npx @electron/rebuild -f -o better-sqlite3 -v ${electronVer} -m "${stage}" -e "${electronDir}"`,
+    `npx @electron/rebuild -f -o better-sqlite3 -v ${electronVer} -a ${nativeArch} -m "${stage}" -e "${electronDir}"`,
     { cwd: root, stdio: 'inherit' }
   )
 } catch (err) {
@@ -84,6 +103,24 @@ if (!existsSync(nodeBinding)) {
   console.warn('[stage-brain-core] copying Electron ABI binding from root node_modules')
   mkdirSync(dirname(nodeBinding), { recursive: true })
   cpSync(fallback, nodeBinding)
+}
+
+if (process.platform === 'darwin' || process.platform === 'linux') {
+  try {
+    const info = execSync(`file "${nodeBinding}"`, { encoding: 'utf8' }).trim()
+    console.log('[stage-brain-core]', info)
+    const need = nativeArch === 'x64' ? /x86_64|x86-64|Intel 64/i : /arm64|aarch64/i
+    const wrong = nativeArch === 'x64' ? /arm64/i : /x86_64|x86-64/i
+    if (wrong.test(info) && !need.test(info)) {
+      throw new Error(
+        `better_sqlite3.node is the wrong arch for ${nativeArch}: ${info}. ` +
+          `Set POMNIA_NATIVE_ARCH and rebuild; do not pack this into a ${nativeArch} DMG.`,
+      )
+    }
+  } catch (err) {
+    if (String(err?.message || err).includes('wrong arch')) throw err
+    console.warn('[stage-brain-core] file(1) check skipped:', err?.message || err)
+  }
 }
 
 console.log('[stage-brain-core] skip Electron helper EXE (utilityProcess uses Pomnia ABI)')
