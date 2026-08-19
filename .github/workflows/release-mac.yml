@@ -51,6 +51,12 @@ jobs:
           # skipped this gate since it was written; macOS never did, which is
           # what the run failed on once the missing build step was fixed.
           GOLDEN_PATH_SKIP: '1'
+          # Third and last thing the Linux job carried that this one did not.
+          # @napi-rs/canvas is both an explicit files: copy and a resolved
+          # dependency, so electron-builder tries to hardlink it into place
+          # twice and dies on EEXIST. Nothing macOS-specific — the same
+          # collision, found the same way, one platform later.
+          USE_HARD_LINKS: 'false'
 
       - name: SHA-256 checksum
         run: |
