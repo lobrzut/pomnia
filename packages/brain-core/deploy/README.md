@@ -11,7 +11,8 @@ Linux with its native modules already compiled, so there is nothing to build.
 
 One shot (POSIX `sh`, so `| sh` is dash-safe on Debian). Resolves
 `pomnia-brain-core-*-linux-x64.tar.gz` from `releases/latest`, checks sha256
-when that asset exists, then `sudo`s into `deploy/install.sh`:
+when that asset exists, then `sudo`s into `deploy/install.sh`.
+`POMNIA_BOOTSTRAP_DRY_RUN=1` stops after unpack (no sudo, no unit).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/lobrzut/pomnia/master/packages/brain-core/deploy/bootstrap.sh | sh
