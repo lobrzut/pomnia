@@ -39,11 +39,11 @@ die() { echo "✗ $*" >&2; exit 1; }
 ok()  { echo "✔ $*"; }
 
 [[ $EUID -eq 0 ]] || die "run as root (systemd unit + system user)"
-command -v node >/dev/null || die "node not found — install Node 20+ first"
+command -v node >/dev/null || die "node not found — install Node 22 first (tarball native addons match CI Node 22)"
 command -v systemctl >/dev/null || die "systemd not found; use the Dockerfile instead"
 
 NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
-[[ "$NODE_MAJOR" -ge 20 ]] || die "node $NODE_MAJOR is too old — brain-core needs 20+"
+[[ "$NODE_MAJOR" -ge 22 ]] || die "node $NODE_MAJOR is too old — the packed better-sqlite3 is Node 22 (ABI 127); 20 crashes on start"
 
 # The build has to exist. Shipping a unit that points at nothing produces a
 # service that fails five seconds after a successful-looking install.
@@ -89,6 +89,12 @@ if [[ ! -f "$USERS" ]]; then
        --data-dir "$DATA" --add-user admin --role admin >/dev/null 2>&1; then
     ok "created the panel account 'admin'"
     NEW_USER=1
+    # Write before healthz: if the unit fails to listen, the operator still
+    # has the password (users.json is already created; stdout must not hold it).
+    PASSFILE="$DATA/admin-initial-password"
+    printf '%s\n' "$ADMIN_PW" > "$PASSFILE"
+    chown "$USER_NAME:$USER_NAME" "$PASSFILE"
+    chmod 600 "$PASSFILE"
   else
     echo "! could not create the first account — do it yourself:" >&2
     echo "    sudo -u $USER_NAME node $PREFIX/dist/daemon.js --data-dir $DATA --add-user <login> --role admin" >&2
@@ -132,15 +138,9 @@ echo "  panel              →  http://$HOST_IP:$PORT/admin"
 echo "  status             →  ${STATUS:-unknown}"
 [[ -n "${NEW_TOKEN:-}" ]] && echo "  agent token        →  $NEW_TOKEN"
 if [[ -n "${NEW_USER:-}" ]]; then
-  # Never echo the password to stdout (logs, scrollback, shared tmux). Write once
-  # to a 600 file the operator can read and delete after first login.
-  PASSFILE="$DATA/admin-initial-password"
-  printf '%s\n' "$ADMIN_PW" > "$PASSFILE"
-  chown "$USER_NAME:$USER_NAME" "$PASSFILE"
-  chmod 600 "$PASSFILE"
   echo
   echo "  panel login        →  admin"
-  echo "  panel password     →  written once to $PASSFILE (chmod 600; delete after login)"
+  echo "  panel password     →  written once to ${PASSFILE:-$DATA/admin-initial-password} (chmod 600; delete after login)"
   echo "  Change it after the first login (Konta → Hasło)."
 fi
 echo
