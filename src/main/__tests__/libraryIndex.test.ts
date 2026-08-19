@@ -80,6 +80,21 @@ describe('ensureBrainForIndexing', () => {
     })
   }, 30_000)
 
+  it('starts brain-core against the relay transport when probing a LAN daemon', async () => {
+    probeOllama.mockResolvedValue({
+      ok: true,
+      url: 'http://192.168.1.201:11434',
+      models: ['nomic-embed-text:latest'],
+      transport: 'http://127.0.0.1:18765',
+    })
+    const { ensureBrainForIndexing } = await import('../ensureBrain.js')
+    const r = await ensureBrainForIndexing('http://192.168.1.201:11434')
+    expect(r.ollamaUrl).toBe('http://192.168.1.201:11434')
+    expect(brainStart).toHaveBeenCalledWith(
+      expect.objectContaining({ ollamaUrl: 'http://127.0.0.1:18765' }),
+    )
+  }, 30_000)
+
   it('fails gracefully when Ollama is offline', async () => {
     probeOllama.mockResolvedValue({ ok: false, baseUrl: 'http://localhost:11434', error: 'fetch failed' })
     const { ensureBrainForIndexing } = await import('../ensureBrain.js')

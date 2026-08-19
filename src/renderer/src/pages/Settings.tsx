@@ -12,7 +12,7 @@ import { humanBytes, relativeTime } from '../lib/format'
 import { uiLabels } from '../lib/labels'
 import { COLOR_SCHEMES, type ColorScheme } from '../lib/theme'
 import { UI_LOCALES, type UiLocale } from '../lib/uiLocale'
-import { useStore, ollamaUrlFromBrainUrl } from '../store/useStore'
+import { useStore, ollamaUrlFromBrainUrl, ollamaUrlLooksLocal } from '../store/useStore'
 import { isMcpClientActive } from '../lib/mcpClientVisibility'
 import { hasOllamaModel as hasModel } from '@core/brain/modelMatch'
 import type { ClientId } from '../lib/types'
@@ -88,7 +88,11 @@ function HealthCheck() {
           id: 'ollama',
           label: labels.healthOllama,
           ok: !!status?.reachable,
-          detail: status?.reachable ? status.baseUrl : labels.healthOllamaMissing,
+          detail: status?.reachable
+            ? status.baseUrl
+            : ollamaUrlLooksLocal(ollamaUrl)
+              ? labels.healthOllamaMissing
+              : labels.healthOllamaUnreachable(ollamaUrl.trim() || status?.baseUrl || ''),
         })
 
         const models = status?.models ?? []

@@ -309,6 +309,7 @@ export interface UiLabels {
   // ── settings: health + integrity ─────────────────────────────────────────
   healthVaultAction: string
   healthOllamaMissing: string
+  healthOllamaUnreachable: (url: string) => string
   /** Remote brain: local Ollama is not required for search — hint distill URL. */
   healthOllamaOptionalRemote: (url: string) => string
   /** Short distill-only hint when remote brain and Ollama offline. */
@@ -339,6 +340,7 @@ export interface UiLabels {
   connectLegacyHubToggle: string
   connectLegacyHubHint: string
   onboardingEngineLooking: string
+  onboardingEngineLookingAt: (url: string) => string
   onboardingEngineRunning: string
   onboardingEngineMoreModels: (n: number) => string
   onboardingEngineEmbedHint: (model: string) => string
@@ -350,6 +352,9 @@ export interface UiLabels {
   onboardingEnginePullBtn: string
   onboardingEngineCancelPull: string
   onboardingEngineNotFound: string
+  onboardingEngineUnreachable: string
+  onboardingEngineUnreachableDetail: (url: string) => string
+  onboardingEngineOllamaUrl: string
   onboardingEngineInstall1: string
   onboardingEngineInstall2: string
   onboardingEngineInstall3: string
@@ -1108,6 +1113,7 @@ const PL_LABELS: UiLabels = {
   snippetRulePath: 'ścieżka reguły',
   healthVaultAction: 'Otwórz lub utwórz vault',
   healthOllamaMissing: 'Ollama niedostępne — zainstaluj i uruchom ollama.com',
+  healthOllamaUnreachable: (url) => `Ollama nie odpowiada pod ${url} — to nie jest brak lokalnej instalacji`,
   healthOllamaOptionalRemote: (url) =>
     `Opcjonalne przy zdalnym Brain — search idzie na serwerze. Do destylacji ustaw URL Ollama (np. ${url}).`,
   healthOllamaDistillHint: 'Do destylacji: ustaw URL Ollama na serwer :11434 (search nie wymaga lokalnej instalacji).',
@@ -1137,6 +1143,7 @@ const PL_LABELS: UiLabels = {
   connectLegacyHubHint:
     'Zaawansowane: stary hub z pomnia + pomnia-vault + pomnia-library na /sse. Domyślnie Connect emituje brain-core (jeden /mcp).',
   onboardingEngineLooking: 'Szukam Ollama na tym komputerze…',
+  onboardingEngineLookingAt: (url) => `Sprawdzam Ollama pod ${url}…`,
   onboardingEngineRunning: 'Ollama działa',
   onboardingEngineMoreModels: (n) => `+${n} więcej`,
   onboardingEngineEmbedHint: (model) =>
@@ -1151,6 +1158,10 @@ const PL_LABELS: UiLabels = {
   onboardingEnginePullBtn: 'Pobierz w Pomni',
   onboardingEngineCancelPull: 'Anuluj',
   onboardingEngineNotFound: 'Nie znaleziono Ollama',
+  onboardingEngineUnreachable: 'Ollama pod tym URL nie odpowiada',
+  onboardingEngineUnreachableDetail: (url) =>
+    `Skonfigurowany adres ${url} nie odpowiada. Lokalna instalacja (Homebrew / ollama.com) nie jest potrzebna — uruchom demona na tym hoście i zezwól Pomni na sieć lokalną.`,
+  onboardingEngineOllamaUrl: 'URL Ollama',
   onboardingEngineInstall1: 'Pobierz z ollama.com/download i zainstaluj (~2 min).',
   onboardingEngineInstall2:
     'Po instalacji wróć tutaj — modele pobierzesz przyciskiem w aplikacji (albo: ollama pull nomic-embed-text).',
@@ -1977,6 +1988,7 @@ const EN_LABELS: UiLabels = {
   snippetRulePath: 'rule path',
   healthVaultAction: 'Open or create a vault',
   healthOllamaMissing: 'Ollama unreachable — install and start it from ollama.com',
+  healthOllamaUnreachable: (url) => `Ollama is not answering at ${url} — that is not a missing local install`,
   healthOllamaOptionalRemote: (url) =>
     `Optional with remote Brain — search runs on the server. For distill, set Ollama URL (e.g. ${url}).`,
   healthOllamaDistillHint: 'For distill: set Ollama URL to server :11434 (search needs no local install).',
@@ -2006,6 +2018,7 @@ const EN_LABELS: UiLabels = {
   connectLegacyHubHint:
     'Advanced: old hub with pomnia + pomnia-vault + pomnia-library on /sse. By default Connect emits brain-core (single /mcp).',
   onboardingEngineLooking: 'Looking for Ollama on this machine…',
+  onboardingEngineLookingAt: (url) => `Checking Ollama at ${url}…`,
   onboardingEngineRunning: 'Ollama is running',
   onboardingEngineMoreModels: (n) => `+${n} more`,
   onboardingEngineEmbedHint: (model) =>
@@ -2020,6 +2033,10 @@ const EN_LABELS: UiLabels = {
   onboardingEnginePullBtn: 'Pull in Pomnia',
   onboardingEngineCancelPull: 'Cancel',
   onboardingEngineNotFound: 'Ollama not found',
+  onboardingEngineUnreachable: 'Ollama at this URL is not answering',
+  onboardingEngineUnreachableDetail: (url) =>
+    `Configured address ${url} did not respond. A local Homebrew / ollama.com install is not required — start the daemon on that host and allow Pomnia on the local network.`,
+  onboardingEngineOllamaUrl: 'Ollama URL',
   onboardingEngineInstall1: 'Download from ollama.com/download and install (2 min).',
   onboardingEngineInstall2:
     'After install, come back — pull models with the in-app button (or: ollama pull nomic-embed-text).',

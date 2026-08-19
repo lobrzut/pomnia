@@ -35,6 +35,24 @@ export function defaultOllamaConfig(): OllamaConfig {
   }
 }
 
+/** Empty / invalid / loopback → local install. LAN/hostname URLs are remote daemons. */
+export function ollamaUrlLooksLocal(raw: string): boolean {
+  const trimmed = raw.trim()
+  if (!trimmed) return true
+  try {
+    const h = new URL(trimmed).hostname.toLowerCase()
+    return h === '127.0.0.1' || h === 'localhost' || h === '::1'
+  } catch {
+    return true
+  }
+}
+
+/** macOS Electron/Node often cannot open LAN sockets; use a launchd localhost relay. */
+export function ollamaNeedsMacOsRelay(baseUrl: string, platform = process.platform): boolean {
+  if (platform !== 'darwin') return false
+  return !ollamaUrlLooksLocal(baseUrl)
+}
+
 export { hasOllamaModel } from './modelMatch.js'
 
 export class Ollama {

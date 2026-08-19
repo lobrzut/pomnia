@@ -117,6 +117,20 @@ describe('buildOllamaDoctorCheck', () => {
     expect(c.action).toMatch(/:11434/)
   })
 
+  it('does not send the user to ollama.com when a LAN URL is unreachable', () => {
+    const c = buildOllamaDoctorCheck({
+      remoteBrain: false,
+      reachable: false,
+      baseUrl: 'http://192.168.1.201:11434',
+      embedModel: 'nomic-embed-text',
+      distillModel: 'qwen2.5:14b',
+      models: [],
+    })
+    expect(c.level).toBe('FAIL')
+    expect(c.action).toMatch(/192\.168\.1\.201:11434/)
+    expect(c.action).not.toMatch(/ollama\.com/)
+  })
+
   it('WARN missing embed when remote; FAIL when embedded', () => {
     const remote = buildOllamaDoctorCheck({
       remoteBrain: true,

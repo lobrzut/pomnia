@@ -17,6 +17,10 @@ vi.mock('../brainPaths.js', () => ({
 
 vi.mock('../ollamaSettings.js', () => ({
   resolveOllamaUrl: () => 'http://127.0.0.1:11434',
+  resolveOllamaTransport: async () => ({
+    configured: 'http://127.0.0.1:11434',
+    transport: 'http://127.0.0.1:11434',
+  }),
 }))
 
 vi.mock('@core/brain/ollama.js', () => ({
