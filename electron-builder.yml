@@ -139,8 +139,8 @@ mac:
   # Sonoma/Sequoia: without this, LAN fetch to Ollama/Brain can fail while curl works.
   extendInfo:
     NSLocalNetworkUsageDescription: >-
-      Pomnia łączy się z Ollamą i serwerem Brain w Twojej sieci lokalnej
-      (np. http://192.168.1.201:11434), żeby destylować rozmowy i szukać w vault.
+      Pomnia łączy się z Ollamą i serwerem Brain w Twojej sieci lokalnej,
+      żeby destylować rozmowy i szukać w vault.
     NSBonjourServices:
       - _http._tcp
 # Linux: build on Linux (or ubuntu-latest CI). AppImage needs Linux host —

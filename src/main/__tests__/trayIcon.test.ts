@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({
@@ -24,11 +25,16 @@ describe('darwin tray icon resolution', () => {
     expect(trayFileNames('darwin')).not.toContain('trayTemplate.png')
   })
 
+  // join() follows the host, not the platform argument, so on Windows a
+  // darwin-shaped literal like '/App/.../trayIcon.png' never matches what the
+  // function builds. Build the fixtures with the same join and the assertion
+  // is about which candidate wins, which is what it was always testing.
+  const RES = join('/App', 'Contents', 'Resources')
+  const TRAY = join(RES, 'trayIcon.png')
+
   it('picks extraResources path outside asar', () => {
-    const exists = (p: string) => p === '/App/Contents/Resources/trayIcon.png'
-    expect(pickTrayPath('darwin', '/App/Contents/Resources', '/App/Contents/Resources/app.asar', exists)).toBe(
-      '/App/Contents/Resources/trayIcon.png',
-    )
+    const exists = (p: string) => p === TRAY
+    expect(pickTrayPath('darwin', RES, join(RES, 'app.asar'), exists)).toBe(TRAY)
   })
 
   it('skips a tray PNG packed inside asar', () => {
