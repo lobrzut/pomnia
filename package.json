@@ -35,6 +35,7 @@
     "build:doc-parser": "npm run build --prefix packages/doc-parser",
     "stage:brain-core": "node scripts/stage-brain-core.mjs",
     "stage:tessdata": "node scripts/stage-tessdata.mjs",
+    "generate:tray": "node scripts/gen-tray-icon.mjs",
     "build:win": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && npm run stage:tessdata && npm run generate:build-info && electron-vite build && npm run test:golden && electron-builder --win",
     "pack:win": "npm run build:win",
     "pack:mac": "npm run build:brain-core && npm run build:doc-parser && npm run stage:brain-core && npm run stage:tessdata && npm run generate:build-info && electron-vite build && npm run test:golden && electron-builder --mac --publish never",
