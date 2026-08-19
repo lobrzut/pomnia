@@ -7,6 +7,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { log } from '@core/log.js'
 import { isEnLocale, m } from './mainStrings.js'
 import { app, Menu, Tray, nativeImage, type BrowserWindow, type NativeImage } from 'electron'
 import { activity } from './activity.js'
@@ -16,16 +17,57 @@ import { showProfilePreview } from './profilePreview.js'
 
 let tray: Tray | null = null
 
-async function resolveIcon(): Promise<NativeImage> {
-  const candidates = [
-    join(process.resourcesPath, 'icon.ico'),
-    join(app.getAppPath(), 'resources', 'icon.ico'),
+/** Filenames tried in order. Darwin uses a color brand PNG outside asar (not Template). */
+export function trayFileNames(platform: NodeJS.Platform): string[] {
+  return platform === 'darwin'
+    ? ['trayIcon.png']
+    : ['icon.ico', 'icon.png', 'trayIcon.png']
+}
+
+export function traySearchDirs(resourcesPath: string, appPath: string): string[] {
+  return [
+    resourcesPath,
+    join(appPath, 'resources'),
+    join(appPath, '..', '..', 'resources'),
   ]
-  for (const p of candidates) {
-    if (existsSync(p)) {
-      const img = nativeImage.createFromPath(p)
-      if (!img.isEmpty()) return img
+}
+
+/**
+ * First existing candidate. Darwin skips asar paths so Electron can load
+ * trayIcon@2x.png next to the 1x file from the filesystem.
+ */
+export function pickTrayPath(
+  platform: NodeJS.Platform,
+  resourcesPath: string,
+  appPath: string,
+  exists: (p: string) => boolean = existsSync,
+): string | undefined {
+  for (const name of trayFileNames(platform)) {
+    for (const dir of traySearchDirs(resourcesPath, appPath)) {
+      const p = join(dir, name)
+      if (!exists(p)) continue
+      if (platform === 'darwin' && p.includes('.asar')) continue
+      return p
     }
+  }
+  return undefined
+}
+
+/**
+ * macOS menu bar: full-color trayIcon.png from extraResources (filesystem path).
+ * Do not mark it as a Template image — that turns the brand mark into a blob.
+ * Color ICO / getFileIcon on darwin becomes an empty NativeImage → Electron's
+ * generic `[...]` placeholder.
+ */
+function resolveTrayImage(): string | NativeImage {
+  const p = pickTrayPath(process.platform, process.resourcesPath, app.getAppPath())
+  if (p) {
+    if (process.platform === 'darwin') return p
+    const img = nativeImage.createFromPath(p)
+    if (!img.isEmpty()) return img
+  }
+  if (process.platform === 'darwin') {
+    return nativeImage.createEmpty()
   }
   return app.getFileIcon(process.execPath, { size: 'small' })
 }
@@ -102,7 +144,10 @@ export function refreshTrayTooltip(): void {
 
 export async function initTray(win: BrowserWindow, onQuit: () => void): Promise<void> {
   if (tray) return
-  const icon = await resolveIcon()
+  const icon = resolveTrayImage()
+  if (process.platform === 'darwin' && typeof icon !== 'string') {
+    log.warn('darwin tray: trayIcon.png not found outside asar — menu bar will show Electron placeholder')
+  }
   tray = new Tray(icon)
   refreshTrayTooltip()
   tray.setContextMenu(buildMenu(win, onQuit))
