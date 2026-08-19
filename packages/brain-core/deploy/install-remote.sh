@@ -64,7 +64,9 @@ if [ "$DRY" != 1 ]; then
     die "systemd not found — this pack installs a unit; use the Dockerfile instead"
   fi
   command -v bash >/dev/null 2>&1 || die "bash not found (install.sh is bash; this wrapper is sh)"
-  command -v node >/dev/null 2>&1 || die "node not found — install Node 20+ before running this"
+  command -v node >/dev/null 2>&1 || die "node not found — install Node 22 before running this (packed native addons)"
+  NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
+  [ "$NODE_MAJOR" -ge 22 ] || die "node $NODE_MAJOR is too old — GitHub tarball is built on Node 22; 20 fails better-sqlite3 ABI"
   if [ "$(id -u)" -ne 0 ]; then
     command -v sudo >/dev/null 2>&1 || die "not root and sudo not found"
   fi
