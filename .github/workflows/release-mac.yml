@@ -37,26 +37,74 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Build macOS DMG
-        run: npm run pack:mac
+      # pack:mac does these before it packs; building electron-builder
+      # directly means doing them here or shipping an app without the bundled
+      # brain-core and tessdata it expects at runtime.
+      - name: Stage bundled resources
+        run: npm run stage:brain-core && npm run stage:tessdata && npm run generate:build-info
+
+      # One invocation per architecture, not one that emits both.
+      #
+      # electron-builder stages the app once and copies it per target, so
+      # building x64 and arm64 together on an Apple Silicon runner puts arm64
+      # .node files inside the Intel app. That app opens, draws its window, and
+      # dies on the first SQLite query with "have 'arm64', need 'x86_64'" —
+      # verified on a real Intel Mac against the v0.1.63 artefact, which is why
+      # both DMGs were pulled from that release.
+      - name: Build macOS DMG (arm64)
+        run: npx electron-vite build && npx electron-builder --mac --arm64 --publish never
         env:
-          # Unsigned build — no Apple Developer secrets required. Gatekeeper
-          # will warn on first open; the download page says so rather than
-          # letting people discover it.
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          # pack:mac runs test:golden, which checks the operator's own vault —
-          # skills under C:\Vault, library.db, app-settings.json. A CI runner has
-          # none of that, and the failure reads absurdly on macOS: it went
-          # looking for /Users/runner/AppData/Roaming/pomnia. The Linux job has
-          # skipped this gate since it was written; macOS never did, which is
-          # what the run failed on once the missing build step was fixed.
-          GOLDEN_PATH_SKIP: '1'
-          # Third and last thing the Linux job carried that this one did not.
-          # @napi-rs/canvas is both an explicit files: copy and a resolved
-          # dependency, so electron-builder tries to hardlink it into place
-          # twice and dies on EEXIST. Nothing macOS-specific — the same
-          # collision, found the same way, one platform later.
           USE_HARD_LINKS: 'false'
+
+      - name: Build macOS DMG (x64)
+        run: npx electron-builder --mac --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          USE_HARD_LINKS: 'false'
+
+      # The counter that has to move. A DMG carrying the wrong architecture is
+      # indistinguishable from a good one until someone opens it and runs a
+      # query, so this asks the binaries what they are instead of trusting the
+      # build that produced them. Failing here is the point: a broken DMG that
+      # never reaches a release costs a rerun, and one that does costs trust.
+      - name: Verify native modules match their architecture
+        run: |
+          set -euo pipefail
+          fail=0
+          for arch in arm64 x64; do
+            case "$arch" in
+              arm64) want='arm64'  ; dir='release/mac-arm64' ;;
+              x64)   want='x86_64' ; dir='release/mac' ;;
+            esac
+            [ -d "$dir" ] || dir="release/mac-$arch"
+            app="$dir/Pomnia.app"
+            if [ ! -d "$app" ]; then
+              echo "::error::no .app for $arch (looked in $dir)"
+              ls -la release/ || true
+              fail=1
+              continue
+            fi
+            echo "-- $arch expects $want, checking $app"
+            found=0
+            while IFS= read -r bin; do
+              found=1
+              got=$(file -b "$bin" || echo unknown)
+              case "$got" in
+                *"$want"*) echo "   ok    $(basename "$bin")" ;;
+                *)         echo "   WRONG $(basename "$bin"): $got" ; fail=1 ;;
+              esac
+            done < <(find "$app" \( -name '*.node' -o -name '*.dylib' \) | head -40)
+            if [ "$found" = 0 ]; then
+              echo "::error::no native modules found in $app — packaging changed"
+              fail=1
+            fi
+          done
+          if [ "$fail" != 0 ]; then
+            echo "::error::a DMG carries native modules for the wrong architecture"
+            exit 1
+          fi
+          echo "every native module matches its target architecture"
 
       - name: SHA-256 checksum
         run: |
