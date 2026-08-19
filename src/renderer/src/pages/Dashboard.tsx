@@ -20,7 +20,7 @@ import { ActivityBanner } from '../components/ActivityBanner'
 import { StatusStrip } from '../components/StatusStrip'
 import { humanBytes, relativeTime, sourceMeta } from '../lib/format'
 import { uiLabels } from '../lib/labels'
-import { isMcpClientActive } from '../lib/mcpClientVisibility'
+import { mcpClientMemoryState } from '../lib/mcpClientVisibility'
 import { api } from '../lib/api'
 import { useStore } from '../store/useStore'
 import type { ClientId, LibraryDocListItem } from '../lib/types'
@@ -90,7 +90,6 @@ export default function Dashboard() {
     loadBrainState,
     mcpClients,
     loadMcpClients,
-    connectClientOverride,
   } = useStore()
   const labels = uiLabels()
   const busy = backingUp || brainRunning
@@ -282,7 +281,7 @@ export default function Dashboard() {
                 s.conversations != null && s.conversations > 0
                   ? labels.sourceChatsCount(s.conversations)
                   : labels.sourceNoChats
-              const mcpActive = isMcpClientActive(s.id as ClientId, mcpClients, connectClientOverride)
+              const mcpState = mcpClientMemoryState(s.id as ClientId, mcpClients)
               return (
                 <GlassCard
                   key={s.id}
@@ -321,8 +320,19 @@ export default function Dashboard() {
                         <span>{humanBytes(s.sizeBytes)}</span>
                         <span>{chatsLabel}</span>
                       </div>
-                      {mcpActive ? (
+                      {mcpState === 'wired' ? (
                         <p className="mt-0.5 text-[10px] leading-snug text-mint">{labels.sourceMcpReads}</p>
+                      ) : mcpState === 'unreachable' ? (
+                        <button
+                          type="button"
+                          className="no-drag mt-0.5 block text-left text-[10px] leading-snug text-rose-400 hover:text-cyan"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setRoute('connect')
+                          }}
+                        >
+                          {labels.sourceMcpUnreachable}
+                        </button>
                       ) : (
                         <button
                           type="button"

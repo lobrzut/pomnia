@@ -11,6 +11,7 @@ import {
   buildSnippet,
   upsertPomniaBrainBrief,
   checkAllClients,
+  syncManagedMcpConfigs,
   createMcpToken,
   currentOS,
   defaultOllamaConfig,
@@ -1927,17 +1928,37 @@ function registerIpc(): void {
     }
   )
 
-  // ── Connect to Brain (status read + copy-paste snippets, no auto-deploy) ──
+  // ── Connect to Brain (live probe + rewrite Pomnia-managed MCP block) ──
   ipcMain.handle('connect:status', async (_e, brainUrl?: string, token?: string, target?: 'embedded' | 'remote') => {
     const saved = getAppSettings()
+    const resolvedTarget = target ?? saved.brainTarget ?? 'embedded'
     const url =
       brainUrl?.trim() ||
-      (target === 'embedded'
+      (resolvedTarget === 'embedded'
         ? 'http://127.0.0.1:7862'
         : saved.brainMcpUrl?.trim() || '')
-    // Probe rather than trust the file: a config can be word-perfect and still
-    // point at a machine that is no longer on the network.
-    const probeOpts = { probe: true, token: target === 'embedded' ? undefined : token }
+    if (url && (resolvedTarget === 'embedded' || resolvedTarget === 'remote')) {
+      try {
+        const sync = await syncManagedMcpConfigs({
+          brainUrl: url,
+          target: resolvedTarget,
+          token: resolvedTarget === 'remote' ? token : undefined,
+        })
+        if (sync.updated.length) {
+          log.info(
+            'rewrote Pomnia MCP block:',
+            sync.updated.map((u) => `${u.id} ${u.from} → ${u.to}`).join('; '),
+          )
+        }
+      } catch (e) {
+        log.warn('mcp config sync failed:', (e as Error).message)
+      }
+    }
+    const probeOpts = {
+      probe: true as const,
+      token: resolvedTarget === 'embedded' ? undefined : token,
+      expectedBaseUrl: url || undefined,
+    }
     if (!url) {
       const clients = await checkAllClients(probeOpts)
       return {
@@ -1947,7 +1968,7 @@ function registerIpc(): void {
     }
     const [clients, brain] = await Promise.all([
       checkAllClients(probeOpts),
-      pingBrain(url, target === 'embedded' ? undefined : token),
+      pingBrain(url, resolvedTarget === 'embedded' ? undefined : token),
     ])
     return { clients, brain }
   })

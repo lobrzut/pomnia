@@ -158,6 +158,7 @@ describe('uiLabels', () => {
     expect(labels.strategySnapshot).toBe('tylko config')
     expect(labels.sourceMcpReads).toContain('czyta pamięć przez MCP')
     expect(labels.sourceMcpNotConnected).toContain('skonfiguruj w Connect')
+    expect(labels.sourceMcpUnreachable).toContain('Nie odpowiada')
     expect(labels.mcpClientsLead).toContain('czytają pamięć')
     expect(labels.lockVaultBtn).toBe('Zablokuj vault')
     expect(labels.dashboardBackupAndBrain).toBe('Backup i do Brain')

@@ -574,6 +574,7 @@ export interface UiLabels {
   strategySnapshotHint: string
   sourceMcpReads: string
   sourceMcpNotConnected: string
+  sourceMcpUnreachable: string
   sourceChatsCount: (n: number) => string
   sourceNoChats: string
   detectedOnMachine: string
@@ -1182,7 +1183,7 @@ const PL_LABELS: UiLabels = {
   onboardingSimpleBrainStart: 'Start i dalej',
   onboardingConnectTitle: 'Podłącz agenta',
   onboardingConnectLead:
-    'Skopiuj konfigurację MCP i wklej u klienta — Pomnia nigdy nie dotyka Twoich plików.',
+    'Skopiuj konfigurację MCP i wklej u klienta — Pomnia przepisuje tylko blok `pomnia` na Brain tej aplikacji.',
   onboardingConnectCopied: 'Skopiowano',
   onboardingConnectCopy: 'Kopiuj config',
   onboardingConnectSkip: 'Pomiń — podepnij klientów później w Connect',
@@ -1348,7 +1349,7 @@ const PL_LABELS: UiLabels = {
   profilePreviewEmptyBrain: 'Lokalna wyszukiwarka nie działa — uruchom Brain na stronie Brain.',
   profilePreviewEmptyKnowledge: 'Uzupełnij § PROFIL (kim jesteś) i Zapisz — TECH to projekt, nie Ty.',
   connectPageLead:
-    'Skopiuj konfigurację MCP i wklej u klienta (Cursor, Claude, Antigravity…) — Pomnia nigdy nie dotyka Twoich plików.',
+    'Skopiuj konfigurację MCP i wklej u klienta (Cursor, Claude, Antigravity…) — Pomnia przepisuje blok `pomnia` na Brain tej aplikacji, inne serwery zostawia.',
   connectChecklistTitle: 'Pierwsze podłączenie (4 kroki)',
   connectStepUrl: 'URL Brain MCP (brain-core :7865)',
   connectStepToken: 'Token Bearer (wymagany dla remote)',
@@ -1401,6 +1402,7 @@ const PL_LABELS: UiLabels = {
     'To narzędzie nie udostępnia swoich rozmów w czytelnym formacie — zbieramy tylko jego konfigurację. Pamięć czyta normalnie, przez MCP.',
   sourceMcpReads: '✅ czyta pamięć przez MCP',
   sourceMcpNotConnected: '◽ MCP niepodłączone — skonfiguruj w Connect',
+  sourceMcpUnreachable: '⚠️ Nie odpowiada — MCP nie wskazuje na ten Brain',
   sourceChatsCount: (n) => `${n} rozmów`,
   sourceNoChats: 'brak czatów do wyciągnięcia',
   detectedOnMachine: 'Wykryty na tym komputerze',
@@ -2057,7 +2059,7 @@ const EN_LABELS: UiLabels = {
   onboardingSimpleBrainStart: 'Start & continue',
   onboardingConnectTitle: 'Connect an agent',
   onboardingConnectLead:
-    'Copy the MCP config and paste it in your client — Pomnia never touches your files.',
+    'Copy the MCP config and paste it in your client — Pomnia rewrites only the `pomnia` block to this app’s Brain.',
   onboardingConnectCopied: 'Copied',
   onboardingConnectCopy: 'Copy config',
   onboardingConnectSkip: 'Skip — wire clients later from the Connect tab',
@@ -2242,6 +2244,7 @@ const EN_LABELS: UiLabels = {
     'This tool does not expose its chats in a readable format — we only collect its configuration. Memory is still read normally, via MCP.',
   sourceMcpReads: '✅ reads memory via MCP',
   sourceMcpNotConnected: '◽ MCP not connected — set up in Connect',
+  sourceMcpUnreachable: '⚠️ Not responding — MCP does not point at this Brain',
   sourceChatsCount: (n) => `${n} chats`,
   sourceNoChats: 'no chats to capture',
   detectedOnMachine: 'Detected on this machine',
@@ -2516,7 +2519,7 @@ const EN_LABELS: UiLabels = {
   guideFlowReplay: 'Replay demo',
   guideFlowReplayLast: 'Replay last activity',
   connectPageLead:
-    'Copy the MCP config and paste it in your client (Cursor, Claude, Antigravity…) — Pomnia never touches your files.',
+    'Copy the MCP config and paste it in your client (Cursor, Claude, Antigravity…) — Pomnia rewrites the `pomnia` block to this app’s Brain and leaves other servers alone.',
   connectStepReload: 'Reload the MCP client (e.g. Reload Window)',
   connectMacNoAppHint:
     'Without Desktop: docs/CURSOR-MCP.md — same MCP JSON (Cursor example; other clients via Connect).',

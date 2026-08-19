@@ -22,6 +22,7 @@ import {
   type ClientSpec,
 } from './snippet.js'
 import { dashboardUrlFromBrainUrl } from './deploy.js'
+import { urlsPointAtSameBrain } from './mcpUrl.js'
 
 /**
  * `wired` means the config points at Pomnia — NOT that anything answers there.
@@ -264,13 +265,22 @@ export async function checkClient(spec: ClientSpec, opts?: CheckClientOptions): 
     )
   }
 
+  // A host that still answers is not "this app" if mcp.json points elsewhere
+  // (stale LAN 192.168.1.201 while embedded Brain is 127.0.0.1:7862).
+  if (opts?.expectedBaseUrl && rag?.present && rag.url && !urlsPointAtSameBrain(rag.url, opts.expectedBaseUrl)) {
+    state = 'unreachable'
+    issues.unshift(
+      `${rag.url} is not this app's Brain (expected ${opts.expectedBaseUrl.replace(/\/+$/, '')})`,
+    )
+  }
+
   // Reading the file only proves the paste landed. Asking the URL proves the
   // agent will get an answer — the two diverge the moment a machine or network
   // changes, and that gap is invisible to every check above.
   let probe: McpProbe | undefined
   if (opts?.probe && rag?.present && rag.url) {
     probe = await probeMcpUrl(rag.url, opts.token, opts.probeTimeoutMs)
-    if (!probe.reachable) {
+    if (!probe.reachable && state === 'wired') {
       state = 'unreachable'
       issues.unshift(`${rag.url} is not answering (${probe.error ?? 'no response'})`)
     }
@@ -285,6 +295,12 @@ export interface CheckClientOptions {
   /** Bearer token for probing a remote, auth-gated brain. */
   token?: string
   probeTimeoutMs?: number
+  /**
+   * The Brain THIS Pomnia instance is running (embedded localhost or the
+   * user-chosen remote). A config pointing at any other host is `unreachable`,
+   * even if that other host still speaks MCP.
+   */
+  expectedBaseUrl?: string
 }
 
 export async function checkAllClients(opts?: CheckClientOptions): Promise<ClientStatus[]> {
