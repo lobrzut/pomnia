@@ -1,8 +1,15 @@
 # Pomnia — build macOS (DMG)
 
+> **Od 2026-08-20 nie trzeba tego robić ręcznie.** `.github/workflows/release-mac.yml`
+> buduje DMG na `macos-latest` przy każdym tagu `v*` i dołącza go do wydania.
+> Ten dokument opisuje build lokalny — przydatny do debugowania, niepotrzebny do
+> wydawania. Historia: workflow padał po cichu na v0.1.61–v0.1.63, bo powstał ze
+> szkicu zadania linuksowego bez jego czterech poprawek (build pakietów,
+> GOLDEN_PATH_SKIP, USE_HARD_LINKS, --publish never).
+
 Build **musi** iść na macOS. Na Windows `npm run pack:mac` się nie uda (brak narzędzi Apple + natywne moduły pod Darwin).
 
-Aktualna wersja w repo: **0.1.2** (`package.json`). Skrypt pakowania:
+Wersja bierze się z `package.json` — nie wpisujcie jej tutaj, bo zdezaktualizuje się w tydzień (ten wiersz mówił 0.1.2 przy 0.1.63). Skrypt pakowania:
 
 ```json
 "pack:mac": "npm run build:brain-core && npm run stage:brain-core && electron-vite build && electron-builder --mac"
