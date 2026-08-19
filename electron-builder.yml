@@ -120,10 +120,20 @@ nsis:
   include: installer.nsh
   # Quit running app before replacing files (see installer.nsh customCheckAppRunning).
   deleteAppDataOnUninstall: false
+# macOS: both architectures, named apart.
+#
+# `macos-latest` on GitHub is Apple Silicon, and with no arch declared
+# electron-builder quietly builds for the runner only. That produced a file
+# called Pomnia-<version>.dmg that an Intel Mac cannot open at all — the worst
+# shape of wrong, because the name promises macOS and the failure arrives after
+# the download. Naming the arch in the artifact makes the choice the visitor's
+# instead of a surprise.
 mac:
-  target: [dmg]
+  target:
+    - target: dmg
+      arch: [arm64, x64]
   category: public.app-category.utilities
-  artifactName: ${productName}-${version}.${ext}
+  artifactName: ${productName}-${version}-${arch}.${ext}
 # Linux: build on Linux (or ubuntu-latest CI). AppImage needs Linux host —
 # Windows cannot cross-produce a working AppImage with native better-sqlite3.
 linux:
