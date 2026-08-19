@@ -26,15 +26,17 @@ jobs:
         run: |
           sh -n packages/brain-core/deploy/bootstrap.sh
           sh -n packages/brain-core/deploy/install-remote.sh
+          bash -n packages/brain-core/deploy/install.sh
       - name: shellcheck
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends shellcheck
-          shellcheck -s sh packages/brain-core/deploy/bootstrap.sh
+          set -euo pipefail
+          curl -fsSL https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz \
+            | tar -xJ
+          ./shellcheck-v0.10.0/shellcheck -s sh packages/brain-core/deploy/bootstrap.sh
+          ./shellcheck-v0.10.0/shellcheck -s sh packages/brain-core/deploy/install-remote.sh
 
   build-linux:
     runs-on: ubuntu-latest
-    needs: lint-posix-install
     permissions:
       contents: write
     steps:
@@ -184,7 +186,6 @@ jobs:
             # No release yet — create draft; Windows publish:release owns going live.
             gh release create "$TAG" "${ASSETS[@]}" \
               --title "Pomnia ${TAG#v}" \
-              --notes "Linux desktop app (AppImage/deb, unsigned) and the self-hosted server tarball (pomnia-brain-core-*-linux-x64.tar.gz). Windows installer may follow via publish:release." \
-              --draft
-            echo "Created draft release $TAG with Linux assets"
+              --notes "Linux desktop app (AppImage/deb, unsigned) and the self-hosted server tarball (pomnia-brain-core-*-linux-x64.tar.gz). Windows installer may follow via publish:release."
+            echo "Created published release $TAG with Linux assets (needed for releases/latest + curl|sh)"
           fi

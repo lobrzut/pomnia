@@ -3,16 +3,18 @@
 # Download the Linux server tarball from GitHub Releases and run install.sh.
 #
 # POSIX sh (Debian dash). This is the curl|sh entry — landing may later serve
-# the same file as /install.sh. Do not bash-only constructs in here.
+# the same file as /install.sh. No bash-only constructs in here.
 #
 #   curl -fsSL https://raw.githubusercontent.com/lobrzut/pomnia/master/packages/brain-core/deploy/bootstrap.sh | sh
 #   curl -fsSL …/bootstrap.sh | sh -s -- --with-ollama
+#   POMNIA_BOOTSTRAP_DRY_RUN=1 … | sh   # download, sha256, unpack; do not sudo
 #
 # Override repo with POMNIA_GITHUB_REPO=owner/name (tests).
 set -eu
 
 REPO="${POMNIA_GITHUB_REPO:-lobrzut/pomnia}"
 API="https://api.github.com/repos/${REPO}/releases/latest"
+DRY="${POMNIA_BOOTSTRAP_DRY_RUN:-0}"
 
 die() {
   printf '✗ %s\n' "$*" >&2
@@ -35,6 +37,11 @@ file_sha256() {
   fi
 }
 
+pick_asset() {
+  # Quote-split JSON; print the first https URL matching $1 (ERE).
+  printf '%s\n' "$json" | tr '"' '\n' | grep '^https://' | grep -E "$1" | head -n 1
+}
+
 os=$(uname -s)
 [ "$os" = Linux ] || die "this installer is for Linux (this kernel is $os)"
 
@@ -46,17 +53,23 @@ case "$arch" in
     ;;
 esac
 
-[ -d /run/systemd/system ] || command -v systemctl >/dev/null 2>&1 \
-  || die "systemd not found — this pack installs a unit; use the Dockerfile instead"
-
 need curl
 need tar
 need gzip
-command -v bash >/dev/null 2>&1 || die "bash not found (install.sh is bash; this wrapper is sh)"
-command -v node >/dev/null 2>&1 || die "node not found — install Node 20+ before running this"
+need grep
+need awk
+need head
+need tr
 
-if [ "$(id -u)" -ne 0 ]; then
-  command -v sudo >/dev/null 2>&1 || die "not root and sudo not found"
+if [ "$DRY" != 1 ]; then
+  if [ ! -d /run/systemd/system ]; then
+    die "systemd not found — this pack installs a unit; use the Dockerfile instead"
+  fi
+  command -v bash >/dev/null 2>&1 || die "bash not found (install.sh is bash; this wrapper is sh)"
+  command -v node >/dev/null 2>&1 || die "node not found — install Node 20+ before running this"
+  if [ "$(id -u)" -ne 0 ]; then
+    command -v sudo >/dev/null 2>&1 || die "not root and sudo not found"
+  fi
 fi
 
 curl_auth() {
@@ -71,15 +84,11 @@ curl_auth() {
 printf 'resolving latest server tarball from %s …\n' "$REPO"
 json=$(curl_auth "$API") || die "could not read $API"
 
-# Quote-split JSON; pick the linux-x64 server archive, not AppImage/deb/sha256.
-tarball_url=$(printf '%s\n' "$json" | tr '"' '\n' | grep '^https://' \
-  | grep '/pomnia-brain-core-' | grep -- '-linux-x64.tar.gz$' | grep -v '\.sha256$' \
-  | head -n 1) || true
-[ -n "$tarball_url" ] || die "no pomnia-brain-core-*-linux-x64.tar.gz on releases/latest — tag a release that CI packed"
+# linux-x64 server archive, not AppImage/deb/sha256.
+tarball_url=$(pick_asset '/pomnia-brain-core-[^"]+-linux-x64\.tar\.gz$') || true
+[ -n "${tarball_url:-}" ] || die "no pomnia-brain-core-*-linux-x64.tar.gz on releases/latest — tag a release that CI packed"
 
-sum_url=$(printf '%s\n' "$json" | tr '"' '\n' | grep '^https://' \
-  | grep '/pomnia-brain-core-' | grep -- '-linux-x64.tar.gz.sha256$' \
-  | head -n 1) || true
+sum_url=$(pick_asset '/pomnia-brain-core-[^"]+-linux-x64\.tar\.gz\.sha256$') || true
 
 work="${TMPDIR:-/tmp}/pomnia-bootstrap.$$"
 mkdir -m 700 "$work" || die "could not create $work"
@@ -89,7 +98,7 @@ trap cleanup EXIT INT TERM
 printf 'downloading %s\n' "$tarball_url"
 curl -fL --retry 3 -o "$work/pkg.tar.gz" "$tarball_url" || die "download failed"
 
-if [ -n "$sum_url" ]; then
+if [ -n "${sum_url:-}" ]; then
   curl_auth -o "$work/pkg.sha256" "$sum_url" || die "checksum download failed"
   expected=$(awk '{print $1}' "$work/pkg.sha256")
   actual=$(file_sha256 "$work/pkg.tar.gz")
@@ -109,6 +118,14 @@ elif [ -f "$work/unpack/deploy/install.sh" ]; then
   root="$work/unpack"
 else
   die "tarball did not contain deploy/install.sh"
+fi
+
+if [ "$DRY" = 1 ]; then
+  trap - EXIT INT TERM
+  printf 'dry-run: unpacked %s\n' "$root"
+  printf 'dry-run: would run: bash %s/deploy/install.sh\n' "$root"
+  ls -la "$root/deploy"
+  exit 0
 fi
 
 printf '\nInstaller needs root for the systemd unit, /opt, and the pomnia system user.\n'
