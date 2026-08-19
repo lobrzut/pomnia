@@ -20,7 +20,7 @@ import {
 } from '../buildInfo.js'
 import { PROFILE_EMBED_MODEL, VRAM_PROFILES } from './brain/profiles.js'
 import { hasOllamaModel as hasModel } from './brain/modelMatch.js'
-import { defaultOllamaConfig, Ollama } from './brain/ollama.js'
+import { defaultOllamaConfig, ollamaUrlLooksLocal, Ollama } from './brain/ollama.js'
 import { isDistillableSource } from './brain/distillSources.js'
 import { ledgerPathInVault, ownerProcessed, parseLedger } from './brain/ledgerStore.js'
 import { pingBrain } from './brain/status.js'
@@ -61,6 +61,8 @@ export interface DoctorOptions {
   /** Pomnia userData root override */
   userDataDir?: string
   ollamaUrl?: string
+  /** Socket to probe (macOS LAN relay). Messages still name `ollamaUrl`. */
+  ollamaTransportUrl?: string
   /** Distill chat model from VRAM profile (default: standard). */
   distillModel?: string
   embedModel?: string
@@ -578,7 +580,9 @@ export function buildOllamaDoctorCheck(args: {
         : `ollama unreachable at ${baseUrl}`,
       action: remoteBrain
         ? 'for distill, point Ollama URL at your server :11434 (same host as Brain); search/MCP do not need a local install'
-        : 'start Ollama (https://ollama.com) then: ollama pull nomic-embed-text',
+        : ollamaUrlLooksLocal(baseUrl)
+          ? 'start Ollama (https://ollama.com) then: ollama pull nomic-embed-text'
+          : `check that Ollama is running at ${baseUrl} (LAN daemon — no local Homebrew install needed)`,
       data: { baseUrl, brainTarget: remoteBrain ? 'remote' : 'embedded' },
     }
   }
@@ -865,7 +869,8 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
     })
   } else {
     const cfg = defaultOllamaConfig()
-    if (opts.ollamaUrl) cfg.baseUrl = opts.ollamaUrl
+    const displayUrl = opts.ollamaUrl || cfg.baseUrl
+    cfg.baseUrl = opts.ollamaTransportUrl || displayUrl
     cfg.embedModel = embedModel
     cfg.chatModel = distillModel
     const ollama = new Ollama(cfg)
@@ -874,7 +879,7 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
       buildOllamaDoctorCheck({
         remoteBrain,
         reachable,
-        baseUrl: cfg.baseUrl,
+        baseUrl: displayUrl,
         embedModel,
         distillModel,
         models: reachable ? (await ollama.listModels()).map((m) => m.name) : [],

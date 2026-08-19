@@ -33,7 +33,7 @@ import { isDistillableSource } from '@core/brain/distillSources'
 import type { BrainHit, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent, QuarantineBucket, QuarantineNoteMeta } from '../lib/types'
 import { uiLabels } from '../lib/labels'
 import { saveDoctorLastResult } from '../lib/doctorLastResult'
-import { useStore, ollamaUrlFromBrainUrl, dashboardUrlFromBrainUrl } from '../store/useStore'
+import { useStore, ollamaUrlFromBrainUrl, dashboardUrlFromBrainUrl, ollamaUrlLooksLocal } from '../store/useStore'
 import { ActivityBanner } from '../components/ActivityBanner'
 
 type DoctorCheckRow = {
@@ -110,6 +110,7 @@ export default function Brain() {
   const showAdvanced = !simpleMode || advancedOpen
   /** Remote Master owns search/MCP — local Ollama is distill-only, never an install gate. */
   const isRemoteTarget = brainTarget === 'remote'
+  const ollamaLooksLocal = ollamaUrlLooksLocal(ollamaUrl)
   const allPipelineStages = [
     { id: 'collect' as const, label: labels.brainPipeCollect, note: labels.brainPipeCollectNote, icon: STAGE_ICONS.collect },
     { id: 'distill' as const, label: labels.brainPipeDistill, note: labels.brainPipeDistillNote, icon: STAGE_ICONS.distill },
@@ -121,6 +122,7 @@ export default function Brain() {
     : allPipelineStages.filter((s) => s.id !== 'deploy')
   const [status, setStatus] = useState<BrainStatus | null>(null)
   const [checking, setChecking] = useState(true)
+  const showOllamaInstallGate = !isRemoteTarget && ollamaLooksLocal && !status?.reachable
 
   // VRAM profile: which chat model distillation uses. Persisted per user.
   const [profileId, setProfileId] = useState<string>(() => {
@@ -793,18 +795,18 @@ export default function Brain() {
         </div>
 
         <p className="mb-3 text-xs text-ink-faint">
-          {isRemoteTarget
+          {isRemoteTarget || !ollamaLooksLocal
             ? labels.brainOllamaDistillLead
             : 'Pick the profile matching your GPU — it sets which model distills your chats. Missing models can be pulled right here.'}
         </p>
 
-        {!isRemoteTarget && !status?.reachable && (
+        {showOllamaInstallGate && (
           <div className="mb-3 rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-[11px] text-amber-100">
             <div className="font-semibold text-ink">{labels.onboardingEngineNotFound}</div>
             <p className="mt-1 text-ink-dim">{labels.onboardingEngineInstall1}</p>
           </div>
         )}
-        {isRemoteTarget && !status?.reachable && (
+        {!showOllamaInstallGate && !status?.reachable && (
           <div className="mb-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-[11px] text-ink-dim">
             {labels.brainOllamaDistillOfflineHint}
           </div>

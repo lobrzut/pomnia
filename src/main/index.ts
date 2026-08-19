@@ -153,6 +153,8 @@ import {
   ollamaUnreachableMessage,
   probeOllama,
   resolveOllamaUrl,
+  resolveOllamaTransport,
+  getOllamaTransportUrl,
 } from './ollamaSettings.js'
 
 function vaultSkillsFields(path: string | null | undefined) {
@@ -344,7 +346,8 @@ async function healLedgerForVault(): Promise<void> {
 
 function ollamaFor(url?: string, model?: string): Ollama {
   const cfg = defaultOllamaConfig()
-  cfg.baseUrl = resolveOllamaUrl(url)
+  const configured = resolveOllamaUrl(url)
+  cfg.baseUrl = getOllamaTransportUrl(configured)
   if (model) cfg.chatModel = model
   return new Ollama(cfg)
 }
@@ -1069,10 +1072,11 @@ function registerIpc(): void {
 
   // ── Brain pipeline (host-side distill + pre-index → deploy) ──
   ipcMain.handle('brain:status', async (_e, url?: string) => {
+    const { configured } = await resolveOllamaTransport(url)
     const o = ollamaFor(url)
     const reachable = await o.reachable()
     const models = reachable ? (await o.listModels()).map((m) => m.name) : []
-    return { reachable, baseUrl: o.cfg.baseUrl, chatModel: o.cfg.chatModel, embedModel: o.cfg.embedModel, models }
+    return { reachable, baseUrl: configured, chatModel: o.cfg.chatModel, embedModel: o.cfg.embedModel, models }
   })
 
   // One pull at a time — Ollama serializes downloads anyway, and a single
@@ -1080,6 +1084,7 @@ function registerIpc(): void {
   let pullAbort: AbortController | null = null
   ipcMain.handle('ollama:pull', async (_e, model: string, url?: string) => {
     if (pullAbort) throw new Error('another pull is already running')
+    await resolveOllamaTransport(url)
     const o = ollamaFor(url)
     pullAbort = new AbortController()
     try {
@@ -1125,8 +1130,9 @@ function registerIpc(): void {
       const signal = brainRunAbort.signal
       let triggerFinale = false
       try {
+        const { configured } = await resolveOllamaTransport(opts.ollamaUrl)
         const o = ollamaFor(opts.ollamaUrl, opts.model)
-        if (!(await o.reachable())) throw new Error(`Ollama offline at ${o.cfg.baseUrl}`)
+        if (!(await o.reachable())) throw new Error(`Ollama offline at ${configured}`)
         let convs = opts.importPath
           ? (await parseExportPath(opts.importPath)).conversations.slice(0, opts.limit || undefined)
           : await collectLive(opts.sources, opts.limit)
@@ -1494,9 +1500,9 @@ function registerIpc(): void {
 
   ipcMain.handle('brainCore:status', () => brainCore.status())
   ipcMain.handle('brainCore:start', async (_e, ollamaUrl?: string) => {
-    const url = resolveOllamaUrl(ollamaUrl)
+    const { configured, transport } = await resolveOllamaTransport(ollamaUrl)
     activity.update({ kind: 'brain-start', phase: 'start', detail: m().checkingOllama })
-    const probe = await probeOllama(url)
+    const probe = await probeOllama(configured)
     if (!probe.ok) throw new Error(ollamaUnreachableMessage(probe))
     // Reachable is not the same as usable. Start anyway — agents still get the
     // skills tools — but say it out loud instead of looking healthy while every
@@ -1509,15 +1515,15 @@ function registerIpc(): void {
     try {
       await brainCore.start({
         dataDir: brainCoreDataDir(),
-        ollamaUrl: url,
+        ollamaUrl: probe.transport ?? transport,
         skillsRoot: brainSkillsDir(vaultPath),
         vaultRoot: brainVaultRoot(vaultPath),
         handshakePhrase: getHandshakePhrase(),
         handshakeEnabled: isHandshakeEnabled(),
         autoCheckpointEnabled: getAppSettings().autoCheckpointEnabled !== false,
       })
-      await setAppSettings({ embeddedBrainAutoStart: true, ollamaUrl: url })
-      await flushPendingLibraryDocs(url)
+      await setAppSettings({ embeddedBrainAutoStart: true, ollamaUrl: configured })
+      await flushPendingLibraryDocs(configured)
       void maybeHygieneReindexAfterVaultChange()
       checkVaultHealthInBackground()
       refreshTrayMenu(win, requestQuit)
@@ -1582,11 +1588,13 @@ function registerIpc(): void {
         ollamaUrl = remoteUrl.replace(/:\d+(\/.*)?$/, ':11434')
       }
     }
+    const { configured, transport } = await resolveOllamaTransport(ollamaUrl)
     return runDoctor({
       vaultPath: vaultPath ?? settings.lastIndexedVaultRoot,
       vaultOpen: !!vault,
       userDataDir: app.getPath('userData'),
-      ollamaUrl,
+      ollamaUrl: configured,
+      ollamaTransportUrl: transport,
       distillModel: opts?.distillModel,
       brainUrl,
       brainTarget,
@@ -1862,6 +1870,7 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('brain:search', async (_e, query: string, url?: string) => {
+    await resolveOllamaTransport(url)
     const idx = await loadIndex(brainIndexFile())
     return searchIndex(idx, query, ollamaFor(url), 8)
   })
@@ -2103,6 +2112,11 @@ app.whenReady().then(async () => {
   await fs.mkdir(brainDir(), { recursive: true })
   await migrateBrainIndexFile(brainDir())
   await loadAppSettings()
+  try {
+    await resolveOllamaTransport()
+  } catch (e) {
+    log.warn('ollama relay warm-up:', e)
+  }
 
   // Delayed so it never competes with startup, and never blocks it. Until this
   // existed, whoever installed a build stayed on it forever — every fix we ship

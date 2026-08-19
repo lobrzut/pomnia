@@ -152,6 +152,18 @@ export function ollamaUrlFromBrainUrl(brainUrl: string): string {
   }
 }
 
+/** Empty / loopback → expect a local install. LAN hostnames are a remote daemon. */
+export function ollamaUrlLooksLocal(url: string): boolean {
+  const t = url.trim()
+  if (!t) return true
+  try {
+    const h = new URL(t).hostname.toLowerCase()
+    return h === '127.0.0.1' || h === 'localhost' || h === '::1'
+  } catch {
+    return true
+  }
+}
+
 function loadRemoteBrainUrl(): string {
   try {
     return localStorage.getItem(REMOTE_BRAIN_URL_KEY) || ''

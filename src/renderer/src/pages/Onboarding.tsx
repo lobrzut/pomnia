@@ -27,7 +27,7 @@ import { GuideOverlay } from '../components/GuideMap'
 import { ClientIcon } from '../components/ClientIcon'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
-import { useStore, ollamaUrlFromBrainUrl } from '../store/useStore'
+import { useStore, ollamaUrlFromBrainUrl, ollamaUrlLooksLocal } from '../store/useStore'
 import { identifyEngine } from '@core/brain/engine'
 import { hasOllamaModel } from '@core/brain/modelMatch'
 import { EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from '@core/brain/snippet'
@@ -116,7 +116,12 @@ export default function Onboarding() {
       className="absolute inset-0 z-40 flex items-stretch bg-void/80 backdrop-blur-md"
     >
       {/* Step rail — pt clears TitleBar (h-12) so brand isn't under window chrome */}
-      <div className="hidden w-[230px] shrink-0 flex-col justify-between border-r border-white/6 px-7 pb-7 pt-14 sm:flex">
+      <div
+        className={clsx(
+          'hidden w-[230px] shrink-0 flex-col justify-between border-r border-white/6 pb-7 pt-14 sm:flex',
+          api.platform === 'darwin' ? 'pl-[76px] pr-7' : 'px-7',
+        )}
+      >
         <div>
           <div className="mb-10 flex items-center gap-2.5">
             <AppLogo size="sm" />
@@ -468,6 +473,8 @@ function EngineStep({
   const setBrainTarget = useStore((s) => s.setBrainTarget)
   const setRemoteBrainUrl = useStore((s) => s.setRemoteBrainUrl)
   const remoteBrainUrl = useStore((s) => s.remoteBrainUrl)
+  const ollamaUrl = useStore((s) => s.ollamaUrl)
+  const setOllamaUrl = useStore((s) => s.setOllamaUrl)
   const [checking, setChecking] = useState(true)
   const [status, setStatus] = useState<BrainStatus | null>(null)
   const [mode, setMode] = useState<BrainTarget>('embedded')
@@ -514,7 +521,8 @@ function EngineStep({
   async function check() {
     setChecking(true)
     try {
-      setStatus(await api.brainStatus())
+      const url = useStore.getState().ollamaUrl.trim() || undefined
+      setStatus(await api.brainStatus(url))
     } catch {
       setStatus(null)
     } finally {
@@ -538,9 +546,10 @@ function EngineStep({
     if (pull) return
     setPullError(null)
     setPull({ model, status: 'starting' })
+    const url = useStore.getState().ollamaUrl.trim() || undefined
     try {
-      await api.ollamaPull(model)
-      const after = await api.brainStatus()
+      await api.ollamaPull(model, url)
+      const after = await api.brainStatus(url)
       setStatus(after)
       if (!hasOllamaModel(after.models ?? [], model)) {
         setPullError(labels.toastModelStillMissing(model))
@@ -685,11 +694,28 @@ function EngineStep({
         </div>
       )}
 
+      {mode === 'embedded' && (
+        <div className="mb-4">
+          <Field label={labels.onboardingEngineOllamaUrl}>
+            <Input
+              value={ollamaUrl}
+              onChange={(e) => setOllamaUrl(e.target.value)}
+              onBlur={() => void check()}
+              placeholder="http://127.0.0.1:11434"
+            />
+          </Field>
+        </div>
+      )}
+
       {mode === 'embedded' &&
         (checking ? (
           <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/20 px-4 py-5">
             <Spinner className="h-4 w-4 text-iris" />
-            <span className="text-sm text-ink-dim">{labels.onboardingEngineLooking}</span>
+            <span className="text-sm text-ink-dim">
+              {ollamaUrlLooksLocal(ollamaUrl)
+                ? labels.onboardingEngineLooking
+                : labels.onboardingEngineLookingAt(ollamaUrl.trim())}
+            </span>
           </div>
         ) : found ? (
           <motion.div
@@ -737,21 +763,31 @@ function EngineStep({
           </motion.div>
         ) : (
           <div className="rounded-2xl border border-amber/20 bg-amber/5 p-4">
-            <div className="text-sm font-semibold text-ink">{labels.onboardingEngineNotFound}</div>
-            <ol className="mt-2.5 space-y-2 text-[13px] text-ink-dim">
-              <li className="flex gap-2">
-                <span className="font-bold text-amber">1.</span>
-                <span>{labels.onboardingEngineInstall1}</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold text-amber">2.</span>
-                <span>{labels.onboardingEngineInstall2}</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold text-amber">3.</span>
-                <span>{labels.onboardingEngineInstall3}</span>
-              </li>
-            </ol>
+            <div className="text-sm font-semibold text-ink">
+              {ollamaUrlLooksLocal(ollamaUrl)
+                ? labels.onboardingEngineNotFound
+                : labels.onboardingEngineUnreachable}
+            </div>
+            {ollamaUrlLooksLocal(ollamaUrl) ? (
+              <ol className="mt-2.5 space-y-2 text-[13px] text-ink-dim">
+                <li className="flex gap-2">
+                  <span className="font-bold text-amber">1.</span>
+                  <span>{labels.onboardingEngineInstall1}</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-bold text-amber">2.</span>
+                  <span>{labels.onboardingEngineInstall2}</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-bold text-amber">3.</span>
+                  <span>{labels.onboardingEngineInstall3}</span>
+                </li>
+              </ol>
+            ) : (
+              <p className="mt-2.5 text-[13px] text-ink-dim">
+                {labels.onboardingEngineUnreachableDetail(ollamaUrl.trim())}
+              </p>
+            )}
             <Button variant="soft" onClick={check} className="mt-3.5">
               <RefreshCw className="h-3.5 w-3.5" /> {labels.onboardingEngineRecheck}
             </Button>

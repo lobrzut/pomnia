@@ -14,7 +14,7 @@ import { loadIndex, searchIndex } from '@core/brain/localIndex.js'
 import { log } from '@core/log.js'
 import { brainCore } from './brainCore.js'
 import { brainVaultDistilledDir, brainVaultRoot, getOpenEncryptedVaultPath } from './brainPaths.js'
-import { resolveOllamaUrl } from './ollamaSettings.js'
+import { resolveOllamaTransport } from './ollamaSettings.js'
 
 export type ProfilePreviewStatus = 'ok' | 'vault_locked' | 'brain_down' | 'no_knowledge'
 
@@ -426,7 +426,7 @@ export async function buildProfilePreview(opts?: {
   let notes = await readDistilledSnippets(vaultRoot)
 
   const brainRunning = brainCore.status().running
-  const ollamaUrl = resolveOllamaUrl()
+  const { transport: ollamaUrl } = await resolveOllamaTransport()
 
   if (opts?.brainIndexFile && existsSync(opts.brainIndexFile)) {
     progress('search', 40)

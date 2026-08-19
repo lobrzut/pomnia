@@ -4,6 +4,7 @@ import { hasOllamaModel } from '@core/brain/modelMatch.js'
 import { defaultOllamaConfig } from '@core/brain/ollama.js'
 import { m } from './mainStrings.js'
 import { getAppSettings } from './appSettings.js'
+import { ensureOllamaTransportUrl, needsOllamaRelay } from './ollamaRelay.js'
 
 export function resolveOllamaUrl(passed?: string): string {
   const trimmed = passed?.trim()
@@ -13,35 +14,61 @@ export function resolveOllamaUrl(passed?: string): string {
   return defaultOllamaConfig().baseUrl.replace(/\/$/, '')
 }
 
+/** Last transport URL (may be loopback relay). Used by sync ollamaFor(). */
+let cachedTransportUrl: string | null = null
+let cachedConfiguredUrl: string | null = null
+
+export function getOllamaTransportUrl(configured?: string): string {
+  const cfg = configured ?? cachedConfiguredUrl ?? resolveOllamaUrl()
+  if (cachedTransportUrl && cachedConfiguredUrl === cfg) return cachedTransportUrl
+  return cfg
+}
+
+/** Resolve configured URL and ensure macOS launchd relay when talking to LAN. */
+export async function resolveOllamaTransport(passed?: string): Promise<{ configured: string; transport: string }> {
+  const configured = resolveOllamaUrl(passed)
+  const transport = await ensureOllamaTransportUrl(configured)
+  cachedConfiguredUrl = configured
+  cachedTransportUrl = transport
+  return { configured, transport }
+}
+
 export type OllamaProbeResult =
-  | { ok: true; url: string; models: string[] }
+  | { ok: true; url: string; models: string[]; transport?: string }
   | { ok: false; reason: 'unreachable' | 'http_error'; url: string; detail?: string }
 
 /**
  * Probe Ollama with GET /api/tags — same check the UI uses for "online".
- * Returns the installed tags too: the response already carries them, and
- * "reachable" alone is not enough to know the brain can embed anything.
+ * On macOS + remote Ollama, traffic goes through a launchd localhost relay
+ * (Electron fetch to LAN fails while curl from Terminal works).
  */
 export async function probeOllama(passedUrl?: string): Promise<OllamaProbeResult> {
-  const url = resolveOllamaUrl(passedUrl)
+  const { configured, transport } = await resolveOllamaTransport(passedUrl)
   try {
-    const r = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(8000) })
-    if (!r.ok) return { ok: false, reason: 'http_error', url, detail: `HTTP ${r.status}` }
+    const r = await fetch(`${transport}/api/tags`, { signal: AbortSignal.timeout(8000) })
+    if (!r.ok) return { ok: false, reason: 'http_error', url: configured, detail: `HTTP ${r.status}` }
     let models: string[] = []
     try {
       const j = (await r.json()) as { models?: { name?: string }[] }
-      models = (j.models ?? []).map((m) => m.name ?? '').filter(Boolean)
+      models = (j.models ?? []).map((row) => row.name ?? '').filter(Boolean)
     } catch {
       // A 200 with an unreadable body still means Ollama answered. The model
       // list is a bonus here — never a reason to call the host unreachable.
     }
-    return { ok: true, url, models }
+    return { ok: true, url: configured, models, transport }
   } catch (e) {
+    const viaRelay = transport !== configured
+    const err = e instanceof Error ? e.message : String(e)
+    const detail = viaRelay
+      ? `host ${configured.replace(/^https?:\/\//, '')} nie odpowiada przez lokalny relay (${err})`
+      : needsOllamaRelay(configured)
+        ? `${err} (LAN — macOS blokuje gniazda Pomni; relay powinien przejąć ruch)`
+        : err
     return {
       ok: false,
       reason: 'unreachable',
-      url,
-      detail: e instanceof Error ? e.message : String(e),
+      url: configured,
+      detail,
     }
   }
 }

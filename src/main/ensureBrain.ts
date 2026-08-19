@@ -102,7 +102,7 @@ export async function ensureBrainForIndexing(
   try {
     await brainCore.start({
       dataDir: brainCoreDataDir(),
-      ollamaUrl: baseUrl,
+      ollamaUrl: probe.transport ?? baseUrl,
       skillsRoot,
       vaultRoot,
       handshakePhrase: getHandshakePhrase(),
