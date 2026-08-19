@@ -35,6 +35,108 @@ jobs:
           ./shellcheck-v0.10.0/shellcheck -s sh packages/brain-core/deploy/bootstrap.sh
           ./shellcheck-v0.10.0/shellcheck -s sh packages/brain-core/deploy/install-remote.sh
 
+  # curl|sh needs this tarball. Desktop AppImage waits on apt-get (rpm/fuse),
+  # which has sat in "Install Linux pack tools" for hours. Do not make latest
+  # honest Node 22 install.sh wait on that.
+  pack-brain-core:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build brain-core
+        run: npm run build:brain-core
+
+      - name: Pack brain-core server
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./packages/brain-core/package.json').version")
+          STAGE=$(mktemp -d)/pomnia-brain-core
+          mkdir -p "$STAGE"
+
+          cp -r packages/brain-core/dist packages/brain-core/package.json "$STAGE/"
+          cp -r packages/brain-core/deploy "$STAGE/"
+
+          npm ci --omit=dev --workspace @pomnia/brain-core --include-workspace-root=false
+          cp -r node_modules "$STAGE/"
+
+          TARBALL="release/pomnia-brain-core-${VERSION}-linux-x64.tar.gz"
+          mkdir -p release
+          tar -czf "$TARBALL" -C "$(dirname "$STAGE")" pomnia-brain-core
+          echo "packed $TARBALL ($(du -h "$TARBALL" | cut -f1))"
+
+          VERIFY=$(mktemp -d)
+          tar -xzf "$TARBALL" -C "$VERIFY"
+          U="$VERIFY/pomnia-brain-core"
+
+          node -e "
+            const { readFileSync } = require('node:fs')
+            const v = JSON.parse(readFileSync('$U/package.json','utf8')).version
+            if (v !== '$VERSION') { console.error('version mismatch: ' + v); process.exit(1) }
+            console.log('version in archive: ' + v)
+          "
+          NODE_PATH="$U/node_modules" node -e "
+            require('$U/node_modules/better-sqlite3')
+            console.log('native module loads from the archive')
+          "
+          grep -q 'Node 22' "$U/deploy/install.sh" || { echo 'install.sh does not mention Node 22' >&2; exit 1; }
+          test -f "$U/deploy/bootstrap.sh" || { echo 'no deploy/bootstrap.sh' >&2; exit 1; }
+          sh -n "$U/deploy/bootstrap.sh"
+          test -f "$U/deploy/pomnia-brain-core.service" || { echo 'no unit file' >&2; exit 1; }
+          test -f "$U/dist/daemon.js" || { echo 'no daemon.js' >&2; exit 1; }
+          echo "tarball unpacks, resolves native deps, and install.sh requires Node 22"
+
+      - name: SHA-256 checksums
+        run: |
+          cd release
+          for f in *.tar.gz; do
+            [ -f "$f" ] || continue
+            sha256sum "$f" | tee "${f}.sha256"
+          done
+
+      - name: Upload Actions artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pomnia-brain-core-linux
+          path: |
+            release/*.tar.gz
+            release/*.sha256
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release (tag pushes)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          shopt -s nullglob
+          ASSETS=(release/*.tar.gz release/*.sha256)
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "No tarball to upload"
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+            echo "Attached brain-core tarball to existing $TAG"
+          else
+            gh release create "$TAG" "${ASSETS[@]}" \
+              --title "Pomnia ${TAG#v}" \
+              --notes "Self-hosted server tarball (pomnia-brain-core-*-linux-x64.tar.gz). Requires Node 22 (packed better-sqlite3 ABI). Linux desktop AppImage/deb may follow from the parallel pack job."
+            echo "Created published release $TAG with brain-core tarball (needed for releases/latest + curl|sh)"
+          fi
+
   build-linux:
     runs-on: ubuntu-latest
     permissions:
@@ -53,6 +155,7 @@ jobs:
         run: npm ci
 
       - name: Install Linux pack tools
+        timeout-minutes: 8
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
