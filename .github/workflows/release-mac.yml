@@ -9,6 +9,8 @@ on:
 jobs:
   build-mac:
     runs-on: macos-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,20 +24,69 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The Linux job has always had this and macOS never did, which is the
+      # whole reason no DMG exists. The test suite imports @pomnia/brain-core
+      # and @pomnia/doc-parser, so without their dist/ the run dies on "Failed
+      # to resolve entry for package" — seven failures, under a minute, on every
+      # tag since v0.1.61. A job that fails identically every time stops being
+      # read, which is how three releases shipped without the platform anybody
+      # noticed was missing.
+      - name: Build workspace packages
+        run: npm run build:brain-core && npm run build:doc-parser
+
       - name: Run tests
         run: npm test
 
       - name: Build macOS DMG
         run: npm run pack:mac
         env:
-          # Unsigned build — no Apple Developer secrets required
+          # Unsigned build — no Apple Developer secrets required. Gatekeeper
+          # will warn on first open; the download page says so rather than
+          # letting people discover it.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Upload DMG artifact
+      - name: SHA-256 checksum
+        run: |
+          set -euo pipefail
+          cd release
+          for f in *.dmg; do
+            [ -f "$f" ] || continue
+            shasum -a 256 "$f" | tee "${f}.sha256"
+          done
+          ls -lah *.dmg *.sha256 2>/dev/null || true
+
+      - name: Upload Actions artifact
         uses: actions/upload-artifact@v4
         with:
           name: pomnia-macos-dmg
           path: |
             release/*.dmg
-            release/mac/*.app
+            release/*.sha256
           if-no-files-found: error
+
+      # Uploading to Actions only meant the DMG existed somewhere nobody
+      # downloads from. The release page is where every link on pomnia.ai
+      # points, so that is where it has to land.
+      - name: Attach to GitHub Release (tag pushes)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          shopt -s nullglob
+          ASSETS=(release/*.dmg release/*.sha256)
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "No DMG to upload" >&2
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+            echo "Attached macOS assets to $TAG"
+          else
+            gh release create "$TAG" "${ASSETS[@]}" \
+              --title "Pomnia ${TAG#v}" \
+              --notes "macOS DMG (unsigned)." \
+              --draft
+            echo "Created draft release $TAG with the macOS DMG"
+          fi
