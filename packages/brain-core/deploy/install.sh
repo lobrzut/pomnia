@@ -165,11 +165,23 @@ offer_ollama() {
   local answer=""
   if [[ "${WITH_OLLAMA:-0}" == "1" ]]; then
     answer=y
-  elif [[ -t 0 ]]; then
-    echo "  Ollama is not answering, so nothing can be embedded — search will find"
-    echo "  nothing until it is."
-    echo
-    read -r -p "  Install Ollama now and pull $EMBED_MODEL (~275 MB)? [y/N] " answer
+  else
+    # curl|sh leaves stdin as the script pipe, so [[ -t 0 ]] is false and the
+    # old branch skipped the question (everyone got "Left alone"). Ask on the
+    # controlling terminal when there is one.
+    local tty=""
+    if [[ -t 0 ]]; then
+      tty=/dev/stdin
+    elif [[ -r /dev/tty ]]; then
+      tty=/dev/tty
+    fi
+    if [[ -n "$tty" ]]; then
+      echo "  Ollama is not answering, so nothing can be embedded — search will find"
+      echo "  nothing until it is."
+      echo
+      printf "  Install Ollama now and pull %s (~275 MB)? [y/N] " "$EMBED_MODEL"
+      read -r answer < "$tty" || true
+    fi
   fi
 
   if [[ ! "$answer" =~ ^[Yy]$ ]]; then
