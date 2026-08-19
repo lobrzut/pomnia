@@ -62,7 +62,7 @@ picks it up, and `search_library` returns the words back.
 
 | | |
 | --- | --- |
-| Node | 20 or newer |
+| Node | 22 or newer (tarball native addons are built on GitHub Actions Node 22) |
 | Ollama | for embeddings — `ollama pull nomic-embed-text` |
 | Disk | the vault, plus roughly half its size again for the index |
 | RAM | ~200 MB serving; indexing peaks higher, capped at 2 GB by the unit |
