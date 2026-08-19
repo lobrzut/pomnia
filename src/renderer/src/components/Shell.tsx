@@ -45,7 +45,12 @@ export function TitleBar() {
     // z-50: must stay above VaultGate's lock overlay (z-40) — on a frameless
     // window these minimize/maximize/close buttons are the only way to control
     // the window, so they can't be obscured while the vault is locked.
-    <div className="drag relative z-50 flex h-12 items-center justify-between px-4">
+    <div
+      className={clsx(
+        'drag relative z-50 flex h-12 items-center justify-between pr-4',
+        api.platform === 'darwin' ? 'pl-[76px]' : 'pl-4',
+      )}
+    >
       <div className="flex min-w-0 items-center gap-3">
         {!gateOpen && (
           <>
@@ -71,9 +76,13 @@ export function TitleBar() {
             preview
           </span>
         )}
-        <WinBtn onClick={() => api.minimize()}><Minus className="h-3.5 w-3.5" /></WinBtn>
-        <WinBtn onClick={() => api.toggleMaximize()}><Square className="h-3 w-3" /></WinBtn>
-        <WinBtn onClick={() => api.close()} danger><X className="h-3.5 w-3.5" /></WinBtn>
+        {api.platform !== 'darwin' && (
+          <>
+            <WinBtn onClick={() => api.minimize()}><Minus className="h-3.5 w-3.5" /></WinBtn>
+            <WinBtn onClick={() => api.toggleMaximize()}><Square className="h-3 w-3" /></WinBtn>
+            <WinBtn onClick={() => api.close()} danger><X className="h-3.5 w-3.5" /></WinBtn>
+          </>
+        )}
       </div>
     </div>
   )
