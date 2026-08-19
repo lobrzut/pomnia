@@ -42,17 +42,6 @@ pick_asset() {
   printf '%s\n' "$json" | tr '"' '\n' | grep '^https://' | grep -E "$1" | head -n 1
 }
 
-os=$(uname -s)
-[ "$os" = Linux ] || die "this installer is for Linux (this kernel is $os)"
-
-arch=$(uname -m)
-case "$arch" in
-  x86_64|amd64) ;;
-  *)
-    die "GitHub packs linux-x64 only; this machine is $arch"
-    ;;
-esac
-
 need curl
 need tar
 need gzip
@@ -62,6 +51,15 @@ need head
 need tr
 
 if [ "$DRY" != 1 ]; then
+  os=$(uname -s)
+  [ "$os" = Linux ] || die "this installer is for Linux (this kernel is $os)"
+  arch=$(uname -m)
+  case "$arch" in
+    x86_64|amd64) ;;
+    *)
+      die "GitHub packs linux-x64 only; this machine is $arch"
+      ;;
+  esac
   if [ ! -d /run/systemd/system ]; then
     die "systemd not found — this pack installs a unit; use the Dockerfile instead"
   fi
@@ -91,7 +89,8 @@ tarball_url=$(pick_asset '/pomnia-brain-core-[^"]+-linux-x64\.tar\.gz$') || true
 sum_url=$(pick_asset '/pomnia-brain-core-[^"]+-linux-x64\.tar\.gz\.sha256$') || true
 
 work="${TMPDIR:-/tmp}/pomnia-bootstrap.$$"
-mkdir -m 700 "$work" || die "could not create $work"
+mkdir "$work" || die "could not create $work"
+chmod 700 "$work" 2>/dev/null || true
 cleanup() { rm -rf "$work"; }
 trap cleanup EXIT INT TERM
 
@@ -110,7 +109,11 @@ else
 fi
 
 mkdir "$work/unpack"
-tar -xzf "$work/pkg.tar.gz" -C "$work/unpack"
+# npm workspace copies can contain dangling symlinks; GNU tar on Linux creates
+# them, MSYS tar on Windows aborts. Keep going if the payload we need is there.
+if ! tar -xzf "$work/pkg.tar.gz" -C "$work/unpack"; then
+  printf '! tar reported errors (often workspace symlinks on non-Linux)\n' >&2
+fi
 
 if [ -f "$work/unpack/pomnia-brain-core/deploy/install.sh" ]; then
   root="$work/unpack/pomnia-brain-core"
