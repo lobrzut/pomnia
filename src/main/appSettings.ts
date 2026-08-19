@@ -231,9 +231,12 @@ export async function setAppSettings(patch: Partial<AppSettings>): Promise<AppSe
 /** Sync Electron OS login item with persisted openAtLogin (default off). */
 export function applyLoginItemSettings(): void {
   try {
+    // Unsigned macOS builds cannot register login items. Calling the API with
+    // openAtLogin:false still logs "Unable to set login item: Operation not permitted".
+    if (process.platform === 'darwin' && !cached.openAtLogin) return
     app.setLoginItemSettings({ openAtLogin: !!cached.openAtLogin })
   } catch {
-    /* unsupported platform / tests */
+    /* unsupported platform / tests / TCC */
   }
 }
 

@@ -49,10 +49,9 @@ export async function isCursorDbTooLarge(root: string): Promise<boolean> {
 /** Lazy-load sql.js (WASM). Returns null if the dependency isn't installed. */
 async function loadSql(): Promise<any | null> {
   try {
-    const mod: any = await import('sql.js')
-    const initSqlJs = mod.default ?? mod
     const { createRequire } = await import('node:module')
     const require = createRequire(import.meta.url)
+    const initSqlJs = require('sql.js')
     const wasmPath = require.resolve('sql.js/dist/sql-wasm.wasm')
     return await initSqlJs({ locateFile: () => wasmPath })
   } catch (e) {
