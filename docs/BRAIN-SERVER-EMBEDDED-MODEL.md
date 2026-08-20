@@ -1,129 +1,129 @@
 # Brain Server — bundled embed model (~250–500 MB)
 
-> Plan techniczny (2026-07-13). **Nie implementujemy tu pełnego obrazu** — tylko kontrakt, opcje i kolejność.
-> Powiązane: `docs/BRAIN-KVM-ARCHITECTURE.md`, `docs/BRAIN-INTEGRATION.md` (internal/historical), hub `Projects/brain` (Docker edge).
+> Technical plan (2026-07-13). **This does not implement the full image** — only the contract, the options and the order.
+> Related: `docs/BRAIN-KVM-ARCHITECTURE.md`, `docs/BRAIN-INTEGRATION.md` (internal/historical), hub `Projects/brain` (Docker edge).
 
-## Stan dziś (research)
+## Where things stand (research)
 
-| Warstwa | Embed dziś | Model | Wymaga Ollamy? |
+| Layer | Embedding today | Model | Needs Ollama? |
 |---------|------------|-------|----------------|
-| **brain-core** (`packages/brain-core`, Node) | `POST {ollama}/api/embed` | `nomic-embed-text` → **dim 768** | **Tak** (MVP Ollama-only) |
-| **Pomnia desktop embedded** | fork child → ten sam `EmbedClient` | j.w. | **Tak** — URL z Settings / `127.0.0.1:11434` |
-| **Pomnia distill** | `qwen2.5:14b` (chat) | ~9 GB | Tak, na **PC klienta** (GPU) |
-| **Brain hub Python** (`Projects/brain`) | `BRAIN_EMBED_BACKEND=fastembed` **lub** `ollama` | `nomic-ai/nomic-embed-text-v1.5` / Ollama `nomic-embed-text` | Edge Docker: **nie**; live KVM w homelabie: Ollama z wieloma modelami |
-| **Docker edge** (`brain/docker-compose.yml` + `Dockerfile`) | fastembed ONNX, model **prefetch w build** | v1.5 | **Nie** — „No Ollama, no GPU” |
+| **brain-core** (`packages/brain-core`, Node) | `POST {ollama}/api/embed` | `nomic-embed-text` → **dim 768** | **Yes** (Ollama-only MVP) |
+| **Pomnia desktop, embedded** | forked child → the same `EmbedClient` | as above | **Yes** — URL from Settings / `127.0.0.1:11434` |
+| **Pomnia distill** | `qwen2.5:14b` (chat) | ~9 GB | Yes, on the **client PC** (GPU) |
+| **Brain hub, Python** (`Projects/brain`) | `BRAIN_EMBED_BACKEND=fastembed` **or** `ollama` | `nomic-ai/nomic-embed-text-v1.5` / Ollama `nomic-embed-text` | Docker edge: **no**; live homelab KVM: Ollama with many models |
+| **Docker edge** (`brain/docker-compose.yml` + `Dockerfile`) | fastembed ONNX, model **prefetched at build** | v1.5 | **No** — "no Ollama, no GPU" |
 
-Klucz: wektory z Ollama `nomic-embed-text` i Python fastembed v1.5 są **zgodne kierunkowo** (dim 768) — istniejący `library.db` da się query’ować bez reindexu przy zmianie backendu (zweryfikowane Phase 0 / komentarze w `embed.ts` + `rag.py`).
+The key point: vectors from Ollama `nomic-embed-text` and Python fastembed v1.5 are **directionally compatible** (dim 768) — an existing `library.db` can be queried after a backend swap without a reindex (verified in Phase 0; see the comments in `embed.ts` and `rag.py`).
 
 ---
 
-## A. Co dokładnie bundlować
+## A. What exactly to bundle
 
-### Bundlować
+### Bundle
 
 - **Model:** `nomic-embed-text` / `nomic-ai/nomic-embed-text-v1.5` (137M, Apache 2.0).
-- **Rozmiar:** ~**274 MB** (Ollama F16) albo cache ONNX fastembed (~**0,5 GB** przy pierwszym load / warstwie Docker — Dockerfile już to prefetchuje).
-- **Rola:** wyłącznie embeddingi do `search_library` / reindex / doc index. **To wystarczy, by serwer „działał sam” po boot.**
+- **Size:** roughly **274 MB** (Ollama F16), or the fastembed ONNX cache (~**0.5 GB** on first load / in the Docker layer — the Dockerfile already prefetches it).
+- **Job:** embeddings only, for `search_library` / reindex / document index. **That alone is enough for the server to "just work" after boot.**
 
-### Nie bundlować
+### Do not bundle
 
-- **`qwen2.5:14b` (~9 GB) i inne chat/LLM** — distill zostaje na PC klienta (GPU). Serwer Brain = pamięć do pytań, nie fabryka notatek.
-- Pełny katalog 32 modeli z live KVM w homelabie — to homelab power-user, nie produkt „Brain Server”.
+- **`qwen2.5:14b` (~9 GB) or any other chat/LLM** — distillation stays on the client PC with its GPU. A Brain server is memory to ask questions of, not a note factory.
+- The full 32-model catalogue from the live homelab KVM — that is a homelab power user, not the "Brain Server" product.
 
-### Footprint (oczekiwania)
+### Footprint (expectations)
 
-| | Disk (image/warstwa) | RAM runtime (CPU embed) |
+| | Disk (image/layer) | Runtime RAM (CPU embed) |
 |--|----------------------|-------------------------|
-| Tylko nomic (Ollama sidecar) | ~274 MB + runtime Ollama | ~0,5–1 GB przy warm model |
-| fastembed ONNX (edge Docker) | ~0,5 GB w warstwie obrazu | ~0,5–1 GB po lazy load |
-| + qwen 14b (NIE) | +~9 GB | +~10–16 GB VRAM/RAM |
+| nomic only (Ollama sidecar) | ~274 MB + the Ollama runtime | ~0.5–1 GB with the model warm |
+| fastembed ONNX (Docker edge) | ~0.5 GB in the image layer | ~0.5–1 GB after lazy load |
+| + qwen 14b (NO) | +~9 GB | +~10–16 GB VRAM/RAM |
 
-Mały KVM (2–4 GB RAM, bez GPU) → **tylko embed**. Distill opcjonalny / offboard.
+A small KVM (2–4 GB RAM, no GPU) → **embedding only**. Distillation optional, or offboard.
 
 ---
 
-## B. Opcje realizacji — porównanie i rekomendacja
+## B. Options compared, and the recommendation
 
-| # | Opcja | Pros | Cons | Homelab KVM | Produkt Brain Server |
+| # | Option | Pros | Cons | Homelab KVM | Brain Server product |
 |---|-------|------|------|-------------|----------------------|
-| **1** | Ollama sidecar w compose + pre-pull `nomic-embed-text` | Ten sam kontrakt co desktop (`/api/embed`); łatwy swap modelu tagiem | Cięższy obraz (Ollama + model); kolejny proces; GPU niepotrzebne ale kusi „dokładanie LLM” | OK jako most do live homelab | OK, ale nadmiarowe |
-| **2** | **ONNX / fastembed tylko pod embed** (bez Ollamy) | Już zrobione w hub Docker; `docker up` → search; mały RAM; zero ręcznego `ollama pull` | brain-core Node jeszcze tego nie ma; prefix `search_query:` trzeba trzymać w kodzie | Idealne dla lekkiego VM | **Najlepsze** |
-| **3** | Bake modelu w binary/data brain-core | Jedna paczka Electron/daemon | Gigantyczny update Electron; trudniejszy bump modelu; miesza app z serwerem | Słabe | Słabe |
+| **1** | Ollama sidecar in compose, pre-pulling `nomic-embed-text` | Same contract as the desktop (`/api/embed`); swapping the model is a tag change | Heavier image (Ollama + model); another process; the GPU is unnecessary but invites "let's add an LLM" | Fine as a bridge to the live homelab | Fine, but redundant |
+| **2** | **ONNX / fastembed for embedding only** (no Ollama) | Already done in the hub's Docker; `docker up` → search; small RAM; no manual `ollama pull` | brain-core (Node) does not have it yet; the `search_query:` prefix has to live in code | Ideal for a light VM | **Best** |
+| **3** | Bake the model into the brain-core binary/data | One Electron/daemon package | Enormous Electron updates; bumping the model gets harder; mixes the app with the server | Weak | Weak |
 
-### Rekomendacja
+### Recommendation
 
-1. **Brain Server / KVM image (produkt + lekki homelab):** **opcja 2** — utrzymać i utwardzić istniejący edge path w `Projects/brain` (`BRAIN_EMBED_BACKEND=fastembed`, model w warstwie Docker). Kryterium akceptacji: `docker compose … up` → `search_library` **bez** ręcznego `ollama pull`.
-2. **Live KVM homelab:** zostaw Ollamę z GPU do distill/eksperymentów; search może iść fastembed **lub** Ollama — nie mieszaj backendów w jednym `library.db` bez świadomej decyzji (oba nomic 768 są OK, ale trzymaj jeden backend na deploy).
-3. **brain-core Node (przyszłość):** po desktop parity dodać backend `onnx`/`fastembed`-equivalent **albo** opcjonalny Ollama sidecar tylko w compose serwerowym — nie piecz modelu w Electron.
+1. **Brain Server / KVM image (product + light homelab):** **option 2** — keep and harden the existing edge path in `Projects/brain` (`BRAIN_EMBED_BACKEND=fastembed`, model in the Docker layer). Acceptance criterion: `docker compose … up` → `search_library` works **without** a manual `ollama pull`.
+2. **Live homelab KVM:** keep Ollama on the GPU for distillation and experiments; search can go through fastembed **or** Ollama — but do not mix backends inside one `library.db` without deciding to. Both nomic 768 variants are fine; pick one backend per deployment.
+3. **brain-core, Node (future):** after desktop parity, add an `onnx`/fastembed-equivalent backend **or** an optional Ollama sidecar in the server compose only. Do not bake a model into Electron.
 
 ---
 
-## C. Kontrakt produktu / nazewnictwo UI
+## C. Product contract and UI naming
 
-| Rola | Znaczenie dla usera |
+| Role | What it means to a user |
 |------|---------------------|
-| **Serwer Brain** | Pamięć do pytań (MCP `search_library`, vault notes, index) |
-| **Aplikacja Pomnia** | Zbieranie (backup/import) + vault `.pomnia` + distill na lokalnym GPU |
+| **Brain server** | Memory to ask questions of (MCP `search_library`, vault notes, index) |
+| **Pomnia app** | Collection (backup/import) + the `.pomnia` vault + distillation on the local GPU |
 
-### Etykiety Settings / nawigacja (kierunek)
+### Settings labels / navigation (direction)
 
-| Termin | Znaczenie |
+| Term | Meaning |
 |--------|-----------|
-| **Archiwum** | Vault `.pomnia` — zaszyfrowane snapshoty (nie wyszukiwarka) |
-| **Pamięć** | Indeks / Brain — to, po czym agent pyta |
-| **Podłącz Cursor** | Connect MCP (`:7862`) |
+| **Archive** | The `.pomnia` vault — encrypted snapshots, not a search engine |
+| **Memory** | The index / Brain — what the agent queries |
+| **Connect Cursor** | Connect MCP (`:7862`) |
 
-### „Działa sam” po boot = minimum
+### "Works on its own" after boot, minimally
 
-- ✅ `search_library` / health MCP bez ręcznej instalacji modeli
-- ✅ Reindex notatek już w vault
-- ❌ Distill LLM **nie** jest wymagany na serwerze (opcjonalny, zwykle na desktopie)
-
----
-
-## D. Kolejność wdrożenia
-
-### Milestone 0 — Desktop first (uzgodnione)
-
-- Embedded brain-core + **user Ollama** z `nomic-embed-text` (pull w UI jeśli brak).
-- Distill = lokalny `qwen2.5:14b` (lub inny chat) — poza zakresem bundla serwera.
-- UI: jasny health „Ollama + nomic” vs „wyszukiwarka działa”.
-
-### Milestone 1 — KVM / Brain Server image z bundled embed
-
-- Bazować na `brain/Dockerfile` + compose edge (fastembed prefetch).
-- Smoke: `docker compose -f docker-compose.yml -f docker-compose.lan.yml up -d --build` → Bearer token → MCP search na sample note.
-- **Acceptance:** świeży host **bez** Ollamy → search OK w &lt; N minut po `up`.
-
-### Milestone 2 — brain-core Node na serwerze (gdy rewrite dojrzeje)
-
-- Albo: compose z Ollama sidecar (tylko nomic) pod `BRAIN_OLLAMA_URL`.
-- Albo: natywny ONNX w Node (parity z Python edge).
-- Nie: bundlować qwen w obrazie serwera.
-
-### Milestone 3 — Produkt „działa sam” w copy
-
-- Landing / START-HERE: serwer = pamięć; app = archiwum + zbieranie.
-- Usunąć wrażenie, że KVM musi mieć 32 modele.
+- ✅ `search_library` and MCP health without installing models by hand
+- ✅ Reindex of notes already in the vault
+- ❌ An LLM for distillation is **not** required on the server (optional, and usually on the desktop)
 
 ---
 
-## E. Ryzyka
+## D. Rollout order
 
-| Ryzyko | Mitygacja |
+### Milestone 0 — desktop first (agreed)
+
+- Embedded brain-core plus the **user's Ollama** with `nomic-embed-text` (pull from the UI when missing).
+- Distillation is a local `qwen2.5:14b` (or another chat model), outside the scope of the server bundle.
+- UI: a clear split between "Ollama + nomic" health and "search works".
+
+### Milestone 1 — KVM / Brain Server image with a bundled embedder
+
+- Build on `brain/Dockerfile` plus the edge compose (fastembed prefetch).
+- Smoke: `docker compose -f docker-compose.yml -f docker-compose.lan.yml up -d --build` → Bearer token → MCP search against a sample note.
+- **Acceptance:** a fresh host **without** Ollama gets working search in under N minutes after `up`.
+
+### Milestone 2 — brain-core (Node) on the server, once the rewrite matures
+
+- Either: compose with an Ollama sidecar (nomic only) behind `BRAIN_OLLAMA_URL`.
+- Or: native ONNX in Node (parity with the Python edge).
+- Not: bundling qwen into the server image.
+
+### Milestone 3 — "works on its own" in the copy
+
+- Landing page and START-HERE: the server is memory; the app is archive plus collection.
+- Remove any impression that a KVM needs 32 models.
+
+---
+
+## E. Risks
+
+| Risk | Mitigation |
 |--------|-----------|
-| **GPU vs CPU embed** | Produkt = CPU ONNX; GPU Ollama tylko gdy user już ma stack |
-| **Aktualizacje modelu** | Pin tagu (`v1.5`); bump = nowa warstwa obrazu + opcjonalny reindex; nie mieszać dim |
-| **Licencja** | Nomic Embed **Apache 2.0** — OK komercyjnie; cytować w NOTICE obrazu |
-| **Dual path desktop** | Embedded nadal używa **Ollamy usera** — nie obiecywać „zero Ollama” w Electron, dopóki Node nie ma ONNX |
-| **English-centric nomic** | Hybrid search / PL queries — już zauważone w `brain-core` search; nie mylić z „brak modelu” |
-| **Prefix query/document** | Ollama template vs explicit prefix w fastembed — nie psuć przy porcie do Node |
+| **GPU vs CPU embedding** | The product is CPU ONNX; GPU Ollama only when the user already runs that stack |
+| **Model updates** | Pin the tag (`v1.5`); a bump means a new image layer and an optional reindex; never mix dimensions |
+| **Licence** | Nomic Embed is **Apache 2.0** — fine commercially; cite it in the image's NOTICE |
+| **Dual path on desktop** | Embedded still uses **the user's Ollama** — do not promise "zero Ollama" in Electron until Node has ONNX |
+| **nomic is English-centric** | Hybrid search / Polish queries — already noted in `brain-core` search; do not confuse it with "the model is missing" |
+| **query vs document prefix** | Ollama's template vs the explicit prefix in fastembed — do not break this when porting to Node |
 
 ---
 
-## Decyzja (skrót)
+## Decision, in short
 
-- **Bundlować:** tylko nomic-embed (~274 MB Ollama / ~0,5 GB ONNX), nie qwen.
-- **Ścieżka serwera:** fastembed w obrazie Docker (już w hub) = „działa sam”.
-- **Desktop:** nadal Ollama usera na MVP; serwer osobno.
-- **Następny konkretny krok implementacyjny:** smoke test + dokumentacja acceptance Milestone 1 na obrazie edge — bez przebudowy Electron.
+- **Bundle:** nomic-embed only (~274 MB Ollama / ~0.5 GB ONNX), not qwen.
+- **Server path:** fastembed inside the Docker image (already in the hub) = "works on its own".
+- **Desktop:** still the user's Ollama for the MVP; the server is a separate story.
+- **Next concrete implementation step:** a smoke test plus acceptance documentation for Milestone 1 on the edge image — with no Electron rebuild.
