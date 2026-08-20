@@ -18,11 +18,15 @@ describe('dataLocations', () => {
     expect(defaultVaultPathHint('win32')).toBe('C:\\Vault')
   })
 
-  it('resolves XDG-style userData on Linux', () => {
+  // Lower case, and Linux is the only platform where that is observable:
+  // app.getName() falls back to package.json `name` because no top-level
+  // productName exists, so a real install has ~/.config/pomnia. The
+  // capitalised spelling this used to assert is a directory that is not there.
+  it('resolves XDG-style userData on Linux, lower case', () => {
     const ud = pomniaUserDataDir('linux', '/home/alice')
-    expect(ud.replace(/\\/g, '/')).toBe('/home/alice/.config/Pomnia')
+    expect(ud.replace(/\\/g, '/')).toBe('/home/alice/.config/pomnia')
     expect(libraryDbPathUnder(ud).replace(/\\/g, '/')).toContain(
-      '/home/alice/.config/Pomnia/brain-core-data/vectordb/library.db',
+      '/home/alice/.config/pomnia/brain-core-data/vectordb/library.db',
     )
   })
 
@@ -39,7 +43,7 @@ describe('dataLocations', () => {
 
   it('builds a snapshot that admits plaintext index', () => {
     const s = buildDataLocationsSnapshot({
-      userDataDir: '/home/alice/.config/Pomnia',
+      userDataDir: '/home/alice/.config/pomnia',
       vaultPath: '/home/alice/Vault',
       platform: 'linux',
       installForm: 'appimage',
