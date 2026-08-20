@@ -45,6 +45,31 @@ describe('save_conversation never replaces a note that is already there', () => 
     }
   })
 
+  // Three saves in one day went out as unknown/untitled or lost a field to a
+  // typo, and each answered with a bare tick. Nothing is refused here - agents
+  // calling loosely keep working - but the answer stops hiding what was lost.
+  it('names the required fields the caller left out', async () => {
+    const r = await runSaveConversation({}, { vaultRoot })
+    expect(r.text).toContain('source, topic, summary not provided')
+    expect(r.text).toContain('unknown/untitled')
+  })
+
+  it('names a misspelled field instead of dropping it in silence', async () => {
+    const r = await runSaveConversation(
+      { source: 'x', topic: 'y', sumary: 'content that would vanish' },
+      { vaultRoot },
+    )
+    expect(r.text).toContain('ignored unknown field(s): sumary')
+  })
+
+  it('stays quiet when the call is complete', async () => {
+    const r = await runSaveConversation(
+      { source: 'cursor', topic: 'refactor', summary: 'all present' },
+      { vaultRoot },
+    )
+    expect(r.text).not.toContain('!')
+  })
+
   it('leaves no .tmp file behind', async () => {
     await runSaveConversation({ source: 's', topic: 't', summary: 'y' }, { vaultRoot })
     expect(sessions().filter((f) => f.endsWith('.tmp'))).toEqual([])

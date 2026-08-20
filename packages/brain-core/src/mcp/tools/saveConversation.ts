@@ -17,6 +17,8 @@
 
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, renameSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
+
+const NL = String.fromCharCode(10)
 import { z } from 'zod'
 
 export const saveConversationSchema = {
@@ -98,6 +100,19 @@ export async function runSaveConversation(
   args: unknown,
   deps: SaveConversationDeps,
 ): Promise<SaveConversationResult> {
+  // What the caller actually sent, before zod fills the gaps. The published
+  // JSON Schema marks source, topic and summary required and the schema that
+  // runs marks everything optional, so a call with none of them is accepted and
+  // written as unknown/untitled, and a misspelled key is dropped in silence.
+  // Tightening either half breaks agents already calling it loosely, so this
+  // refuses nothing - it stops the answer being a bare tick when something was
+  // lost. A note nobody can attribute is worth little in a store people read
+  // months later; a dropped summary is worth nothing at all.
+  const sent = args && typeof args === 'object' ? Object.keys(args as object) : []
+  const known = new Set(Object.keys(argsSchema.shape))
+  const ignored = sent.filter((k) => !known.has(k))
+  const absent = ['source', 'topic', 'summary'].filter((k) => !sent.includes(k))
+
   const a = argsSchema.parse(args)
   const src = a.source.trim().toLowerCase() || 'unknown'
   const topic = a.topic.trim() || 'untitled'
@@ -161,10 +176,22 @@ export async function runSaveConversation(
   }
   renameSync(tmp, finalPath)
 
+  const notes: string[] = []
+  if (absent.length) {
+    notes.push(
+      `! ${absent.join(', ')} not provided - filed as ${src}/${topic}, which is hard to find later.`,
+    )
+  }
+  if (ignored.length) {
+    notes.push(`! ignored unknown field(s): ${ignored.join(', ')} - check the spelling.`)
+  }
+  const extra = notes.length ? notes.join(NL) + NL : ''
+
   return {
     path: finalPath,
     text:
       `✓ Saved to vault/sessions/${finalName}\n` +
+      extra +
       `Indexing for search_library in the background.\n` +
       `Will appear on knowledge graph within 30s.`,
   }
