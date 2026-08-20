@@ -1,70 +1,70 @@
-﻿# Cursor ↔ Brain MCP (first-time)
+# Cursor ↔ Brain MCP (first-time)
 
-Podłączenie Cursora do Brain na **nowej maszynie** (zwłaszcza Mac bez DMG Pomni).
+Connecting Cursor to Brain on a **new machine** — especially a Mac without the Pomnia DMG.
 
-## Co musi być w `~/.cursor/mcp.json`
+## What has to be in `~/.cursor/mcp.json`
 
-**Zawsze trzy serwery** na remote Brain (`:7862` + Bearer):
+**Always three servers** against a remote Brain (`:7862` + Bearer):
 
-| Klucz MCP (client) | Ścieżka HTTP na serwerze |
+| MCP key (client) | HTTP path on the server |
 |--------------------|--------------------------|
 | `pomnia` | `/sse` |
 | `pomnia-vault` | `/servers/brain-vault/sse` |
 | `pomnia-library` | `/servers/brain-library/sse` |
 
-Sam `pomnia` = **niepełna** konfiguracja (brak vault/library). Status w aplikacji nadal akceptuje legacy klucze `brain-rag` / `brain-vault` / `brain-library`.
+`pomnia` on its own is an **incomplete** configuration — no vault, no library. Status in the app still accepts the legacy keys `brain-rag` / `brain-vault` / `brain-library`.
 
-Ścieżki URL `/servers/brain-vault|library` to **ścieżki na proxy Brain** — nie zmieniaj ich; zmienia się tylko nazwa klucza w `mcp.json`.
+The URL paths `/servers/brain-vault|library` are **paths on the Brain proxy** — do not change them. Only the key name in `mcp.json` changes.
 
-## Mac / bez aplikacji Pomnia (teraz)
+## Mac / no Pomnia app (for now)
 
-1. Otwórz generator w przeglądarce:
-   - strona marketingowa (poza tym repo, Cloudflare / pomnia.ai): `https://pomnia.ai/cursor-mcp.html` (jeśli wdrożona)
-2. Wklej URL Brain (`http://…:7862`) i token Bearer.
-3. **Kopiuj mcp.json dla Cursora** → zapisz jako `~/.cursor/mcp.json`.
+1. Open the generator in a browser:
+   - marketing site (outside this repo, Cloudflare / pomnia.ai): `https://pomnia.ai/cursor-mcp.html` (if deployed)
+2. Paste the Brain URL (`http://…:7862`) and the Bearer token.
+3. **Copy mcp.json for Cursor** → save it as `~/.cursor/mcp.json`.
 4. Cursor → `Cmd+Shift+P` → **Developer: Reload Window**.
 
-Token: dashboard Brain na **`:7860`** (ten sam host co MCP, inny port) → Settings / API tokens.
+Token: the Brain dashboard on **`:7860`** (same host as MCP, different port) → Settings / API tokens.
 
-## Windows (gdy masz instalator Pomni)
+## Windows (when you have the Pomnia installer)
 
-Zakładka **Connect** w aplikacji:
+The **Connect** tab in the app:
 
-1. Tryb **Na serwerze** → URL `:7862`
-2. Token (wklej albo **New token** z dashboardu)
-3. Wybierz **Cursor** → **Kopiuj mcp.json dla Cursora**
-4. Reload Window w Cursorze
+1. Mode **On your server** → URL `:7862`
+2. Token (paste one, or **New token** from the dashboard)
+3. Pick **Cursor** → **Copy mcp.json for Cursor**
+4. Reload Window in Cursor
 
-Connect wykrywa też config **Partial** (tylko rag) i podpowiada brak vault/library.
+Connect also detects a **Partial** config (rag only) and tells you vault/library are missing.
 
-## Przykład (szablon — wstaw swój URL i token)
+## Example (template — put in your own URL and token)
 
 ```json
 {
   "mcpServers": {
     "pomnia": {
-      "url": "http://TWOJ-HOST:7862/sse",
+      "url": "http://YOUR-HOST:7862/sse",
       "headers": { "Authorization": "Bearer btk_…" }
     },
     "pomnia-vault": {
-      "url": "http://TWOJ-HOST:7862/servers/brain-vault/sse",
+      "url": "http://YOUR-HOST:7862/servers/brain-vault/sse",
       "headers": { "Authorization": "Bearer btk_…" }
     },
     "pomnia-library": {
-      "url": "http://TWOJ-HOST:7862/servers/brain-library/sse",
+      "url": "http://YOUR-HOST:7862/servers/brain-library/sse",
       "headers": { "Authorization": "Bearer btk_…" }
     }
   }
 }
 ```
 
-Nie commituj prawdziwego tokena. Na macOS: `chmod 600 ~/.cursor/mcp.json`.
+Do not commit a real token. On macOS: `chmod 600 ~/.cursor/mcp.json`.
 
-## Weryfikacja
+## Verifying
 
-- Cursor → Settings → MCP: trzy serwery Connected
-- Agent woła `get_user_profile` / `search_library`
+- Cursor → Settings → MCP: three servers Connected
+- The agent calls `get_user_profile` / `search_library`
 
-## Embedded (tylko z aplikacją Pomnia)
+## Embedded (with the Pomnia app only)
 
-Lokalny brain w Pomni = **jeden** serwer `pomnia` na `http://127.0.0.1:7862/mcp`, bez tokena. To nie dotyczy Mac bez DMG — użyj remote + trzech serwerów powyżej.
+The local brain inside Pomnia is **one** `pomnia` server at `http://127.0.0.1:7862/mcp`, no token. That does not apply to a Mac without the DMG — use remote plus the three servers above.

@@ -1,19 +1,19 @@
-# FlowDiagram na żywo — jeden punkt obserwacji (Brain MCP)
+# Live FlowDiagram — one place to watch (Brain MCP)
 
-**Nie trzeba per agenta.** Cursor, Claude Code, Claude Desktop, Antigravity, Windsurf — każdy klient MCP woła ten sam serwer `pomnia` (legacy klucz `brain-rag` nadal działa). Pomnia obserwuje **wyłącznie Brain**, nie pliki konfiguracyjne agentów.
+**No per-agent work needed.** Cursor, Claude Code, Claude Desktop, Antigravity, Windsurf — every MCP client calls the same `pomnia` server (the legacy `brain-rag` key still works). Pomnia watches **Brain only**, never the agents' own config files.
 
-## Architektura
+## Architecture
 
 ```mermaid
 flowchart LR
-  subgraph clients [Dowolny klient MCP]
+  subgraph clients [Any MCP client]
     C1[Cursor]
     C2[Claude Code]
     C3[Antigravity]
     C4[Claude Desktop]
   end
 
-  subgraph brain [Brain homelab — jeden punkt]
+  subgraph brain [Brain homelab — one place]
     MCP[pomnia / mcp_rag.py]
     ACT[last_mcp_activity.json]
     API["GET /mcp/activity (:7862)\nGET /api/mcp/last-activity (:7860)"]
@@ -22,56 +22,57 @@ flowchart LR
   end
 
   subgraph pomnia [Pomnia]
-    POLL[mcpActivityPoll co 2s]
+    POLL[mcpActivityPoll every 2s]
     ACTIVITY[activity mcp-query]
     DIAG[FlowDiagram SVG]
     POLL --> ACTIVITY --> DIAG
   end
 
   clients -->|search_library / get_skill / run_skill| MCP
-  API -->|poll gdy remote + okno w fokusie| POLL
+  API -->|poll when remote + window focused| POLL
   EMB[embedded brain-core] -->|fork IPC mcp-query| ACTIVITY
 ```
 
-## Co się dzieje przy zapytaniu
+## What happens on a query
 
-1. Agent woła narzędzie MCP (`search_library`, `get_skill`, `run_skill`, …).
-2. `dashboard/mcp_rag.py` → `record_mcp_tool()` zapisuje `{ tool, ts, query_preview }` do `data/last_mcp_activity.json`.
+1. The agent calls an MCP tool (`search_library`, `get_skill`, `run_skill`, …).
+2. `dashboard/mcp_rag.py` → `record_mcp_tool()` writes `{ tool, ts, query_preview }` to `data/last_mcp_activity.json`.
 3. Pomnia:
-   - **Embedded** (`brainTarget=embedded`): child process `brain-core` emituje `mcp-query` przez fork IPC — bez pollingu.
-   - **Remote** (`brainTarget=remote`): main process polluje co **2 s** gdy okno w fokusie i widoczny jest Dashboard lub HowItWorks (`mcpActivity:watch` ref-count).
-4. `activity.update({ kind: 'mcp-query' })` → FlowDiagram podświetla gałąź agent → biblioteka.
+   - **Embedded** (`brainTarget=embedded`): the `brain-core` child process emits `mcp-query` over fork IPC — no polling at all.
+   - **Remote** (`brainTarget=remote`): the main process polls every **2 s** while the window has focus and either Dashboard or HowItWorks is visible (`mcpActivity:watch` ref-count).
+4. `activity.update({ kind: 'mcp-query' })` → FlowDiagram lights the agent → library branch.
 
-## Endpointy (Brain)
+## Endpoints (Brain)
 
-| URL | Port | Format |
+| URL | Port | Shape |
 |-----|------|--------|
 | `GET /mcp/activity` | 7862 (auth proxy) | `{ last: { tool, detail, ts }, recent }` |
 | `GET /api/mcp/last-activity` | 7860 (dashboard) | `{ tool, ts, query_preview }` |
-| `GET /api/mcp/last-activity` | 7862 (alias) | j.w. |
+| `GET /api/mcp/last-activity` | 7862 (alias) | as above |
 
-`recent=true` gdy ostatnie wywołanie &lt; 4 s temu. Tylko metadane — bez treści vaultu.
+`recent=true` when the last call was less than 4 s ago. Metadata only — no vault content leaves the server.
 
-## Deploy Brain (homelab / 192.168.x.x)
+## Deploying Brain (homelab / 192.168.x.x)
 
-Na serwerze Brain (repo `brain`, branch `main` → remote `hub`):
+On the Brain server (repo `brain`, branch `main` → remote `hub`):
 
 ```powershell
-cd C:\Users\Alice\Projects\brain   # lub SSH na host
+cd C:\Users\Alice\Projects\brain   # or SSH to the host
 
-# 1. Pull + upewnij się że jest pipeline/mcp_activity.py
+# 1. Pull, and make sure pipeline/mcp_activity.py is present
 git pull hub main
 
-# 2. Restart usług MCP (supergateway + auth proxy + mcp_rag)
+# 2. Restart the MCP services (supergateway + auth proxy + mcp_rag)
 # Docker:
 docker compose restart brain-mcp-gateway brain-mcp-auth-proxy
 
-# Lub systemd (Linux):
+# Or systemd (Linux):
 sudo systemctl restart brain-mcp-gateway brain-mcp-auth-proxy
 
-# 3. Restart dashboardu FastAPI (:7860) — nowy endpoint /api/mcp/last-activity
+# 3. Restart the FastAPI dashboard (:7860) — it serves the new
+#    /api/mcp/last-activity endpoint
 sudo systemctl restart brain-dashboard
-# lub: docker compose restart brain-dashboard
+# or: docker compose restart brain-dashboard
 ```
 
 **Smoke test:**
@@ -81,19 +82,19 @@ curl -s http://brain.example.local:7862/mcp/activity
 curl -s http://brain.example.local:7860/api/mcp/last-activity
 ```
 
-W Cursorze: `pomnia.search_library "test"` — w ciągu 2 s FlowDiagram w Pomni powinien mrugnąć gałęzią MCP.
+In Cursor: `pomnia.search_library "test"` — within 2 s the FlowDiagram in Pomnia should blink its MCP branch.
 
-## Konfiguracja Pomnia
+## Pomnia configuration
 
-1. Ustawienia → Brain target: **Remote**
-2. URL MCP: `http://brain.example.local:7862` (auth proxy)
-3. Token MCP (ten sam co w `~/.cursor/mcp.json`)
-4. Otwórz **Dashboard** lub **Jak to działa** — polling włącza się automatycznie
+1. Settings → Brain target: **Remote**
+2. MCP URL: `http://brain.example.local:7862` (auth proxy)
+3. MCP token (the same one as in `~/.cursor/mcp.json`)
+4. Open **Dashboard** or **How it works** — polling starts on its own
 
-## Czego NIE robimy
+## What we deliberately do not do
 
-- ❌ Hooki w Cursor / Claude / Antigravity
-- ❌ Parsowanie logów agentów
-- ❌ Osobna integracja per klient
+- ❌ Hooks in Cursor / Claude / Antigravity
+- ❌ Parsing agent logs
+- ❌ A separate integration per client
 
-Wystarczy skonfigurować klienta na Brain MCP (Connect → snippet) — diagram żyje sam.
+Point the client at Brain MCP (Connect → snippet) and the diagram takes care of itself.

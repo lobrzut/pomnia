@@ -1,70 +1,73 @@
-# Pomnia — build macOS (DMG)
+# Pomnia — macOS build (DMG)
 
-> **Od 2026-08-20 nie trzeba tego robić ręcznie.** `.github/workflows/release-mac.yml`
-> buduje DMG na `macos-latest` przy każdym tagu `v*` i dołącza go do wydania.
-> Ten dokument opisuje build lokalny — przydatny do debugowania, niepotrzebny do
-> wydawania. Historia: workflow padał po cichu na v0.1.61–v0.1.63, bo powstał ze
-> szkicu zadania linuksowego bez jego czterech poprawek (build pakietów,
-> GOLDEN_PATH_SKIP, USE_HARD_LINKS, --publish never).
+> **Since 2026-08-20 you do not need to do this by hand.**
+> `.github/workflows/release-mac.yml` builds both DMGs on every `v*` tag and
+> attaches them to the release — one runner per architecture (`macos-15-intel`
+> for x64, `macos-latest` for arm64), because cross-compiling put arm64 native
+> modules inside the "Intel" app and it died on the first SQLite query.
+> This document covers the local build: useful for debugging, unnecessary for
+> releasing. History: the workflow failed silently on v0.1.61–v0.1.63 because it
+> was written from a sketch of the Linux job without its four fixes (build the
+> workspace packages, GOLDEN_PATH_SKIP, USE_HARD_LINKS, `--publish never`).
 
-Build **musi** iść na macOS. Na Windows `npm run pack:mac` się nie uda (brak narzędzi Apple + natywne moduły pod Darwin).
+The build **must** run on macOS. On Windows `npm run pack:mac` will not work — the Apple tooling is missing and the native modules are built for Darwin.
 
-Wersja bierze się z `package.json` — nie wpisujcie jej tutaj, bo zdezaktualizuje się w tydzień (ten wiersz mówił 0.1.2 przy 0.1.63). Skrypt pakowania:
+The version comes from `package.json`. Do not write it here; it goes stale within a week (this line said 0.1.2 while the project was on 0.1.63). The packing script:
 
 ```json
 "pack:mac": "npm run build:brain-core && npm run stage:brain-core && electron-vite build && electron-builder --mac"
 ```
 
-Konfiguracja `electron-builder.yml`:
+`electron-builder.yml` configuration:
 
 - output: `release/`
 - target: `dmg`
-- artifact: `Pomnia-${version}.dmg` (np. `release/Pomnia-0.1.2.dmg`)
-- dodatkowo: `release/mac/` (rozpakowana aplikacja `.app`)
+- artifact: `Pomnia-${version}-${arch}.dmg`
+- also: `release/mac/` (the unpacked `.app`)
 
 ---
 
-## 1. Wymagania
+## 1. Requirements
 
-| Narzędzie | Wersja / uwagi |
+| Tool | Version / notes |
 |-----------|----------------|
-| **macOS** | 12+ (Monterey lub nowszy) |
-| **Node.js** | 20 LTS lub 22 (zalecane LTS) |
-| **npm** | 10+ (wbudowany w Node) |
-| **Xcode Command Line Tools** | wymagane przez `electron-builder` i kompilację `better-sqlite3` |
+| **macOS** | 12+ (Monterey or newer) |
+| **Node.js** | 20 LTS or 22 (LTS recommended) |
+| **npm** | 10+ (ships with Node) |
+| **Xcode Command Line Tools** | required by `electron-builder` and to compile `better-sqlite3` |
 
-Instalacja CLT (jednorazowo):
+Installing CLT (once):
 
 ```bash
 xcode-select --install
 ```
 
-Sprawdzenie:
+Checking:
 
 ```bash
 node -v
 npm -v
-xcode-select -p   # powinno wypisać ścieżkę, np. /Library/Developer/CommandLineTools
+xcode-select -p   # should print a path, e.g. /Library/Developer/CommandLineTools
 ```
 
 ---
 
-## 2. Przygotowanie repo
+## 2. Preparing the repo
 
 ```bash
-git clone <url-repozytorium> pomnia
+git clone <repository-url> pomnia
 cd pomnia
 git checkout master
 git pull
 ```
 
-Czysta instalacja zależności (zalecane przed pierwszym buildem):
+A clean dependency install (recommended before the first build):
 
 ```bash
 npm ci
 ```
 
-Opcjonalnie — testy przed pakowaniem:
+Optionally, tests before packing:
 
 ```bash
 npm test
@@ -73,85 +76,78 @@ npm run typecheck
 
 ---
 
-## 3. Ikona (opcjonalnie)
+## 3. Icon (optional)
 
-W `resources/` są `icon.png` i `icon.ico`. Dla macOS electron-builder preferuje **`resources/icon.icns`**.
+`resources/` holds `icon.png` and `icon.ico`. For macOS electron-builder prefers **`resources/icon.icns`**.
 
-Jeśli build narzeka na brak ikony, wygeneruj `.icns` z PNG (512×512 lub większy):
+If the build complains about a missing icon, generate `.icns` from a PNG (512×512 or larger):
 
 ```bash
 mkdir -p resources/icon.iconset
 sips -z 512 512 resources/icon.png --out resources/icon.iconset/icon_512x512.png
-# … pozostałe rozmiary iconset (1024, 256, 128, …) lub użyj narzędzia typu png2icns
+# … the remaining iconset sizes (1024, 256, 128, …) or use something like png2icns
 iconutil -c icns resources/icon.iconset -o resources/icon.icns
 ```
 
-Bez `icon.icns` builder często i tak buduje DMG z domyślną ikoną Electron — aplikacja działa, wygląd Dock/Finder może być generyczny.
+Without `icon.icns` the builder will usually still produce a DMG carrying Electron's default icon — the app runs, but Dock and Finder look generic.
 
 ---
 
-## 4. Build DMG
+## 4. Building the DMG
 
 ```bash
 npm run pack:mac
 ```
 
-Kolejność wewnątrz skryptu:
+What the script does, in order:
 
-1. `build:brain-core` — kompilacja `@pomnia/brain-core`
-2. `stage:brain-core` — staging runtime + `electron-rebuild` dla `better-sqlite3` (ABI Electrona)
+1. `build:brain-core` — compile `@pomnia/brain-core`
+2. `stage:brain-core` — stage the runtime and run `electron-rebuild` for `better-sqlite3` (Electron's ABI)
 3. `electron-vite build` — bundle main/preload/renderer → `out/`
-4. `electron-builder --mac` — DMG w `release/`
+4. `electron-builder --mac` — DMG in `release/`
 
-Oczekiwany wynik:
+Expected result:
 
 ```
-release/Pomnia-0.1.2.dmg
+release/Pomnia-<version>-<arch>.dmg
 release/mac/Pomnia.app
 ```
 
-Instalacja lokalna: otwórz DMG, przeciągnij `Pomnia.app` do Applications.
+To install locally: open the DMG and drag `Pomnia.app` into Applications.
 
 ---
 
 ## 5. Apple Silicon vs Intel
 
-Domyślnie **architektura maszyny, na której budujesz**:
+By default you get **the architecture of the machine you build on**:
 
-| Maszyna buildu | DMG zawiera |
+| Build machine | The DMG contains |
 |----------------|-------------|
-| Mac M1/M2/M3/M4 (arm64) | aplikacja **arm64** |
-| Mac Intel (x64) | aplikacja **x64** |
+| Mac M1/M2/M3/M4 (arm64) | an **arm64** app |
+| Intel Mac (x64) | an **x64** app |
 
-Uniwersalny binarny (arm64 + x64 w jednym DMG) — **nie jest skonfigurowany**. Jeśli potrzebujesz obu architektur, dodaj w `electron-builder.yml` np.:
+A universal binary (arm64 + x64 in one DMG) is **not configured**.
 
-```yaml
-mac:
-  target:
-    - target: dmg
-      arch: [arm64, x64]
-```
-
-albo buduj na obu typach Maców / w CI (osobne artefakty).
+Do not try to produce both architectures from one machine by listing them in `electron-builder.yml`. `sqlite-vec` and `@napi-rs/canvas` ship per-platform optional dependencies, so `npm ci` on an Apple Silicon machine installs `darwin-arm64` and nothing else — there is no x64 binary present to package, and the resulting "Intel" app launches and then dies on its first SQLite call. Build on both kinds of Mac, or let CI do it: one runner per architecture, which is what `release-mac.yml` does.
 
 ---
 
-## 6. Podpisywanie kodu i notaryzacja (opcjonalne)
+## 6. Code signing and notarisation (optional)
 
-Dla **dev / lokalnego użytku** podpis nie jest wymagany. Po zainstalowaniu macOS może pokazać:
+For **dev / local use** a signature is not required. After installing, macOS may say:
 
-> „Pomnia” cannot be opened because the developer cannot be verified.
+> "Pomnia" cannot be opened because the developer cannot be verified.
 
-Obejście (tylko zaufane buildy):
+Ways round it (for builds you trust only):
 
-- System Settings → Privacy & Security → **Open Anyway**, albo
-- klik prawy na aplikację → **Open** (pierwsze uruchomienie)
+- System Settings → Privacy & Security → **Open Anyway**, or
+- on older macOS, right-click the app → **Open** (first launch only; Sequoia removed this path for unsigned apps)
 
-Dla **dystrybucji publicznej** potrzebujesz:
+For **public distribution** you need:
 
-- konto **Apple Developer** (płatne)
-- certyfikat **Developer ID Application**
-- zmienne środowiskowe dla `electron-builder`, np.:
+- an **Apple Developer** account (paid)
+- a **Developer ID Application** certificate
+- environment variables for `electron-builder`, e.g.:
 
 ```bash
 export CSC_LINK=/path/to/certificate.p12
@@ -162,41 +158,42 @@ export APPLE_TEAM_ID='…'
 npm run pack:mac
 ```
 
-Notaryzacja (`@electron/notarize`) — osobny krok po podpisaniu; bez tego Gatekeeper nadal blokuje pobrania z internetu.
+Notarisation (`@electron/notarize`) is a separate step after signing; without it Gatekeeper still blocks anything downloaded from the internet.
 
-**Ten repo nie ma skonfigurowanych sekretów podpisu** — lokalny / CI build bez certyfikatów = unsigned DMG (OK do testów).
+**This repo has no signing secrets configured** — a local or CI build without certificates produces an unsigned DMG, which is fine for testing.
 
 ---
 
-## 7. Typowe problemy
+## 7. Common problems
 
-| Problem | Rozwiązanie |
+| Problem | Fix |
 |---------|-------------|
 | `xcode-select: error: tool 'xcodebuild' requires Xcode` | `xcode-select --install` |
-| błąd kompilacji `better-sqlite3` | upewnij się, że CLT są zainstalowane; usuń `build/brain-core-runtime` i uruchom `pack:mac` ponownie |
-| brak miejsca na dysku | staging brain-core + `node_modules` ~1–2 GB |
-| Gatekeeper blokuje app | patrz §6 — unsigned build |
-| budujesz na Windows | **nie rób tego** — użyj Maca lub GitHub Actions (`release-mac.yml`) |
+| `better-sqlite3` fails to compile | make sure CLT is installed; delete `build/brain-core-runtime` and run `pack:mac` again |
+| out of disk space | brain-core staging plus `node_modules` is roughly 1–2 GB |
+| Gatekeeper blocks the app | see §6 — unsigned build |
+| you are building on Windows | **don't** — use a Mac or GitHub Actions (`release-mac.yml`) |
 
 ---
 
-## 8. Build w CI (GitHub Actions)
+## 8. Building in CI (GitHub Actions)
 
 Workflow `.github/workflows/release-mac.yml`:
 
-- trigger: ręcznie (`workflow_dispatch`) lub tag `v*` (np. `v0.1.2`)
-- runner: `macos-latest` (Apple Silicon)
-- artefakt: `Pomnia-*.dmg` z `release/`
+- trigger: manual (`workflow_dispatch`) or a `v*` tag
+- runners: `macos-15-intel` (x64) and `macos-latest` (arm64), as a matrix
+- verification: every `.node` and `.dylib` in the packed app is checked with `file`, and the job fails rather than uploads if the architecture does not match the label on the DMG
+- artifacts: `Pomnia-*.dmg` from `release/`, attached to the release on tag pushes
 
-Bez sekretów Apple = unsigned DMG do pobrania z zakładki Actions → Artifacts.
+Without Apple secrets this produces unsigned DMGs.
 
 ---
 
-## 9. Szybka ściąga (copy-paste)
+## 9. Quick copy-paste
 
 ```bash
 git clone <url> pomnia && cd pomnia
-xcode-select --install    # jeśli jeszcze nie
+xcode-select --install    # if you have not already
 npm ci
 npm run pack:mac
 open release/Pomnia-*.dmg
