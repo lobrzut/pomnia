@@ -13,13 +13,23 @@ import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 
 function read(): string {
-  try {
-    return (require('../package.json') as { version?: string }).version ?? '0.0.0'
-  } catch {
-    // Bundled without the manifest — better an honest unknown than a stale
-    // number that looks authoritative.
-    return '0.0.0'
+  // Two layouts, and only one of them was handled. In the repo this file is
+  // packages/brain-core/dist/version.js, so '../package.json' is the package
+  // manifest. Staged for shipping it is flattened - version.js and
+  // package.json sit side by side - and '../package.json' resolves a level too
+  // high, to Electron's resources manifest. Every packaged build therefore
+  // reported 0.0.0, which is the exact failure this module was written to stop.
+  for (const rel of ['../package.json', './package.json']) {
+    try {
+      const v = (require(rel) as { version?: string }).version
+      if (v) return v
+    } catch {
+      /* try the next layout */
+    }
   }
+  // Genuinely bundled without a manifest - an honest unknown beats a stale
+  // number that looks authoritative.
+  return '0.0.0'
 }
 
 export const BRAIN_CORE_VERSION = read()

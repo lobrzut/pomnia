@@ -11,7 +11,7 @@
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { execSync } from 'node:child_process'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -53,6 +53,13 @@ writeFileSync(
   JSON.stringify(
     {
       name: 'brain-core-runtime',
+      // The staged manifest carried dependencies and no version, so
+      // BRAIN_CORE_VERSION fell through to its '0.0.0' fallback and every
+      // shipped build told agents, /healthz and any bug report that it was
+      // version 0.0.0. version.ts exists precisely to stop the handshake
+      // advertising a number that points at the wrong code; it fixed the
+      // stale-number half and this left the no-number half.
+      version: bcPkg.version,
       private: true,
       type: 'module',
       dependencies: bcPkg.dependencies
@@ -124,4 +131,21 @@ if (process.platform === 'darwin' || process.platform === 'linux') {
 }
 
 console.log('[stage-brain-core] skip Electron helper EXE (utilityProcess uses Pomnia ABI)')
+// Ask the staged runtime what version it thinks it is, rather than trusting
+// that writing the field was enough. Both halves of this have been wrong at
+// once: the manifest had no version, and version.js resolved '../package.json'
+// against a layout that only exists in the repo. Either one silently yields
+// 0.0.0, which is what every shipped build reported until now.
+{
+  const url = pathToFileURL(join(stage, 'version.js')).href
+  const { BRAIN_CORE_VERSION } = await import(url)
+  if (BRAIN_CORE_VERSION !== bcPkg.version) {
+    throw new Error(
+      `staged runtime reports version ${BRAIN_CORE_VERSION}, expected ${bcPkg.version} — ` +
+        'agents, /healthz and every bug report would quote the wrong build',
+    )
+  }
+  console.log(`[stage-brain-core] version check OK - runtime reports ${BRAIN_CORE_VERSION}`)
+}
+
 console.log('[stage-brain-core] done →', stage)
