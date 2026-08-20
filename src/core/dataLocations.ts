@@ -29,8 +29,8 @@ export function defaultVaultPathHint(os: OS = currentOS()): string {
 /** Where Pomnia keeps settings, logs, and the rebuildable search index. */
 export function pomniaUserDataDir(os: OS = currentOS(), home: string = homeDir()): string {
   const root = appDataRoot(os, home)
-  if (os === 'win32') return join(root, 'Pomnia')
-  return posix.join(root.replace(/\\/g, '/'), 'Pomnia')
+  if (os === 'win32') return join(root, 'pomnia')
+  return posix.join(root.replace(/\\/g, '/'), 'pomnia')
 }
 
 export function brainCoreDataDirUnder(userData: string): string {
