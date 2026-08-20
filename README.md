@@ -1,8 +1,14 @@
 # Pomnia
 
+<img src="docs/assets/social-card-en.png" alt="The same question asked twice: an assistant with no memory says it has no context from previous conversations; the same question with Pomnia answers with the decision, its date and the file it came from." width="100%">
+
 **One encrypted memory your AI agents share** — conversations from every assistant, distilled on your own hardware, recalled over MCP. Local-first: nothing depends on a vendor's cloud.
 
 Pomnia Desktop (Windows / macOS) collects chats from assistants (Claude Code, Cursor, Claude Desktop, Antigravity, VS Code, Continue) **and** imports from exports (Claude.ai, ChatGPT, Gemini, Grok) plus documents (PDF, DOCX, EPUB) into one vault — with search (**Chats**), distill via Ollama, and Brain on `127.0.0.1:7862`.
+
+I have run this on my own machines for six months, every working day — 2415 distilled
+notes and 3735 indexed chunks at the time of writing. It went public about seven weeks
+ago. That is a real test and a narrow one, and the docs say which parts are which.
 
 > **Desktop app** — version in [`package.json`](package.json). Windows installer: **only** via `npm run release:win` (see below). Start: [docs/START-HERE.md](docs/START-HERE.md).  
 > **Repo:** [github.com/lobrzut/pomnia](https://github.com/lobrzut/pomnia) · **Site:** [pomnia.ai](https://pomnia.ai)
