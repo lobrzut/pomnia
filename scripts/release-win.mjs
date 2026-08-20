@@ -18,7 +18,7 @@
  *   --dry-run      steps 1–5 only (no version bump / pack)
  */
 import { execSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -84,7 +84,21 @@ if (dryRun) {
 
 run('npm version patch --no-git-tag-version')
 const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version
-run('git add package.json package-lock.json')
+
+// The workspace package has to move with the app. `npm version patch` touches
+// the root manifest only, so brain-core kept the previous number and reported
+// it over MCP and /healthz — a version that matches no release, which is the
+// exact defect version.ts exists to prevent. Bumped in lockstep, and the
+// staging script verifies the running runtime agrees before it finishes.
+const bcPath = join(root, 'packages', 'brain-core', 'package.json')
+const bc = JSON.parse(readFileSync(bcPath, 'utf8'))
+if (bc.version !== version) {
+  writeFileSync(bcPath, JSON.stringify({ ...bc, version }, null, 2) + '
+', 'utf8')
+  console.log(`brain-core ${bc.version} -> ${version}`)
+}
+
+run('git add package.json package-lock.json packages/brain-core/package.json')
 run(`git commit -m "Release ${version}"`)
 
 console.log(`\nRelease commit ready (${version}). Building installer with buildInfo from this commit…\n`)
