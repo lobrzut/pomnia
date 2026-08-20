@@ -38,6 +38,7 @@ import {
   pingBrain,
   probeMcpUrl,
   identifyEngine,
+  isWebUrl,
   emptyLedger,
   ledgerPathInVault,
   loadLedgerForVault,
@@ -683,7 +684,17 @@ function createWindow(): void {
       .catch((e: unknown) => log.warn('renderer bridge check failed:', (e as Error).message))
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    // openExternal hands the string to the OS URI handler, so the scheme decides
+    // what actually runs. Every link the app opens is a web page, and the only
+    // one built from data we do not author is update.releaseUrl — `html_url`
+    // straight out of the GitHub API response. That is a long way from
+    // attacker-controlled, and it is also one comparison away from not
+    // mattering: anything that is not http(s) is refused rather than launched.
+    if (!isWebUrl(url)) {
+      log.warn(`refused to open a non-web URL: ${url.slice(0, 120)}`)
+      return { action: 'deny' }
+    }
+    void shell.openExternal(url)
     return { action: 'deny' }
   })
 
