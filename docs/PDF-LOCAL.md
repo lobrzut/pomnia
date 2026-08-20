@@ -1,112 +1,112 @@
-# Lokalne parsowanie PDF i dokumentów (Pomnia desktop)
+# Local PDF and document parsing (Pomnia desktop)
 
-> **Cel:** Pomnia musi indeksować PDF/DOCX **offline**, w spakowanym instalatorze, bez wymagania Javy, Pythona ani homelab Brain. Serwer Brain (opendataloader-pdf) zostaje opcjonalnym Tier 3 — nie blokującym v1.
+> **Goal:** Pomnia has to index PDF/DOCX **offline**, from the packaged installer, without requiring Java, Python or a homelab Brain. The Brain server (opendataloader-pdf) stays an optional Tier 3 and does not block v1.
 
-## Kontekst
+## Context
 
-| Stan dziś | Problem |
+| Where we are | Problem |
 |-----------|---------|
-| `distill` = tylko rozmowy (Ollama JSON → `.md`) | Brak ścieżki dla plików |
-| `brain-core` indexer = `.md` / `.txt` tylko | PDF/EPUB „library-server concern" |
-| Homelab Brain = opendataloader-pdf (Java) | Nie zawsze online / nie na każdym PC |
+| `distill` handles conversations only (Ollama JSON → `.md`) | No path for files |
+| The `brain-core` indexer takes `.md` / `.txt` only | PDF/EPUB treated as a "library-server concern" |
+| Homelab Brain uses opendataloader-pdf (Java) | Not always online, and not on every PC |
 
-**Wniosek:** potrzebny jest osobny moduł `packages/doc-parser` + rozszerzenie pipeline indeksowania — niezależnie od dostępności serwera.
+**Conclusion:** we need a separate `packages/doc-parser` module plus an extension to the indexing pipeline — independent of whether a server is available.
 
 ---
 
-## 1. Porównanie opcji (Electron / Node, offline)
+## 1. Options compared (Electron / Node, offline)
 
-### Rekomendowane ✅
+### Recommended ✅
 
-| Biblioteka | Tekst | OCR | Native deps | Offline exe | Uwagi |
+| Library | Text | OCR | Native deps | Offline exe | Notes |
 |------------|-------|-----|-------------|-------------|-------|
-| **[unpdf](https://github.com/unjs/unpdf)** | ✅ | ❌ | **Brak** (bundled pdfjs) | ✅ | **v1 pick** — zero canvas, działa w fork child |
-| **pdfjs-dist legacy** | ✅ | ❌ (render wymaga canvas) | `@napi-rs/canvas` opcjonalnie | ✅ | Niższy poziom; unpdf to wrapper |
-| **mammoth** | DOCX ✅ | — | Brak | ✅ | Mały, sprawdzony; v1 dla Word |
-| **tesseract.js** | — | ✅ (obrazy) | WASM ~4–8 MB/lang | ✅* | *Wymaga renderu stron pdfjs→canvas; wolne CPU |
+| **[unpdf](https://github.com/unjs/unpdf)** | ✅ | ❌ | **None** (bundled pdfjs) | ✅ | **v1 pick** — no canvas, works inside a forked child |
+| **pdfjs-dist legacy** | ✅ | ❌ (rendering needs canvas) | `@napi-rs/canvas` optionally | ✅ | Lower level; unpdf wraps it |
+| **mammoth** | DOCX ✅ | — | None | ✅ | Small, proven; the v1 choice for Word |
+| **tesseract.js** | — | ✅ (images) | WASM ~4–8 MB per language | ✅* | *Needs pdfjs to render pages to canvas; slow on CPU |
 
-### Akceptowalne później (v2+)
+### Acceptable later (v2+)
 
-| Biblioteka | Problem dla instalatora |
+| Library | Problem for the installer |
 |------------|-------------------------|
-| **markitdown-ts** / **@markitdownjs/*** | Duży zestaw zależności (jsdom, xlsx…); PDF przez pdf-parse; więcej formatów, ale cięższy bundle |
-| **Ollama vision** (llava, moondream) | Już mamy Ollama na hoście; render stron pdfjs + opis — dobre dla skanów, wolne |
-| **scribe.js** | PDF+OCR w jednym; AGPL/commercial — sprawdzić licencję przed produkcją |
+| **markitdown-ts** / **@markitdownjs/*** | Large dependency set (jsdom, xlsx…); PDF via pdf-parse; more formats, heavier bundle |
+| **Ollama vision** (llava, moondream) | Ollama is already on the host; render pages with pdfjs and describe them — good for scans, slow |
+| **scribe.js** | PDF+OCR in one; AGPL/commercial — check the licence before shipping |
 
-### Unikać w instalatorze ❌
+### Avoid in the installer ❌
 
-| Opcja | Dlaczego nie |
+| Option | Why not |
 |-------|--------------|
-| **@opendataloader/pdf** | Wymaga **Java 11+** — +80–150 MB JRE lub wymóg instalacji u usera |
-| **Microsoft markitdown (Python)** | Python runtime + pip extras; trudne w electron-builder |
-| **PyMuPDF sidecar** | Ten sam problem co Python brain — osobny interpreter, AV false positives |
-| **docling** | IBM stack, modele ML, Python — overkill na desktop MVP |
-| **@mote-software/markitdown** | Bundluje Python binary per platforma — duży, drugi runtime |
-| **pdf-lib** | Tworzenie/edycja PDF, nie ekstrakcja tekstu |
-| **pdf2json** | JSON layout — kruche, trudne do chunkingu RAG |
-| **pdf-parse** | Opakowanie pdfjs; **unpdf** jest utrzymywany i serverless-ready |
-| **Windows Print-to-text** | Brak API, niedeterministyczne, nie cross-platform |
+| **@opendataloader/pdf** | Needs **Java 11+** — either +80–150 MB of JRE or a requirement on the user |
+| **Microsoft markitdown (Python)** | Python runtime plus pip extras; painful in electron-builder |
+| **PyMuPDF sidecar** | Same problem as the Python brain — a second interpreter, and AV false positives |
+| **docling** | IBM stack, ML models, Python — overkill for a desktop MVP |
+| **@mote-software/markitdown** | Bundles a Python binary per platform — large, and a second runtime |
+| **pdf-lib** | Creates and edits PDFs; does not extract text |
+| **pdf2json** | JSON layout — brittle, and awkward to chunk for RAG |
+| **pdf-parse** | A wrapper around pdfjs; **unpdf** is maintained and serverless-ready |
+| **Windows print-to-text** | No API, non-deterministic, not cross-platform |
 
 ---
 
-## 2. Architektura — trzy tiery
+## 2. Architecture — three tiers
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  User: Import PDF/DOCX (GUI / CLI / drag-drop)                  │
+│  User: import PDF/DOCX (GUI / CLI / drag-drop)                  │
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  @pomnia/doc-parser  (nowy workspace package)                   │
-│  Tier 1: unpdf (text layer) + mammoth (docx) + passthrough md   │
+│  @pomnia/doc-parser  (new workspace package)                    │
+│  Tier 1: unpdf (text layer) + mammoth (docx) + markdown passthru│
 │  Tier 2: pdfjs render → tesseract.js WASM (scanned pages)       │
-│          lub Ollama vision (jeśli Ollama + model vision)        │
-│  Tier 3: HTTP → Brain homelab opendataloader (gdy online)       │
+│          or Ollama vision (when Ollama has a vision model)      │
+│  Tier 3: HTTP → homelab Brain opendataloader (when online)      │
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  vault/library/                                                 │
-│    sources/     oryginały (pdf, docx)                           │
+│    sources/     originals (pdf, docx)                           │
 │    extracted/   {sha256}_{name}.md + frontmatter                │
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  @pomnia/brain-core — indexFiles / indexDir                     │
 │  chunk → nomic-embed-text (Ollama) → library.db                 │
-│  search_library source=library                                    │
+│  search_library source=library                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Tier 1 — zawsze lokalnie (v1)
+### Tier 1 — always local (v1)
 
-- **PDF:** `unpdf` → tekst per strona → markdown z nagłówkami `## Page N`
-- **DOCX:** `mammoth` → markdown (tabele uproszczone)
+- **PDF:** `unpdf` → text per page → markdown with `## Page N` headings
+- **DOCX:** `mammoth` → markdown (tables flattened)
 - **MD/TXT:** passthrough
-- **Heurystyka jakości:** jeśli średnio &lt; 50 znaków/stronę → oznacz `extraction: sparse` w frontmatter (sygnał dla Tier 2)
+- **Quality heuristic:** if the average is under 50 characters per page, mark `extraction: sparse` in the frontmatter — the signal for Tier 2
 
-### Tier 2 — lokalnie + CPU/GPU (v1.1)
+### Tier 2 — local, CPU/GPU (v1.1)
 
-- Render strony: `pdfjs-dist` + `@napi-rs/canvas` (tylko gdy OCR/vision)
-- **OCR:** `tesseract.js` + `eng.traineddata` w `extraResources` (~4 MB)
-- **Vision:** opcjonalnie Ollama `llava` / `moondream` na PNG strony — lepsza jakość niż OCR, wolniejsze
-- Uruchamiane **on-demand** per dokument, nie przy każdym starcie
+- Page rendering: `pdfjs-dist` + `@napi-rs/canvas` (only when doing OCR or vision)
+- **OCR:** `tesseract.js` with `eng.traineddata` in `extraResources` (~4 MB)
+- **Vision:** optionally Ollama `llava` / `moondream` on a page PNG — better quality than OCR, slower
+- Run **on demand** per document, never on every start
 
-### Tier 3 — zdalnie, opcjonalnie
+### Tier 3 — remote, optional
 
-- Gdy `brainTarget === remote` i endpoint odpowiada:
-  - `POST /api/library/upload` + opendataloader (istniejący Python Brain)
-  - Lub dedykowany `POST /api/library/parse` zwracający markdown
-- Pomnia zapisuje wynik lokalnie i indeksuje embedded — **cache offline**
-- Brak serwera → Tier 1/2 bez błędu (graceful degradation)
+- When `brainTarget === remote` and the endpoint answers:
+  - `POST /api/library/upload` + opendataloader (the existing Python Brain)
+  - or a dedicated `POST /api/library/parse` returning markdown
+- Pomnia stores the result locally and indexes it in the embedded engine — an **offline cache**
+- No server → Tier 1/2 without an error (graceful degradation)
 
 ---
 
-## 3. Punkty integracji w Pomnia
+## 3. Integration points in Pomnia
 
-### Nowy pakiet: `packages/doc-parser`
+### New package: `packages/doc-parser`
 
 ```typescript
-// API (propozycja)
+// API (proposed)
 export interface ParsedPage { page: number; text: string }
 export interface ParsedDocument {
   sourcePath: string
@@ -119,39 +119,39 @@ export interface ParsedDocument {
 export async function parseDocument(path: string, opts?: ParseOptions): Promise<ParsedDocument>
 ```
 
-**Zależności v1:** `unpdf`, `mammoth` — obie pure JS, bez native addonów.
+**v1 dependencies:** `unpdf`, `mammoth` — both pure JS, no native addons.
 
 ### `packages/brain-core`
 
-| Plik | Zmiana |
+| File | Change |
 |------|--------|
 | `src/storage/vault.ts` | `libraryDir: join(root, 'library')`, `librarySourcesDir`, `libraryExtractedDir` |
-| `src/rag/indexer.ts` | `indexDocument(parsed: ParsedDocument)` — chunk per page (`page_num` z PDF) |
-| `src/embedded.ts` | Nowy IPC: `{ type: 'index-document', path }` |
-| `src/mcp/tools/` | Opcjonalnie `ingest_document` tool |
+| `src/rag/indexer.ts` | `indexDocument(parsed: ParsedDocument)` — chunk per page (`page_num` from the PDF) |
+| `src/embedded.ts` | New IPC message: `{ type: 'index-document', path }` |
+| `src/mcp/tools/` | Optionally an `ingest_document` tool |
 
-**Ważne:** dziś `indexFiles` ustawia `page_num = 1` dla wszystkich chunków. Dla PDF trzeba chunkować w obrębie strony lub tagować chunk metadanym strony — schema już ma `page_num` (legacy z Python RAG).
+**Important:** today `indexFiles` sets `page_num = 1` for every chunk. For PDFs we need to chunk within a page, or tag each chunk with its page — the schema already has `page_num` (a legacy field from the Python RAG).
 
 ### Electron main (`src/main/`)
 
-- `ipcMain.handle('doc:import', …)` — wybór pliku → parse → zapis extracted → `brainCore.indexDocument`
-- Progress events: `doc:import-progress` (strona N/M)
-- CLI: `pomnia doc import <path>` w `src/cli/index.ts`
+- `ipcMain.handle('doc:import', …)` — pick a file → parse → write the extracted markdown → `brainCore.indexDocument`
+- Progress events: `doc:import-progress` (page N of M)
+- CLI: `pomnia doc import <path>` in `src/cli/index.ts`
 
 ### Renderer
 
-- Strona Import: sekcja „Dokumenty" obok archiwów czatów
-- Lista `vault/library/sources/` + status ekstrakcji
+- The Import page: a "Documents" section beside the chat archives
+- A listing of `vault/library/sources/` with extraction status
 
-### Gdzie lądują pliki
+### Where the files land
 
-| Lokalizacja | Zawartość |
+| Location | Contents |
 |-------------|-----------|
-| `%AppData%/Pomnia/brain-core-data/vault/library/sources/` | Oryginały PDF/DOCX |
-| `…/vault/library/extracted/` | `.md` z frontmatter |
-| `…/vectordb/library.db` | Chunki RAG (`pdf_path` = ścieżka źródła) |
+| `%AppData%/pomnia/brain-core-data/vault/library/sources/` | PDF/DOCX originals |
+| `…/vault/library/extracted/` | `.md` with frontmatter |
+| `…/vectordb/library.db` | RAG chunks (`pdf_path` = the source path) |
 
-Frontmatter extracted (propozycja):
+Extracted frontmatter (proposed):
 
 ```yaml
 ---
@@ -168,79 +168,79 @@ imported_via: pomnia
 
 ---
 
-## 4. Rekomendowany stack v1 (shippable)
+## 4. Recommended v1 stack (shippable)
 
-| Warstwa | Wybór | Rozmiar / ryzyko |
+| Layer | Choice | Size / risk |
 |---------|-------|------------------|
-| PDF text | **unpdf** | ~0 native, ~2 MB w bundle |
+| PDF text | **unpdf** | no native code, ~2 MB in the bundle |
 | DOCX | **mammoth** | ~200 KB |
-| Indeks | istniejący **brain-core** + Ollama embed | bez zmian |
+| Index | existing **brain-core** + Ollama embed | unchanged |
 | UI | Import page + IPC | S |
-| OCR | **poza v1** | +8 MB lang + wolne CPU |
-| Java opendataloader | **tylko Tier 3 remote** | 0 w exe |
+| OCR | **out of v1** | +8 MB per language, and slow on CPU |
+| Java opendataloader | **Tier 3 remote only** | 0 in the exe |
 
-**Dlaczego unpdf a nie surowy pdfjs-dist:** unpdf bundluje serverless pdfjs bez wymogu `canvas` / `DOMMatrix` polyfillów — krytyczne w `child_process.fork` brain-core i Electron main.
+**Why unpdf rather than raw pdfjs-dist:** unpdf bundles a serverless pdfjs that needs no `canvas` / `DOMMatrix` polyfills — which matters inside `child_process.fork` for brain-core and in the Electron main process.
 
-**Dlaczego nie markitdown-ts w v1:** cięższy dependency tree (jsdom, xlsx, ai SDK) dla formatów których v1 nie potrzebuje (PPTX, YouTube…).
+**Why not markitdown-ts in v1:** a heavier dependency tree (jsdom, xlsx, the ai SDK) for formats v1 does not need (PPTX, YouTube…).
 
 ---
 
-## 5. Plan wdrożenia i estymaty
+## 5. Rollout plan and estimates
 
-| Faza | Zakres | Effort |
+| Phase | Scope | Effort |
 |------|--------|--------|
-| **0. Spike** | `packages/doc-parser` + unpdf + test | **S** (done) |
-| **1. Core** | parse PDF/DOCX → markdown + vault dirs | **M** (~2–3 dni) |
-| **2. Index** | `indexDocument` z `page_num`, embedded IPC | **M** (~2 dni) |
-| **3. UI** | Import dokumentów, progress, lista | **M** (~2 dni) |
-| **4. Tier 2 OCR** | tesseract + canvas render, heurystyka sparse | **L** (~4–5 dni) |
-| **5. Tier 3 remote** | upload do Brain + cache lokalny | **S** (~1 dzień, jeśli API gotowe) |
+| **0. Spike** | `packages/doc-parser` + unpdf + a test | **S** (done) |
+| **1. Core** | parse PDF/DOCX → markdown + vault dirs | **M** (~2–3 days) |
+| **2. Index** | `indexDocument` with `page_num`, embedded IPC | **M** (~2 days) |
+| **3. UI** | Document import, progress, listing | **M** (~2 days) |
+| **4. Tier 2 OCR** | tesseract + canvas rendering, sparse heuristic | **L** (~4–5 days) |
+| **5. Tier 3 remote** | upload to Brain + local cache | **S** (~1 day, if the API is ready) |
 
-**v1 shippable = fazy 0–3** → **~1–1.5 tygodnia** focused work.
+**Shippable v1 = phases 0–3** → roughly **1 to 1.5 weeks** of focused work.
 
 ---
 
-## 6. Ryzyka i mitigacje
+## 6. Risks and mitigations
 
-| Ryzyko | Mitigacja |
+| Risk | Mitigation |
 |--------|-----------|
-| Skanowane PDF bez warstwy tekstu | Frontmatter `sparse: true` + prompt w UI „uruchom OCR" (v1.1) |
-| Duże PDF (500+ stron) | Limit stron w v1 (np. 200), batch progress, cancel |
-| Electron asar + pdfjs worker | Worker path via `extraResources` / `pathToFileURL` (jak brain-core staging) |
-| Jakość tabel w PDF | Tier 1 = płaski tekst; Tier 3 opendataloader dla tabel gdy online |
-| AV na tesseract WASM | `asarUnpack: **/*.wasm` już w `electron-builder.yml` |
+| Scanned PDFs with no text layer | Frontmatter `sparse: true` plus a UI prompt to "run OCR" (v1.1) |
+| Large PDFs (500+ pages) | A page limit in v1 (say 200), batch progress, cancel |
+| Electron asar + the pdfjs worker | Worker path via `extraResources` / `pathToFileURL` (as with brain-core staging) |
+| Table quality in PDFs | Tier 1 is flat text; Tier 3 opendataloader handles tables when online |
+| AV reacting to the tesseract WASM | `asarUnpack: **/*.wasm` is already in `electron-builder.yml` |
 
 ---
 
-## 7. Test plan v1
+## 7. v1 test plan
 
-1. **Digital PDF** (arxiv, faktura) — tekst kompletny, `sparse: false`
-2. **Skan** — `sparse: true`, chunki puste lub śmieci → UI sugeruje OCR
-3. **DOCX** — nagłówki i listy w markdown
-4. **Offline** — airplane mode, import + search_library działa
-5. **Packaged exe** — `npm run pack:win`, import PDF na czystym PC
-6. **Remote fallback** — Brain online → lepszy markdown, zapisany lokalnie
+1. **Digital PDF** (arxiv paper, invoice) — complete text, `sparse: false`
+2. **Scan** — `sparse: true`, chunks empty or garbage → the UI suggests OCR
+3. **DOCX** — headings and lists survive into markdown
+4. **Offline** — airplane mode; import and `search_library` still work
+5. **Packaged exe** — `npm run pack:win`, import a PDF on a clean PC
+6. **Remote fallback** — Brain online → better markdown, cached locally
 
 ---
 
 ## 8. Spike: `packages/doc-parser`
 
-Minimalny pakiet workspace z `parsePdf()` opartym o unpdf:
+A minimal workspace package with `parsePdf()` built on unpdf:
 
 ```bash
 npm run build -w @pomnia/doc-parser
 npm test -w @pomnia/doc-parser
 ```
 
-Kolejny krok: podpiąć pod `brain-core` `indexDocument()` i IPC `doc:import`.
+Next step: wire it into `brain-core`'s `indexDocument()` and the `doc:import` IPC.
 
 ---
 
-## Powiązane pliki
+## Related files
 
-- `packages/brain-core/src/rag/indexer.ts` — indexer (dziś tylko `.md`/`.txt`)
-- `packages/brain-core/src/embedded.ts` — fork IPC protocol
-- `packages/brain-core/src/storage/vault.ts` — layout vault
-- `src/core/import/archives.ts` — import czatów (osobna ścieżka niż docs)
+- `packages/brain-core/src/rag/indexer.ts` — the indexer (today `.md`/`.txt` only)
+- `packages/brain-core/src/embedded.ts` — the fork IPC protocol
+- `packages/brain-core/src/storage/vault.ts` — vault layout
+- `src/core/import/archives.ts` — chat import (a separate path from documents)
 - `docs/BRAIN-KVM-ARCHITECTURE.md` — Tier 3 remote deploy
 - `docs/BRAIN-INTEGRATION.md` — Python library upload (homelab; internal/historical)
