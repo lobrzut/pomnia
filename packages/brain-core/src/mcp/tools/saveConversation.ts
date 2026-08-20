@@ -15,7 +15,7 @@
  * saves silently.
  */
 
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, renameSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 
@@ -134,15 +134,37 @@ export async function runSaveConversation(
     `\n## Facts\n${bullets(a.facts)}\n\n` +
     `## Open questions\n${bullets(a.open_questions)}\n`
 
-  // Atomic write: write to tmp then rename. Matches Python impl.
-  const tmp = outPath + '.tmp'
-  writeFileSync(tmp, content, 'utf-8')
-  renameSync(tmp, outPath)
+  // session_id is minute-resolution, so two saves in the same minute with the
+  // same source and topic land on the same path - and rename() replaces what is
+  // already there without a word. Both calls were told the save succeeded while
+  // only the second note survived. In a memory product that is the worst way to
+  // fail: the thing whose whole job is not to forget, quietly forgetting, with
+  // a tick beside it. Never replace a note that already exists.
+  let finalPath = outPath
+  let finalName = filename
+  for (let n = 2; existsSync(finalPath) && n < 1000; n++) {
+    finalName = filename.replace(/\.md$/, `-${n}.md`)
+    finalPath = join(sessionsDir, finalName)
+  }
+
+  // fsync before rename, for the reason vault.ts already learned the hard way:
+  // rename is atomic against readers and says nothing about durability. The
+  // manifest that came back as 55 KB of zeros after a power cut was written
+  // exactly like the line below used to be.
+  const tmp = finalPath + '.tmp'
+  const fd = openSync(tmp, 'w')
+  try {
+    writeSync(fd, content, null, 'utf-8')
+    fsyncSync(fd)
+  } finally {
+    closeSync(fd)
+  }
+  renameSync(tmp, finalPath)
 
   return {
-    path: outPath,
+    path: finalPath,
     text:
-      `✓ Saved to vault/sessions/${filename}\n` +
+      `✓ Saved to vault/sessions/${finalName}\n` +
       `Indexing for search_library in the background.\n` +
       `Will appear on knowledge graph within 30s.`,
   }

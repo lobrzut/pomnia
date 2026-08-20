@@ -12,6 +12,7 @@ export { detectAll, getAdapter, ADAPTERS } from './adapters/index.js'
 export { conversationToMarkdown, exportConversationsToDir } from './brainExport.js'
 export { log, setLogSink, addLogSink } from './log.js'
 export { initFileLog } from './logFile.js'
+export { isWebUrl } from './externalUrl.js'
 export { SOURCES, descriptorFor } from './locations.js'
 export * from './brain/index.js'
 export {
