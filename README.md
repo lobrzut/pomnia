@@ -1,6 +1,6 @@
 # Pomnia
 
-<img src="docs/assets/social-card-en.png" alt="The same question asked twice: an assistant with no memory says it has no context from previous conversations; the same question with Pomnia answers with the decision, its date and the file it came from." width="100%">
+<img src="docs/assets/social-card-en.png" alt="Claude Code, Cursor, Claude Desktop, VS Code and Antigravity in a row, each holding its own separate scraps of history with nothing linking them; curves run down from all five into one vault below — a folder you own, holding the notes all of them read." width="100%">
 
 **One encrypted memory your AI agents share** — conversations from every assistant, distilled on your own hardware, recalled over MCP. Local-first: nothing depends on a vendor's cloud.
 
