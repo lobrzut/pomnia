@@ -41,9 +41,10 @@ npm run pack:win
 
 ### Without a cert (today)
 
-- Local/private builds: expected SmartScreen → **Więcej info → Uruchom mimo to**.
+- Local/private builds: SmartScreen is expected → **More info → Run anyway**
+  (a Polish Windows shows this as *Więcej info → Uruchom mimo to*).
 - **Symantec Endpoint / Norton** and Defender commonly warn on **unsigned** Electron NSIS + helper EXE — reputation is fixed by **signing**, not by documenting exclusions as onboarding.
-- Optional last resort (unsigned / enterprise IT only): folder exceptions in the AV UI — Settings → Windows / antywirus. Never ask users to disable AV.
+- Optional last resort (unsigned / enterprise IT only): folder exceptions in the AV UI — Settings → Windows Security / antivirus. Never ask users to disable AV.
 
 ### Optional `certificateFile` in electron-builder.yml
 

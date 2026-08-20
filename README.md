@@ -126,7 +126,7 @@ npm run pack:mac     # DMG / macOS app
 
 Use **`npm ci`** on a fresh clone (installs from the lockfile; does not rewrite it). Prefer `npm ci` over `npm install` so `package-lock.json` stays the source of truth across machines and npm versions.
 
-Build identity (Settings → Bezpieczeństwo / Security, and `pomnia --version`): `0.1.45 · 7ff41c7 · 2026-07-30 01:12` — dirty tree at generate time appends `+dirty` to the sha.
+Build identity (Settings → Security, and `pomnia --version`): `0.1.45 · 7ff41c7 · 2026-07-30 01:12` — dirty tree at generate time appends `+dirty` to the sha.
 
 ### Windows: never run vitest from a UNC path
 

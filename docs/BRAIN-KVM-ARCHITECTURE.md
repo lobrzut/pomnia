@@ -1,46 +1,46 @@
-# Pomnia × Brain — architektura KVM (split client / server)
+# Pomnia × Brain — KVM architecture (client / server split)
 
-## Podział ról
+## Who does what
 
-| Warstwa | Gdzie | Ollama / RAM | Co robi |
+| Layer | Where | Ollama / RAM | Job |
 |---------|-------|--------------|---------|
-| **Pomnia Vault** | NAS / lokalny dysk (`*.pomnia`) | — | Zaszyfrowane snapshoty surowych czatów |
-| **Distill** | PC klienta (GPU) | `qwen2.5:14b` (~9 GB) | Czat → notatka markdown (JSON-mode) |
-| **Staging** | `%AppData%/Pomnia/brain-notes` | — | Notatki + lokalny indeks (opcjonalny) |
-| **Brain KVM** | homelab / mały VM | `nomic-embed-text` (~274 MB) | Embed + `library.db` + MCP `:7862` |
+| **Pomnia Vault** | NAS / local disk (`*.pomnia`) | — | Encrypted snapshots of raw chats |
+| **Distill** | client PC (GPU) | `qwen2.5:14b` (~9 GB) | Chat → markdown note (JSON mode) |
+| **Staging** | `%AppData%/pomnia/brain-notes` | — | Notes + optional local index |
+| **Brain KVM** | homelab / small VM | `nomic-embed-text` (~274 MB) | Embed + `library.db` + MCP `:7862` |
 
-## Przepływ (Remote master)
+## Flow (Remote master)
 
 ```
-PC klienta                         KVM Brain (192.168.x.x)
+client PC                          KVM Brain (192.168.x.x)
 ────────────                       ───────────────────────────
 backup → Vault (NAS)
-distill (qwen, Ollama LAN)
+distill (qwen, Ollama over LAN)
   ↓
 brain-notes/*.md  ──auto-deploy──►  vault/distilled/
-  (staging)          SMB lub         ↓
+  (staging)          SMB or          ↓
                      save-note API   library/reindex (nomic)
                                     ↓
 Cursor / Claude ──MCP :7862──────► search_library
 ```
 
-## Pomnia — auto-deploy (od 2026-07-06)
+## Pomnia — auto-deploy (since 2026-07-06)
 
-Gdy **Connect → Remote master** i **Brain → Auto-deploy after distill**:
+With **Connect → Remote master** and **Brain → Auto-deploy after distill**:
 
-1. Po distill + lokalnym pre-index (opcjonalnie)
-2. Kopia `.md` do `brainDeployTarget` (SMB, np. `\\192.168.x.x\brain\vault\distilled`) **lub** HTTP `POST /api/vault/save-note`
-3. `POST /api/library/reindex` na dashboard `:7860`
+1. After distill and the optional local pre-index
+2. Copy the `.md` to `brainDeployTarget` (SMB, e.g. `\\192.168.x.x\brain\vault\distilled`) **or** HTTP `POST /api/vault/save-note`
+3. `POST /api/library/reindex` against the dashboard on `:7860`
 
-Ustawienia w `localStorage`: `pomnia.brain.autoDeploy`, `pomnia.brain.deployUrl`, `pomnia.brain.deployTarget`.
+Settings live in `localStorage`: `pomnia.brain.autoDeploy`, `pomnia.brain.deployUrl`, `pomnia.brain.deployTarget`.
 
-## Wymagania KVM
+## What the KVM needs
 
-- Ollama z **samym** `nomic-embed-text` wystarczy do search (distill nie musi być na VM)
+- Ollama with **only** `nomic-embed-text` is enough for search — distill does not have to run on the VM
 - Brain dashboard `:7860`, MCP proxy `:7862`
-- Opcjonalnie: udostępniony folder `distilled` (SMB/NFS) — najpewniejszy deploy bez nowego API
+- Optional: a shared `distilled` folder (SMB/NFS) — the most reliable deploy, and it needs no new API
 
 ## Brain-side TODO
 
-- `POST /api/vault/save-note` — przyjęcie gotowej notatki md (fallback gdy brak SMB)
-- `POST /api/library/merge-index` — precomputed wektory z hosta (zero re-embed na VM)
+- `POST /api/vault/save-note` — accept a finished markdown note (fallback when there is no SMB)
+- `POST /api/library/merge-index` — precomputed vectors from the host, so the VM never re-embeds
