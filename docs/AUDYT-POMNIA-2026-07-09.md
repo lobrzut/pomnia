@@ -1,274 +1,274 @@
-# Audyt Pomnia — 2026-07-09
+# Pomnia audit — 2026-07-09
 
-> **Historical snapshot (2026-07-09).** Not current product state. For live facts use [README](../README.md), [SECURITY.md](../SECURITY.md), and [docs/START-HERE.md](START-HERE.md). Remote is now `lobrzut/pomnia`; marketing landing is **outside** this repo; release line is 0.1.35+.
+> **Historical snapshot (2026-07-09).** Not current product state. For live facts use [README](../README.md), [SECURITY.md](../SECURITY.md), and [docs/START-HERE.md](START-HERE.md). Remote is now `lobrzut/pomnia`; the marketing landing page is **outside** this repo; the release line is 0.1.35+.
 
-> **Zakres (ówczesny):** lokalne drzewo + ekosystem (Brain MCP, landing, homelab)  
-> **Wersja produktu wtedy:** 0.1.2 · **Branch:** `master` · **Audytor:** agent (kod, testy, docs, stan repo)
+> **Scope (as of then):** the local tree plus the ecosystem (Brain MCP, landing page, homelab)  
+> **Product version then:** 0.1.2 · **Branch:** `master` · **Auditor:** agent (code, tests, docs, repo state)
 
 ---
 
-## Executive summary (1 strona)
+## Executive summary (one page)
 
-### Werdykt ogólny: 🟡 **Silnik gotowy — produkt beta wymaga domknięcia UX i dystrybucji**
+### Overall verdict: 🟡 **The engine is ready — the beta product needs its UX and distribution closed off**
 
-Pomnia ma **działający rdzeń techniczny**: szyfrowany vault, backup czatów, import archiwów, pipeline distill→index→MCP, embedded brain-core w instalatorze Windows. To nie jest prototyp — **419 plików Claude Code + 148 czatów Cursora** przeszły round-trip w testach na żywych danych (README). Instalator **`Pomnia-0.1.2-setup.exe`** (~94 MB) leży w `release/` i jest gotowy do ręcznej dystrybucji beta.
+Pomnia has a **working technical core**: an encrypted vault, chat backup, archive import, the distill→index→MCP pipeline, and embedded brain-core inside the Windows installer. This is not a prototype — **419 Claude Code files and 148 Cursor chats** made the round trip in tests against live data (README). The installer **`Pomnia-0.1.2-setup.exe`** (~94 MB) sits in `release/` and is ready for manual beta distribution.
 
-**Główny problem nie jest inżynieryjny, lecz produktowy:** dwa magazyny o nazwie „vault”, dwa pipeline'y czaty vs dokumenty, a warstwa onboarding/landing **nie domyka obietnicy** dla obcego użytkownika Windows bez Node/Ollama. ~~Domyślne IP homelab~~ — **naprawione** w `74db87d` (per-user `app-settings.json`, pusty default remote URL).
+**The main problem is not engineering but product:** two stores both called "vault", two pipelines (chats vs documents), and an onboarding/landing layer that **does not close the promise** for a stranger on Windows without Node or Ollama. ~~The default homelab IP~~ — **fixed** in `74db87d` (per-user `app-settings.json`, empty default remote URL).
 
-### Sygnalizatory
+### Signals
 
-| Obszar | Status | Komentarz |
+| Area | Status | Comment |
 |--------|--------|-----------|
-| Silnik vault + crypto | 🟢 | 7/7 testów engine, incremental backup OK |
-| Backup adapterów | 🟢 | Claude Code, Cursor — zweryfikowane; Antigravity — 🟡 |
-| Distill + embedded brain | 🟢 | Wymaga Ollama + 2 modele; działa u operatora |
-| Doc import (PDF/DOCX/EPUB) | 🟡 | Parser + vault + index — kod i testy OK; OCR 🔲 |
-| MCP Connect (Cursor) | 🟢 | Snippet + mint token; wymaga restartu klienta |
-| Przejrzystość UX | 🟢 | Mapa (75c15d4) + animowany FlowDiagram (b85e410) ✅ |
-| Dystrybucja zewnętrzna | 🔴 | Unsigned exe, brak GitHub Release, landing 503 |
-| Mac | 🟡 | CI workflow gotowy; brak opublikowanego DMG |
-| Testy CI | 🟡 | 73/74 pass; 1 fail native module (Node ABI) |
-| Branding | 🔴 | Brak wybranego finału logo; stary icon.ico |
+| Vault engine + crypto | 🟢 | 7/7 engine tests, incremental backup fine |
+| Adapter backup | 🟢 | Claude Code, Cursor verified; Antigravity 🟡 |
+| Distill + embedded brain | 🟢 | Needs Ollama and two models; works for the operator |
+| Doc import (PDF/DOCX/EPUB) | 🟡 | Parser + vault + index — code and tests fine; OCR 🔲 |
+| MCP Connect (Cursor) | 🟢 | Snippet + minted token; the client needs a restart |
+| UX clarity | 🟢 | Map (75c15d4) + animated FlowDiagram (b85e410) ✅ |
+| External distribution | 🔴 | Unsigned exe, no GitHub Release, landing 503 |
+| Mac | 🟡 | CI workflow ready; no published DMG |
+| CI tests | 🟡 | 73/74 pass; 1 native-module failure (Node ABI) |
+| Branding | 🔴 | No final logo chosen; the old icon.ico |
 
-### Trzy najważniejsze wnioski
+### Three headline conclusions
 
-1. **Możesz dać 3–5 beta testerom Windows exe już dziś** — pod warunkiem ręcznego onboarding (Ollama, START-HERE, SmartScreen bypass) i embedded brain, nie remote homelab.
-2. ~~**Obcy użytkownik remote Brain się wyłoży**~~ — ✅ **FIXED** (`74db87d`): brak domyślnego homelab IP; embedded Brain zalecany na start; remote URL tylko gdy user wpisze.
-3. **Przed „public beta” brakuje:** opublikowany release + strona pobierania, wybór logo, naprawa testu brain-core na aktualnym Node.
+1. **You could hand three to five beta testers the Windows exe today** — provided onboarding is done by hand (Ollama, START-HERE, the SmartScreen bypass) and they use the embedded brain rather than a remote homelab.
+2. ~~**A stranger's remote Brain will fall over**~~ — ✅ **FIXED** (`74db87d`): no default homelab IP; embedded Brain recommended to start; a remote URL only when the user types one.
+3. **Before a "public beta" what is missing:** a published release plus a download page, a logo decision, and a fix for the brain-core test on current Node.
 
-### Rekomendacja na 2 tygodnie
+### Two-week recommendation
 
-**Tydzień 1 — „5 testerów bez wstydu”:** ~~hardcoded IP → pusty default~~ ✅; `BETA-SMOKE.md`; GitHub Release 0.1.2; landing z linkiem do exe; preflight Ollama przed distill w UI.
+**Week 1 — "five testers without embarrassment":** ~~hardcoded IP → empty default~~ ✅; `BETA-SMOKE.md`; GitHub Release 0.1.2; a landing page linking to the exe; an Ollama preflight before distillation in the UI.
 
-**Tydzień 2 — „nie tylko u mnie”:** Antigravity na realnym dumpie; pełny onboarding PL + krok backup w full mode; pierwszy tag `v0.1.3`; smoke brain-core na packaged Windows w CI; decyzja logo → podmiana `resources/icon.ico`.
+**Week 2 — "not only on my machine":** Antigravity against a real dump; full onboarding with a backup step; the first `v0.1.3` tag; a brain-core smoke test against a packaged Windows build in CI; a logo decision → swap `resources/icon.ico`.
 
 ---
 
-## 1. Weryfikacja stanu repozytorium
+## 1. Repository state
 
 ### 1.1 Git
 
-| Metryka | Wartość |
+| Metric | Value |
 |---------|---------|
 | Branch | `master` |
-| HEAD | `e14a438` — *fix(ui): FlowDiagram — gałąź dokumentów poniżej* (+ `74db87d` fix hardcoded IP) |
-| Stan working tree | **CLEAN** (poza untracked: audit doc, `_agent_out.txt`, `_icon.txt`, `_pack_full.txt`) |
+| HEAD | `e14a438` — *fix(ui): FlowDiagram — document branch below* (+ `74db87d` fixing the hardcoded IP) |
+| Working tree | **CLEAN** (apart from untracked: the audit doc, `_agent_out.txt`, `_icon.txt`, `_pack_full.txt`) |
 | Remote | `origin` → `https://github.com/lobrzut/reliqua.git` (private) |
-| Tagi | **brak** tagów `v*` w repo |
-| GitHub Releases | **brak** opublikowanych release'ów (`gh release list` pusty) |
+| Tags | **no** `v*` tags in the repo |
+| GitHub Releases | **none** published (`gh release list` empty) |
 
-**Ostatnie 3 commity:**
+**Last three commits:**
 
 ```
-b85e410 feat(ui): animowany diagram przepływu Pomnia (Jak to działa)
-75c15d4 feat(ui): Mapa Pomnia i pasek statusu dla beta testerów
-b0b7463 docs: roadmap przejrzystosci beta + health check w Settings
+b85e410 feat(ui): animated Pomnia flow diagram (How it works)
+75c15d4 feat(ui): Pomnia Map and status strip for beta testers
+b0b7463 docs: beta clarity roadmap + health check in Settings
 ```
 
-### 1.2 Kluczowe commity / features
+### 1.2 Key commits / features
 
-| Feature | Commit / stan | W master? |
+| Feature | Commit / state | In master? |
 |---------|---------------|-----------|
-| Mapa Pomnia + StatusStrip + HowItWorks | `75c15d4` | 🟢 TAK |
-| Health check (Settings) | `b0b7463` | 🟢 TAK |
-| START-HERE.md | `75c15d4` (update) | 🟢 TAK |
-| Animowany FlowDiagram | `b85e410` (+358 linii `FlowDiagram.tsx`) | 🟢 TAK — commit `502eaece` nie istnieje w repo; w master jest `b85e410` |
-| Release 0.1.2 (tray, Antigravity, persistence) | `db6246b` (w historii) | 🟢 TAK |
+| Pomnia Map + StatusStrip + HowItWorks | `75c15d4` | 🟢 YES |
+| Health check (Settings) | `b0b7463` | 🟢 YES |
+| START-HERE.md | `75c15d4` (update) | 🟢 YES |
+| Animated FlowDiagram | `b85e410` (+358 lines in `FlowDiagram.tsx`) | 🟢 YES — commit `502eaece` does not exist in the repo; master has `b85e410` |
+| Release 0.1.2 (tray, Antigravity, persistence) | `db6246b` (in history) | 🟢 YES |
 
-### 1.3 Testy (`npm test`)
+### 1.3 Tests (`npm test`)
 
 ```
 Test Files  1 failed | 20 passed (21)
 Tests       1 failed | 73 passed (74)
 ```
 
-| Wynik | Szczegół |
+| Result | Detail |
 |-------|----------|
-| 🟢 73 testy | vault, crypto, import, distill deploy, ollama, library index, doc-parser PDF/DOCX/EPUB, antigravity parser, activity, labels |
-| 🔴 1 test | `packages/brain-core/tests/indexDocument.test.ts` — **better-sqlite3 ABI mismatch** (skompilowane pod NODE_MODULE_VERSION 130, Node wymaga 137). Fix: `npm rebuild better-sqlite3` lub `@electron/rebuild` |
+| 🟢 73 tests | vault, crypto, import, distill deploy, ollama, library index, doc-parser PDF/DOCX/EPUB, antigravity parser, activity, labels |
+| 🔴 1 test | `packages/brain-core/tests/indexDocument.test.ts` — **better-sqlite3 ABI mismatch** (compiled for NODE_MODULE_VERSION 130, Node wants 137). Fix: `npm rebuild better-sqlite3` or `@electron/rebuild` |
 
-**Uwaga:** packaged build w `release/win-unpacked/` ma własną kopię `better-sqlite3` — aplikacja desktopowa prawdopodobnie działa; fail dotyczy dev/test na aktualnym Node 22+.
+**Note:** the packaged build in `release/win-unpacked/` carries its own copy of `better-sqlite3`, so the desktop app probably works; the failure is about dev/test on current Node 22+.
 
-### 1.4 Instalator / `release/`
+### 1.4 Installer / `release/`
 
-| Artefakt | Stan |
+| Artifact | State |
 |----------|------|
-| `release/Pomnia-0.1.2-setup.exe` | 🟢 **istnieje** (~98 483 362 B) |
-| `release/latest.yml` | 🟢 wersja 0.1.2, SHA512, data 2026-07-08 |
-| `release/win-unpacked/` | 🟢 rozpakowana aplikacja + bundled `brain-core` |
-| Podpis kodu | 🔴 **unsigned** — SmartScreen / Gatekeeper warning |
+| `release/Pomnia-0.1.2-setup.exe` | 🟢 **present** (~98,483,362 B) |
+| `release/latest.yml` | 🟢 version 0.1.2, SHA512, dated 2026-07-08 |
+| `release/win-unpacked/` | 🟢 unpacked app + bundled `brain-core` |
+| Code signature | 🔴 **unsigned** — SmartScreen / Gatekeeper warning |
 
 ---
 
-## 2. Macierz funkcji
+## 2. Feature matrix
 
-Legenda: 🟢 **DZIAŁA** · 🟡 **CZĘŚCIOWO** · ⚪ **NIE TESTOWANE** · 🔴 **BROKEN**
+Legend: 🟢 **WORKS** · 🟡 **PARTIAL** · ⚪ **UNTESTED** · 🔴 **BROKEN**
 
-| Funkcja | Status | Dowód / uwagi |
+| Feature | Status | Evidence / notes |
 |---------|--------|---------------|
-| **Vault** (tworzenie, otwarcie, szyfrowanie) | 🟢 DZIAŁA | `engine.test.ts` 7/7; AES-256-GCM + scrypt; round-trip na żywych danych |
-| **Backup** (live adapters) | 🟢 DZIAŁA | `backup.ts` + adapters; README: 419+148 plików |
-| **Backup — Claude Code** | 🟢 DZIAŁA | hybrid JSONL + snapshot; testy import |
-| **Backup — Cursor** | 🟡 CZĘŚCIOWO | Działa; duży `state.vscdb` → parse skipped, 0 czatów bez komunikatu CTA |
-| **Backup — Claude Desktop** | 🟢 DZIAŁA | snapshot configów (nie pełne czaty) — zgodne z obietnicą |
-| **Backup — Antigravity** | 🟡 CZĘŚCIOWO | 1 test syntetyczny; ⚪ na realnych maszynach Windows |
-| **Backup — VS Code / Windsurf / Continue** | 🟡 CZĘŚCIOWO | profile snapshot; ⚪ pełna weryfikacja u beta |
-| **Distill** (pipeline ogólny) | 🟢 DZIAŁA | `distill.ts` + Ollama qwen; quality gate ok/stub/garbage |
-| **Distill per adapter** | 🟡 CZĘŚCIOWO | Distill operuje na `Conversation` po backup/import — nie per-adapter; jakość zależy od jakości ekstrakcji adaptera |
-| **Import czatów** (ZIP/JSON) | 🟢 DZIAŁA | `archives.ts`; Claude.ai, ChatGPT, Gemini, Grok |
-| **Doc import — PDF** | 🟡 CZĘŚCIOWO | `doc-parser` + `docImport.ts`; test PDF minimal OK; skany bez OCR → sparse |
-| **Doc import — DOCX** | 🟡 CZĘŚCIOWO | mammoth; 1 test; GUI drag-drop |
-| **Doc import — EPUB** | 🟡 CZĘŚCIOWO | v0.2; 3 testy epub |
-| **Doc import — MD/TXT** | 🟢 DZIAŁA | passthrough |
-| **Encrypted library** (bloby w vault) | 🟢 DZIAŁA | `stores library documents as encrypted blobs` test |
-| **Embedded brain-core** | 🟢 DZIAŁA | fork child, port 7862; bundled w exe; Settings health check |
-| **Remote brain** (homelab MCP) | 🟡 CZĘŚCIOWO | Kod OK; **default URL = homelab IP**; wymaga token Bearer |
-| **MCP Connect** (Cursor) | 🟢 DZIAŁA | `Connect.tsx`, snippet, mint token; ⚪ Hermes/Antigravity client — mniej testów |
-| **Deploy homelab** | 🟡 CZĘŚCIOWO | CLI `brain deploy`; SMB/HTTP; błędy 404 słabo widoczne w UI |
-| **Tray** (system tray) | 🟢 DZIAŁA | `tray.ts`; status brain + activity line; release 0.1.2 |
-| **Activity status** | 🟢 DZIAŁA | `activity.ts` + `StatusStrip` na Dashboard |
-| **Diagnostyka** | 🟢 DZIAŁA | Settings → HealthCheck: vault, Ollama, modele, brain-core, MCP |
-| **Onboarding** | 🟡 CZĘŚCIOWO | Simple mode PL ✅; Full mode: brak kroku backup, etykiety EN |
-| **Landing** | 🔴 BROKEN | `pomnia.ai` → **503**; waitlist bez linku do exe |
+| **Vault** (create, open, encrypt) | 🟢 WORKS | `engine.test.ts` 7/7; AES-256-GCM + scrypt; round trip on live data |
+| **Backup** (live adapters) | 🟢 WORKS | `backup.ts` + adapters; README: 419+148 files |
+| **Backup — Claude Code** | 🟢 WORKS | hybrid JSONL + snapshot; import tests |
+| **Backup — Cursor** | 🟡 PARTIAL | Works; a large `state.vscdb` means parse skipped, 0 chats and no call to action |
+| **Backup — Claude Desktop** | 🟢 WORKS | config snapshot (not full chats) — as promised |
+| **Backup — Antigravity** | 🟡 PARTIAL | one synthetic test; ⚪ on real Windows machines |
+| **Backup — VS Code / Windsurf / Continue** | 🟡 PARTIAL | profile snapshot; ⚪ full verification during beta |
+| **Distill** (general pipeline) | 🟢 WORKS | `distill.ts` + Ollama qwen; quality gate ok/stub/garbage |
+| **Distill per adapter** | 🟡 PARTIAL | Distillation operates on a `Conversation` after backup/import, not per adapter; quality follows the adapter's extraction quality |
+| **Chat import** (ZIP/JSON) | 🟢 WORKS | `archives.ts`; Claude.ai, ChatGPT, Gemini, Grok |
+| **Doc import — PDF** | 🟡 PARTIAL | `doc-parser` + `docImport.ts`; minimal PDF test passes; scans without OCR come out sparse |
+| **Doc import — DOCX** | 🟡 PARTIAL | mammoth; one test; GUI drag-and-drop |
+| **Doc import — EPUB** | 🟡 PARTIAL | v0.2; three epub tests |
+| **Doc import — MD/TXT** | 🟢 WORKS | passthrough |
+| **Encrypted library** (blobs in the vault) | 🟢 WORKS | the `stores library documents as encrypted blobs` test |
+| **Embedded brain-core** | 🟢 WORKS | forked child, port 7862; bundled in the exe; Settings health check |
+| **Remote brain** (homelab MCP) | 🟡 PARTIAL | Code fine; **default URL is a homelab IP**; needs a Bearer token |
+| **MCP Connect** (Cursor) | 🟢 WORKS | `Connect.tsx`, snippet, minted token; ⚪ Hermes/Antigravity clients less tested |
+| **Homelab deploy** | 🟡 PARTIAL | CLI `brain deploy`; SMB/HTTP; 404s barely visible in the UI |
+| **Tray** | 🟢 WORKS | `tray.ts`; brain status + activity line; release 0.1.2 |
+| **Activity status** | 🟢 WORKS | `activity.ts` + `StatusStrip` on the Dashboard |
+| **Diagnostics** | 🟢 WORKS | Settings → HealthCheck: vault, Ollama, models, brain-core, MCP |
+| **Onboarding** | 🟡 PARTIAL | Simple mode ✅; full mode: no backup step |
+| **Landing** | 🔴 BROKEN | `pomnia.ai` → **503**; a waitlist with no link to the exe |
 
 ---
 
-## 3. Audyt przejrzystości (clarity)
+## 3. Clarity audit
 
-### 3.1 Strona „Jak to działa"
+### 3.1 The "How it works" page
 
-| Element | Stan | Ocena |
+| Element | State | Assessment |
 |---------|------|-------|
-| Route `/how-it-works` | 🟢 | W menu bocznym (Shell) |
-| `GuideMap` — kroki PL | 🟢 | 9 kroków z linkami do zakładek |
-| `FlowDiagram` — animowany przepływ | 🟢 | `b85e410` — SVG + animacja cząsteczek, wariant full/mini, replay |
-| Przycisk „Odtwórz animację" | 🟢 | W `HowItWorks.tsx` |
-| Link z Dashboard | 🟢 | „Nie wiem od czego zacząć →" |
-| `StatusStrip` „Gdzie jesteś teraz" | 🟢 | Na Dashboard — vault, Ollama, brain, backlog |
+| Route `/how-it-works` | 🟢 | In the sidebar (Shell) |
+| `GuideMap` — the steps | 🟢 | Nine steps linking to the tabs |
+| `FlowDiagram` — animated flow | 🟢 | `b85e410` — SVG plus particle animation, full/mini variants, replay |
+| "Replay animation" button | 🟢 | In `HowItWorks.tsx` |
+| Link from the Dashboard | 🟢 | "I don't know where to start →" |
+| `StatusStrip` "Where you are now" | 🟢 | On the Dashboard — vault, Ollama, brain, backlog |
 
-**Werdykt:** 🟢 **Strona kompletna** — mapa statyczna + animowany diagram + linki do zakładek. Beta tester ma pełną narrację przepływu.
+**Verdict:** 🟢 **The page is complete** — a static map plus an animated diagram plus links to the tabs. A beta tester gets the whole story of the flow.
 
-### 3.2 Co nadal myli beta usera
+### 3.2 What still confuses a beta user
 
-| # | Problem | Gdzie | Priorytet |
+| # | Problem | Where | Priority |
 |---|---------|-------|-----------|
-| 1 | **Dwa „vaulty"** — `.pomnia` vs `brain-core-data/` | Cała appka | 🔴 |
-| 2 | **Dwa pipeline'y** — czaty (distill+LLM) vs dokumenty (direct index) | Import, Brain | 🟡 |
-| 3 | ~~**Embedded vs remote** — domyślnie remote URL operatora~~ | Connect, Onboarding, store | ✅ FIXED `74db87d` |
-| 4 | **Backup vs Import** — kiedy którego użyć | Dashboard, Import | 🟡 |
-| 5 | **Full onboarding pomija backup** | `Onboarding.tsx` FULL_STEPS | 🟡 |
-| 6 | **Ollama jako ukryta zależność** | Distill milczy bez preflight w UI | 🟡 |
-| 7 | **„Distill" vs `save_conversation` w MCP** | Tylko w DOCUMENT-PIPELINE.md | ⚪ |
-| 8 | Brak **„Pokaż kreator ponownie"** w Settings | Settings | 🟡 |
-| 9 | Landing mówi „coming soon" — exe już jest | pomnia.ai | 🔴 |
+| 1 | **Two "vaults"** — `.pomnia` vs `brain-core-data/` | Everywhere | 🔴 |
+| 2 | **Two pipelines** — chats (distill + LLM) vs documents (direct index) | Import, Brain | 🟡 |
+| 3 | ~~**Embedded vs remote** — the operator's remote URL by default~~ | Connect, Onboarding, store | ✅ FIXED `74db87d` |
+| 4 | **Backup vs Import** — when to use which | Dashboard, Import | 🟡 |
+| 5 | **Full onboarding skips backup** | `Onboarding.tsx` FULL_STEPS | 🟡 |
+| 6 | **Ollama as a hidden dependency** | Distillation goes quiet with no preflight in the UI | 🟡 |
+| 7 | **"Distill" vs `save_conversation` in MCP** | Only in DOCUMENT-PIPELINE.md | ⚪ |
+| 8 | No **"Show the wizard again"** in Settings | Settings | 🟡 |
+| 9 | The landing says "coming soon" — the exe already exists | pomnia.ai | 🔴 |
 
-### 3.3 Dokumentacja — co jest, czego brakuje
+### 3.3 Documentation — what exists, what is missing
 
-| Dokument | Status |
+| Document | Status |
 |----------|--------|
-| `docs/START-HERE.md` | 🟢 Jedna strona dla bety |
-| `docs/ROADMAP-CLARITY.md` | 🟢 Audyt przejrzystości + fazy A/B/C |
-| `docs/DOCUMENT-PIPELINE.md` | 🟢 Master doc (490 linii — za gęsty dla bety) |
-| `docs/BETA-SMOKE.md` | 🔴 **Brak** — checklista w roadmapie jako TODO |
-| `README.md` sekcja beta | 🟢 |
+| `docs/START-HERE.md` | 🟢 One page for the beta |
+| `docs/ROADMAP-CLARITY.md` | 🟢 Clarity audit plus phases A/B/C |
+| `docs/DOCUMENT-PIPELINE.md` | 🟢 Master doc (490 lines — too dense for a beta) |
+| `docs/BETA-SMOKE.md` | 🔴 **Missing** — a TODO in the roadmap |
+| `README.md` beta section | 🟢 |
 
 ---
 
-## 4. Ryzyka dla użytkownika zewnętrznego
+## 4. Risks for an external user
 
-| Ryzyko | Severity | Szczegół | Mitigacja |
+| Risk | Severity | Detail | Mitigation |
 |--------|----------|----------|-----------|
-| ~~**Hardcoded IP 192.168.x.x**~~ | ✅ FIXED | `74db87d` — per-user `app-settings.json`, pusty default remote | Embedded zalecany; remote tylko user URL |
-| **Ollama wymagane** | 🟡 | distill, embed, doc index — bez Ollama pipeline stoi | Health check ✅; brak preflight blokady przed distill |
-| **Modele ~8 GB RAM** | 🟡 | `qwen2.5:14b` + `nomic-embed-text` | Dokumentacja START-HERE; brak profilu „light" w UI |
-| **Unsigned installer** | 🔴 | SmartScreen blokuje; brak Authenticode | README ma instrukcję; code signing — track osobny |
-| **better-sqlite3 / native modules** | 🟡 | Dev test fail; packaged może OK | CI rebuild; smoke na fresh Windows |
-| **Cursor 0 czatów** | 🟡 | Duży vscdb | Import ZIP z eksportu |
-| **Antigravity ścieżki** | 🟡 | `~/.gemini/antigravity` — nietypowa | ⚪ nie testowane u innych |
-| **Brain data plaintext** | 🟡 | `%AppData%/Pomnia/brain-core-data/` nieszyfrowane | Opisane w START-HERE; user musi wiedzieć |
-| **Brak telemetrii / crash report** | ⚪ | Trudna diagnoza u bety | Eksport logów ✅ (`api.openLogs`) |
-| **Repo private + brak public release** | 🔴 | Tester nie ma skąd pobrać oficjalnie | GitHub Release + landing |
-| **Token MCP remote** | 🟡 | Wymaga dashboard :7860 lub mint w Connect | Brak instrukcji „skąd token ręcznie" |
-| **Ścieżki deploy SMB** | 🟡 | Przykłady `\\192.168.x.x\brain\` w docs | Wizard deploy |
+| ~~**Hardcoded IP 192.168.x.x**~~ | ✅ FIXED | `74db87d` — per-user `app-settings.json`, empty default remote | Embedded recommended; remote only from the user's URL |
+| **Ollama required** | 🟡 | distill, embed, doc index — without it the pipeline stops | Health check ✅; no preflight block before distillation |
+| **Models need ~8 GB RAM** | 🟡 | `qwen2.5:14b` + `nomic-embed-text` | Documented in START-HERE; no "light" profile in the UI |
+| **Unsigned installer** | 🔴 | SmartScreen blocks it; no Authenticode | The README has instructions; code signing is its own track |
+| **better-sqlite3 / native modules** | 🟡 | Dev test fails; packaged may be fine | CI rebuild; smoke test on fresh Windows |
+| **Cursor shows 0 chats** | 🟡 | Large vscdb | Import the ZIP export instead |
+| **Antigravity paths** | 🟡 | `~/.gemini/antigravity` — unusual | ⚪ untested elsewhere |
+| **Brain data is plaintext** | 🟡 | `%AppData%/pomnia/brain-core-data/` is unencrypted | Described in START-HERE; the user has to know |
+| **No telemetry / crash reports** | ⚪ | Hard to diagnose during a beta | Log export ✅ (`api.openLogs`) |
+| **Private repo, no public release** | 🔴 | A tester has nowhere official to download from | GitHub Release + landing page |
+| **Remote MCP token** | 🟡 | Needs the dashboard on :7860, or minting in Connect | No instructions for getting a token by hand |
+| **SMB deploy paths** | 🟡 | Examples like `\\192.168.x.x\brain\` in the docs | A deploy wizard |
 
-### ~~Mapa hardcoded IP~~ — FIXED (`74db87d`, 2026-07-09)
+### ~~Hardcoded IP map~~ — FIXED (`74db87d`, 2026-07-09)
 
-Domyślny homelab URL usunięty z UI/store/snippet/CLI. Remote Brain wymaga jawnego wpisu użytkownika; embedded `127.0.0.1:7862` jest ścieżką domyślną w onboarding.
+The default homelab URL is gone from the UI, store, snippet and CLI. A remote Brain now requires the user to type it; embedded `127.0.0.1:7862` is the default path in onboarding.
 
 ---
 
-## 5. Logo i branding
+## 5. Logo and branding
 
 | Element | Status |
 |---------|--------|
-| **Finalna ikona** | 🔴 **Nie wybrana** — `docs/BRAND-LOGO.md`: czeka na decyzję między Moss Vault / Dew Sigil / Bold series |
-| **`resources/icon.ico`** | 🔴 Stary Reliqua-style (fiolet + litera R) — nie podmieniony |
-| **Paleta Slavic green** | 🟡 Zdefiniowana w docs; UI nadal violet/cyan w landing |
-| **Galeria koncepcji** | 🟢 `assets/generated/` + preview.html |
+| **Final icon** | 🔴 **Not chosen** — `docs/BRAND-LOGO.md`: waiting on a decision between Moss Vault / Dew Sigil / the bold series |
+| **`resources/icon.ico`** | 🔴 Still the old Reliqua style (violet plus an "R") |
+| **Slavic green palette** | 🟡 Defined in the docs; the UI and landing are still violet/cyan |
+| **Concept gallery** | 🟢 `assets/generated/` + preview.html |
 | **Landing live** | 🔴 `https://pomnia.ai` → **503 Service Unavailable** (2026-07-09) |
-| **Landing content** | 🟡 Waitlist Formspree; sekcja download = „Wkrótce"; brak linku do GitHub Releases |
-| **Domena** | 🟢 Zarejestrowana 2026-07-07 (`LANDING-DEPLOY.md`) |
-| **index-fable.html** | ⚪ Wariant narracyjny — niezsynchronizowany z `index.html` |
+| **Landing content** | 🟡 Formspree waitlist; the download section says "soon"; no link to GitHub Releases |
+| **Domain** | 🟢 Registered 2026-07-07 (`LANDING-DEPLOY.md`) |
+| **index-fable.html** | ⚪ A narrative variant, out of sync with `index.html` |
 
 ---
 
-## 6. Mac — status (skrót)
+## 6. Mac — status (short)
 
-| Aspekt | Stan |
+| Aspect | State |
 |--------|------|
-| Build lokalny | 🟡 Tylko na macOS (`docs/MAC-BUILD.md`) |
-| CI | 🟢 `.github/workflows/release-mac.yml` — trigger tag `v*` lub manual |
-| Podpis | 🔴 Unsigned (`CSC_IDENTITY_AUTO_DISCOVERY: false`) |
-| Opublikowany DMG | 🔴 Brak tagów → workflow nie odpalony na release |
+| Local build | 🟡 macOS only (`docs/MAC-BUILD.md`) |
+| CI | 🟢 `.github/workflows/release-mac.yml` — triggered by a `v*` tag or manually |
+| Signature | 🔴 Unsigned (`CSC_IDENTITY_AUTO_DISCOVERY: false`) |
+| Published DMG | 🔴 No tags, so the workflow has never run for a release |
 | Cross-platform paths | 🟢 `locations.ts` — Win/Mac/Linux |
-| Testy na macOS | ⚪ Brak regularnego CI poza release workflow |
+| Tests on macOS | ⚪ No regular CI beyond the release workflow |
 
-**Wniosek:** Mac to **osobny track** — dokumentacja i CI gotowe, brak artefaktu do dystrybucji.
-
----
-
-## 7. TOP priorytety — następne 2 tygodnie
-
-### Tydzień 1 (9–15 lipca 2026)
-
-| # | Zadanie | Effort | Faza | Dlaczego |
-|---|---------|--------|------|----------|
-| 1 | ~~Usunąć default `192.168.x.x` z UI/store/snippet~~ ✅ **2026-07-09** | S | A | Bloker remote dla obcych |
-| 2 | `docs/BETA-SMOKE.md` + checklist 15 min | S | B | Powtarzalna weryfikacja przed każdym exe |
-| 3 | GitHub Release 0.1.2 z `Pomnia-0.1.2-setup.exe` | S | C | Oficjalny link dla testerów |
-| 4 | Landing: link pobierania + naprawa 503 | S | C | Waitlist ≠ produkt |
-| 5 | Preflight Ollama przed Distill (blokada + lista braków) | S | B | #1 silent fail |
-
-### Tydzień 2 (16–22 lipca 2026)
-
-| # | Zadanie | Effort | Faza | Dlaczego |
-|---|---------|--------|------|----------|
-| 7 | Wybór logo → podmiana `icon.ico` + tray | M | C | Pierwsze wrażenie |
-| 8 | Full onboarding: krok backup + PL labels | S | A | Dziura w happy path |
-| 9 | Antigravity: test na realnym Windows dumpie | M | B | Obiecany adapter |
-| 10 | `npm rebuild` / fix test `indexDocument` w CI | S | B | 74/74 green |
-| 11 | Settings → „Pokaż kreator ponownie" | S | A | Support beta |
-| 12 | Tag `v0.1.3` + Mac DMG artifact z CI | M | Mac | Pierwszy cross-platform release |
-
-### Metryki „gotowi na 5 beta testerów" (z ROADMAP-CLARITY)
-
-- [ ] Każdy przechodzi `BETA-SMOKE.md` na czystym Windows 11 **bez Node**
-- [ ] Health check zielony: Ollama + nomic-embed-text + vault + MCP
-- [ ] Cursor Connect na ≥2 różnych maszynach
-- [x] Zero `192.168.x.x` w ścieżce UI *(naprawione 2026-07-09 — per-user `app-settings.json`)*
-- [ ] Jeden link START-HERE + download exe
+**Conclusion:** Mac is **its own track** — documentation and CI are ready, but there is no artifact to distribute.
 
 ---
 
-## 8. Załącznik — szybka mapa architektury
+## 7. Top priorities — the next two weeks
+
+### Week 1 (9–15 July 2026)
+
+| # | Task | Effort | Phase | Why |
+|---|---------|--------|------|----------|
+| 1 | ~~Remove the `192.168.x.x` default from UI/store/snippet~~ ✅ **2026-07-09** | S | A | A remote blocker for strangers |
+| 2 | `docs/BETA-SMOKE.md` plus a 15-minute checklist | S | B | Repeatable verification before every exe |
+| 3 | GitHub Release 0.1.2 with `Pomnia-0.1.2-setup.exe` | S | C | An official link for testers |
+| 4 | Landing: a download link, and fix the 503 | S | C | A waitlist is not a product |
+| 5 | Ollama preflight before distillation (block plus a list of what is missing) | S | B | The number one silent failure |
+
+### Week 2 (16–22 July 2026)
+
+| # | Task | Effort | Phase | Why |
+|---|---------|--------|------|----------|
+| 7 | Choose a logo → swap `icon.ico` and the tray | M | C | First impression |
+| 8 | Full onboarding: a backup step | S | A | A hole in the happy path |
+| 9 | Antigravity: test against a real Windows dump | M | B | A promised adapter |
+| 10 | `npm rebuild` / fix the `indexDocument` test in CI | S | B | 74/74 green |
+| 11 | Settings → "Show the wizard again" | S | A | Beta support |
+| 12 | Tag `v0.1.3` plus a Mac DMG artifact from CI | M | Mac | The first cross-platform release |
+
+### "Ready for five beta testers" metrics (from ROADMAP-CLARITY)
+
+- [ ] Every one of them gets through `BETA-SMOKE.md` on a clean Windows 11 **without Node**
+- [ ] Health check green: Ollama + nomic-embed-text + vault + MCP
+- [ ] Cursor Connect on two or more different machines
+- [x] Zero `192.168.x.x` in any UI path *(fixed 2026-07-09 — per-user `app-settings.json`)*
+- [ ] One START-HERE link plus an exe download
+
+---
+
+## 8. Appendix — quick architecture map
 
 ```
-Asystenci (Claude Code, Cursor, …)
-        │ backup / import ZIP
+Assistants (Claude Code, Cursor, …)
+        │ backup / ZIP import
         ▼
   Pomnia Vault (.pomnia) ── encrypted AES-256-GCM
         │
-        ├──► Chats tab (full-text, bez GPU)
+        ├──► Chats tab (full text, no GPU)
         │
         ├──► DISTILL (Ollama qwen) ──► brain-notes/*.md
         │                                    │
@@ -280,23 +280,23 @@ Asystenci (Claude Code, Cursor, …)
                     brain-core embedded (127.0.0.1:7862)
                     library.db + MCP search_library
                                │
-                               ▼ opcjonalnie
+                               ▼ optionally
                     Remote Brain homelab (user URL + token)
                                │
                                ▼
-                    Cursor / inni klienci MCP
+                    Cursor / other MCP clients
 ```
 
 ---
 
-## 9. Historia tego audytu
+## 9. History of this audit
 
-| Data | Akcja |
+| Date | Action |
 |------|-------|
-| 2026-07-09 | Pełny audyt repo + ekosystem; testy 73/74; weryfikacja release/; HEAD b85e410 (mapa + animacja) |
-| 2026-07-09 | Powiązane: `docs/ROADMAP-CLARITY.md`, `docs/START-HERE.md` |
-| 2026-07-09 | Bloker #1 hardcoded IP → **FIXED** (`74db87d`); FlowDiagram MCP: skills → search_library |
+| 2026-07-09 | Full repo and ecosystem audit; tests 73/74; `release/` verified; HEAD b85e410 (map + animation) |
+| 2026-07-09 | Related: `docs/ROADMAP-CLARITY.md`, `docs/START-HERE.md` |
+| 2026-07-09 | Blocker #1, the hardcoded IP → **FIXED** (`74db87d`); FlowDiagram MCP: skills → search_library |
 
 ---
 
-*Pomnia · local-first AI memory · audyt wewnętrzny dla operatora*
+*Pomnia · local-first AI memory · internal audit for the operator*
