@@ -63,11 +63,11 @@ export interface AdminDeps {
      * BRAIN_VAULT_HOST_PATH). Shown when the in-process path is a container mount.
      */
     hostPath?: string | null
-    /** Short operator label (POMNIA_VAULT_LABEL), e.g. "katalog testowy (e2e)". */
+    /** Optional short label (POMNIA_VAULT_LABEL), sanitized — never e2e junk. */
     label?: string | null
-    /** One Polish sentence: where memory lives (not a raw path). */
+    /** Optional override (POMNIA_VAULT_WHERE). Prefer smbPath / hostPath in the UI. */
     where?: string | null
-    /** Windows/SMB hint (POMNIA_VAULT_SMB / VAULT_SMB_UNC). */
+    /** Real Windows UNC (POMNIA_VAULT_SMB / VAULT_SMB_UNC); fake notes become null. */
     smbPath?: string | null
   }
   /**
@@ -295,7 +295,7 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
       return j(409, {
         error: 'pinned_read_only',
         detail:
-          'Ten serwer jest przypięty jako replika (--read-only w unicie systemd). Usuń tę flagę i zrestartuj, zanim przejmiesz vault.',
+          'Ten serwer jest na stałe tylko do odczytu. Zmień to w konfiguracji hosta i zrestartuj, zanim przejmiesz sejf.',
       })
     }
     if (state.writable) {

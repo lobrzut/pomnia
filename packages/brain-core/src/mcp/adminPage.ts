@@ -206,7 +206,7 @@ ${brandSkyHtml()}
 
     <section class="card" id="tab-dash">
       <h2 data-i18n="dashTitle">Pulpit</h2>
-      <p class="lead" data-i18n="dashLead">Zdrowie search-appliance: indeks, klienci, uptime — nie przeglądarka pamięci (to Desktop).</p>
+      <p class="lead" data-i18n="dashLead">Indeks, klienci, uptime.</p>
       <div class="tiles" id="tiles"></div>
       <h3 class="sub-h" data-i18n="dashDisk" id="dash-disk-h">Katalogi na dysku</h3>
       <table><tbody id="vault-rows"></tbody></table>
@@ -219,92 +219,74 @@ ${brandSkyHtml()}
     </section>
 
     <section class="card hidden" id="tab-status">
-      <h2>Stan serwera</h2>
-      <p class="lead">
-        To samo, co <code class="mono">/healthz</code> — z powodami, bo jesteś zalogowany.
-      </p>
+      <h2 data-i18n="statusTitle">Stan serwera</h2>
       <table><tbody id="checks"></tbody></table>
       <div class="row">
-        <button id="refresh" class="ghost">Odśwież</button>
+        <button id="refresh" class="ghost" data-i18n="refresh">Odśwież</button>
       </div>
       <div id="status-msg"></div>
     </section>
 
     <section class="card hidden" id="tab-engine">
-      <h2>Silnik wyszukiwania</h2>
-      <p class="lead">
-        Embeddingi: <strong>fastembed</strong> (ONNX nomic w procesie — domyślne na KVM,
-        bez Ollamy) albo <strong>ollama</strong> (HTTP). Adres Ollamy jest używany
-        tylko w trybie ollama i jest walidowany (odmowa link-local / metadata cloud).
-      </p>
+      <h2 data-i18n="engineTitle">Silnik wyszukiwania</h2>
+      <p class="lead" data-i18n="engineLead">Skąd serwer bierze embeddingi — i kiedy przebudować indeks.</p>
       <div id="embed-status" class="msg" style="margin:0 0 1rem"></div>
-      <label for="ollama">Adres Ollamy <span class="mono" style="color:var(--ink-faint)">(tylko backend ollama)</span></label>
+      <label for="ollama" data-i18n="engineOllama">Adres Ollamy</label>
       <input id="ollama" type="url" spellcheck="false" placeholder="http://127.0.0.1:11434">
-      <label for="model">Model embeddingów (Ollama tag)</label>
+      <label for="model" data-i18n="engineModel">Model embeddingów</label>
       <input id="model" spellcheck="false" placeholder="nomic-embed-text">
       <div class="row">
-        <button id="save-engine">Zapisz</button>
-        <button id="probe-ollama" class="ghost">Sprawdź embedder</button>
-        <button id="reindex" class="ghost">Przebuduj indeks</button>
+        <button id="save-engine" data-i18n="save">Zapisz</button>
+        <button id="probe-ollama" class="ghost" data-i18n="engineProbe">Sprawdź embedder</button>
+        <button id="reindex" class="ghost" data-i18n="engineReindex">Przebuduj indeks</button>
       </div>
       <div id="engine-msg"></div>
     </section>
 
     <section class="card hidden" id="tab-clients">
-      <h2>Klienci</h2>
-      <p class="lead">
-        Pomnia jest jednoosobowa — to nie są konta użytkowników, tylko urządzenia
-        i agenci, którym wydajesz dostęp. <strong>agent</strong> sięga po MCP
-        i replikację; <strong>admin</strong> dodatkowo po ten panel.
-      </p>
+      <h2 data-i18n="clientsTitle">Klienci</h2>
+      <p class="lead" data-i18n="clientsLead">Tokeny dla urządzeń i agentów — nie konta ludzi.</p>
       <table>
-        <thead><tr><th>Nazwa</th><th>Rola</th><th>Ostatnio</th><th></th></tr></thead>
+        <thead><tr><th data-i18n="colName">Nazwa</th><th data-i18n="colRole">Rola</th><th data-i18n="colLast">Ostatnio</th><th></th></tr></thead>
         <tbody id="tokens"></tbody>
       </table>
       <div class="row">
         <div>
-          <label for="newname">Nowy klient</label>
+          <label for="newname" data-i18n="clientsNew">Nowy klient</label>
           <input id="newname" placeholder="laptop" spellcheck="false">
         </div>
         <div style="flex:0 0 9rem">
-          <label for="newrole">Rola</label>
+          <label for="newrole" data-i18n="colRole">Rola</label>
           <select id="newrole"><option value="agent">agent</option><option value="admin">admin</option></select>
         </div>
-        <button id="add">Wydaj token</button>
+        <button id="add" data-i18n="clientsIssue">Wydaj token</button>
       </div>
       <div id="clients-msg"></div>
     </section>
 
     <section class="card hidden" id="tab-users">
-      <h2>Konta panelu</h2>
-      <p class="lead">
-        Ludzie logujący się tutaj — to co innego niż tokeny, którymi łączą się
-        maszyny. Zmiana hasła natychmiast kończy wszystkie sesje tego konta.
-      </p>
+      <h2 data-i18n="usersTitle">Konta panelu</h2>
+      <p class="lead" data-i18n="usersLead">Konta do tego panelu. Nowe hasło kończy stare sesje.</p>
       <table>
-        <thead><tr><th>Login</th><th>Rola</th><th>Ostatnie logowanie</th><th></th></tr></thead>
+        <thead><tr><th data-i18n="colLogin">Login</th><th data-i18n="colRole">Rola</th><th data-i18n="colLastLogin">Ostatnie logowanie</th><th></th></tr></thead>
         <tbody id="users"></tbody>
       </table>
       <div class="row">
         <div>
-          <label for="nu">Nowe konto</label>
+          <label for="nu" data-i18n="usersNew">Nowe konto</label>
           <input id="nu" spellcheck="false" autocapitalize="off" placeholder="login">
         </div>
         <div>
-          <label for="np">Hasło (min. 12 znaków)</label>
+          <label for="np" data-i18n="usersPass">Hasło (min. 12 znaków)</label>
           <input id="np" type="password" autocomplete="new-password">
         </div>
-        <button id="adduser">Utwórz</button>
+        <button id="adduser" data-i18n="usersCreate">Utwórz</button>
       </div>
       <div id="users-msg"></div>
     </section>
 
     <section class="card hidden" id="tab-settings">
       <h2 data-i18n="settingsTitle">Ustawienia</h2>
-      <p class="lead" data-i18n="settingsLead">
-        Preferencje panelu w tej przeglądarce — jak Desktop → Ustawienia (kolorystyka / język).
-        Zachowanie agentów, Silnik i Sejf zostają osobnymi zakładkami operacyjnymi.
-      </p>
       <div class="subnav" id="settings-subnav" role="tablist" aria-label="Ustawienia">
         <button type="button" data-settings="appearance" aria-current="true" data-i18n="setAppearance">Wygląd</button>
         <button type="button" data-settings="language" data-i18n="setLanguage">Język</button>
@@ -313,24 +295,11 @@ ${brandSkyHtml()}
 
       <div class="settings-pane" id="settings-appearance">
         <h3 class="sub-h" data-i18n="setAppearance">Wygląd</h3>
-        <p class="lead" data-i18n="appearanceLead">
-          Te same schematy kolorów co w Pomnia Desktop (Ustawienia → Kolorystyka).
-          Zapis w przeglądarce (<code class="mono">localStorage</code>) — bez round-tripu na serwer.
-          Logo pomarańczowe/mieniące zostaje; zmieniają się tła i akcenty.
-        </p>
         ${themeSwitcherHtml()}
-        <p class="lead" style="margin-top:1rem" data-i18n="appearanceBrand">
-          Favicon i ikona = assety z <a href="https://pomnia.ai">pomnia.ai</a>.
-          Tło: lekka galaktyka neuronów (pauza gdy karta w tle).
-        </p>
       </div>
 
       <div class="settings-pane hidden" id="settings-language">
         <h3 class="sub-h" data-i18n="setLanguage">Język</h3>
-        <p class="lead" data-i18n="languageLead">
-          Język chrome panelu (nawigacja, etykiety). Wiedza w vaultcie zostaje bilingwalna PL+EN —
-          jak w Desktop. Persist: <code class="mono">localStorage</code> klucz <code class="mono">pomnia-ui-locale</code>.
-        </p>
         <div class="pref-bar" id="locale-bar" role="radiogroup" aria-label="Język">
           <span class="lbl" data-i18n="languageLabel">Interfejs</span>
           <button type="button" role="radio" data-locale="pl" aria-checked="true">PL</button>
@@ -340,47 +309,37 @@ ${brandSkyHtml()}
 
       <div class="settings-pane hidden" id="settings-interface">
         <h3 class="sub-h" data-i18n="setInterface">Interfejs</h3>
-        <p class="lead" data-i18n="densityLead">
-          Gęstość układu panelu. Tray / autostart / floating monitor z Desktop nie mają tu sensu
-          (to nie Electron). Persist: <code class="mono">pomnia-ui-density</code>.
-        </p>
         <div class="pref-bar" id="density-bar" role="radiogroup" aria-label="Gęstość">
           <span class="lbl" data-i18n="densityLabel">Gęstość</span>
           <button type="button" role="radio" data-density="comfortable" aria-checked="true" data-i18n="densityComfortable">Wygodna</button>
           <button type="button" role="radio" data-density="compact" aria-checked="false" data-i18n="densityCompact">Zwarta</button>
         </div>
-        <p class="lead" style="margin-top:1rem" data-i18n="timezoneNote">
-          Strefa czasu: przeglądarka hosta (daty „temu” / last-used). Osobny wybór regionu na serwerze — nie teraz.
-        </p>
       </div>
     </section>
 
     <section class="card hidden" id="tab-behaviour">
-      <h2>Zachowanie agentów</h2>
-      <p class="lead">
-        Te ustawienia trafiają do opisów narzędzi, które czyta każdy podłączony
-        agent — działają od następnego wywołania, bez restartu.
-      </p>
-      <label for="phrase">Fraza handshake</label>
+      <h2 data-i18n="behaviourTitle">Zachowanie agentów</h2>
+      <p class="lead" data-i18n="behaviourLead">Wpływa na to, co widzą podłączeni agenci — od razu.</p>
+      <label for="phrase" data-i18n="behaviourPhrase">Fraza handshake</label>
       <input id="phrase" spellcheck="false" placeholder="OK to Go Go Go">
-      <p class="lead" style="margin:.4rem 0 0">
-        Agent otwiera nią pierwszą odpowiedź — to dowód, że Pomnia jest naprawdę podpięta.
+      <p class="lead" style="margin:.4rem 0 0" data-i18n="behaviourPhraseHint">
+        Pierwsza odpowiedź agenta — dowód, że Pomnia jest podpięta.
       </p>
       <div class="row">
         <label style="display:flex;align-items:center;gap:.5rem;color:var(--ink);font-size:.83rem;margin:0">
-          <input id="hs-on" type="checkbox" style="width:auto"> Wymagaj frazy
+          <input id="hs-on" type="checkbox" style="width:auto"> <span data-i18n="behaviourRequire">Wymagaj frazy</span>
         </label>
         <label style="display:flex;align-items:center;gap:.5rem;color:var(--ink);font-size:.83rem;margin:0">
-          <input id="ac-on" type="checkbox" style="width:auto"> Pozwól na auto-checkpoint
+          <input id="ac-on" type="checkbox" style="width:auto"> <span data-i18n="behaviourCheckpoint">Pozwól na auto-checkpoint</span>
         </label>
       </div>
-      <label for="label">Nazwa tej instancji</label>
+      <label for="label" data-i18n="behaviourLabel">Nazwa tej instancji</label>
       <input id="label" spellcheck="false" placeholder="pomnia-server">
-      <p class="lead" style="margin:.4rem 0 0">
-        Pod tą nazwą serwer przedstawia się, gdy przejmie vault.
+      <p class="lead" style="margin:.4rem 0 0" data-i18n="behaviourLabelHint">
+        Jak serwer się przedstawia przy przejęciu sejfu.
       </p>
       <div class="row">
-        <button id="save-behaviour">Zapisz</button>
+        <button id="save-behaviour" data-i18n="save">Zapisz</button>
       </div>
       <div id="behaviour-msg"></div>
     </section>
@@ -388,9 +347,7 @@ ${brandSkyHtml()}
     <section class="card hidden" id="tab-vault">
       <h2 data-i18n="tabVault">Sejf</h2>
       <p class="lead" data-i18n-html="vaultLead">
-        Tu widać <em>skąd</em> ten serwer bierze pamięć — po ludzku, nie tylko
-        ścieżkami Dockera. Zapisywać może tylko jedna instancja naraz; przejęcie
-        natychmiast odbiera prawo zapisu poprzedniemu właścicielowi.
+        Tylko jedna instancja może zapisywać naraz.
       </p>
       <table><tbody id="vault-info"></tbody></table>
       <div id="vault-tech"></div>
@@ -423,26 +380,56 @@ ${brandSkyHtml()}
       tabDash: 'Pulpit', tabStatus: 'Stan', tabEngine: 'Silnik', tabClients: 'Klienci',
       tabUsers: 'Konta', tabBehaviour: 'Zachowanie', tabSettings: 'Ustawienia', tabVault: 'Sejf',
       dashTitle: 'Pulpit',
-      dashLead: 'Zdrowie search-appliance: indeks, klienci, uptime — nie przeglądarka pamięci (to Desktop).',
+      dashLead: 'Indeks, klienci, uptime.',
       dashDisk: 'Katalogi na dysku',
       dashDiskGap: 'Katalogi na dysku (luka indeksu)',
       dashActors: 'Kto pyta (ostatnie 24 h)',
-      dashRecent: 'Ostatnie zapytania', refresh: 'Odśwież',
+      dashRecent: 'Ostatnie zapytania', refresh: 'Odśwież', save: 'Zapisz',
+      statusTitle: 'Stan serwera',
+      engineTitle: 'Silnik wyszukiwania',
+      engineLead: 'Skąd serwer bierze embeddingi — i kiedy przebudować indeks.',
+      engineOllama: 'Adres Ollamy', engineModel: 'Model embeddingów',
+      engineProbe: 'Sprawdź embedder', engineReindex: 'Przebuduj indeks',
+      clientsTitle: 'Klienci',
+      clientsLead: 'Tokeny dla urządzeń i agentów — nie konta ludzi.',
+      clientsNew: 'Nowy klient', clientsIssue: 'Wydaj token',
+      usersTitle: 'Konta panelu',
+      usersLead: 'Konta do tego panelu. Nowe hasło kończy stare sesje.',
+      usersNew: 'Nowe konto', usersPass: 'Hasło (min. 12 znaków)', usersCreate: 'Utwórz',
+      colName: 'Nazwa', colRole: 'Rola', colLast: 'Ostatnio', colLogin: 'Login', colLastLogin: 'Ostatnie logowanie',
       settingsTitle: 'Ustawienia',
-      settingsLead: 'Preferencje panelu w tej przeglądarce — jak Desktop → Ustawienia (kolorystyka / język). Zachowanie agentów, Silnik i Sejf zostają osobnymi zakładkami operacyjnymi.',
       setAppearance: 'Wygląd', setLanguage: 'Język', setInterface: 'Interfejs',
-      appearanceLead: 'Te same schematy kolorów co w Pomnia Desktop (Ustawienia → Kolorystyka). Zapis w przeglądarce (<code class="mono">localStorage</code>) — bez round-tripu na serwer. Logo pomarańczowe/mieniące zostaje; zmieniają się tła i akcenty.',
-      appearanceBrand: 'Favicon i ikona = assety z <a href="https://pomnia.ai">pomnia.ai</a>. Tło: lekka galaktyka neuronów (pauza gdy karta w tle).',
-      languageLead: 'Język chrome panelu (nawigacja, etykiety). Wiedza w vaultcie zostaje bilingwalna PL+EN — jak w Desktop. Persist: <code class="mono">localStorage</code> klucz <code class="mono">pomnia-ui-locale</code>.',
       languageLabel: 'Interfejs',
-      densityLead: 'Gęstość układu panelu. Tray / autostart / floating monitor z Desktop nie mają tu sensu (to nie Electron). Persist: <code class="mono">pomnia-ui-density</code>.',
       densityLabel: 'Gęstość', densityComfortable: 'Wygodna', densityCompact: 'Zwarta',
-      timezoneNote: 'Strefa czasu: przeglądarka hosta (daty „temu” / last-used). Osobny wybór regionu na serwerze — nie teraz.',
+      behaviourTitle: 'Zachowanie agentów',
+      behaviourLead: 'Wpływa na to, co widzą podłączeni agenci — od razu.',
+      behaviourPhrase: 'Fraza handshake',
+      behaviourPhraseHint: 'Pierwsza odpowiedź agenta — dowód, że Pomnia jest podpięta.',
+      behaviourRequire: 'Wymagaj frazy',
+      behaviourCheckpoint: 'Pozwól na auto-checkpoint',
+      behaviourLabel: 'Nazwa tej instancji',
+      behaviourLabelHint: 'Jak serwer się przedstawia przy przejęciu sejfu.',
       claimBtn: 'Przejmij własność',
-      claimOwned: 'Ten serwer już jest właścicielem sejfu.',
-      claimPinned: 'Przypięty --read-only w unicie — nie da się przejąć z panelu.',
-      claimReady: 'Przejmij zapis od innego właściciela (zsynchronizuj go najpierw).',
-      vaultLead: 'Tu widać <em>skąd</em> ten serwer bierze pamięć — po ludzku, nie tylko ścieżkami Dockera. Zapisywać może tylko jedna instancja naraz; przejęcie natychmiast odbiera prawo zapisu poprzedniemu właścicielowi.',
+      claimOwned: 'Ten serwer już zapisuje do tego sejfu.',
+      claimPinned: 'Ten serwer jest na stałe tylko do odczytu — nie da się przejąć z panelu.',
+      claimReady: 'Przejmij zapis od innej instancji (zsynchronizuj ją najpierw).',
+      vaultLead: 'Tylko jedna instancja może zapisywać naraz.',
+      vaultForYou: 'Dla Ciebie',
+      vaultOnServer: 'Na serwerze',
+      vaultWrite: 'Zapis',
+      vaultWriteSelf: 'Ten serwer zapisuje',
+      vaultWriteOther: 'Inna instancja zapisuje',
+      vaultWriteRo: 'Tylko odczyt',
+      vaultRo: 'Tylko odczyt',
+      vaultRoYes: 'tak',
+      vaultRoNo: 'nie',
+      vaultTech: 'Szczegóły techniczne',
+      vaultInContainer: 'W kontenerze',
+      vaultOwnerId: 'Id właściciela',
+      vaultLabel: 'Etykieta',
+      vaultBannerRw: 'Ten serwer zapisuje.',
+      vaultBannerOther: 'Inna instancja zapisuje.',
+      vaultBannerRo: 'Tylko odczyt.',
       tileFiles: 'plików w indeksie', tileChunks: 'fragmentów', tileWait: 'czeka na indeks',
       tileReq: 'zapytań / 24 h', tileClients: 'aktywnych klientów', tileUp: 'działa',
     },
@@ -453,26 +440,56 @@ ${brandSkyHtml()}
       tabDash: 'Dashboard', tabStatus: 'Status', tabEngine: 'Engine', tabClients: 'Clients',
       tabUsers: 'Accounts', tabBehaviour: 'Behaviour', tabSettings: 'Settings', tabVault: 'Vault',
       dashTitle: 'Dashboard',
-      dashLead: 'Search-appliance health: index, clients, uptime — not a memory browser (that is Desktop).',
+      dashLead: 'Index, clients, uptime.',
       dashDisk: 'On-disk dirs',
       dashDiskGap: 'On-disk dirs (index gap)',
       dashActors: 'Who asked (last 24 h)',
-      dashRecent: 'Recent calls', refresh: 'Refresh',
+      dashRecent: 'Recent calls', refresh: 'Refresh', save: 'Save',
+      statusTitle: 'Server status',
+      engineTitle: 'Search engine',
+      engineLead: 'Where embeddings come from — and when to rebuild the index.',
+      engineOllama: 'Ollama URL', engineModel: 'Embedding model',
+      engineProbe: 'Probe embedder', engineReindex: 'Rebuild index',
+      clientsTitle: 'Clients',
+      clientsLead: 'Tokens for devices and agents — not people accounts.',
+      clientsNew: 'New client', clientsIssue: 'Issue token',
+      usersTitle: 'Panel accounts',
+      usersLead: 'Accounts for this panel. A new password ends old sessions.',
+      usersNew: 'New account', usersPass: 'Password (min. 12 chars)', usersCreate: 'Create',
+      colName: 'Name', colRole: 'Role', colLast: 'Last seen', colLogin: 'Login', colLastLogin: 'Last sign-in',
       settingsTitle: 'Settings',
-      settingsLead: 'Panel prefs in this browser — like Desktop → Settings (colors / language). Agent behaviour, Engine and Vault stay as operational tabs.',
       setAppearance: 'Appearance', setLanguage: 'Language', setInterface: 'Interface',
-      appearanceLead: 'Same color schemes as Pomnia Desktop (Settings → Colors). Stored in the browser (<code class="mono">localStorage</code>) — no server round-trip. Orange/shimmer logo stays; backgrounds and accents change.',
-      appearanceBrand: 'Favicon and icon = assets from <a href="https://pomnia.ai">pomnia.ai</a>. Background: light neuron field (pauses when the tab is hidden).',
-      languageLead: 'Panel chrome language (nav, labels). Vault knowledge stays bilingual PL+EN — same as Desktop. Persist: <code class="mono">localStorage</code> key <code class="mono">pomnia-ui-locale</code>.',
       languageLabel: 'Interface',
-      densityLead: 'Panel layout density. Tray / autostart / floating monitor from Desktop do not apply here (not Electron). Persist: <code class="mono">pomnia-ui-density</code>.',
       densityLabel: 'Density', densityComfortable: 'Comfortable', densityCompact: 'Compact',
-      timezoneNote: 'Time zone: this browser (relative dates / last-used). Server region picker — not now.',
+      behaviourTitle: 'Agent behaviour',
+      behaviourLead: 'What connected agents see — takes effect immediately.',
+      behaviourPhrase: 'Handshake phrase',
+      behaviourPhraseHint: 'The agent’s first reply — proof Pomnia is wired.',
+      behaviourRequire: 'Require phrase',
+      behaviourCheckpoint: 'Allow auto-checkpoint',
+      behaviourLabel: 'This instance’s name',
+      behaviourLabelHint: 'How the server introduces itself when it claims the vault.',
       claimBtn: 'Take ownership',
-      claimOwned: 'This server already owns the vault.',
-      claimPinned: 'Pinned --read-only in the unit — cannot claim from the panel.',
-      claimReady: 'Take write ownership from the other writer (sync it first).',
-      vaultLead: 'Shows <em>where</em> this server reads memory — in plain language, not only Docker paths. Only one instance may write at a time; claiming immediately revokes the previous owner.',
+      claimOwned: 'This server already writes to this vault.',
+      claimPinned: 'This server is permanently read-only — cannot claim from the panel.',
+      claimReady: 'Take write ownership from the other instance (sync it first).',
+      vaultLead: 'Only one instance may write at a time.',
+      vaultForYou: 'For you',
+      vaultOnServer: 'On the server',
+      vaultWrite: 'Write',
+      vaultWriteSelf: 'This server writes',
+      vaultWriteOther: 'Another instance writes',
+      vaultWriteRo: 'Read-only',
+      vaultRo: 'Read-only',
+      vaultRoYes: 'yes',
+      vaultRoNo: 'no',
+      vaultTech: 'Technical details',
+      vaultInContainer: 'In container',
+      vaultOwnerId: 'Owner id',
+      vaultLabel: 'Label',
+      vaultBannerRw: 'This server writes.',
+      vaultBannerOther: 'Another instance writes.',
+      vaultBannerRo: 'Read-only.',
       tileFiles: 'files in index', tileChunks: 'chunks', tileWait: 'waiting to index',
       tileReq: 'requests / 24 h', tileClients: 'active clients', tileUp: 'uptime',
     },
@@ -936,6 +953,12 @@ ${brandSkyHtml()}
   }
 
   // ── vault ───────────────────────────────────────────────────────────────
+  function vaultWriteLabel(v) {
+    if (v.writable) return t('vaultWriteSelf')
+    if (v.owner) return t('vaultWriteOther')
+    return t('vaultWriteRo')
+  }
+
   function paintVaultBanner(v) {
     const ban = $('vault-banner')
     const badge = $('vault-badge')
@@ -943,17 +966,12 @@ ${brandSkyHtml()}
     if (!ban || !badge || !detail) return
     if (v.writable) {
       ban.className = 'banner rw'
-      badge.textContent = 'Zapis'
-      detail.textContent = 'Ten serwer jest właścicielem vaultu' +
-        (v.owner ? ' (' + v.owner + ').' : '.')
+      badge.textContent = t('vaultWrite')
+      detail.textContent = t('vaultBannerRw')
     } else {
       ban.className = 'banner ro'
-      badge.textContent = 'Tylko odczyt'
-      const pin = v.readOnlyFlag ? ' · przypięty --read-only w systemd' : ''
-      detail.textContent = (v.owner
-        ? 'Replika — właściciel: ' + v.owner
-        : 'Replika — właściciel nieznany') + pin +
-        '. Push z Desktop (Connect) aktualizuje kopię; ten host nie zapisuje notatek agentów.'
+      badge.textContent = t('vaultRo')
+      detail.textContent = v.owner ? t('vaultBannerOther') : t('vaultBannerRo')
     }
   }
 
@@ -972,24 +990,31 @@ ${brandSkyHtml()}
       b.textContent = val
       tr.append(a, b); tb.appendChild(tr)
     }
-    const where = v.where || (v.label ? ('Lokalizacja: ' + v.label + '.') : null)
-    if (where) add('Gdzie jest Twoja pamięć (vault)', where, true)
-    else if (v.label) add('Etykieta', v.label, true)
-    if (v.smbPath) add('Dla Ciebie (Windows)', v.smbPath, false)
-    if (v.hostPath) add('Na serwerze', v.hostPath, false)
-    add('Zapis', v.writable ? 'ten serwer jest właścicielem' : 'tylko odczyt (replika)', true)
-    add('Właściciel', v.owner || '—', false)
-    add('Przypięty --read-only', v.readOnlyFlag ? 'tak (w unicie systemd)' : 'nie', true)
-    if (tech && v.path) {
-      const d = document.createElement('details')
-      d.className = 'tech'
-      const s = document.createElement('summary')
-      s.textContent = 'Szczegóły techniczne'
-      const body = document.createElement('div')
-      body.className = 'tech-body'
-      body.textContent = 'W kontenerze: ' + v.path
-      d.append(s, body)
-      tech.appendChild(d)
+    // Facts first: UNC for the human, host path on the box — never e2e notes.
+    if (v.smbPath) add(t('vaultForYou'), v.smbPath, false)
+    if (v.hostPath) add(t('vaultOnServer'), v.hostPath, false)
+    else if (v.where) add(t('vaultOnServer'), v.where, true)
+    else if (v.path && !String(v.path).startsWith('/var/')) {
+      add(t('vaultOnServer'), v.path, false)
+    }
+    add(t('vaultWrite'), vaultWriteLabel(v), true)
+    add(t('vaultRo'), v.readOnlyFlag ? t('vaultRoYes') : t('vaultRoNo'), true)
+    if (tech) {
+      const lines = []
+      if (v.path) lines.push(t('vaultInContainer') + ': ' + v.path)
+      if (v.owner) lines.push(t('vaultOwnerId') + ': ' + v.owner)
+      if (v.label) lines.push(t('vaultLabel') + ': ' + v.label)
+      if (lines.length) {
+        const d = document.createElement('details')
+        d.className = 'tech'
+        const s = document.createElement('summary')
+        s.textContent = t('vaultTech')
+        const body = document.createElement('div')
+        body.className = 'tech-body'
+        body.textContent = lines.join('\\n')
+        d.append(s, body)
+        tech.appendChild(d)
+      }
     }
     $('claim').disabled = v.writable || v.readOnlyFlag
     const state = v.readOnlyFlag ? 'pinned' : v.writable ? 'owned' : 'ready'
