@@ -24,9 +24,20 @@
  * There is no form, no storage, nothing to phish.
  *
  * Zero external requests — inlined CSS, no fonts, no scripts from anywhere.
+ * Brand chrome (shimmer mark, neuron sky, themes) matches pomnia.ai / Desktop.
  * The CSP header the server sends says so, so a future edit that reaches for a
  * CDN breaks loudly instead of quietly phoning out.
  */
+
+import {
+  BRAND_HEAD_LINKS,
+  brandChromeCss,
+  brandSkyHtml,
+  brandSkyScript,
+  brandWordmarkHtml,
+  themeScript,
+  themeSwitcherHtml,
+} from './brandChrome.js'
 
 export type PageState = 'ok' | 'degraded' | 'down'
 
@@ -82,35 +93,20 @@ export function renderStatusPage(info: StatusPageInfo): string {
   const detailed = !!info.checks?.length
 
   return `<!doctype html>
-<html lang="en">
+<html lang="en" data-theme="mint">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Pomnia · brain-core</title>
+${BRAND_HEAD_LINKS}
+<title>Pomnia</title>
 <style>
-  :root {
-    --bg: #060a08; --bg-2: #0a110d; --panel: rgba(17, 31, 24, .58);
-    --border: rgba(255,255,255,.09);
-    --ink: #e9f5ee; --ink-dim: #8fa89a; --ink-faint: #5b7868;
-    --mint: #34d399; --iris: #2dd4bf; --amber: #fbbf24; --rose: #fb7185;
-    --glow: rgba(45, 212, 191, .10);
-    --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-    --mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  }
-  @media (prefers-color-scheme: light) {
-    :root {
-      --bg: #f4f8f6; --bg-2: #e8f0eb; --panel: rgba(255,255,255,.72);
-      --border: rgba(0,0,0,.09);
-      --ink: #10241a; --ink-dim: #46614f; --ink-faint: #6d8577;
-      --glow: rgba(45, 212, 191, .18);
-    }
-  }
+  ${brandChromeCss()}
   * { box-sizing: border-box; }
   body {
-    margin: 0; min-height: 100vh; font-family: var(--font); color: var(--ink);
-    background: radial-gradient(1100px 620px at 18% -12%, var(--glow), transparent),
-                linear-gradient(160deg, var(--bg), var(--bg-2));
+    margin: 0; min-height: 100vh; font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
     display: flex; align-items: center; justify-content: center;
     padding: 2.5rem 1.25rem; line-height: 1.5;
   }
@@ -120,11 +116,6 @@ export function renderStatusPage(info: StatusPageInfo): string {
     backdrop-filter: blur(14px);
   }
   header { display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
-  h1 {
-    margin: 0; font-size: 1.7rem; font-weight: 800; letter-spacing: -.025em;
-    background: linear-gradient(120deg, #1a5c3a, var(--mint) 48%, var(--iris));
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
   .status {
     margin-left: auto; display: inline-flex; align-items: center; gap: .5rem;
     padding: .3rem .8rem; border-radius: 999px; font-size: .8rem; font-weight: 700;
@@ -137,16 +128,17 @@ export function renderStatusPage(info: StatusPageInfo): string {
   .degraded .dot { background: var(--amber); }
   .down  { color: var(--rose);  background: color-mix(in srgb, var(--rose) 15%, transparent); }
   .down  .dot { background: var(--rose); }
-  .sub { margin: .4rem 0 1.6rem; color: var(--ink-dim); font-size: .9rem; width: 100%; }
+  .sub { margin: .4rem 0 1.2rem; color: var(--ink-dim); font-size: .9rem; width: 100%; }
+  .theme-wrap { width: 100%; margin: 0 0 1.1rem; }
   dl {
     display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .6rem 1.25rem;
     margin: 0; font-size: .875rem;
   }
   dt { color: var(--ink-faint); }
-  dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+  dd { margin: 0; font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; overflow-wrap: anywhere; }
   .pill {
     display: inline-block; padding: .12rem .6rem; border-radius: 999px;
-    font-family: var(--font); font-size: .78rem; font-weight: 600;
+    font-family: inherit; font-size: .78rem; font-weight: 600;
   }
   ul.checks { list-style: none; margin: 1.6rem 0 0; padding: 1.25rem 0 0; border-top: 1px solid var(--border); }
   .chk {
@@ -164,14 +156,14 @@ export function renderStatusPage(info: StatusPageInfo): string {
   .chk.degraded .chk-state { color: var(--amber); }
   .chk.down .chk-state { color: var(--rose); }
   .chk-detail {
-    grid-column: 2 / -1; margin: .15rem 0 0; font-family: var(--mono);
+    grid-column: 2 / -1; margin: .15rem 0 0; font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
     font-size: .78rem; color: var(--ink-dim); overflow-wrap: anywhere;
   }
   .hint {
     margin: 1.6rem 0 0; padding: .85rem 1rem; border-radius: 14px;
     border: 1px solid var(--border); font-size: .8rem; color: var(--ink-dim);
   }
-  .hint code { font-family: var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+  .hint code { font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; color: var(--ink); overflow-wrap: anywhere; }
   footer {
     margin-top: 1.6rem; padding-top: 1.2rem; border-top: 1px solid var(--border);
     color: var(--ink-faint); font-size: .78rem;
@@ -186,19 +178,22 @@ export function renderStatusPage(info: StatusPageInfo): string {
 </style>
 </head>
 <body>
+  ${brandSkyHtml()}
+  <div class="page-root">
   <main class="card">
     <header>
-      <h1>Pomnia</h1>
+      ${brandWordmarkHtml('h1')}
       <span class="status ${info.state}"><span class="dot"></span>${STATE_LABEL[info.state]}</span>
       <p class="sub">${
         detailed
-          ? 'brain-core — operator view. Everything below is status; nothing here reads the vault.'
-          : 'brain-core is running. This is everything it will tell you without a token.'
+          ? 'Pomnia — operator view. Everything below is status; nothing here reads the vault.'
+          : 'Pomnia is running. This is everything it will tell you without a token.'
       }</p>
+      <div class="theme-wrap">${themeSwitcherHtml()}</div>
     </header>
 
     <dl>
-      <dt>Service</dt><dd>brain-core ${esc(info.version)}</dd>
+      <dt>Service</dt><dd>Pomnia ${esc(info.version)}</dd>
       <dt>MCP endpoint</dt><dd>${esc(info.origin)}/mcp</dd>
       <dt>Access</dt><dd><span class="pill ${access.cls}">${access.text}</span></dd>
       <dt>Vault</dt><dd>${
@@ -230,6 +225,8 @@ export function renderStatusPage(info: StatusPageInfo): string {
       <br>AGPL-3.0 · <a href="https://pomnia.ai">pomnia.ai</a>
     </footer>
   </main>
+  </div>
+<script>${themeScript()}${brandSkyScript()}</script>
 </body>
 </html>
 `
