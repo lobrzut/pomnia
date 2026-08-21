@@ -123,3 +123,24 @@ describe('paths derived from --data-dir', () => {
     expect(cfg.auth.tokensFile).toBe('/etc/pomnia/tokens.json')
   })
 })
+
+describe('sync peer vs archive target', () => {
+  it('keeps peer and archive as separate settings', async () => {
+    const cfg = await loadConfig(
+      [...base, '--sync-peer', 'http://peer:7865', '--archive-target', '\\\\nas\\blobs'],
+      {},
+    )
+    expect(cfg.syncPeer).toBe('http://peer:7865')
+    expect(cfg.archiveTarget).toBe('\\\\nas\\blobs')
+    expect(cfg.syncPeer).not.toBe(cfg.archiveTarget)
+  })
+
+  it('reads them from env without sharing one field', async () => {
+    const cfg = await loadConfig([...base], {
+      BRAIN_SYNC_PEER: 'desktop-label',
+      BRAIN_ARCHIVE_TARGET: '/mnt/archive',
+    } as NodeJS.ProcessEnv)
+    expect(cfg.syncPeer).toBe('desktop-label')
+    expect(cfg.archiveTarget).toBe('/mnt/archive')
+  })
+})

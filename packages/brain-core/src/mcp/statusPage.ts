@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
 /**
- * The page a human gets when they open the server's address in a browser.
+ * The page a human gets at `/status` (public health summary).
  *
- * Before this it was `{"error":"not_found"}` — correct for a machine, useless
- * for the person checking whether their server is up. The legacy Python
- * dashboard filled that role but is a different product generation: it brands
- * itself BRAIN, ships the Reliqua purple the desktop moved off, and pulls its
- * webfonts from Google on every load — an outbound request from the one
- * machine whose whole promise is that nothing leaves it.
+ * Homepage `/` is the panel login gate — not this page. Before that split,
+ * opening the server address dumped status to anyone; operators asked for
+ * login first. Status stays reachable without credentials at `/status`.
  *
  * Two audiences, one page, and the split is deliberate:
  *
@@ -222,6 +219,7 @@ ${BRAND_HEAD_LINKS}
     <footer>
       Point an MCP-speaking agent at the endpoint above. Memory, search and
       every other tool live behind it.
+      <br>Panel login: <a href="${esc(info.origin)}/">${esc(info.origin)}/</a>
       <br>AGPL-3.0 · <a href="https://pomnia.ai">pomnia.ai</a>
     </footer>
   </main>

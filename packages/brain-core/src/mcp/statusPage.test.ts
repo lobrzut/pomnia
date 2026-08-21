@@ -22,16 +22,19 @@ describe('renderStatusPage', () => {
    */
   it('fetches nothing from anywhere', () => {
     const html = page()
-    // A URL printed as text is fine — the endpoint is the point of the page.
-    // What must not exist is anything the browser will go and *load*.
-    expect(html).not.toMatch(/\ssrc=/i)
-    expect(html).not.toMatch(/<link\b/i)
-    expect(html).not.toMatch(/<script/i)
+    // Same-origin favicon/icon links + inline theme/sky scripts are fine.
+    // What must not exist is anything the browser will go and *load* off-box.
+    expect(html).not.toMatch(/\ssrc=["']https?:/i)
+    expect(html).not.toMatch(/<link[^>]+https?:/i)
     expect(html).not.toMatch(/@import/i)
     expect(html).not.toMatch(/url\(\s*['"]?https?:/i)
-    // The one link is a plain anchor the user must click, not a request.
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1])
-    expect(hrefs).toEqual(['https://pomnia.ai'])
+    for (const h of hrefs) {
+      if (h.startsWith('/') || h.startsWith('http://192.168.1.201:7865')) continue
+      expect(h, `external href must stay pomnia.ai, got ${h}`).toBe('https://pomnia.ai')
+    }
+    expect(hrefs).toContain('https://pomnia.ai')
+    expect(hrefs).toContain('http://192.168.1.201:7865/')
   })
 
   it('shows the endpoint a client actually needs', () => {

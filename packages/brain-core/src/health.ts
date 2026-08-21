@@ -32,8 +32,18 @@ import { join } from 'node:path'
 import type Database from 'better-sqlite3'
 
 import type { EmbedBackendName, EmbedClient } from './rag/embed.js'
+import type { SyncHealthSnapshot } from './sync/status.js'
 
 export type CheckState = 'ok' | 'degraded' | 'down'
+
+/** Fresh process: nothing received yet. Public /healthz must show this. */
+export const EMPTY_SYNC_HEALTH: SyncHealthSnapshot = {
+  lastReceivedAt: null,
+  lastPeer: null,
+  filesReceived: 0,
+  conflicts: 0,
+  archiveLastAt: null,
+}
 
 export interface Check {
   state: CheckState
@@ -115,6 +125,12 @@ export interface HealthReport {
    * was born. Counts require a token (or `/admin/health`).
    */
   index: { files: number; chunks: number } | null
+  /**
+   * Surface + archive intake visibility. Stays public (like `embed.backend`):
+   * operators need to see "nothing ever arrived" without a token. Conflict
+   * *paths* live only under `/admin`, not here.
+   */
+  sync: SyncHealthSnapshot
 }
 
 /**
@@ -132,6 +148,9 @@ export interface HealthReport {
  *
  * `embed.backend` and `embed.ready` stay public: operators and install.sh need
  * them without a token. The model id is redacted (paths / HF cache hints).
+ *
+ * `sync.*` stays public the same way — `lastReceivedAt: null` is how you tell
+ * "nothing ever arrived" from a monitor without credentials.
  */
 export function redactHealth(h: HealthReport): HealthReport {
   const bare = (c: Check): Check => ({ state: c.state })
@@ -143,6 +162,8 @@ export function redactHealth(h: HealthReport): HealthReport {
       model: '',
       ready: h.embed.ready,
     },
+    // sync block is intentional public telemetry (no secrets, no vault paths).
+    sync: { ...h.sync },
     checks: {
       db: bare(h.checks.db),
       index: bare(h.checks.index),
@@ -195,6 +216,8 @@ export async function collectHealth(opts: {
   writable: boolean
   vaultOwner: string | null
   startedAt: number
+  /** Intake counters; omit → empty (fresh / tests). */
+  sync?: SyncHealthSnapshot
 }): Promise<HealthReport> {
   let db: Check = { state: 'ok' }
   let index: Check = { state: 'ok' }
@@ -260,5 +283,6 @@ export async function collectHealth(opts: {
     embed: { backend, model, ready: embedReady },
     checks: { db, index, vault, disk, ollama: effectiveEmbed },
     index: counts,
+    sync: opts.sync ? { ...opts.sync } : { ...EMPTY_SYNC_HEALTH },
   }
 }

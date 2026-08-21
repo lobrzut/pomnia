@@ -215,8 +215,16 @@ describe('what the operator is told', () => {
     expect(body.uptimeSec).toBeGreaterThanOrEqual(0)
   })
 
-  it('serves the status page without a token, naming itself', async () => {
+  it('serves the login panel at /, not the public status page', async () => {
     const r = await fetch(`${BASE}/`)
+    const html = await r.text()
+    expect(r.status).toBe(200)
+    expect(html).toMatch(/login|Zaloguj|Sign in/i)
+    expect(html).not.toMatch(/Not serving|Operational/)
+  })
+
+  it('serves the public status page at /status without a token', async () => {
+    const r = await fetch(`${BASE}/status`)
     const html = await r.text()
     expect(r.status).toBe(200)
     expect(html).toContain('brain-core')

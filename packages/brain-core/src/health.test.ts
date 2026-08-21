@@ -54,6 +54,13 @@ describe('collectHealth', () => {
     expect(h.ok).toBe(true)
     expect(h.index).toEqual({ files: 10, chunks: 44 })
     expect(h.embed).toEqual({ backend: 'ollama', model: 'nomic-embed-text', ready: true })
+    expect(h.sync).toEqual({
+      lastReceivedAt: null,
+      lastPeer: null,
+      filesReceived: 0,
+      conflicts: 0,
+      archiveLastAt: null,
+    })
   })
 
   /**
@@ -147,6 +154,7 @@ describe('redactHealth', () => {
     expect(r.embed.backend).toBe('ollama')
     expect(r.embed.ready).toBe(true)
     expect(r.embed.model).toBe('')
+    expect(r.sync.lastReceivedAt).toBeNull()
   })
 })
 
