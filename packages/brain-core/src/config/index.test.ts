@@ -144,3 +144,23 @@ describe('sync peer vs archive target', () => {
     expect(cfg.archiveTarget).toBe('/mnt/archive')
   })
 })
+
+describe('distill config', () => {
+  it('defaults distill on with qwen2.5:14b', async () => {
+    const cfg = await loadConfig([...base], {})
+    expect(cfg.distillEnabled).toBe(true)
+    expect(cfg.distillModel).toBe('qwen2.5:14b')
+  })
+
+  it('turns distill off with BRAIN_DISTILL=0', async () => {
+    const cfg = await loadConfig([...base], { BRAIN_DISTILL: '0' } as NodeJS.ProcessEnv)
+    expect(cfg.distillEnabled).toBe(false)
+  })
+
+  it('takes BRAIN_DISTILL_MODEL / --distill-model', async () => {
+    const cfg = await loadConfig([...base, '--distill-model', 'qwen2.5:32b'], {
+      BRAIN_DISTILL_MODEL: 'qwen2.5:7b',
+    } as NodeJS.ProcessEnv)
+    expect(cfg.distillModel).toBe('qwen2.5:32b')
+  })
+})

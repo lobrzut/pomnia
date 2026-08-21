@@ -41,7 +41,7 @@ describe('the panel script', () => {
     const script = inlineScript()
     // Every id the script reaches for must exist in the markup, and every
     // button the markup declares must be reachable from the script.
-    for (const id of ['login-form', 'logout', 'adduser', 'save-behaviour', 'save-engine', 'probe-ollama', 'add', 'claim', 'claim-hint', 'refresh', 'dash-refresh', 'tiles', 'vault-banner', 'sync-checks', 'sync-conflicts']) {
+    for (const id of ['login-form', 'logout', 'adduser', 'save-behaviour', 'save-engine', 'probe-ollama', 'add', 'claim', 'claim-hint', 'refresh', 'dash-refresh', 'tiles', 'vault-banner', 'sync-checks', 'sync-conflicts', 'distill-start', 'distill-dry', 'nav-distill']) {
       expect(page, `markup is missing #${id}`).toContain(`id="${id}"`)
       expect(script, `script never touches #${id}`).toContain(`'${id}'`)
     }
@@ -55,7 +55,7 @@ describe('the panel script', () => {
 
   it('reaches every tab section the nav offers', () => {
     const page = html()
-    for (const tab of ['dash', 'status', 'engine', 'clients', 'users', 'behaviour', 'settings', 'vault']) {
+    for (const tab of ['dash', 'status', 'engine', 'distill', 'clients', 'users', 'behaviour', 'settings', 'vault']) {
       expect(page, `no section for the ${tab} tab`).toContain(`id="tab-${tab}"`)
       expect(page, `no nav button for ${tab}`).toContain(`data-tab="${tab}"`)
     }
@@ -68,6 +68,13 @@ describe('the panel script', () => {
     expect(page).toContain('nav #logout')
     expect(page).toContain("tabVault: 'Sejf'")
     expect(page).toContain("tabVault: 'Vault'")
+  })
+
+  it('hides distill chrome when feature is off', () => {
+    const page = renderAdminPage('http://192.168.1.150:7865', { distillFeature: false })
+    expect(page).not.toContain('id="tab-distill"')
+    expect(page).not.toContain('data-tab="distill"')
+    expect(page).toContain('DISTILL_FEATURE = false')
   })
 })
 

@@ -69,7 +69,8 @@ import {
 import { authenticate, touchLogin } from '../admin/users.js'
 import { collectOverview, createActivityRing, type ActivityRing } from '../admin/overview.js'
 import { collectHealth, redactHealth } from '../health.js'
-import { indexDir } from '../rag/indexer.js'
+import { indexDir, indexFiles } from '../rag/indexer.js'
+import { createDistillJob, parseConversation } from '../distill/index.js'
 import { renderAdminPage } from './adminPage.js'
 import { renderStatusPage } from './statusPage.js'
 import { APPLE_TOUCH_B64, FAVICON_ICO_B64, ICON_PNG_B64 } from './brandAssets.js'
@@ -281,6 +282,25 @@ export async function createBrainServer(
   const loginFails = new Map<string, number[]>()
   let adopted = false
 
+  const distillJob = createDistillJob(() => ({
+    enabled: config.distillEnabled !== false,
+    model: config.distillModel || 'qwen2.5:14b',
+    ollamaUrl: config.ollamaUrl,
+    vaultRoot: ctx?.vaultRoot ?? config.vaultRoot ?? join(config.dataDir, 'vault'),
+    writable: vaultOwnership?.writable ?? false,
+    readOnlyFlag: config.readOnly === true,
+  }))
+
+  const distillHealthSnap = () => {
+    const s = distillJob.status()
+    return {
+      enabled: s.enabled,
+      runnable: s.runnable,
+      phase: s.phase,
+      model: s.model,
+    }
+  }
+
   const url = `http://${config.host}:${config.port}/mcp`
 
   return {
@@ -450,6 +470,7 @@ export async function createBrainServer(
                 : (ctx?.authoritativeVaultHint ?? null),
               startedAt: startedAt(),
               sync: syncIntake.snapshot(),
+              distill: distillHealthSnap(),
             })
             const authed = await gate.peek(req)
             const h = authed ? health : redactHealth(health)
@@ -517,6 +538,7 @@ export async function createBrainServer(
                 : (ctx?.authoritativeVaultHint ?? null),
               startedAt: startedAt(),
               sync: syncIntake.snapshot(),
+              distill: distillHealthSnap(),
             })
             // The verdict is public — a monitor has to be able to see a broken
             // server. The reasons are not: they name the vault path, the Ollama
@@ -567,7 +589,11 @@ export async function createBrainServer(
           res.setHeader('referrer-policy', 'no-referrer')
           res.setHeader('x-content-type-options', 'nosniff')
           res.setHeader('cache-control', 'no-store')
-          res.end(renderAdminPage(`${proto === 'https' ? 'https' : 'http'}://${host}`))
+          res.end(
+            renderAdminPage(`${proto === 'https' ? 'https' : 'http'}://${host}`, {
+              distillFeature: config.distillEnabled !== false,
+            }),
+          )
           return
         }
         // Public status page — moved off `/` so the homepage is login.
@@ -590,6 +616,7 @@ export async function createBrainServer(
                 : (ctx?.authoritativeVaultHint ?? null),
               startedAt: startedAt(),
               sync: syncIntake.snapshot(),
+              distill: distillHealthSnap(),
             })
             // Per-check reasons name paths and models, so they follow the same
             // rule as every other detail: behind the token. The overall verdict
@@ -1013,9 +1040,39 @@ export async function createBrainServer(
                 : (ctx?.authoritativeVaultHint ?? null),
               startedAt: startedAt(),
               sync: syncIntake.snapshot(),
+              distill: distillHealthSnap(),
             })
             // Conflict paths + peer/archive config — admin only, not public /healthz.
             return { ...h, sync: syncIntake.adminSnapshot() }
+          },
+          distill: {
+            status: () => distillJob.status(),
+            start(opts) {
+              const conversations = Array.isArray(opts.conversations)
+                ? opts.conversations
+                    .map((c) => parseConversation(c))
+                    .filter((c): c is NonNullable<typeof c> => c !== null)
+                : undefined
+              return distillJob.start({
+                dryRun: opts.dryRun === true,
+                conversations,
+                onWritten: async (paths) => {
+                  if (!ctx || paths.length === 0) return
+                  const { readFile } = await import('node:fs/promises')
+                  const files = []
+                  for (const path of paths) {
+                    if (/[/\\]_review[/\\]/i.test(path)) continue
+                    try {
+                      files.push({ path, text: await readFile(path, 'utf8') })
+                    } catch {
+                      /* skip */
+                    }
+                  }
+                  if (files.length) await indexFiles(ctx.db, ctx.embedder, files)
+                },
+              })
+            },
+            cancel: () => distillJob.cancel(),
           },
         }
       }

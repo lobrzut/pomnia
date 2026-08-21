@@ -37,6 +37,24 @@ export type { VaultConfig } from './storage/vault.js'
 export { loadConfig, defaultConfig } from './config/index.js'
 export type { BrainConfig } from './config/index.js'
 
+// Distill (server-side Ollama chat → distilled/)
+export {
+  createDistillJob,
+  distillRunnable,
+  distillConversation,
+  isWorthDistilling,
+  GARBAGE_THRESHOLD,
+  DEFAULT_DISTILL_MODEL,
+  assembleNote,
+  scoreFields,
+  deployDistilledNotes,
+} from './distill/index.js'
+export type {
+  DistillJobStatus,
+  DistillConversation,
+  DistilledNote,
+} from './distill/index.js'
+
 // Surface sync (knowledge layer — not blobs / library.db)
 export {
   SYNC_DIRS,

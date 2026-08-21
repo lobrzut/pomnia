@@ -61,6 +61,7 @@ describe('collectHealth', () => {
       conflicts: 0,
       archiveLastAt: null,
     })
+    expect(h.distill).toEqual({ enabled: false, runnable: false, phase: 'idle', model: '' })
   })
 
   /**
@@ -154,6 +155,7 @@ describe('redactHealth', () => {
     expect(r.embed.backend).toBe('ollama')
     expect(r.embed.ready).toBe(true)
     expect(r.embed.model).toBe('')
+    expect(r.distill.model).toBe('')
     expect(r.sync.lastReceivedAt).toBeNull()
   })
 })

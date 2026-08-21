@@ -69,6 +69,34 @@ beforeEach(async () => {
       writable: false,
       vaultOwner: 'Pomnia Desktop',
     })),
+    distill: {
+      status: vi.fn(() => ({
+        phase: 'idle',
+        enabled: true,
+        runnable: false,
+        reason: 'vault not writable',
+        model: 'qwen2.5:14b',
+        ollamaUrl: 'http://127.0.0.1:11434',
+        dryRun: false,
+        startedAt: null,
+        finishedAt: null,
+        done: 0,
+        total: 0,
+        ok: 0,
+        stubs: 0,
+        garbage: 0,
+        skipped: 0,
+        failed: 0,
+        written: [],
+        lastError: null,
+      })),
+      start: vi.fn(() => ({
+        started: false,
+        reason: 'vault not writable',
+        status: { phase: 'idle' },
+      })),
+      cancel: vi.fn(() => ({ cancelled: false })),
+    },
   }
 })
 afterEach(async () => {
@@ -354,5 +382,19 @@ describe('health', () => {
       vaultOwner: 'Pomnia Desktop',
     })
     expect(deps.health).toHaveBeenCalled()
+  })
+})
+
+describe('distill admin API', () => {
+  it('returns status', async () => {
+    const r = await call('GET', '/admin/distill')
+    expect(r.status).toBe(200)
+    expect(r.body).toMatchObject({ phase: 'idle', model: 'qwen2.5:14b' })
+  })
+
+  it('posts start and surfaces refusal when not runnable', async () => {
+    const r = await call('POST', '/admin/distill', { dryRun: false })
+    expect(r.status).toBe(409)
+    expect(r.body).toMatchObject({ started: false })
   })
 })
