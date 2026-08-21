@@ -63,21 +63,21 @@ picks it up, and `search_library` returns the words back.
 | | |
 | --- | --- |
 | Node | 22 or newer (tarball native addons are built on GitHub Actions Node 22) |
-| Ollama | for embeddings — `ollama pull nomic-embed-text` |
-| Disk | the vault, plus roughly half its size again for the index |
-| RAM | ~200 MB serving; indexing peaks higher, capped at 2 GB by the unit |
+| Ollama | optional — only when `BRAIN_EMBED_BACKEND=ollama` |
+| Disk | the vault, plus roughly half its size again for the index, plus ~0.5 GB ONNX cache when using fastembed |
+| RAM | ~200 MB serving; indexing / ONNX load peaks higher, capped at 3 GB by the unit |
 
-Ollama is `Wants=`, not `Requires=`. Without it the server still starts and
-still serves skills, profile and note reads; only semantic search stops, and
-`/healthz` reports `degraded` instead of pretending. Refusing to start would
-turn a partial outage into a full one.
+Default KVM path is **fastembed** (in-process ONNX, `nomic-ai/nomic-embed-text-v1.5`).
+No chat model is bundled. Distillation stays on a GPU machine.
 
-**Embeddings honesty:** this Node daemon talks to Ollama only
-(`POST /api/embed`). The zero-Ollama ONNX/fastembed path lives in the older
-Python Brain hub Docker image (`BRAIN_EMBED_BACKEND=fastembed`) — see
-`docs/BRAIN-SERVER-EMBEDDED-MODEL.md`. The Dockerfile in this folder does
-**not** bake an ONNX model; do not expect `docker run` of brain-core to search
-without a reachable Ollama (or a future Node ONNX backend).
+`BRAIN_EMBED_BACKEND=ollama` is optional for hosts that already run Ollama.
+Without Ollama on the fastembed path the server still starts; `/healthz` reports
+`embed.backend` + `embed.ready`. Refusing to start would turn a partial outage
+into a full one.
+
+**Embeddings:** Node supports both backends (`BRAIN_EMBED_BACKEND`). Prefixes
+`search_document: ` / `search_query: ` are applied in code and must not change
+without wiping `library.db`. See `docs/BRAIN-SERVER-EMBEDDED-MODEL.md`.
 
 Public `/healthz` without a Bearer token redacts index counts (`index: null`)
 and check *reasons*. The overall `status` stays public. Full numbers: Bearer
@@ -102,7 +102,7 @@ probe. A process that is up but returns nothing for every search is precisely
 the state this reports, because it used to be the state that looked healthy.
 
 ```json
-{"ok":true,"status":"degraded","checks":{"ollama":{"state":"degraded"}}}
+{"ok":true,"status":"degraded","embed":{"backend":"fastembed","ready":false},"checks":{"ollama":{"state":"degraded"}}}
 ```
 
 ## Who may write

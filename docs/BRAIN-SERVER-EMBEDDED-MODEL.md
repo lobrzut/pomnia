@@ -7,8 +7,8 @@
 
 | Layer | Embedding today | Model | Needs Ollama? |
 |---------|------------|-------|----------------|
-| **brain-core** (`packages/brain-core`, Node) | `POST {ollama}/api/embed` | `nomic-embed-text` → **dim 768** | **Yes** (Ollama-only MVP) |
-| **Pomnia desktop, embedded** | forked child → the same `EmbedClient` | as above | **Yes** — URL from Settings / `127.0.0.1:11434` |
+| **brain-core** (`packages/brain-core`, Node) | `BRAIN_EMBED_BACKEND=fastembed` **or** `ollama` | `nomic-ai/nomic-embed-text-v1.5` / Ollama `nomic-embed-text` → **dim 768** | KVM/Docker: **no**; desktop default: Ollama |
+| **Pomnia desktop, embedded** | forked child → the same `EmbedClient` (default ollama) | as above | **Yes** for MVP search/index — URL from Settings / `127.0.0.1:11434` |
 | **Pomnia distill** | `qwen2.5:14b` (chat) | ~9 GB | Yes, on the **client PC** (GPU) |
 | **Brain hub, Python** (`Projects/brain`) | `BRAIN_EMBED_BACKEND=fastembed` **or** `ollama` | `nomic-ai/nomic-embed-text-v1.5` / Ollama `nomic-embed-text` | Docker edge: **no**; live homelab KVM: Ollama with many models |
 | **Docker edge** (`brain/docker-compose.yml` + `Dockerfile`) | fastembed ONNX, model **prefetched at build** | v1.5 | **No** — "no Ollama, no GPU" |
@@ -47,14 +47,14 @@ A small KVM (2–4 GB RAM, no GPU) → **embedding only**. Distillation optional
 | # | Option | Pros | Cons | Homelab KVM | Brain Server product |
 |---|-------|------|------|-------------|----------------------|
 | **1** | Ollama sidecar in compose, pre-pulling `nomic-embed-text` | Same contract as the desktop (`/api/embed`); swapping the model is a tag change | Heavier image (Ollama + model); another process; the GPU is unnecessary but invites "let's add an LLM" | Fine as a bridge to the live homelab | Fine, but redundant |
-| **2** | **ONNX / fastembed for embedding only** (no Ollama) | Already done in the hub's Docker; `docker up` → search; small RAM; no manual `ollama pull` | brain-core (Node) does not have it yet; the `search_query:` prefix has to live in code | Ideal for a light VM | **Best** |
+| **2** | **ONNX / fastembed for embedding only** (no Ollama) | Already done in Node brain-core KVM image + Python hub Docker; `docker up` → search; small RAM; no manual `ollama pull` | First cold load ~0.5 GB; prefixes must stay exact | Ideal for a light VM / QNAP | **Best** |
 | **3** | Bake the model into the brain-core binary/data | One Electron/daemon package | Enormous Electron updates; bumping the model gets harder; mixes the app with the server | Weak | Weak |
 
 ### Recommendation
 
 1. **Brain Server / KVM image (product + light homelab):** **option 2** — keep and harden the existing edge path in `Projects/brain` (`BRAIN_EMBED_BACKEND=fastembed`, model in the Docker layer). Acceptance criterion: `docker compose … up` → `search_library` works **without** a manual `ollama pull`.
 2. **Live homelab KVM:** keep Ollama on the GPU for distillation and experiments; search can go through fastembed **or** Ollama — but do not mix backends inside one `library.db` without deciding to. Both nomic 768 variants are fine; pick one backend per deployment.
-3. **brain-core, Node (future):** after desktop parity, add an `onnx`/fastembed-equivalent backend **or** an optional Ollama sidecar in the server compose only. Do not bake a model into Electron.
+3. **brain-core, Node (shipped for KVM):** `BRAIN_EMBED_BACKEND=fastembed` (alias `EMBED_PROVIDER=local` / `onnx`) via `@huggingface/transformers` + `nomic-ai/nomic-embed-text-v1.5`. Desktop default remains `ollama`. Do not bake a model into Electron.
 
 ---
 
@@ -95,11 +95,13 @@ A small KVM (2–4 GB RAM, no GPU) → **embedding only**. Distillation optional
 - Smoke: `docker compose -f docker-compose.yml -f docker-compose.lan.yml up -d --build` → Bearer token → MCP search against a sample note.
 - **Acceptance:** a fresh host **without** Ollama gets working search in under N minutes after `up`.
 
-### Milestone 2 — brain-core (Node) on the server, once the rewrite matures
+### Milestone 2 — brain-core (Node) ONNX — **done (TOR C)**
 
-- Either: compose with an Ollama sidecar (nomic only) behind `BRAIN_OLLAMA_URL`.
-- Or: native ONNX in Node (parity with the Python edge).
-- Not: bundling qwen into the server image.
+- `BRAIN_EMBED_BACKEND=fastembed|ollama` in `@pomnia/brain-core`.
+- KVM `install.sh` / unit / Dockerfile default to fastembed; prefetch ~0.5 GB
+  nomic ONNX; no chat model; no mandatory `ollama pull`.
+- `/healthz` reports `embed.backend` + `embed.ready` (and keeps `checks.ollama`
+  as the embedder readiness alias for older probes).
 
 ### Milestone 3 — "works on its own" in the copy
 

@@ -8,20 +8,15 @@
 [Unit]
 Description=Pomnia brain-core — MCP memory server (vault + RAG)
 Documentation=https://pomnia.ai
-; Ollama supplies the embeddings, and there is deliberately no ordering on it.
-;
-; It may be a systemd service, a container, or a box across the LAN — on the
-; machine this was written for it is a container with `restart: unless-stopped`,
-; so `Wants=ollama.service` named a unit that does not exist and quietly did
-; nothing. A dependency that cannot be true everywhere is worse than none: it
-; reads as handled.
-;
-; Nothing is needed instead. The embedder is consulted per request, so a late
-; Ollama means /healthz says `degraded` until it appears and `ok` afterwards,
-; with no restart. Refusing to start would turn a partial outage into a full
-; one; declaring a fake ordering would hide that it can happen at all.
+; Embeddings default to in-process ONNX (BRAIN_EMBED_BACKEND=fastembed).
+; No ordering on Ollama — KVM search does not need it. Distillation stays on
+; GPU machines. If you point BRAIN_EMBED_BACKEND=ollama instead, a late Ollama
+; means /healthz says degraded until it appears; refusing to start would turn
+; a partial outage into a full one.
 Wants=network-online.target
 After=network-online.target
+; install.sh appends RequiresMountsFor= when --vault-root is outside data-dir.
+RequiresMountsFor=/var/lib/pomnia
 
 [Service]
 Type=simple
@@ -30,6 +25,10 @@ Type=simple
 User=pomnia
 Group=pomnia
 WorkingDirectory=/opt/pomnia-brain-core
+
+; KVM product default: ONNX nomic embed (~0.5 GB), no chat model, no Ollama.
+Environment=BRAIN_EMBED_BACKEND=fastembed
+Environment=BRAIN_EMBED_CACHE=/var/lib/pomnia/embed-cache
 
 ; This host is the brain: it owns the vault, indexes it once, and serves every
 ; agent — including their writes. That is the shape Pomnia is built around now.
@@ -60,7 +59,6 @@ ExecStart=/usr/bin/node /opt/pomnia-brain-core/dist/daemon.js \
   --data-dir /var/lib/pomnia \
   --vault-root /var/lib/pomnia/vault \
   --skills-root /var/lib/pomnia/vault/skills \
-  --ollama-url http://127.0.0.1:11434 \
   --instance-label "pomnia-server"
 
 Restart=on-failure
@@ -101,13 +99,15 @@ RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
-; ProtectSystem=strict makes everything read-only; this is the one exception.
+; ProtectSystem=strict makes everything read-only; these are the exceptions.
+; install.sh appends an extra ReadWritePaths= line when --vault-root is outside
+; the data dir (e.g. a separate mount for the vault).
 ReadWritePaths=/var/lib/pomnia
 
 ; ── resource ceilings ──────────────────────────────────────────────────────
-; Indexing a large vault is the memory peak. High enough not to trip on real
-; work, low enough that a leak gets killed instead of taking the host with it.
-MemoryMax=2G
+; Indexing a large vault is the memory peak. ONNX nomic fp32 alone is ~0.5–1 GB
+; resident after load; leave headroom so a leak gets killed instead of the host.
+MemoryMax=3G
 TasksMax=256
 LimitNOFILE=8192
 
