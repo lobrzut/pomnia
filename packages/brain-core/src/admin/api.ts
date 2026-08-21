@@ -76,6 +76,16 @@ export interface AdminDeps {
    * must not curl the public probe.
    */
   health(): Promise<unknown>
+  /** Distill worker: status + start/cancel. Absent when feature compiled out — always present now. */
+  distill: {
+    status(): unknown
+    start(opts: { dryRun?: boolean; conversations?: unknown[] }): {
+      started: boolean
+      reason?: string
+      status: unknown
+    }
+    cancel(): { cancelled: boolean }
+  }
 }
 
 export interface RuntimeSettings {
@@ -316,6 +326,29 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
         ? `${r.previous} zacznie odmawiać zapisów do tego vaultu. Zsynchronizuj go, zanim cokolwiek jeszcze zapisze.`
         : undefined,
     })
+  }
+
+  // ── distill ─────────────────────────────────────────────────────────────
+  if (path === '/admin/distill' && method === 'GET') {
+    return j(200, deps.distill.status())
+  }
+
+  if (path === '/admin/distill' && method === 'POST') {
+    const b = (req.body ?? {}) as {
+      dryRun?: unknown
+      conversations?: unknown
+    }
+    const dryRun = b.dryRun === true
+    const conversations = Array.isArray(b.conversations) ? b.conversations : undefined
+    const r = deps.distill.start({ dryRun, conversations })
+    if (r.started) audit(req.actor, dryRun ? 'distill dry-run' : 'distill start')
+    return j(r.started ? 202 : 409, r)
+  }
+
+  if (path === '/admin/distill/cancel' && method === 'POST') {
+    const r = deps.distill.cancel()
+    if (r.cancelled) audit(req.actor, 'distill cancel')
+    return j(200, r)
   }
 
   // ── index ───────────────────────────────────────────────────────────────

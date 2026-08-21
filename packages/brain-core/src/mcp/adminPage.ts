@@ -45,7 +45,11 @@ import {
   themeSwitcherHtml,
 } from './brandChrome.js'
 
-export function renderAdminPage(origin: string): string {
+export function renderAdminPage(
+  origin: string,
+  opts?: { distillFeature?: boolean },
+): string {
+  const distillFeature = opts?.distillFeature !== false
   const esc = (s: string): string =>
     s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
 
@@ -196,6 +200,7 @@ ${brandSkyHtml()}
       <button data-tab="dash" data-i18n="tabDash" aria-current="true">Pulpit</button>
       <button data-tab="status" data-i18n="tabStatus">Stan</button>
       <button data-tab="engine" data-i18n="tabEngine">Silnik</button>
+      ${distillFeature ? `<button data-tab="distill" data-i18n="tabDistill" id="nav-distill" hidden>Destylacja</button>` : ''}
       <button data-tab="clients" data-i18n="tabClients">Klienci</button>
       <button data-tab="users" data-i18n="tabUsers">Konta</button>
       <button data-tab="behaviour" data-i18n="tabBehaviour">Zachowanie</button>
@@ -252,6 +257,23 @@ ${brandSkyHtml()}
       </div>
       <div id="engine-msg"></div>
     </section>
+
+    ${
+      distillFeature
+        ? `<section class="card hidden" id="tab-distill">
+      <h2 data-i18n="distillTitle">Destylacja</h2>
+      <p class="lead" data-i18n="distillLead">Destylacja sesji na GPU Ollama (qwen) — zapis do distilled/.</p>
+      <table><tbody id="distill-info"></tbody></table>
+      <div class="row">
+        <button id="distill-start" data-i18n="distillStart">Uruchom (inbox)</button>
+        <button id="distill-dry" class="ghost" data-i18n="distillDry">Dry-run Ollama</button>
+        <button id="distill-cancel" class="ghost" data-i18n="distillCancel">Anuluj</button>
+        <button id="distill-refresh" class="ghost" data-i18n="refresh">Odśwież</button>
+      </div>
+      <div id="distill-msg"></div>
+    </section>`
+        : ''
+    }
 
     <section class="card hidden" id="tab-clients">
       <h2 data-i18n="clientsTitle">Klienci</h2>
@@ -379,6 +401,7 @@ ${brandSkyHtml()}
   // (theme / locale / density) may use localStorage — chrome only, not auth.
   let csrf = null
   let me = null
+  const DISTILL_FEATURE = ${distillFeature ? 'true' : 'false'}
 
   const $ = (id) => document.getElementById(id)
   const text = (el, s) => { el.textContent = s }
@@ -388,7 +411,7 @@ ${brandSkyHtml()}
       loginTitle: 'Logowanie',
       loginLead: 'Konto zakłada administrator serwera.',
       loginUser: 'Login', loginPass: 'Hasło', loginBtn: 'Zaloguj', logout: 'Wyloguj',
-      tabDash: 'Pulpit', tabStatus: 'Stan', tabEngine: 'Silnik', tabClients: 'Klienci',
+      tabDash: 'Pulpit', tabStatus: 'Stan', tabEngine: 'Silnik', tabDistill: 'Destylacja', tabClients: 'Klienci',
       tabUsers: 'Konta', tabBehaviour: 'Zachowanie', tabSettings: 'Ustawienia', tabVault: 'Sejf',
       dashTitle: 'Pulpit',
       dashLead: 'Indeks, klienci, uptime.',
@@ -406,10 +429,21 @@ ${brandSkyHtml()}
       syncMode: 'tryb',
       syncReceiveOnly: 'tylko przyjmuje (push)',
       engineTitle: 'Silnik wyszukiwania',
-      engineLeadOllama: 'Ollama: embeddingi teraz; destylacja gdy ten serwer zapisuje (w toku).',
+      engineLeadOllama: 'Ollama: embeddingi + destylacja gdy serwer zapisuje.',
       engineLeadFast: 'Embeddingi lokalne (bez Ollamy). Destylacja poza tym appliance.',
       engineOllama: 'Adres Ollamy', engineModel: 'Model embeddingów',
       engineProbe: 'Sprawdź embedder', engineReindex: 'Przebuduj indeks',
+      distillTitle: 'Destylacja',
+      distillLead: 'Kolejka 1×1: state/distill-inbox/*.json → Ollama chat → distilled/.',
+      distillStart: 'Uruchom (inbox)',
+      distillDry: 'Dry-run Ollama',
+      distillCancel: 'Anuluj',
+      distillModel: 'Model chat',
+      distillPhase: 'Faza',
+      distillRunnable: 'Gotowe',
+      distillProgress: 'Postęp',
+      distillWritten: 'Zapisane',
+      distillNeedWrite: 'Destylacja wymaga zapisu do sejfu (writable).',
       clientsTitle: 'Klienci',
       clientsLead: 'Tokeny dla urządzeń i agentów — nie konta ludzi.',
       clientsNew: 'Nowy klient', clientsIssue: 'Wydaj token',
@@ -460,7 +494,7 @@ ${brandSkyHtml()}
       loginTitle: 'Sign in',
       loginLead: 'Accounts are created by the server administrator.',
       loginUser: 'Username', loginPass: 'Password', loginBtn: 'Sign in', logout: 'Sign out',
-      tabDash: 'Dashboard', tabStatus: 'Status', tabEngine: 'Engine', tabClients: 'Clients',
+      tabDash: 'Dashboard', tabStatus: 'Status', tabEngine: 'Engine', tabDistill: 'Distill', tabClients: 'Clients',
       tabUsers: 'Accounts', tabBehaviour: 'Behaviour', tabSettings: 'Settings', tabVault: 'Vault',
       dashTitle: 'Dashboard',
       dashLead: 'Index, clients, uptime.',
@@ -478,10 +512,21 @@ ${brandSkyHtml()}
       syncMode: 'mode',
       syncReceiveOnly: 'receive-only (push)',
       engineTitle: 'Search engine',
-      engineLeadOllama: 'Ollama: embeddings now; distill when this server writes (in progress).',
+      engineLeadOllama: 'Ollama: embeddings + distill when this server writes.',
       engineLeadFast: 'Local embeddings (no Ollama). Distill stays off this appliance.',
       engineOllama: 'Ollama URL', engineModel: 'Embedding model',
       engineProbe: 'Probe embedder', engineReindex: 'Rebuild index',
+      distillTitle: 'Distillation',
+      distillLead: 'One-at-a-time queue: state/distill-inbox/*.json → Ollama chat → distilled/.',
+      distillStart: 'Run (inbox)',
+      distillDry: 'Dry-run Ollama',
+      distillCancel: 'Cancel',
+      distillModel: 'Chat model',
+      distillPhase: 'Phase',
+      distillRunnable: 'Runnable',
+      distillProgress: 'Progress',
+      distillWritten: 'Written',
+      distillNeedWrite: 'Distill needs a writable vault.',
       clientsTitle: 'Clients',
       clientsLead: 'Tokens for devices and agents — not people accounts.',
       clientsNew: 'New client', clientsIssue: 'Issue token',
@@ -1101,6 +1146,62 @@ ${brandSkyHtml()}
     const state = v.readOnlyFlag ? 'pinned' : v.writable ? 'owned' : 'ready'
     $('claim').dataset.claimState = state
     paintClaim(state)
+    paintDistillNav(v.writable === true && !v.readOnlyFlag)
+  }
+
+  function paintDistillNav(show) {
+    if (!DISTILL_FEATURE) return
+    const nav = $('nav-distill')
+    if (nav) nav.hidden = !show
+    // If the open tab is distill but vault became RO, bounce to engine.
+    if (!show) {
+      const distillTab = $('tab-distill')
+      if (distillTab && !distillTab.classList.contains('hidden')) {
+        const eng = document.querySelector('#main-nav button[data-tab="engine"]')
+        if (eng) eng.click()
+      }
+    }
+  }
+
+  async function loadDistill() {
+    if (!DISTILL_FEATURE || !$('distill-info')) return
+    const tb = $('distill-info')
+    tb.innerHTML = ''
+    const d = await api('GET', '/admin/distill')
+    const add = (k, val) => {
+      const tr = document.createElement('tr')
+      const a = document.createElement('td'); a.textContent = k; a.style.color = 'var(--ink-faint)'
+      const b = document.createElement('td'); b.className = 'mono'; b.textContent = val
+      tr.append(a, b); tb.appendChild(tr)
+    }
+    add(t('distillModel'), d.model || '—')
+    add(t('distillPhase'), d.phase + (d.current ? ' · ' + d.current.title : ''))
+    add(t('distillRunnable'), d.runnable ? 'yes' : ('no' + (d.reason ? ' — ' + d.reason : '')))
+    const L = d.last || {}
+    add(t('distillProgress'), 'queue=' + (d.queueDepth || 0) +
+      ' · ok=' + (L.ok || 0) + ' stub=' + (L.stubs || 0) + ' garbage=' + (L.garbage || 0) +
+      ' skip=' + (L.skipped || 0) + ' fail=' + (L.failed || 0))
+    add(t('distillWritten'), String(L.written || 0))
+    const busy = d.phase === 'running' || d.phase === 'dry-run'
+    if ($('distill-start')) $('distill-start').disabled = busy || !d.runnable
+    if ($('distill-dry')) $('distill-dry').disabled = busy || !d.enabled
+    if ($('distill-cancel')) $('distill-cancel').disabled = !busy
+  }
+
+  async function distillStart(dryRun) {
+    try {
+      const r = await api('POST', '/admin/distill', { dryRun: !!dryRun })
+      if (!r.started) msg($('distill-msg'), 'warn', r.reason || 'not started')
+      else msg($('distill-msg'), 'ok', dryRun ? 'Dry-run…' : 'Destylacja…')
+      await loadDistill()
+    } catch (e) { msg($('distill-msg'), 'err', e.message) }
+  }
+
+  async function distillCancel() {
+    try {
+      await api('POST', '/admin/distill/cancel', {})
+      await loadDistill()
+    } catch (e) { msg($('distill-msg'), 'err', e.message) }
   }
 
   /**
@@ -1151,7 +1252,9 @@ ${brandSkyHtml()}
   }
 
   // ── tabs + settings subnav ──────────────────────────────────────────────
-  const MAIN_TABS = ['dash', 'status', 'engine', 'clients', 'users', 'behaviour', 'settings', 'vault']
+  const MAIN_TABS = DISTILL_FEATURE
+    ? ['dash', 'status', 'engine', 'distill', 'clients', 'users', 'behaviour', 'settings', 'vault']
+    : ['dash', 'status', 'engine', 'clients', 'users', 'behaviour', 'settings', 'vault']
   for (const b of document.querySelectorAll('#main-nav button[data-tab]')) {
     b.onclick = (ev) => {
       const btn = ev.currentTarget
@@ -1161,8 +1264,10 @@ ${brandSkyHtml()}
         else o.removeAttribute('aria-current')
       }
       for (const s of MAIN_TABS) {
-        $('tab-' + s).classList.toggle('hidden', s !== tab)
+        const el = $('tab-' + s)
+        if (el) el.classList.toggle('hidden', s !== tab)
       }
+      if (tab === 'distill') loadDistill().catch(() => {})
     }
   }
   for (const b of document.querySelectorAll('#settings-subnav button[data-settings]')) {
@@ -1204,6 +1309,12 @@ ${brandSkyHtml()}
   $('reindex').onclick = reindex
   $('add').onclick = addToken
   $('claim').onclick = claim
+  if (DISTILL_FEATURE) {
+    if ($('distill-start')) $('distill-start').onclick = () => distillStart(false)
+    if ($('distill-dry')) $('distill-dry').onclick = () => distillStart(true)
+    if ($('distill-cancel')) $('distill-cancel').onclick = distillCancel
+    if ($('distill-refresh')) $('distill-refresh').onclick = () => loadDistill().catch(() => {})
+  }
 
   try {
     applyDensity(localStorage.getItem('pomnia-ui-density') || 'comfortable')

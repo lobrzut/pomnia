@@ -107,6 +107,14 @@ export interface BrainConfig {
   embedCacheDir: string
 
   /**
+   * Server-side distillation (Ollama chat /api/generate). Separate from embed model.
+   * KVM sets BRAIN_DISTILL=0. Linux SoT enables when writable vault + Ollama.
+   */
+  distillEnabled: boolean
+  /** Chat model for distill (default qwen2.5:14b). Env: BRAIN_DISTILL_MODEL. */
+  distillModel: string
+
+  /**
    * Bearer auth. Skipped when host === 127.0.0.1 (localhost trust, Pomnia-embedded
    * mode); enforced otherwise. Token file path optional — defaults to
    * `<dataDir>/mcp-tokens.json`. Format identical to Python impl.
@@ -138,6 +146,8 @@ export function defaultConfig(): BrainConfig {
     embedModel: 'nomic-embed-text',
     embedBackend: 'ollama',
     embedCacheDir: defaultEmbedCacheDir(dataDir),
+    distillEnabled: true,
+    distillModel: 'qwen2.5:14b',
     auth: {
       tokensFile: join(dataDir, 'mcp-tokens.json'),
       maxFailsPerMinute: 20,
@@ -170,11 +180,16 @@ const KNOWN_FLAGS = new Set([
   '--sync-peer',
   '--archive-target',
   '--tokens-file',
+  '--distill-model',
   // daemon.ts one-shot modes
   '--add-token',
   '--add-user',
   '--claim-vault',
   '--reindex',
+  '--distill',
+  '--distill-dry-run',
+  '--dry-run',
+  '--file',
   '--role',
   '--prefetch-embed',
 ])
@@ -217,6 +232,12 @@ export async function loadConfig(
   if (env.BRAIN_INSTANCE_LABEL) cfg.instanceLabel = env.BRAIN_INSTANCE_LABEL
   if (env.BRAIN_SYNC_PEER) cfg.syncPeer = env.BRAIN_SYNC_PEER
   if (env.BRAIN_ARCHIVE_TARGET) cfg.archiveTarget = env.BRAIN_ARCHIVE_TARGET
+  // Distill off when BRAIN_DISTILL=0|false. Default on — KVM compose must set 0.
+  if (env.BRAIN_DISTILL === '0' || env.BRAIN_DISTILL === 'false') cfg.distillEnabled = false
+  if (env.BRAIN_DISTILL === '1' || env.BRAIN_DISTILL === 'true') cfg.distillEnabled = true
+  if (env.BRAIN_DISTILL_MODEL) cfg.distillModel = env.BRAIN_DISTILL_MODEL
+  // Alias used in older docs / Continuum-era notes.
+  if (!env.BRAIN_DISTILL_MODEL && env.BRAIN_CHAT_MODEL) cfg.distillModel = env.BRAIN_CHAT_MODEL
 
   // CLI overrides (simple, no getopt dependency)
   const dataDirBefore = cfg.dataDir
@@ -257,6 +278,7 @@ export async function loadConfig(
     else if (arg === '--instance-label' && next) cfg.instanceLabel = next
     else if (arg === '--sync-peer' && next) cfg.syncPeer = next
     else if (arg === '--archive-target' && next) cfg.archiveTarget = next
+    else if (arg === '--distill-model' && next) cfg.distillModel = next
     else if (arg === '--tokens-file' && next) {
       cfg.auth.tokensFile = next
       tokensFileExplicit = true

@@ -131,6 +131,17 @@ export interface HealthReport {
    * *paths* live only under `/admin`, not here.
    */
   sync: SyncHealthSnapshot
+  /**
+   * Distillation worker visibility. Public enough for monitors: enabled /
+   * busy / model redacted on anonymous. Full status under /admin/distill.
+   */
+  distill: {
+    enabled: boolean
+    runnable: boolean
+    phase: string
+    /** Chat model id — redacted on public /healthz. */
+    model: string
+  }
 }
 
 /**
@@ -164,6 +175,12 @@ export function redactHealth(h: HealthReport): HealthReport {
     },
     // sync block is intentional public telemetry (no secrets, no vault paths).
     sync: { ...h.sync },
+    distill: {
+      enabled: h.distill.enabled,
+      runnable: h.distill.runnable,
+      phase: h.distill.phase,
+      model: '',
+    },
     checks: {
       db: bare(h.checks.db),
       index: bare(h.checks.index),
@@ -218,6 +235,8 @@ export async function collectHealth(opts: {
   startedAt: number
   /** Intake counters; omit → empty (fresh / tests). */
   sync?: SyncHealthSnapshot
+  /** Distill worker snapshot; omit → feature-off idle. */
+  distill?: { enabled: boolean; runnable: boolean; phase: string; model: string }
 }): Promise<HealthReport> {
   let db: Check = { state: 'ok' }
   let index: Check = { state: 'ok' }
@@ -284,5 +303,8 @@ export async function collectHealth(opts: {
     checks: { db, index, vault, disk, ollama: effectiveEmbed },
     index: counts,
     sync: opts.sync ? { ...opts.sync } : { ...EMPTY_SYNC_HEALTH },
+    distill: opts.distill
+      ? { ...opts.distill }
+      : { enabled: false, runnable: false, phase: 'idle', model: '' },
   }
 }
