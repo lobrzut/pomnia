@@ -36,3 +36,30 @@ export type { VaultConfig } from './storage/vault.js'
 // Config (env + optional TOML/JSON file)
 export { loadConfig, defaultConfig } from './config/index.js'
 export type { BrainConfig } from './config/index.js'
+
+// Archive replication (TOR B — content-addressed blobs + snapshot-union merge)
+export {
+  BLOB_HASH_RE,
+  MAX_BLOB_BYTES,
+  safeBlobPath,
+  listBlobHashes,
+  applyArchiveBlob,
+  applyArchiveManifest,
+  applyMergedManifest,
+  mergeSnapshotsById,
+  planArchive,
+  pushArchive,
+  localArchiveBlobs,
+  sha256 as archiveSha256,
+  atomicWrite,
+  writeFileKeepingPrev,
+} from './archive/index.js'
+export type {
+  ArchivePathRejection,
+  ApplyBlobResult,
+  ApplyManifestResult,
+  ApplyMergedManifestResult,
+  ArchivePushOptions,
+  ArchivePushResult,
+  MergeableVaultManifest,
+} from './archive/index.js'

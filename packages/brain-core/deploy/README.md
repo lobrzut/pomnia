@@ -41,16 +41,14 @@ The installer creates a system user, writes the unit, starts the service, and
 **checks that it answers before telling you it worked**. It prints the first
 token once. Re-running upgrades in place and never rotates that token.
 
-Search needs an embedding model, and Ollama is where it comes from. If none is
-answering, the installer asks whether to install it and pull `nomic-embed-text`
-(~275 MB), then restarts and checks that the server can actually reach it. Say
-no and everything else still works — skills, the profile, saved notes — only
-meaning-based search is off, and it says so rather than looking broken. Add
-`--with-ollama` to answer yes up front on an unattended run.
+Search needs an embedding model. The KVM / install path uses **in-process
+ONNX** (`BRAIN_EMBED_BACKEND=fastembed`, `nomic-ai/nomic-embed-text-v1.5`,
+~0.5 GB) — no Ollama, no chat model, no manual `ollama pull`. Distillation
+stays on GPU clients. Pass `--with-ollama` only if you want the Ollama HTTP
+backend instead.
 
-Already running Ollama somewhere? Skip that and point the unit at it with
-`--ollama-url http://host:11434`. It is a shared service by design: one model
-serves Pomnia and everything else on the box.
+Already running Ollama somewhere and prefer it? `sudo ./install.sh --with-ollama`
+or set `BRAIN_EMBED_BACKEND=ollama` and `--ollama-url http://host:11434`.
 
 On a fresh install this host claims the empty vault and becomes the writer, so
 an agent can save to it straight away — no desktop required. That loop is
@@ -63,25 +61,22 @@ picks it up, and `search_library` returns the words back.
 | | |
 | --- | --- |
 | Node | 22 or newer (tarball native addons are built on GitHub Actions Node 22) |
-| Ollama | for embeddings — `ollama pull nomic-embed-text` |
-| Disk | the vault, plus roughly half its size again for the index |
-| RAM | ~200 MB serving; indexing peaks higher, capped at 2 GB by the unit |
+| Embedder | ONNX nomic (~0.5 GB, default) **or** Ollama `nomic-embed-text` |
+| Disk | the vault, plus roughly half its size again for the index, plus embed-cache |
+| RAM | ~200 MB serving; ONNX warm ~0.5–1 GB; indexing peaks higher, capped at 2 GB |
 
-Ollama is `Wants=`, not `Requires=`. Without it the server still starts and
-still serves skills, profile and note reads; only semantic search stops, and
-`/healthz` reports `degraded` instead of pretending. Refusing to start would
-turn a partial outage into a full one.
+Without a ready embedder the server still starts and still serves skills,
+profile and note reads; only semantic search stops, and `/healthz` reports
+`degraded` with `embed.backend` / `embed.ready`. Refusing to start would turn a
+partial outage into a full one.
 
-**Embeddings honesty:** this Node daemon talks to Ollama only
-(`POST /api/embed`). The zero-Ollama ONNX/fastembed path lives in the older
-Python Brain hub Docker image (`BRAIN_EMBED_BACKEND=fastembed`) — see
-`docs/BRAIN-SERVER-EMBEDDED-MODEL.md`. The Dockerfile in this folder does
-**not** bake an ONNX model; do not expect `docker run` of brain-core to search
-without a reachable Ollama (or a future Node ONNX backend).
+**Embeddings:** Node supports both backends via `BRAIN_EMBED_BACKEND`. Vectors
+are compatible with an Ollama-built `library.db` (dim 768, same prefixes) —
+no reindex required when switching. See `docs/BRAIN-SERVER-EMBEDDED-MODEL.md`.
 
 Public `/healthz` without a Bearer token redacts index counts (`index: null`)
-and check *reasons*. The overall `status` stays public. Full numbers: Bearer
-on `/healthz`, or the panel at `/admin` (Stan / Silnik).
+and check *reasons*. The overall `status` and `embed.{backend,ready,model}`
+stay public. Full numbers: Bearer on `/healthz`, or the panel at `/admin`.
 
 ## Endpoints
 
@@ -92,6 +87,7 @@ on `/healthz`, or the panel at `/admin` (Stan / Silnik).
 | `/mcp` | **required** | The MCP endpoint. Point agents here. |
 | `/mcp/activity` | **required** | Last tool call — echoes query text, so it is gated. |
 | `/sync/plan`, `/sync/file`, `/sync/reindex` | **admin** on a vault this host owns, any token on a replica | Write intake. Where the desktop puts what it distils. |
+| `/archive/hashes`, `/archive/plan`, `/archive/blob/:hash`, `/archive/manifest` | same write gate as sync | TOR B archive: content-addressed blobs + JSON manifest merge (`{ manifest, referencedBlobs }`). |
 
 Everything else 404s, including `/.well-known/*` and `/register` — some MCP
 clients probe those for OAuth and stall on anything but a clean 404.
@@ -102,7 +98,7 @@ probe. A process that is up but returns nothing for every search is precisely
 the state this reports, because it used to be the state that looked healthy.
 
 ```json
-{"ok":true,"status":"degraded","checks":{"ollama":{"state":"degraded"}}}
+{"ok":true,"status":"degraded","embed":{"backend":"fastembed","ready":false,"model":"nomic-ai/nomic-embed-text-v1.5"},"checks":{"ollama":{"state":"degraded"}}}
 ```
 
 ## Who may write
