@@ -246,6 +246,7 @@ ${brandSkyHtml()}
       <h2 data-i18n="engineTitle">Silnik wyszukiwania</h2>
       <p class="lead" id="engine-lead" data-i18n="engineLeadOllama" hidden>Ollama: embeddingi teraz; destylacja gdy ten serwer zapisuje (w toku).</p>
       <div id="embed-status" class="msg" style="margin:0 0 1rem"></div>
+      <table style="margin:0 0 1rem"><tbody id="engine-runtime"></tbody></table>
       <label for="ollama" data-i18n="engineOllama">Adres Ollamy</label>
       <input id="ollama" type="url" spellcheck="false" placeholder="http://127.0.0.1:11434">
       <label for="model" data-i18n="engineModel">Model embeddingów</label>
@@ -432,6 +433,13 @@ ${brandSkyHtml()}
       engineLeadOllama: 'Ollama: embeddingi + destylacja gdy serwer zapisuje.',
       engineLeadFast: 'Embeddingi lokalne (bez Ollamy). Destylacja poza tym appliance.',
       engineOllama: 'Adres Ollamy', engineModel: 'Model embeddingów',
+      engineRuntime: 'Runtime Ollama',
+      engineAccel: 'Akcelerator',
+      engineLoaded: 'Załadowane',
+      engineDistillNote: 'Destylacja',
+      engineDistillRo: 'ukryta — sejf tylko do odczytu (wymaga zapisu)',
+      engineDistillOff: 'wyłączona na tym appliance (BRAIN_DISTILL=0)',
+      engineDistillOn: 'włączona — zakładka Destylacja',
       engineProbe: 'Sprawdź embedder', engineReindex: 'Przebuduj indeks',
       distillTitle: 'Destylacja',
       distillLead: 'Kolejka 1×1: state/distill-inbox/*.json → Ollama chat → distilled/.',
@@ -515,6 +523,13 @@ ${brandSkyHtml()}
       engineLeadOllama: 'Ollama: embeddings + distill when this server writes.',
       engineLeadFast: 'Local embeddings (no Ollama). Distill stays off this appliance.',
       engineOllama: 'Ollama URL', engineModel: 'Embedding model',
+      engineRuntime: 'Ollama runtime',
+      engineAccel: 'Accelerator',
+      engineLoaded: 'Loaded',
+      engineDistillNote: 'Distill',
+      engineDistillRo: 'hidden — vault read-only (needs write)',
+      engineDistillOff: 'off on this appliance (BRAIN_DISTILL=0)',
+      engineDistillOn: 'on — Distill tab',
       engineProbe: 'Probe embedder', engineReindex: 'Rebuild index',
       distillTitle: 'Distillation',
       distillLead: 'One-at-a-time queue: state/distill-inbox/*.json → Ollama chat → distilled/.',
@@ -885,6 +900,7 @@ ${brandSkyHtml()}
   function paintEmbedStatus(h) {
     const box = $('embed-status')
     const lead = $('engine-lead')
+    const runtime = $('engine-runtime')
     const backend = h.embed?.backend || 'ollama'
     if (lead) {
       lead.hidden = false
@@ -893,15 +909,52 @@ ${brandSkyHtml()}
     if (!box || !h?.checks?.ollama) return
     const c = h.checks.ollama
     const kind = c.state === 'ok' ? 'ok' : c.state === 'degraded' ? 'warn' : 'err'
+    const rt = h.ollamaRuntime
     let label
     if (c.state === 'ok') {
-      label = backend === 'fastembed'
-        ? 'Embedder OK (lokalny)'
-        : (h.writable ? 'Ollama OK — embed (+ destylacja gdy włączona)' : 'Ollama OK — embed (destylacja wymaga zapisu)')
+      if (backend === 'fastembed') {
+        label = 'Embedder OK (lokalny ONNX)'
+      } else if (rt?.summary) {
+        label = rt.summary
+      } else {
+        label = h.writable
+          ? 'Ollama OK — embed (+ destylacja gdy włączona)'
+          : 'Ollama OK — embed (destylacja wymaga zapisu)'
+      }
     } else {
       label = (STATE_PL[c.state] || c.state) + (c.detail ? ' — ' + c.detail : '')
     }
     msg(box, kind, label)
+
+    if (runtime) {
+      runtime.innerHTML = ''
+      const add = (k, v) => {
+        const tr = document.createElement('tr')
+        const th = document.createElement('td')
+        th.style.color = 'var(--ink-faint)'
+        th.textContent = k
+        const td = document.createElement('td')
+        td.className = 'mono'
+        td.textContent = v
+        tr.append(th, td)
+        runtime.appendChild(tr)
+      }
+      if (rt) {
+        add(t('engineAccel'), rt.accelerator || '—')
+        const loaded = Array.isArray(rt.running) && rt.running.length
+          ? rt.running.map((m) => m.name + (m.sizeVram > 0 ? ' (VRAM)' : ' (CPU)')).join(', ')
+          : '—'
+        add(t('engineLoaded'), loaded)
+      }
+      const d = h.distill
+      if (d) {
+        let note
+        if (!d.enabled) note = t('engineDistillOff')
+        else if (!h.writable) note = t('engineDistillRo') + (d.model ? ' · model ' + d.model : '')
+        else note = t('engineDistillOn') + (d.model ? ' · ' + d.model : '')
+        add(t('engineDistillNote'), note)
+      }
+    }
   }
 
   async function probeOllama() {
