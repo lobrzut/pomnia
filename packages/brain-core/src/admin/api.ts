@@ -52,7 +52,24 @@ export interface AdminDeps {
   /** Take write ownership of the vault for this instance. */
   claimVault(): Promise<{ previous: string | null; owner: string }>
   startReindex(): { started: boolean; reason?: string }
-  vaultState(): { writable: boolean; owner: string | null; readOnlyFlag: boolean }
+  vaultState(): {
+    writable: boolean
+    owner: string | null
+    readOnlyFlag: boolean
+    /** Absolute vault root this process is using (container/host path as seen by the daemon). */
+    path: string
+    /**
+     * Optional operator hint for the bind on the host (e.g. POMNIA_VAULT_HOST_PATH /
+     * BRAIN_VAULT_HOST_PATH). Shown when the in-process path is a container mount.
+     */
+    hostPath?: string | null
+    /** Short operator label (POMNIA_VAULT_LABEL), e.g. "katalog testowy (e2e)". */
+    label?: string | null
+    /** One Polish sentence: where memory lives (not a raw path). */
+    where?: string | null
+    /** Windows/SMB hint (POMNIA_VAULT_SMB / VAULT_SMB_UNC). */
+    smbPath?: string | null
+  }
   /**
    * Full health report for the panel. `/healthz` redacts counts and reasons
    * without a bearer token; the session cookie is not one, so the Stan tab
@@ -279,6 +296,15 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
         error: 'pinned_read_only',
         detail:
           'Ten serwer jest przypięty jako replika (--read-only w unicie systemd). Usuń tę flagę i zrestartuj, zanim przejmiesz vault.',
+      })
+    }
+    if (state.writable) {
+      // Already ours — do not rewrite the marker or warn about "previous owner".
+      return j(200, {
+        ok: true,
+        previous: state.owner,
+        owner: state.owner,
+        alreadyOwner: true,
       })
     }
     const r = await deps.claimVault()

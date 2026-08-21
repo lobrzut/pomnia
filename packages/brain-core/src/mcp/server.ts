@@ -37,6 +37,7 @@ import { checkVaultPresence, writeStamp, countVaultNotes } from '../storage/vaul
 import { MAX_FILE_BYTES, SYNC_DIRS } from '../sync/paths.js'
 import { applyFile, planSync, type ManifestEntry } from '../sync/receive.js'
 import { handleAdmin, readAdminBody, sendAdmin, type AdminDeps } from '../admin/api.js'
+import { resolveVaultLocation } from '../admin/vaultLocation.js'
 import { readSettings } from '../admin/settings.js'
 import { touchToken } from '../admin/tokens.js'
 import {
@@ -53,6 +54,7 @@ import { collectHealth, redactHealth } from '../health.js'
 import { indexDir } from '../rag/indexer.js'
 import { renderAdminPage } from './adminPage.js'
 import { renderStatusPage } from './statusPage.js'
+import { APPLE_TOUCH_B64, FAVICON_ICO_B64, ICON_PNG_B64 } from './brandAssets.js'
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
@@ -379,6 +381,83 @@ export async function createBrainServer(
 
       http = createServer((req: IncomingMessage, res: ServerResponse) => {
         const pathOnly = req.url?.split('?')[0] ?? ''
+        // Brand icons from pomnia-landing (embedded). Same assets as pomnia.ai.
+        if (pathOnly === '/favicon.ico') {
+          res.statusCode = 200
+          res.setHeader('content-type', 'image/x-icon')
+          res.setHeader('cache-control', 'public, max-age=86400')
+          res.end(Buffer.from(FAVICON_ICO_B64, 'base64'))
+          return
+        }
+        if (pathOnly === '/icon.png') {
+          res.statusCode = 200
+          res.setHeader('content-type', 'image/png')
+          res.setHeader('cache-control', 'public, max-age=86400')
+          res.end(Buffer.from(ICON_PNG_B64, 'base64'))
+          return
+        }
+        if (pathOnly === '/apple-touch-icon.png') {
+          res.statusCode = 200
+          res.setHeader('content-type', 'image/png')
+          res.setHeader('cache-control', 'public, max-age=86400')
+          res.end(Buffer.from(APPLE_TOUCH_B64, 'base64'))
+          return
+        }
+        // NetDash legacy Brain tile expected `/stats` with notes/sessions/….
+        // Map Pomnia /healthz into that shape so the widget keeps working.
+        if (pathOnly === '/stats' || pathOnly === '/stats/') {
+          void (async () => {
+            const health = await collectHealth({
+              db: ctx?.db ?? null,
+              embedder: ctx?.embedder ?? null,
+              vaultRoot: ctx?.vaultRoot ?? '',
+              dataDir: config.dataDir,
+              version: BRAIN_CORE_VERSION,
+              authRequired: gate.required,
+              writable: vaultOwnership?.writable ?? false,
+              vaultOwner: vaultOwnership?.owner
+                ? describeOwner(vaultOwnership.owner)
+                : (ctx?.authoritativeVaultHint ?? null),
+              startedAt: startedAt(),
+            })
+            const authed = await gate.peek(req)
+            const h = authed ? health : redactHealth(health)
+            const files = h.index?.files ?? 0
+            const chunks = h.index?.chunks ?? 0
+            res.statusCode = h.ok ? 200 : 503
+            res.setHeader('content-type', 'application/json')
+            res.setHeader('cache-control', 'no-store')
+            res.end(
+              JSON.stringify({
+                // Legacy NetDash Brain fields (mapped):
+                notes: files,
+                sessions: 0,
+                library_docs: files,
+                code_files: 0,
+                graph_nodes: chunks,
+                last_session_at: null,
+                activity_7d: [],
+                // Pomnia-native (widget can prefer these when present):
+                ok: h.ok,
+                service: h.service,
+                version: h.version,
+                status: h.status,
+                vaultOwner: h.vaultOwner,
+                uptimeSec: h.uptimeSec,
+                embed: h.embed,
+                index: h.index,
+                writable: h.writable,
+              }),
+            )
+          })().catch((e: unknown) => {
+            if (!res.headersSent) {
+              res.statusCode = 503
+              res.setHeader('content-type', 'application/json')
+              res.end(JSON.stringify({ ok: false, error: (e as Error).message }))
+            }
+          })
+          return
+        }
         // Public: systemd and Docker probe it before any token exists.
         //
         // It reports whether the server can actually answer, not merely whether
@@ -850,16 +929,23 @@ export async function createBrainServer(
             }
           },
           startReindex: () => startReindex(),
-          vaultState: () => ({
-            writable: vaultOwnership?.writable ?? false,
-            // Same fallback /healthz and the write refusal use: a pinned
-            // replica has no marker of its own, so the operator's hint is all
-            // there is, and showing "—" for the owner helps nobody.
-            owner: vaultOwnership?.owner
-              ? describeOwner(vaultOwnership.owner)
-              : (ctx?.authoritativeVaultHint ?? null),
-            readOnlyFlag: config.readOnly === true,
-          }),
+          vaultState: () => {
+            const path =
+              (ctx?.vaultRoot ?? config.vaultRoot ?? '').trim() ||
+              join(config.dataDir, 'vault')
+            const loc = resolveVaultLocation(path)
+            return {
+              writable: vaultOwnership?.writable ?? false,
+              // Same fallback /healthz and the write refusal use: a pinned
+              // replica has no marker of its own, so the operator's hint is all
+              // there is, and showing "—" for the owner helps nobody.
+              owner: vaultOwnership?.owner
+                ? describeOwner(vaultOwnership.owner)
+                : (ctx?.authoritativeVaultHint ?? null),
+              readOnlyFlag: config.readOnly === true,
+              ...loc,
+            }
+          },
           health: () =>
             collectHealth({
               db: ctx?.db ?? null,
