@@ -127,6 +127,43 @@ describe('pushing into a vault this server owns', () => {
   })
 })
 
+describe('pull reads do not need admin on an owned vault', () => {
+  it('lets an agent token fetch the manifest', async () => {
+    const r = await fetch(`${BASE}/sync/manifest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${AGENT}` },
+      body: '{}',
+    })
+    expect(r.status).toBe(200)
+    const body = (await r.json()) as { entries?: unknown[] }
+    expect(Array.isArray(body.entries)).toBe(true)
+    expect(body.entries!.some((e) => (e as { path: string }).path === 'sessions/a.md')).toBe(true)
+  })
+
+  it('lets an agent token fetch one file', async () => {
+    const r = await fetch(`${BASE}/sync/fetch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${AGENT}` },
+      body: JSON.stringify({ path: 'sessions/a.md' }),
+    })
+    expect(r.status).toBe(200)
+    const body = (await r.json()) as { path?: string; contentBase64?: string; sha256?: string }
+    expect(body.path).toBe('sessions/a.md')
+    expect(Buffer.from(body.contentBase64!, 'base64').toString('utf8')).toBe('# note\n')
+  })
+
+  it('still refuses agent write while allowing the same token to pull', async () => {
+    const pull = await fetch(`${BASE}/sync/manifest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${AGENT}` },
+      body: '{}',
+    })
+    const write = await push('/sync/plan', AGENT)
+    expect(pull.status).toBe(200)
+    expect(write.status).toBe(403)
+  })
+})
+
 describe('the server still answers the things that are not writes', () => {
   it('serves /healthz without a token', async () => {
     const r = await fetch(`${BASE}/healthz`)

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../log.js', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
-import { buildVaultManifest, syncVaultToReplica } from './vaultSync.js'
+import { buildVaultManifest, syncVaultToReplica, pullVaultFromPeer } from './vaultSync.js'
 
 let root: string
 
@@ -142,7 +142,7 @@ describe('syncVaultToReplica', () => {
     )
     const r = await syncVaultToReplica({ vaultRoot: root, target: 'http://replica:7865' })
     expect(r.uploaded).toBe(1)
-    expect(r.failed.map((f) => f.path)).toContain('(reindeks repliki)')
+    expect(r.failed.map((f) => f.path)).toContain('(replica reindex)')
   })
 
   it('uploads only what the replica asked for', async () => {
@@ -220,6 +220,95 @@ describe('syncVaultToReplica', () => {
       signal: ac.signal,
     })
     expect(r.uploaded).toBe(0)
-    expect(r.failed[0].reason).toBe('anulowane')
+    expect(r.failed[0].reason).toBe('cancelled')
+  })
+})
+
+describe('pullVaultFromPeer', () => {
+  it('downloads only what local planSync wants', async () => {
+    await put('sessions/have.md', 'identical')
+    const bodies: Record<string, string> = {
+      'sessions/have.md': 'identical',
+      'sessions/peer.md': 'from peer',
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const u = String(url)
+        if (u.endsWith('/sync/manifest')) {
+          const { sha256 } = await import('../../../packages/brain-core/src/sync/receive.js')
+          const entries = Object.entries(bodies).map(([path, body]) => ({
+            path,
+            sha256: sha256(body),
+            size: Buffer.byteLength(body),
+          }))
+          return { ok: true, status: 200, text: async () => JSON.stringify({ entries, skipped: [] }) }
+        }
+        if (u.endsWith('/sync/fetch')) {
+          const path = JSON.parse(String(init?.body)).path as string
+          const body = bodies[path]
+          const { sha256 } = await import('../../../packages/brain-core/src/sync/receive.js')
+          return {
+            ok: true,
+            status: 200,
+            text: async () =>
+              JSON.stringify({
+                path,
+                sha256: sha256(body),
+                size: Buffer.byteLength(body),
+                contentBase64: Buffer.from(body).toString('base64'),
+              }),
+          }
+        }
+        throw new Error(`unexpected ${u}`)
+      }),
+    )
+    const r = await pullVaultFromPeer({ vaultRoot: root, target: 'http://replica:7865' })
+    expect(r.downloaded).toBe(1)
+    expect(r.unchanged).toBe(1)
+    expect(await (await import('node:fs/promises')).readFile(join(root, 'sessions/peer.md'), 'utf8')).toBe(
+      'from peer',
+    )
+  })
+
+  it('suffixes on content conflict instead of overwriting', async () => {
+    await put('sessions/note.md', 'local')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const u = String(url)
+        const { sha256 } = await import('../../../packages/brain-core/src/sync/receive.js')
+        if (u.endsWith('/sync/manifest')) {
+          return {
+            ok: true,
+            status: 200,
+            text: async () =>
+              JSON.stringify({
+                entries: [{ path: 'sessions/note.md', sha256: sha256('remote'), size: 6 }],
+                skipped: [],
+              }),
+          }
+        }
+        if (u.endsWith('/sync/fetch')) {
+          return {
+            ok: true,
+            status: 200,
+            text: async () =>
+              JSON.stringify({
+                path: 'sessions/note.md',
+                sha256: sha256('remote'),
+                size: 6,
+                contentBase64: Buffer.from('remote').toString('base64'),
+              }),
+          }
+        }
+        throw new Error(`unexpected ${u}`)
+      }),
+    )
+    const r = await pullVaultFromPeer({ vaultRoot: root, target: 'http://replica:7865' })
+    expect(r.conflicts).toEqual([{ kept: 'sessions/note.md', wrote: 'sessions/note-2.md' }])
+    const fs = await import('node:fs/promises')
+    expect(await fs.readFile(join(root, 'sessions/note.md'), 'utf8')).toBe('local')
+    expect(await fs.readFile(join(root, 'sessions/note-2.md'), 'utf8')).toBe('remote')
   })
 })

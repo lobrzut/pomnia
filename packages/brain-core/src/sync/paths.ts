@@ -29,8 +29,21 @@ export const SYNC_DIRS = [
   'state',
 ] as const
 
-/** Files allowed at the vault root. */
+/**
+ * Files allowed at the vault root.
+ *
+ * `state/distill-ledger.json` is not listed here — it lives under SYNC_DIRS
+ * `state/` and is merged as a set-union of conversation ids on apply (see
+ * ledgerMerge.ts). Putting it in SYNC_ROOT_FILES would be the wrong path.
+ */
 export const SYNC_ROOT_FILES = ['USER.md', 'AGENTS.md'] as const
+
+/**
+ * Distillation ledger — lives under `state/` (already in SYNC_DIRS), not the
+ * vault root. Named here because surface sync merges it by set-union of ids
+ * rather than treating it like an ordinary file. See ledgerMerge.ts.
+ */
+export const DISTILL_LEDGER_REL = 'state/distill-ledger.json' as const
 
 /** Per-file ceiling. A vault note is kilobytes; a megabyte is already odd. */
 export const MAX_FILE_BYTES = 8 * 1024 * 1024
