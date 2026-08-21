@@ -22,7 +22,7 @@ import { hostname } from 'node:os'
 import { join } from 'node:path'
 import { loadConfig, type BrainConfig } from './config/index.js'
 import { createBrainServer } from './mcp/server.js'
-import { EmbedClient } from './rag/embed.js'
+import { embedClientFromConfig, prefetchFastembed } from './rag/embed.js'
 import { indexDir } from './rag/indexer.js'
 import { openDb } from './storage/db.js'
 import { defaultVaultConfig, vaultConfigFromRoot } from './storage/vault.js'
@@ -44,7 +44,7 @@ async function reindexInBackground(config: Awaited<ReturnType<typeof loadConfig>
   const vaultRoot = (
     config.vaultRoot ? vaultConfigFromRoot(config.vaultRoot) : defaultVaultConfig(config.dataDir)
   ).root
-  const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
+  const embedder = embedClientFromConfig(config)
   try {
     await embedder.preflight()
   } catch (err) {
@@ -224,6 +224,12 @@ async function main(): Promise<void> {
   if (process.argv.includes('--add-user')) await addUserAndExit(config, process.argv)
   if (process.argv.includes('--add-token')) await addTokenAndExit(config, process.argv)
   if (process.argv.includes('--claim-vault')) await claimAndExit(config)
+  if (process.argv.includes('--prefetch-embed')) {
+    console.error(`[brain-core] prefetching fastembed into ${config.embedCacheDir}…`)
+    await prefetchFastembed(config.embedCacheDir)
+    console.error('[brain-core] embed cache ready')
+    process.exit(0)
+  }
 
   const server = await createBrainServer(config)
   await server.start()
@@ -238,8 +244,13 @@ async function main(): Promise<void> {
   // to a working one in the log, which is where an operator actually looks.
   void (async () => {
     try {
-      await new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel }).preflight()
-      console.error(`[brain-core] embeddings ready (${config.embedModel} via ${config.ollamaUrl})`)
+      const embedder = embedClientFromConfig(config)
+      await embedder.preflight()
+      const where =
+        config.embedBackend === 'fastembed'
+          ? `fastembed ${embedder.config.modelId}`
+          : `${config.embedModel} via ${config.ollamaUrl}`
+      console.error(`[brain-core] embeddings ready (${where})`)
     } catch (e) {
       console.error(
         `[brain-core] DEGRADED — semantic search will return nothing: ${(e as Error).message}`,

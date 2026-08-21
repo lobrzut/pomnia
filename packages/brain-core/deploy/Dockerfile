@@ -40,14 +40,24 @@ COPY --from=build /src/packages/brain-core/package.json ./package.json
 #
 # 7865 is the server port. 7862 belongs to the desktop-embedded brain and, on a
 # machine migrating from the Python stack, is already taken by it.
+#
+# Embed cache under /opt (not /var/lib/pomnia): a VOLUME or -v on the data dir
+# must not hide the ~0.5 GB ONNX weights baked at build.
 ENV NODE_ENV=production \
     NODE_PATH=/opt/pomnia/node_modules \
     BRAIN_DATA_DIR=/var/lib/pomnia \
-    BRAIN_PORT=7865
+    BRAIN_PORT=7865 \
+    BRAIN_EMBED_BACKEND=fastembed \
+    BRAIN_EMBED_CACHE=/opt/pomnia/embed-cache
+
+RUN mkdir -p /opt/pomnia/embed-cache /var/lib/pomnia \
+ && BRAIN_EMBED_BACKEND=fastembed \
+    BRAIN_EMBED_CACHE=/opt/pomnia/embed-cache \
+    node dist/daemon.js --data-dir /var/lib/pomnia --prefetch-embed \
+ && chown -R pomnia:pomnia /opt/pomnia/embed-cache /var/lib/pomnia
 
 # The vault and the index are state — mount them, do not bake them in.
 VOLUME ["/var/lib/pomnia"]
-RUN mkdir -p /var/lib/pomnia && chown -R pomnia:pomnia /var/lib/pomnia
 USER pomnia
 
 EXPOSE 7865
@@ -56,7 +66,7 @@ EXPOSE 7865
 # Reads BRAIN_PORT so overriding the port cannot leave the probe checking a
 # different one than the server bound — a green healthcheck for a port the
 # outside world cannot reach is worse than no healthcheck.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD node -e "const p=process.env.BRAIN_PORT||7865;fetch('http://127.0.0.1:'+p+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # 0.0.0.0 makes the port reachable outside the container, which turns Bearer

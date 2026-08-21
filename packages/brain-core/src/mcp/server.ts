@@ -62,7 +62,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 
 import type { BrainConfig } from '../config/index.js'
-import { EmbedClient } from '../rag/embed.js'
+import { embedClientFromConfig } from '../rag/embed.js'
 import { openDb } from '../storage/db.js'
 import { defaultVaultConfig, vaultConfigFromRoot, type VaultConfig } from '../storage/vault.js'
 import { createAuthGate } from './auth.js'
@@ -309,10 +309,7 @@ export async function createBrainServer(
       if (saved.ollamaUrl) config.ollamaUrl = saved.ollamaUrl
       if (saved.embedModel) config.embedModel = saved.embedModel
 
-      const embedder = new EmbedClient({
-        ollamaUrl: config.ollamaUrl,
-        embedModel: config.embedModel,
-      })
+      const embedder = embedClientFromConfig(config)
       // Who may write is decided by the vault, not by this process's flags.
       // `--read-only` still pins a replica, but an instance without it no
       // longer gets to assume it owns a corpus another instance is holding.
@@ -514,7 +511,13 @@ export async function createBrainServer(
                         { name: 'Index', ...health.checks.index },
                         { name: 'Vault', ...health.checks.vault },
                         { name: 'Disk / write', ...health.checks.disk },
-                        { name: 'Embeddings (Ollama)', ...health.checks.ollama },
+                        {
+                          name:
+                            health.embed.backend === 'fastembed'
+                              ? 'Embeddings (fastembed)'
+                              : 'Embeddings (Ollama)',
+                          ...health.checks.ollama,
+                        },
                       ],
                     }
                   : {}),
