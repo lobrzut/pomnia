@@ -17,8 +17,8 @@ export type { ToolDef, ToolContext } from './mcp/tools/index.js'
 
 // RAG core (embed + cosine + chunking)
 // Re-exports live here so tools/, tests/ and consumers stay decoupled from the file layout.
-export { EmbedClient, EMBED_DIMS } from './rag/embed.js'
-export type { EmbedClientConfig } from './rag/embed.js'
+export { EmbedClient, EMBED_DIMS, FASTEMBED_MODEL_ID, parseEmbedBackend, prefetchFastembed, defaultEmbedCacheDir, embedClientFromConfig, applyEmbedPrefix } from './rag/embed.js'
+export type { EmbedClientConfig, EmbedBackendName, EmbedKind } from './rag/embed.js'
 export { chunkText, CHUNK_CHAR, CHUNK_OVERLAP } from './rag/chunk.js'
 export { vecToBlob, blobToVec } from './rag/vec.js'
 export { search } from './rag/search.js'

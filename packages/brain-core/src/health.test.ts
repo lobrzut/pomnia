@@ -10,8 +10,14 @@ import type { EmbedClient } from './rag/embed.js'
 
 let vaultRoot: string
 
-const okEmbedder = { preflight: vi.fn(async () => {}) } as unknown as EmbedClient
+const okEmbedder = {
+  backend: 'ollama' as const,
+  config: { backend: 'ollama' as const, ollamaUrl: 'http://127.0.0.1:11434', embedModel: 'nomic-embed-text', modelId: 'nomic-embed-text' },
+  preflight: vi.fn(async () => {}),
+} as unknown as EmbedClient
 const deadEmbedder = {
+  backend: 'ollama' as const,
+  config: { backend: 'ollama' as const, ollamaUrl: 'http://127.0.0.1:11434', embedModel: 'nomic-embed-text', modelId: 'nomic-embed-text' },
   preflight: vi.fn(async () => {
     throw new Error('ollama unreachable at http://127.0.0.1:11434 (fetch failed)')
   }),
@@ -47,6 +53,7 @@ describe('collectHealth', () => {
     expect(h.status).toBe('ok')
     expect(h.ok).toBe(true)
     expect(h.index).toEqual({ files: 10, chunks: 44 })
+    expect(h.embed).toEqual({ backend: 'ollama', model: 'nomic-embed-text', ready: true })
   })
 
   /**
@@ -99,6 +106,8 @@ describe('collectHealth', () => {
   /** A health endpoint that hangs makes whatever polls it hang too. */
   it('does not wait on a hanging Ollama', async () => {
     const hanging = {
+      backend: 'ollama' as const,
+      config: { backend: 'ollama' as const, ollamaUrl: 'http://127.0.0.1:11434', embedModel: 'nomic-embed-text', modelId: 'nomic-embed-text' },
       preflight: vi.fn(() => new Promise<void>(() => {})),
     } as unknown as EmbedClient
     const t0 = Date.now()
@@ -106,6 +115,7 @@ describe('collectHealth', () => {
     expect(Date.now() - t0).toBeLessThan(9_000)
     expect(h.checks.ollama.state).toBe('degraded')
     expect(h.checks.ollama.detail).toMatch(/timed out/)
+    expect(h.embed.ready).toBe(false)
   }, 15_000)
 
   it('carries ownership through, so a client can see who may write', async () => {
@@ -134,6 +144,9 @@ describe('redactHealth', () => {
     expect(r.checks.index.detail).toBeUndefined()
     expect(r.status).toBe(h.status)
     expect(r.vaultOwner).toBe('Pomnia Desktop')
+    expect(r.embed.backend).toBe('ollama')
+    expect(r.embed.ready).toBe(true)
+    expect(r.embed.model).toBe('')
   })
 })
 

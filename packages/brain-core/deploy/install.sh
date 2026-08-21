@@ -5,20 +5,21 @@
 # Idempotent: safe to re-run to upgrade an existing install. It never touches
 # the vault, never overwrites tokens, and refuses rather than guesses.
 #
-#   sudo ./install.sh                 # install or upgrade
-#   sudo ./install.sh --port 7865     # non-default port
-#   sudo ./install.sh --with-ollama   # say yes up front (unattended runs)
+#   sudo ./install.sh                      # install or upgrade (fastembed, no Ollama)
+#   sudo ./install.sh --port 7865
+#   sudo ./install.sh --vault-root /mnt/vault
+#   sudo ./install.sh --embed-backend ollama --with-ollama
 #
-# It offers to install Ollama and pull the embedding model, and only with a yes.
-# Everything else stays hands-off on purpose: firewall ports and TLS are
-# decisions about someone else's machine, and guessing them is how an installer
-# becomes something people read before they run.
+# Default embed backend is fastembed (in-process ONNX ~0.5 GB). Ollama is
+# optional for hosts that already run it; chat/distill models are never pulled.
 set -euo pipefail
 
 PREFIX=/opt/pomnia-brain-core
 DATA=/var/lib/pomnia
+VAULT_ROOT=""
 USER_NAME=pomnia
 PORT=7865
+EMBED_BACKEND=fastembed
 UNIT=/etc/systemd/system/pomnia-brain-core.service
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -27,20 +28,27 @@ while [[ $# -gt 0 ]]; do
     --port) PORT="$2"; shift 2 ;;
     --prefix) PREFIX="$2"; shift 2 ;;
     --data-dir) DATA="$2"; shift 2 ;;
+    --vault-root) VAULT_ROOT="$2"; shift 2 ;;
+    --embed-backend) EMBED_BACKEND="$2"; shift 2 ;;
     # Consent up front, for a run with no terminal attached. There is no
     # --no-ollama: doing nothing is already the default when nobody says yes.
-    --with-ollama) WITH_OLLAMA=1; shift ;;
-    -h|--help) sed -n '3,14p' "$0"; exit 0 ;;
+    --with-ollama) WITH_OLLAMA=1; EMBED_BACKEND=ollama; shift ;;
+    -h|--help) sed -n '3,16p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
 
-die() { echo "✗ $*" >&2; exit 1; }
+die() { echo "✗ $*" >&2; exit 2; }
 ok()  { echo "✔ $*"; }
 
 [[ $EUID -eq 0 ]] || die "run as root (systemd unit + system user)"
 command -v node >/dev/null || die "node not found — install Node 22 first (tarball native addons match CI Node 22)"
 command -v systemctl >/dev/null || die "systemd not found; use the Dockerfile instead"
+
+case "$EMBED_BACKEND" in
+  fastembed|ollama) ;;
+  *) die "unknown --embed-backend $EMBED_BACKEND (use fastembed or ollama)" ;;
+esac
 
 NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
 [[ "$NODE_MAJOR" -ge 22 ]] || die "node $NODE_MAJOR is too old — the packed better-sqlite3 is Node 22 (ABI 127); 20 crashes on start"
@@ -54,7 +62,13 @@ id -u "$USER_NAME" >/dev/null 2>&1 || {
   ok "created system user $USER_NAME"
 }
 
-install -d -o "$USER_NAME" -g "$USER_NAME" -m 750 "$DATA" "$DATA/vault" "$DATA/vectordb"
+VAULT_ROOT="${VAULT_ROOT:-$DATA/vault}"
+
+install -d -o "$USER_NAME" -g "$USER_NAME" -m 750 "$DATA" "$DATA/vault" "$DATA/vectordb" "$DATA/embed-cache"
+# Vault may live on its own mount; create the target when it is still local.
+if [[ ! -d "$VAULT_ROOT" ]]; then
+  install -d -o "$USER_NAME" -g "$USER_NAME" -m 750 "$VAULT_ROOT"
+fi
 mkdir -p "$PREFIX"
 # Copy rather than symlink: ProtectSystem=strict + a symlink into someone's
 # home directory is a failure that reads as "node not found".
@@ -103,10 +117,47 @@ else
   ok "kept the existing accounts — upgrade does not reset passwords"
 fi
 
+# Prefetch ONNX weights before starting the unit so first /healthz is not a
+# multi-minute download under ProtectSystem=strict.
+if [[ "$EMBED_BACKEND" == "fastembed" ]]; then
+  echo "  prefetching nomic-embed ONNX (~0.5 GB) into $DATA/embed-cache…"
+  if sudo -u "$USER_NAME" env \
+       BRAIN_EMBED_BACKEND=fastembed \
+       BRAIN_EMBED_CACHE="$DATA/embed-cache" \
+       node "$PREFIX/dist/daemon.js" \
+         --data-dir "$DATA" \
+         --embed-backend fastembed \
+         --embed-cache "$DATA/embed-cache" \
+         --prefetch-embed; then
+    ok "embed cache ready"
+  else
+    echo "! prefetch failed — first search will download the model (needs network)" >&2
+  fi
+fi
+
 sed -e "s|--port 7865|--port $PORT|" \
     -e "s|/opt/pomnia-brain-core|$PREFIX|g" \
+    -e "s|/var/lib/pomnia/vault|$VAULT_ROOT|g" \
     -e "s|/var/lib/pomnia|$DATA|g" \
+    -e "s|BRAIN_EMBED_BACKEND=fastembed|BRAIN_EMBED_BACKEND=$EMBED_BACKEND|" \
     "$SRC/deploy/pomnia-brain-core.service" > "$UNIT"
+
+# ProtectSystem=strict only allows writes under ReadWritePaths. A vault on its
+# own mount (outside $DATA) must be listed, and RequiresMountsFor= stops the
+# unit from claiming an empty pre-mount directory as the real vault.
+DATA_REAL=$(realpath -m "$DATA")
+VAULT_REAL=$(realpath -m "$VAULT_ROOT")
+case "$VAULT_REAL" in
+  "$DATA_REAL"|"$DATA_REAL"/*) ;;
+  *)
+    {
+      echo "RequiresMountsFor=$VAULT_REAL"
+      echo "ReadWritePaths=$VAULT_REAL"
+    } >> "$UNIT"
+    ok "extended unit for vault mount $VAULT_REAL"
+    ;;
+esac
+
 systemctl daemon-reload
 ok "unit written to $UNIT"
 
@@ -116,7 +167,8 @@ systemctl restart pomnia-brain-core
 # Verify rather than announce. An installer that prints "done" over a service
 # that died two seconds ago is the whole failure mode this project keeps
 # hitting, and it is trivial to avoid here.
-for _ in $(seq 1 20); do
+# First fastembed load can take longer than a cold Ollama ping.
+for _ in $(seq 1 60); do
   sleep 0.5
   if curl -fsS -m 2 "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1; then break; fi
 done
@@ -131,11 +183,14 @@ if [[ -z "$HEALTH" ]]; then
 fi
 
 STATUS=$(printf '%s' "$HEALTH" | grep -o '"status":"[a-z]*"' | cut -d'"' -f4)
+EMBED_READY=$(printf '%s' "$HEALTH" | sed -n 's/.*"ready":\(true\|false\).*/\1/p' | head -1)
+EMBED_BE=$(printf '%s' "$HEALTH" | sed -n 's/.*"backend":"\([a-z]*\)".*/\1/p' | head -1)
 HOST_IP="$(hostname -I | awk '{print $1}')"
 echo
 echo "  Pomnia brain-core  →  http://$HOST_IP:$PORT"
 echo "  panel              →  http://$HOST_IP:$PORT/admin"
 echo "  status             →  ${STATUS:-unknown}"
+echo "  embed backend      →  ${EMBED_BE:-$EMBED_BACKEND} (ready=${EMBED_READY:-?})"
 [[ -n "${NEW_TOKEN:-}" ]] && echo "  agent token        →  $NEW_TOKEN"
 if [[ -n "${NEW_USER:-}" ]]; then
   echo
@@ -147,28 +202,15 @@ echo
 
 # The embedder decides whether anything else is worth suggesting, so read it
 # directly instead of inferring from the overall verdict.
-#
-# A fresh install on a machine without Ollama lands on "down" — the index is
-# empty, which is true — and the old message told the operator to run --reindex.
-# That refuses without an embedding model, by design, so the advice sent them
-# into a wall and never named the thing in the way. Semantic search is the point
-# of this server; say what it is missing first, whatever the summary says.
 OLLAMA_STATE=$(printf '%s' "$HEALTH" | sed -n 's/.*"ollama":{"state":"\([a-z]*\)".*/\1/p')
 
 EMBED_MODEL=nomic-embed-text
 
-# Offer, then do it. Reading two commands off a screen and pasting them back is
-# not a decision anybody is making thoughtfully — it is the same install, with a
-# gap in it where people give up. Consent stays explicit: a prompt when someone
-# is watching, --with-ollama when nobody is, and nothing at all otherwise.
 offer_ollama() {
   local answer=""
   if [[ "${WITH_OLLAMA:-0}" == "1" ]]; then
     answer=y
   else
-    # curl|sh leaves stdin as the script pipe, so [[ -t 0 ]] is false and the
-    # old branch skipped the question (everyone got "Left alone"). Ask on the
-    # controlling terminal when there is one.
     local tty=""
     if [[ -t 0 ]]; then
       tty=/dev/stdin
@@ -186,9 +228,10 @@ offer_ollama() {
 
   if [[ ! "$answer" =~ ^[Yy]$ ]]; then
     echo
-    echo "  Left alone. When you want search, either on this host:"
-    echo "      curl -fsSL https://ollama.com/install.sh | sh && ollama pull $EMBED_MODEL"
-    echo "  or point at one you already run, and restart:"
+    echo "  Left alone. Prefer the default KVM path (no Ollama):"
+    echo "      sudo ./install.sh --embed-backend fastembed"
+    echo "  or point at an Ollama you already run, and restart:"
+    echo "      Environment=BRAIN_EMBED_BACKEND=ollama"
     echo "      --ollama-url http://<host>:11434     (in $UNIT)"
     echo
     echo "  The server serves without it: skills, the profile and saved notes all"
@@ -198,9 +241,6 @@ offer_ollama() {
 
   if ! command -v ollama >/dev/null 2>&1; then
     echo "  installing Ollama…"
-    # Their installer, run as themselves — not vendored, not mirrored. Pinning a
-    # copy here would mean shipping someone else's install script and owning its
-    # bugs on distributions nobody here has tested.
     curl -fsSL https://ollama.com/install.sh | sh || {
       echo "! Ollama install failed — do it yourself, then: ollama pull $EMBED_MODEL" >&2
       return
@@ -213,8 +253,6 @@ offer_ollama() {
     return
   }
 
-  # Verify rather than announce, same rule as the rest of this script: the
-  # question is whether the server can embed now, not whether a command exited 0.
   systemctl restart pomnia-brain-core
   for _ in $(seq 1 20); do
     sleep 0.5
@@ -232,7 +270,8 @@ offer_ollama() {
   echo "  journalctl -u pomnia-brain-core -n 30 --no-pager" >&2
 }
 
-if [[ -n "$OLLAMA_STATE" && "$OLLAMA_STATE" != "ok" ]]; then
+# Only offer Ollama when that backend was chosen and it is not ready.
+if [[ "$EMBED_BACKEND" == "ollama" && -n "$OLLAMA_STATE" && "$OLLAMA_STATE" != "ok" ]]; then
   offer_ollama
   echo
 fi
@@ -241,14 +280,17 @@ case "$STATUS" in
   ok) ok "serving" ;;
   degraded)
     echo "  Degraded — it serves, but not everything it should. See /admin → Stan."
+    if [[ "${EMBED_READY:-false}" != "true" ]]; then
+      echo "  Embedder not ready — check journalctl -u pomnia-brain-core"
+    fi
     ;;
   *)
-    if [[ "$OLLAMA_STATE" == "ok" ]]; then
+    if [[ "${EMBED_READY:-false}" == "true" || "$OLLAMA_STATE" == "ok" ]]; then
       echo "  Not serving yet. The index is empty until you build it:"
-      echo "      sudo -u $USER_NAME node $PREFIX/dist/daemon.js --data-dir $DATA --vault-root $DATA/vault --reindex"
+      echo "      sudo -u $USER_NAME node $PREFIX/dist/daemon.js --data-dir $DATA --vault-root $VAULT_ROOT --reindex"
       echo "  Or push a vault from Pomnia Desktop (Connect → push changes)."
     else
-      echo "  Not serving yet — start with Ollama above, then build the index."
+      echo "  Not serving yet — fix the embedder above, then build the index."
     fi
     ;;
 esac

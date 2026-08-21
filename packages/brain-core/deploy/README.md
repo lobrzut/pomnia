@@ -61,18 +61,21 @@ picks it up, and `search_library` returns the words back.
 | | |
 | --- | --- |
 | Node | 22 or newer (tarball native addons are built on GitHub Actions Node 22) |
-| Embedder | ONNX nomic (~0.5 GB, default) **or** Ollama `nomic-embed-text` |
-| Disk | the vault, plus roughly half its size again for the index, plus embed-cache |
-| RAM | ~200 MB serving; ONNX warm ~0.5–1 GB; indexing peaks higher, capped at 2 GB |
+| Ollama | optional — only when `BRAIN_EMBED_BACKEND=ollama` |
+| Disk | the vault, plus roughly half its size again for the index, plus ~0.5 GB ONNX cache when using fastembed |
+| RAM | ~200 MB serving; indexing / ONNX load peaks higher, capped at 3 GB by the unit |
 
-Without a ready embedder the server still starts and still serves skills,
-profile and note reads; only semantic search stops, and `/healthz` reports
-`degraded` with `embed.backend` / `embed.ready`. Refusing to start would turn a
-partial outage into a full one.
+Default KVM path is **fastembed** (in-process ONNX, `nomic-ai/nomic-embed-text-v1.5`).
+No chat model is bundled. Distillation stays on a GPU machine.
 
-**Embeddings:** Node supports both backends via `BRAIN_EMBED_BACKEND`. Vectors
-are compatible with an Ollama-built `library.db` (dim 768, same prefixes) —
-no reindex required when switching. See `docs/BRAIN-SERVER-EMBEDDED-MODEL.md`.
+`BRAIN_EMBED_BACKEND=ollama` is optional for hosts that already run Ollama.
+Without Ollama on the fastembed path the server still starts; `/healthz` reports
+`embed.backend` + `embed.ready`. Refusing to start would turn a partial outage
+into a full one.
+
+**Embeddings:** Node supports both backends (`BRAIN_EMBED_BACKEND`). Prefixes
+`search_document: ` / `search_query: ` are applied in code and must not change
+without wiping `library.db`. See `docs/BRAIN-SERVER-EMBEDDED-MODEL.md`.
 
 Public `/healthz` without a Bearer token redacts index counts (`index: null`)
 and check *reasons*. The overall `status` and `embed.{backend,ready,model}`
@@ -99,7 +102,7 @@ probe. A process that is up but returns nothing for every search is precisely
 the state this reports, because it used to be the state that looked healthy.
 
 ```json
-{"ok":true,"status":"degraded","embed":{"backend":"fastembed","ready":false,"model":"nomic-ai/nomic-embed-text-v1.5"},"checks":{"ollama":{"state":"degraded"}}}
+{"ok":true,"status":"degraded","embed":{"backend":"fastembed","ready":false},"checks":{"ollama":{"state":"degraded"}}}
 ```
 
 ## Who may write

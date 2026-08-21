@@ -13,14 +13,17 @@
  * So health is assembled from the things that have to be true for a search to
  * come back with an answer, each reported separately with its own reason:
  *
- *   ollama   the embedder answers and has the model — no model, no query vector
+ *   embed    the active backend answers (Ollama model, or ONNX fastembed)
  *   index    there are chunks to search
  *   vault    the corpus is readable
  *   db       the database opens and answers
  *
  * `degraded` is a real state and is used: a server that can still serve skills
- * and read notes while Ollama is down is not `down`, and calling it `down`
+ * and read notes while the embedder is down is not `down`, and calling it `down`
  * would train people to ignore the field.
+ *
+ * `checks.ollama` is kept as an alias of embed readiness for older probes and
+ * the install.sh parser; new code should read `embed.backend` + `embed.ready`.
  */
 
 import { promises as fs } from 'node:fs'
@@ -28,7 +31,7 @@ import { join } from 'node:path'
 
 import type Database from 'better-sqlite3'
 
-import type { EmbedClient } from './rag/embed.js'
+import type { EmbedBackendName, EmbedClient } from './rag/embed.js'
 
 export type CheckState = 'ok' | 'degraded' | 'down'
 
@@ -77,6 +80,13 @@ async function checkDisk(dataDir: string): Promise<Check> {
   return { state: 'ok' }
 }
 
+export interface HealthEmbedInfo {
+  backend: EmbedBackendName
+  /** Ollama tag or HuggingFace id actually used for vectors. */
+  model: string
+  ready: boolean
+}
+
 export interface HealthReport {
   /** Kept for compatibility: true unless something makes the server useless. */
   ok: boolean
@@ -88,11 +98,14 @@ export interface HealthReport {
   writable: boolean
   vaultOwner: string | null
   uptimeSec: number
+  /** Which embed backend is configured and whether preflight passed. */
+  embed: HealthEmbedInfo
   checks: {
     db: Check
     index: Check
     vault: Check
     disk: Check
+    /** Embedder readiness. Key kept as `ollama` for older clients / install.sh. */
     ollama: Check
   }
   /**
@@ -116,12 +129,20 @@ export interface HealthReport {
  *
  * Index counts become `null`, never `{files:0,chunks:0}` — a redacted empty
  * object reads as "the index is empty" while the check state still says ok.
+ *
+ * `embed.backend` and `embed.ready` stay public: operators and install.sh need
+ * them without a token. The model id is redacted (paths / HF cache hints).
  */
 export function redactHealth(h: HealthReport): HealthReport {
   const bare = (c: Check): Check => ({ state: c.state })
   return {
     ...h,
     index: null,
+    embed: {
+      backend: h.embed.backend,
+      model: '',
+      ready: h.embed.ready,
+    },
     checks: {
       db: bare(h.checks.db),
       index: bare(h.checks.index),
@@ -144,21 +165,22 @@ function countRow(db: Database.Database, sql: string): number {
 }
 
 /**
- * Ollama is checked with its own short timeout rather than the embedder's
- * 5-minute one: a health endpoint that hangs for five minutes is worse than
- * one that reports `down`, because whatever polls it hangs too.
+ * Embedder is checked with a short timeout when already warm. A cold fastembed
+ * load can take tens of seconds (~0.5 GB ONNX) — allow that once, otherwise a
+ * health endpoint that hangs forever is worse than reporting degraded.
  */
-async function checkOllama(embedder: EmbedClient): Promise<Check> {
+async function checkEmbedder(embedder: EmbedClient): Promise<Check> {
+  const timeoutMs = embedder.backend === 'fastembed' && !embedder.ready ? 90_000 : 5_000
   try {
     await Promise.race([
       embedder.preflight(),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timed out after 5s')), 5_000)),
+      new Promise((_, rej) =>
+        setTimeout(() => rej(new Error(`timed out after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs),
+      ),
     ])
-    return { state: 'ok' }
+    return { state: 'ok', detail: `${embedder.backend} ready (${embedder.config.modelId})` }
   } catch (e) {
     const why = (e as Error).message
-    // Missing model and unreachable host are different problems with different
-    // fixes, and the message from preflight already says which.
     return { state: 'down', detail: why }
   }
 }
@@ -208,16 +230,21 @@ export async function collectHealth(opts: {
 
   const disk = await checkDisk(opts.dataDir)
 
-  const ollama = opts.embedder
-    ? await checkOllama(opts.embedder)
+  const embedCheck = opts.embedder
+    ? await checkEmbedder(opts.embedder)
     : { state: 'down' as const, detail: 'embedder not configured' }
 
-  // Ollama being down degrades rather than kills: skills, profile and note
+  // Embedder being down degrades rather than kills: skills, profile and note
   // reads still work, only semantic search stops. Saying `down` for a server
   // that is still useful teaches people to ignore the field.
-  const effectiveOllama: Check = ollama.state === 'down' ? { ...ollama, state: 'degraded' } : ollama
+  const effectiveEmbed: Check =
+    embedCheck.state === 'down' ? { ...embedCheck, state: 'degraded' } : embedCheck
 
-  const status = worstOf([db, index, vault, disk, effectiveOllama])
+  const backend: EmbedBackendName = opts.embedder?.backend ?? 'ollama'
+  const model = opts.embedder?.config.modelId ?? ''
+  const embedReady = effectiveEmbed.state === 'ok'
+
+  const status = worstOf([db, index, vault, disk, effectiveEmbed])
   return {
     ok: status !== 'down',
     service: 'brain-core',
@@ -230,7 +257,8 @@ export async function collectHealth(opts: {
     // read by a panel and by monitors, and "running for minus two hours" is not
     // a fact any of them can act on — the live server printed -7028.
     uptimeSec: Math.max(0, Math.round((Date.now() - opts.startedAt) / 1000)),
-    checks: { db, index, vault, disk, ollama: effectiveOllama },
+    embed: { backend, model, ready: embedReady },
+    checks: { db, index, vault, disk, ollama: effectiveEmbed },
     index: counts,
   }
 }
