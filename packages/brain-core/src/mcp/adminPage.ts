@@ -208,7 +208,7 @@ ${brandSkyHtml()}
       <h2 data-i18n="dashTitle">Pulpit</h2>
       <p class="lead" data-i18n="dashLead">Zdrowie search-appliance: indeks, klienci, uptime — nie przeglądarka pamięci (to Desktop).</p>
       <div class="tiles" id="tiles"></div>
-      <h3 class="sub-h" data-i18n="dashDisk">Katalogi na dysku (luka indeksu)</h3>
+      <h3 class="sub-h" data-i18n="dashDisk" id="dash-disk-h">Katalogi na dysku</h3>
       <table><tbody id="vault-rows"></tbody></table>
       <h3 class="sub-h" data-i18n="dashActors">Kto pyta (ostatnie 24 h)</h3>
       <table><tbody id="actor-rows"></tbody></table>
@@ -424,7 +424,9 @@ ${brandSkyHtml()}
       tabUsers: 'Konta', tabBehaviour: 'Zachowanie', tabSettings: 'Ustawienia', tabVault: 'Sejf',
       dashTitle: 'Pulpit',
       dashLead: 'Zdrowie search-appliance: indeks, klienci, uptime — nie przeglądarka pamięci (to Desktop).',
-      dashDisk: 'Katalogi na dysku (luka indeksu)', dashActors: 'Kto pyta (ostatnie 24 h)',
+      dashDisk: 'Katalogi na dysku',
+      dashDiskGap: 'Katalogi na dysku (luka indeksu)',
+      dashActors: 'Kto pyta (ostatnie 24 h)',
       dashRecent: 'Ostatnie zapytania', refresh: 'Odśwież',
       settingsTitle: 'Ustawienia',
       settingsLead: 'Preferencje panelu w tej przeglądarce — jak Desktop → Ustawienia (kolorystyka / język). Zachowanie agentów, Silnik i Sejf zostają osobnymi zakładkami operacyjnymi.',
@@ -452,7 +454,9 @@ ${brandSkyHtml()}
       tabUsers: 'Accounts', tabBehaviour: 'Behaviour', tabSettings: 'Settings', tabVault: 'Vault',
       dashTitle: 'Dashboard',
       dashLead: 'Search-appliance health: index, clients, uptime — not a memory browser (that is Desktop).',
-      dashDisk: 'On-disk dirs (index gap)', dashActors: 'Who asked (last 24 h)',
+      dashDisk: 'On-disk dirs',
+      dashDiskGap: 'On-disk dirs (index gap)',
+      dashActors: 'Who asked (last 24 h)',
       dashRecent: 'Recent calls', refresh: 'Refresh',
       settingsTitle: 'Settings',
       settingsLead: 'Panel prefs in this browser — like Desktop → Settings (colors / language). Agent behaviour, Engine and Vault stay as operational tabs.',
@@ -677,6 +681,10 @@ ${brandSkyHtml()}
     tile(tEl, fmt(o.activity.last24h), t('tileReq'), o.activity.last24h > 0 ? 'good' : '')
     tile(tEl, String(o.activity.actors.length), t('tileClients'))
     tile(tEl, uptime(o.uptimeSec), t('tileUp'))
+
+    // Do not scream "index gap" when the gap is zero.
+    const diskH = $('dash-disk-h')
+    if (diskH) diskH.textContent = o.unindexed > 0 ? t('dashDiskGap') : t('dashDisk')
 
     rows($('vault-rows'), o.vault,
       (v) => [[v.dir + (v.indexable ? '' : '  · nie indeksowane')], [fmt(v.files) + ' plików', 'mono'], [bytes(v.bytes), 'mono']],
