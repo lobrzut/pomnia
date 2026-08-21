@@ -20,9 +20,10 @@
  *                   echoed in a header on every mutation. SameSite already
  *                   stops the cross-site POST; this also covers the
  *                   same-site-but-untrusted case, and costs one header.
- *   no storage      not localStorage, not sessionStorage, never document.cookie
- *                   from script. The only thing the page holds is the CSRF
- *                   token, in a closure, for as long as the tab lives.
+ *   prefs only     session / CSRF never in localStorage or document.cookie
+ *                   from script — CSRF lives in a closure for the tab lifetime.
+ *                   UI prefs only (theme / language / density) may use
+ *                   localStorage; that is chrome, not auth.
  *   inline only     one file, no fetch of anything but this server's own API.
  *                   The CSP the server sends says exactly that, so an edit that
  *                   reaches for a CDN breaks loudly instead of phoning out.
@@ -34,39 +35,39 @@
  * deliberately left out while there is one person.
  */
 
+import {
+  BRAND_HEAD_LINKS,
+  brandChromeCss,
+  brandSkyHtml,
+  brandSkyScript,
+  brandWordmarkHtml,
+  themeScript,
+  themeSwitcherHtml,
+} from './brandChrome.js'
+
 export function renderAdminPage(origin: string): string {
   const esc = (s: string): string =>
     s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
 
   return `<!doctype html>
-<html lang="pl">
+<html lang="pl" data-theme="mint">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
+${BRAND_HEAD_LINKS}
 <title>Pomnia · panel</title>
 <style>
+  ${brandChromeCss()}
   :root {
-    --bg:#060a08; --bg-2:#0a110d; --panel:rgba(17,31,24,.58); --border:rgba(255,255,255,.09);
-    --ink:#e9f5ee; --ink-dim:#8fa89a; --ink-faint:#5b7868;
-    --mint:#34d399; --iris:#2dd4bf; --amber:#fbbf24; --rose:#fb7185;
-    --glow:rgba(45,212,191,.10);
     --font:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
     --mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
   }
-  @media (prefers-color-scheme:light){:root{
-    --bg:#f4f8f6;--bg-2:#e8f0eb;--panel:rgba(255,255,255,.74);--border:rgba(0,0,0,.09);
-    --ink:#10241a;--ink-dim:#46614f;--ink-faint:#6d8577;--glow:rgba(45,212,191,.18);}}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;font-family:var(--font);color:var(--ink);line-height:1.5;
-    background:radial-gradient(1100px 620px at 18% -12%,var(--glow),transparent),
-               linear-gradient(160deg,var(--bg),var(--bg-2));
-    padding:2rem 1.25rem;display:flex;justify-content:center}
+    background:var(--bg);padding:2rem 1.25rem;display:flex;justify-content:center}
   main{width:100%;max-width:46rem}
-  h1{margin:0;font-size:1.6rem;font-weight:800;letter-spacing:-.025em;
-    background:linear-gradient(120deg,#1a5c3a,var(--mint) 48%,var(--iris));
-    -webkit-background-clip:text;background-clip:text;color:transparent}
   .top{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem}
   .who{margin-left:auto;font-size:.8rem;color:var(--ink-faint);font-family:var(--mono)}
   .card{border:1px solid var(--border);background:var(--panel);backdrop-filter:blur(14px);
@@ -76,26 +77,37 @@ export function renderAdminPage(origin: string): string {
   label{display:block;font-size:.78rem;color:var(--ink-faint);margin:.9rem 0 .3rem}
   input,select{width:100%;padding:.6rem .8rem;border-radius:12px;border:1px solid var(--border);
     background:rgba(0,0,0,.22);color:var(--ink);font-family:var(--mono);font-size:.85rem}
-  @media (prefers-color-scheme:light){input,select{background:rgba(255,255,255,.7)}}
   input:focus,select:focus{outline:2px solid color-mix(in srgb,var(--mint) 70%,transparent);outline-offset:1px}
   button{font-family:var(--font);font-size:.83rem;font-weight:600;padding:.55rem 1rem;
-    border-radius:12px;border:1px solid var(--border);background:rgba(52,211,153,.14);
+    border-radius:12px;border:1px solid var(--border);background:color-mix(in srgb,var(--mint) 14%,transparent);
     color:var(--mint);cursor:pointer}
-  button:hover{background:rgba(52,211,153,.22)}
+  button:hover{background:color-mix(in srgb,var(--mint) 22%,transparent)}
   button[disabled]{opacity:.5;cursor:not-allowed}
   button.ghost{background:transparent;color:var(--ink-dim)}
   button.danger{background:rgba(251,113,133,.13);color:var(--rose)}
   .row{display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap;margin-top:1rem}
   .row>*{flex:1 1 10rem}
   .row>button{flex:0 0 auto}
-  nav{display:flex;gap:.4rem;margin-bottom:1rem;flex-wrap:wrap}
-  nav button{background:transparent;color:var(--ink-dim);border-color:transparent}
-  nav button[aria-current="true"]{background:rgba(52,211,153,.14);color:var(--mint);border-color:var(--border)}
+  /* One row when possible; logout stays on the tab row (not a lone wrap line). */
+  nav{display:flex;gap:.35rem;margin-bottom:1rem;flex-wrap:nowrap;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  nav button{background:transparent;color:var(--ink-dim);border-color:transparent;flex:0 0 auto;white-space:nowrap;padding:.45rem .7rem}
+  nav button[aria-current="true"]{background:color-mix(in srgb,var(--mint) 14%,transparent);color:var(--mint);border-color:var(--border)}
+  nav #logout{margin-left:auto}
+  @media (max-width:520px){
+    nav{flex-wrap:wrap}
+    nav #logout{margin-left:0}
+  }
   table{width:100%;border-collapse:collapse;font-size:.83rem}
   th{text-align:left;font-weight:600;color:var(--ink-faint);font-size:.75rem;
     padding:.4rem .5rem;border-bottom:1px solid var(--border)}
   td{padding:.55rem .5rem;border-bottom:1px solid var(--border);vertical-align:middle}
   td.mono,.mono{font-family:var(--mono);font-size:.8rem}
+  td.plain{font-family:var(--font);font-size:.85rem;line-height:1.45}
+  details.tech{margin-top:1rem;font-size:.8rem;color:var(--ink-dim)}
+  details.tech summary{cursor:pointer;color:var(--ink-faint);user-select:none}
+  details.tech summary:hover{color:var(--ink-dim)}
+  details.tech .tech-body{margin-top:.55rem;padding:.65rem .8rem;border-radius:12px;
+    border:1px solid var(--border);background:rgba(0,0,0,.18);font-family:var(--mono);font-size:.78rem}
   .tag{display:inline-block;padding:.08rem .5rem;border-radius:999px;font-size:.72rem;font-weight:700}
   .tag.admin{background:color-mix(in srgb,var(--amber) 18%,transparent);color:var(--amber)}
   .tag.agent{background:color-mix(in srgb,var(--iris) 16%,transparent);color:var(--iris)}
@@ -114,7 +126,6 @@ export function renderAdminPage(origin: string): string {
   .banner .detail{color:var(--ink-dim);flex:1 1 12rem}
   .secret{font-family:var(--mono);font-size:.8rem;word-break:break-all;
     background:rgba(0,0,0,.3);padding:.6rem .8rem;border-radius:10px;margin-top:.5rem}
-  @media (prefers-color-scheme:light){.secret{background:rgba(0,0,0,.06)}}
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr));gap:.7rem;margin-bottom:1.4rem}
   .tile{border:1px solid var(--border);border-radius:14px;padding:.8rem .9rem}
   .tile .n{font-size:1.45rem;font-weight:800;letter-spacing:-.02em;line-height:1.15}
@@ -128,29 +139,48 @@ export function renderAdminPage(origin: string): string {
   .hidden{display:none}
   footer{margin-top:1.5rem;color:var(--ink-faint);font-size:.76rem;text-align:center}
   a{color:var(--iris)}
+  .subnav{display:flex;gap:.35rem;flex-wrap:wrap;margin:0 0 1.1rem}
+  .subnav button{font-size:.78rem;padding:.35rem .75rem;border-radius:999px}
+  .subnav button[aria-current="true"]{color:var(--mint);background:color-mix(in srgb,var(--mint) 14%,transparent);
+    border-color:color-mix(in srgb,var(--mint) 35%,var(--border))}
+  .settings-pane.hidden{display:none}
+  html[data-density='compact'] .card{padding:1.1rem}
+  html[data-density='compact'] .lead{margin-bottom:.75rem}
+  html[data-density='compact'] .tile .n{font-size:1.2rem}
+  html[data-density='compact'] td{padding:.4rem .45rem}
+  .pref-bar{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}
+  .pref-bar .lbl{font-size:.72rem;color:var(--ink-faint);margin-right:.25rem}
+  .pref-bar button{
+    font-family:inherit;font-size:.75rem;font-weight:600;padding:.28rem .65rem;border-radius:999px;
+    border:1px solid var(--border);background:transparent;color:var(--ink-dim);cursor:pointer;
+  }
+  .pref-bar button[aria-checked="true"]{
+    color:var(--mint);background:color-mix(in srgb,var(--mint) 14%,transparent);
+    border-color:color-mix(in srgb,var(--mint) 35%,var(--border));
+  }
 </style>
 </head>
 <body>
-<main>
+${brandSkyHtml()}
+<main class="page-root">
   <div class="top">
-    <h1>Pomnia</h1>
+    ${brandWordmarkHtml('h1')}
     <span class="who" id="who"></span>
   </div>
 
   <!-- ── login ──────────────────────────────────────────────────────────── -->
   <section class="card" id="gate">
-    <h2>Logowanie</h2>
-    <p class="lead">
-      Nie masz jeszcze konta? Na serwerze:
-      <code class="mono">brain-core --add-user login --role admin</code>
+    <h2 data-i18n="loginTitle">Logowanie</h2>
+    <p class="lead" data-i18n-html="loginLead">
+      Konto zakłada administrator serwera.
     </p>
     <form id="login-form" autocomplete="on">
-      <label for="user">Login</label>
+      <label for="user" data-i18n="loginUser">Login</label>
       <input id="user" name="username" autocomplete="username" spellcheck="false" autocapitalize="off">
-      <label for="pass">Hasło</label>
+      <label for="pass" data-i18n="loginPass">Hasło</label>
       <input id="pass" name="password" type="password" autocomplete="current-password">
       <div class="row">
-        <button type="submit" id="login">Zaloguj</button>
+        <button type="submit" id="login" data-i18n="loginBtn">Zaloguj</button>
       </div>
     </form>
     <div id="gate-msg"></div>
@@ -162,28 +192,29 @@ export function renderAdminPage(origin: string): string {
       <span class="badge" id="vault-badge">…</span>
       <span class="detail" id="vault-banner-detail">ładowanie stanu vaultu…</span>
     </div>
-    <nav>
-      <button data-tab="dash" aria-current="true">Pulpit</button>
-      <button data-tab="status">Stan</button>
-      <button data-tab="engine">Silnik</button>
-      <button data-tab="clients">Klienci</button>
-      <button data-tab="users">Konta</button>
-      <button data-tab="behaviour">Zachowanie</button>
-      <button data-tab="vault">Vault</button>
-      <button id="logout" class="ghost" style="margin-left:auto">Wyloguj</button>
+    <nav id="main-nav">
+      <button data-tab="dash" data-i18n="tabDash" aria-current="true">Pulpit</button>
+      <button data-tab="status" data-i18n="tabStatus">Stan</button>
+      <button data-tab="engine" data-i18n="tabEngine">Silnik</button>
+      <button data-tab="clients" data-i18n="tabClients">Klienci</button>
+      <button data-tab="users" data-i18n="tabUsers">Konta</button>
+      <button data-tab="behaviour" data-i18n="tabBehaviour">Zachowanie</button>
+      <button data-tab="settings" data-i18n="tabSettings">Ustawienia</button>
+      <button data-tab="vault" data-i18n="tabVault">Sejf</button>
+      <button id="logout" class="ghost" data-i18n="logout">Wyloguj</button>
     </nav>
 
     <section class="card" id="tab-dash">
-      <h2>Pulpit</h2>
-      <p class="lead">Co ten serwer ma i co się z nim dzieje.</p>
+      <h2 data-i18n="dashTitle">Pulpit</h2>
+      <p class="lead" data-i18n="dashLead">Zdrowie search-appliance: indeks, klienci, uptime — nie przeglądarka pamięci (to Desktop).</p>
       <div class="tiles" id="tiles"></div>
-      <h3 class="sub-h">Vault na dysku</h3>
+      <h3 class="sub-h" data-i18n="dashDisk">Katalogi na dysku (luka indeksu)</h3>
       <table><tbody id="vault-rows"></tbody></table>
-      <h3 class="sub-h">Kto pyta (ostatnie 24 h)</h3>
+      <h3 class="sub-h" data-i18n="dashActors">Kto pyta (ostatnie 24 h)</h3>
       <table><tbody id="actor-rows"></tbody></table>
-      <h3 class="sub-h">Ostatnie zapytania</h3>
+      <h3 class="sub-h" data-i18n="dashRecent">Ostatnie zapytania</h3>
       <table><tbody id="act-rows"></tbody></table>
-      <div class="row"><button id="dash-refresh" class="ghost">Odśwież</button></div>
+      <div class="row"><button id="dash-refresh" class="ghost" data-i18n="refresh">Odśwież</button></div>
       <div id="dash-msg"></div>
     </section>
 
@@ -268,6 +299,62 @@ export function renderAdminPage(origin: string): string {
       <div id="users-msg"></div>
     </section>
 
+    <section class="card hidden" id="tab-settings">
+      <h2 data-i18n="settingsTitle">Ustawienia</h2>
+      <p class="lead" data-i18n="settingsLead">
+        Preferencje panelu w tej przeglądarce — jak Desktop → Ustawienia (kolorystyka / język).
+        Zachowanie agentów, Silnik i Sejf zostają osobnymi zakładkami operacyjnymi.
+      </p>
+      <div class="subnav" id="settings-subnav" role="tablist" aria-label="Ustawienia">
+        <button type="button" data-settings="appearance" aria-current="true" data-i18n="setAppearance">Wygląd</button>
+        <button type="button" data-settings="language" data-i18n="setLanguage">Język</button>
+        <button type="button" data-settings="interface" data-i18n="setInterface">Interfejs</button>
+      </div>
+
+      <div class="settings-pane" id="settings-appearance">
+        <h3 class="sub-h" data-i18n="setAppearance">Wygląd</h3>
+        <p class="lead" data-i18n="appearanceLead">
+          Te same schematy kolorów co w Pomnia Desktop (Ustawienia → Kolorystyka).
+          Zapis w przeglądarce (<code class="mono">localStorage</code>) — bez round-tripu na serwer.
+          Logo pomarańczowe/mieniące zostaje; zmieniają się tła i akcenty.
+        </p>
+        ${themeSwitcherHtml()}
+        <p class="lead" style="margin-top:1rem" data-i18n="appearanceBrand">
+          Favicon i ikona = assety z <a href="https://pomnia.ai">pomnia.ai</a>.
+          Tło: lekka galaktyka neuronów (pauza gdy karta w tle).
+        </p>
+      </div>
+
+      <div class="settings-pane hidden" id="settings-language">
+        <h3 class="sub-h" data-i18n="setLanguage">Język</h3>
+        <p class="lead" data-i18n="languageLead">
+          Język chrome panelu (nawigacja, etykiety). Wiedza w vaultcie zostaje bilingwalna PL+EN —
+          jak w Desktop. Persist: <code class="mono">localStorage</code> klucz <code class="mono">pomnia-ui-locale</code>.
+        </p>
+        <div class="pref-bar" id="locale-bar" role="radiogroup" aria-label="Język">
+          <span class="lbl" data-i18n="languageLabel">Interfejs</span>
+          <button type="button" role="radio" data-locale="pl" aria-checked="true">PL</button>
+          <button type="button" role="radio" data-locale="en" aria-checked="false">EN</button>
+        </div>
+      </div>
+
+      <div class="settings-pane hidden" id="settings-interface">
+        <h3 class="sub-h" data-i18n="setInterface">Interfejs</h3>
+        <p class="lead" data-i18n="densityLead">
+          Gęstość układu panelu. Tray / autostart / floating monitor z Desktop nie mają tu sensu
+          (to nie Electron). Persist: <code class="mono">pomnia-ui-density</code>.
+        </p>
+        <div class="pref-bar" id="density-bar" role="radiogroup" aria-label="Gęstość">
+          <span class="lbl" data-i18n="densityLabel">Gęstość</span>
+          <button type="button" role="radio" data-density="comfortable" aria-checked="true" data-i18n="densityComfortable">Wygodna</button>
+          <button type="button" role="radio" data-density="compact" aria-checked="false" data-i18n="densityCompact">Zwarta</button>
+        </div>
+        <p class="lead" style="margin-top:1rem" data-i18n="timezoneNote">
+          Strefa czasu: przeglądarka hosta (daty „temu” / last-used). Osobny wybór regionu na serwerze — nie teraz.
+        </p>
+      </div>
+    </section>
+
     <section class="card hidden" id="tab-behaviour">
       <h2>Zachowanie agentów</h2>
       <p class="lead">
@@ -299,35 +386,139 @@ export function renderAdminPage(origin: string): string {
     </section>
 
     <section class="card hidden" id="tab-vault">
-      <h2>Vault</h2>
-      <p class="lead">
-        Zapisywać może tylko jedna instancja naraz — inaczej dwie kopie pamięci
-        cicho się rozjeżdżają. Przejęcie jest świadome i natychmiast odbiera
-        prawo zapisu poprzedniemu właścicielowi.
+      <h2 data-i18n="tabVault">Sejf</h2>
+      <p class="lead" data-i18n-html="vaultLead">
+        Tu widać <em>skąd</em> ten serwer bierze pamięć — po ludzku, nie tylko
+        ścieżkami Dockera. Zapisywać może tylko jedna instancja naraz; przejęcie
+        natychmiast odbiera prawo zapisu poprzedniemu właścicielowi.
       </p>
       <table><tbody id="vault-info"></tbody></table>
+      <div id="vault-tech"></div>
       <div class="row">
-        <button id="claim" class="danger">Przejmij własność</button>
+        <button id="claim" class="danger" data-i18n="claimBtn" title="">Przejmij własność</button>
       </div>
       <div id="vault-msg"></div>
     </section>
   </div>
 
-  <footer>brain-core · <a href="${esc(origin)}/">strona statusu</a> · AGPL-3.0</footer>
+  <footer>Pomnia · <a href="${esc(origin)}/">strona statusu</a> · AGPL-3.0</footer>
 </main>
 
 <script>
 (() => {
   'use strict'
-  // The session lives in an HttpOnly cookie the browser attaches for us, which
-  // means script cannot read it and an XSS on this origin cannot steal it. What
-  // we do hold is the CSRF token — deliberately NOT in a cookie, because the
-  // whole point is that a cross-site page cannot read it to replay.
+  // Session lives in an HttpOnly cookie. CSRF is NOT in a cookie. UI prefs
+  // (theme / locale / density) may use localStorage — chrome only, not auth.
   let csrf = null
   let me = null
 
   const $ = (id) => document.getElementById(id)
   const text = (el, s) => { el.textContent = s }
+
+  const I18N = {
+    pl: {
+      loginTitle: 'Logowanie',
+      loginLead: 'Konto zakłada administrator serwera.',
+      loginUser: 'Login', loginPass: 'Hasło', loginBtn: 'Zaloguj', logout: 'Wyloguj',
+      tabDash: 'Pulpit', tabStatus: 'Stan', tabEngine: 'Silnik', tabClients: 'Klienci',
+      tabUsers: 'Konta', tabBehaviour: 'Zachowanie', tabSettings: 'Ustawienia', tabVault: 'Sejf',
+      dashTitle: 'Pulpit',
+      dashLead: 'Zdrowie search-appliance: indeks, klienci, uptime — nie przeglądarka pamięci (to Desktop).',
+      dashDisk: 'Katalogi na dysku (luka indeksu)', dashActors: 'Kto pyta (ostatnie 24 h)',
+      dashRecent: 'Ostatnie zapytania', refresh: 'Odśwież',
+      settingsTitle: 'Ustawienia',
+      settingsLead: 'Preferencje panelu w tej przeglądarce — jak Desktop → Ustawienia (kolorystyka / język). Zachowanie agentów, Silnik i Sejf zostają osobnymi zakładkami operacyjnymi.',
+      setAppearance: 'Wygląd', setLanguage: 'Język', setInterface: 'Interfejs',
+      appearanceLead: 'Te same schematy kolorów co w Pomnia Desktop (Ustawienia → Kolorystyka). Zapis w przeglądarce (<code class="mono">localStorage</code>) — bez round-tripu na serwer. Logo pomarańczowe/mieniące zostaje; zmieniają się tła i akcenty.',
+      appearanceBrand: 'Favicon i ikona = assety z <a href="https://pomnia.ai">pomnia.ai</a>. Tło: lekka galaktyka neuronów (pauza gdy karta w tle).',
+      languageLead: 'Język chrome panelu (nawigacja, etykiety). Wiedza w vaultcie zostaje bilingwalna PL+EN — jak w Desktop. Persist: <code class="mono">localStorage</code> klucz <code class="mono">pomnia-ui-locale</code>.',
+      languageLabel: 'Interfejs',
+      densityLead: 'Gęstość układu panelu. Tray / autostart / floating monitor z Desktop nie mają tu sensu (to nie Electron). Persist: <code class="mono">pomnia-ui-density</code>.',
+      densityLabel: 'Gęstość', densityComfortable: 'Wygodna', densityCompact: 'Zwarta',
+      timezoneNote: 'Strefa czasu: przeglądarka hosta (daty „temu” / last-used). Osobny wybór regionu na serwerze — nie teraz.',
+      claimBtn: 'Przejmij własność',
+      claimOwned: 'Ten serwer już jest właścicielem sejfu.',
+      claimPinned: 'Przypięty --read-only w unicie — nie da się przejąć z panelu.',
+      claimReady: 'Przejmij zapis od innego właściciela (zsynchronizuj go najpierw).',
+      vaultLead: 'Tu widać <em>skąd</em> ten serwer bierze pamięć — po ludzku, nie tylko ścieżkami Dockera. Zapisywać może tylko jedna instancja naraz; przejęcie natychmiast odbiera prawo zapisu poprzedniemu właścicielowi.',
+      tileFiles: 'plików w indeksie', tileChunks: 'fragmentów', tileWait: 'czeka na indeks',
+      tileReq: 'zapytań / 24 h', tileClients: 'aktywnych klientów', tileUp: 'działa',
+    },
+    en: {
+      loginTitle: 'Sign in',
+      loginLead: 'Accounts are created by the server administrator.',
+      loginUser: 'Username', loginPass: 'Password', loginBtn: 'Sign in', logout: 'Sign out',
+      tabDash: 'Dashboard', tabStatus: 'Status', tabEngine: 'Engine', tabClients: 'Clients',
+      tabUsers: 'Accounts', tabBehaviour: 'Behaviour', tabSettings: 'Settings', tabVault: 'Vault',
+      dashTitle: 'Dashboard',
+      dashLead: 'Search-appliance health: index, clients, uptime — not a memory browser (that is Desktop).',
+      dashDisk: 'On-disk dirs (index gap)', dashActors: 'Who asked (last 24 h)',
+      dashRecent: 'Recent calls', refresh: 'Refresh',
+      settingsTitle: 'Settings',
+      settingsLead: 'Panel prefs in this browser — like Desktop → Settings (colors / language). Agent behaviour, Engine and Vault stay as operational tabs.',
+      setAppearance: 'Appearance', setLanguage: 'Language', setInterface: 'Interface',
+      appearanceLead: 'Same color schemes as Pomnia Desktop (Settings → Colors). Stored in the browser (<code class="mono">localStorage</code>) — no server round-trip. Orange/shimmer logo stays; backgrounds and accents change.',
+      appearanceBrand: 'Favicon and icon = assets from <a href="https://pomnia.ai">pomnia.ai</a>. Background: light neuron field (pauses when the tab is hidden).',
+      languageLead: 'Panel chrome language (nav, labels). Vault knowledge stays bilingual PL+EN — same as Desktop. Persist: <code class="mono">localStorage</code> key <code class="mono">pomnia-ui-locale</code>.',
+      languageLabel: 'Interface',
+      densityLead: 'Panel layout density. Tray / autostart / floating monitor from Desktop do not apply here (not Electron). Persist: <code class="mono">pomnia-ui-density</code>.',
+      densityLabel: 'Density', densityComfortable: 'Comfortable', densityCompact: 'Compact',
+      timezoneNote: 'Time zone: this browser (relative dates / last-used). Server region picker — not now.',
+      claimBtn: 'Take ownership',
+      claimOwned: 'This server already owns the vault.',
+      claimPinned: 'Pinned --read-only in the unit — cannot claim from the panel.',
+      claimReady: 'Take write ownership from the other writer (sync it first).',
+      vaultLead: 'Shows <em>where</em> this server reads memory — in plain language, not only Docker paths. Only one instance may write at a time; claiming immediately revokes the previous owner.',
+      tileFiles: 'files in index', tileChunks: 'chunks', tileWait: 'waiting to index',
+      tileReq: 'requests / 24 h', tileClients: 'active clients', tileUp: 'uptime',
+    },
+  }
+  let locale = 'pl'
+  try { locale = localStorage.getItem('pomnia-ui-locale') === 'en' ? 'en' : 'pl' } catch (e) {}
+  const t = (k) => (I18N[locale] && I18N[locale][k]) || I18N.pl[k] || k
+
+  function applyLocale(next) {
+    locale = next === 'en' ? 'en' : 'pl'
+    try { localStorage.setItem('pomnia-ui-locale', locale) } catch (e) {}
+    document.documentElement.setAttribute('lang', locale)
+    for (const el of document.querySelectorAll('[data-i18n]')) {
+      const key = el.getAttribute('data-i18n')
+      if (key && I18N.pl[key] !== undefined) el.textContent = t(key)
+    }
+    for (const el of document.querySelectorAll('[data-i18n-html]')) {
+      const key = el.getAttribute('data-i18n-html')
+      if (key && I18N.pl[key] !== undefined) el.innerHTML = t(key)
+    }
+    const bar = $('locale-bar')
+    if (bar) {
+      for (const b of bar.querySelectorAll('[data-locale]')) {
+        b.setAttribute('aria-checked', String(b.getAttribute('data-locale') === locale))
+      }
+    }
+    // Shared chrome defaults to English (public status page); retitle for PL admin.
+    const themes = $('theme-bar')
+    if (themes) {
+      const colors = locale === 'en' ? 'Colors' : 'Kolorystyka'
+      themes.setAttribute('aria-label', colors)
+      const lbl = themes.querySelector('.lbl')
+      if (lbl) lbl.textContent = colors
+      const glass = themes.querySelector('[data-theme-opt="glass"]')
+      if (glass) glass.textContent = locale === 'en' ? 'Glass' : 'Szkło'
+    }
+    const claim = $('claim')
+    if (claim && claim.dataset.claimState) paintClaimTitle(claim.dataset.claimState)
+  }
+
+  function applyDensity(d) {
+    const density = d === 'compact' ? 'compact' : 'comfortable'
+    document.documentElement.setAttribute('data-density', density)
+    try { localStorage.setItem('pomnia-ui-density', density) } catch (e) {}
+    const bar = $('density-bar')
+    if (!bar) return
+    for (const b of bar.querySelectorAll('[data-density]')) {
+      b.setAttribute('aria-checked', String(b.getAttribute('data-density') === density))
+    }
+  }
 
   function msg(el, kind, s) {
     if (!el) return
@@ -478,18 +669,18 @@ export function renderAdminPage(origin: string): string {
     try { o = await api('GET', '/admin/overview') } catch (e) { msg($('dash-msg'), 'err', e.message); return }
     msg($('dash-msg'), null, null)
 
-    const t = $('tiles'); t.innerHTML = ''
-    tile(t, fmt(o.index.files), 'plików w indeksie')
-    tile(t, fmt(o.index.chunks), 'fragmentów')
+    const tEl = $('tiles'); tEl.innerHTML = ''
+    tile(tEl, fmt(o.index.files), t('tileFiles'))
+    tile(tEl, fmt(o.index.chunks), t('tileChunks'))
     // The number worth a colour: notes on disk the index has never seen.
-    tile(t, fmt(o.unindexed), 'czeka na indeks', o.unindexed > 0 ? 'warn' : 'good')
-    tile(t, fmt(o.activity.last24h), 'zapytań / 24 h', o.activity.last24h > 0 ? 'good' : '')
-    tile(t, String(o.activity.actors.length), 'aktywnych klientów')
-    tile(t, uptime(o.uptimeSec), 'działa')
+    tile(tEl, fmt(o.unindexed), t('tileWait'), o.unindexed > 0 ? 'warn' : 'good')
+    tile(tEl, fmt(o.activity.last24h), t('tileReq'), o.activity.last24h > 0 ? 'good' : '')
+    tile(tEl, String(o.activity.actors.length), t('tileClients'))
+    tile(tEl, uptime(o.uptimeSec), t('tileUp'))
 
     rows($('vault-rows'), o.vault,
       (v) => [[v.dir + (v.indexable ? '' : '  · nie indeksowane')], [fmt(v.files) + ' plików', 'mono'], [bytes(v.bytes), 'mono']],
-      'Vault jest pusty — nic tu jeszcze nie trafiło.')
+      'Sejf jest pusty — nic tu jeszcze nie trafiło.')
 
     rows($('actor-rows'), o.activity.actors,
       (a) => [[a.name], [fmt(a.calls) + ' zapytań', 'mono'], [ago(a.last), 'mono']],
@@ -502,7 +693,7 @@ export function renderAdminPage(origin: string): string {
 
   // ── status ──────────────────────────────────────────────────────────────
   const STATE_PL = { ok: 'sprawne', degraded: 'ograniczone', down: 'nie działa' }
-  const NAMES = { db: 'Baza', index: 'Indeks', vault: 'Vault', disk: 'Dysk / zapis' }
+  const NAMES = { db: 'Baza', index: 'Indeks', vault: 'Sejf', disk: 'Dysk / zapis' }
 
   async function loadStatus() {
     const tb = $('checks')
@@ -526,7 +717,7 @@ export function renderAdminPage(origin: string): string {
       tr.append(th, td); tb.appendChild(tr)
     }
     add('Ogólnie', STATE_PL[h.status] || h.status)
-    add('Wersja', 'brain-core ' + h.version)
+    add('Wersja', 'Pomnia ' + h.version)
     add('Zapis', h.writable ? 'ten serwer jest właścicielem' : 'tylko odczyt (replika)')
     add('Właściciel vaultu', h.vaultOwner || '—')
     const backend = h.embed?.backend || 'ollama'
@@ -760,19 +951,50 @@ export function renderAdminPage(origin: string): string {
 
   async function loadVault() {
     const tb = $('vault-info')
+    const tech = $('vault-tech')
     tb.innerHTML = ''
+    if (tech) tech.innerHTML = ''
     const v = await api('GET', '/admin/vault')
     paintVaultBanner(v)
-    const add = (k, val) => {
+    const add = (k, val, plain) => {
       const tr = document.createElement('tr')
       const a = document.createElement('td'); a.textContent = k; a.style.color = 'var(--ink-faint)'
-      const b = document.createElement('td'); b.className = 'mono'; b.textContent = val
+      const b = document.createElement('td')
+      b.className = plain ? 'plain' : 'mono'
+      b.textContent = val
       tr.append(a, b); tb.appendChild(tr)
     }
-    add('Zapis', v.writable ? 'ten serwer jest właścicielem' : 'tylko odczyt (replika)')
-    add('Właściciel', v.owner || '—')
-    add('Przypięty --read-only', v.readOnlyFlag ? 'tak (w unicie systemd)' : 'nie')
+    const where = v.where || (v.label ? ('Lokalizacja: ' + v.label + '.') : null)
+    if (where) add('Gdzie jest Twoja pamięć (vault)', where, true)
+    else if (v.label) add('Etykieta', v.label, true)
+    if (v.smbPath) add('Dla Ciebie (Windows)', v.smbPath, false)
+    if (v.hostPath) add('Na serwerze', v.hostPath, false)
+    add('Zapis', v.writable ? 'ten serwer jest właścicielem' : 'tylko odczyt (replika)', true)
+    add('Właściciel', v.owner || '—', false)
+    add('Przypięty --read-only', v.readOnlyFlag ? 'tak (w unicie systemd)' : 'nie', true)
+    if (tech && v.path) {
+      const d = document.createElement('details')
+      d.className = 'tech'
+      const s = document.createElement('summary')
+      s.textContent = 'Szczegóły techniczne'
+      const body = document.createElement('div')
+      body.className = 'tech-body'
+      body.textContent = 'W kontenerze: ' + v.path
+      d.append(s, body)
+      tech.appendChild(d)
+    }
     $('claim').disabled = v.writable || v.readOnlyFlag
+    const state = v.readOnlyFlag ? 'pinned' : v.writable ? 'owned' : 'ready'
+    $('claim').dataset.claimState = state
+    paintClaimTitle(state)
+  }
+
+  function paintClaimTitle(state) {
+    const btn = $('claim')
+    if (!btn) return
+    btn.title = state === 'pinned' ? t('claimPinned')
+      : state === 'owned' ? t('claimOwned')
+      : t('claimReady')
   }
 
   async function claim() {
@@ -788,14 +1010,47 @@ export function renderAdminPage(origin: string): string {
     } catch (e) { msg($('vault-msg'), 'err', e.message) }
   }
 
-  // ── tabs ────────────────────────────────────────────────────────────────
-  for (const b of document.querySelectorAll('nav button')) {
-    b.onclick = () => {
-      for (const o of document.querySelectorAll('nav button')) o.setAttribute('aria-current', String(o === b))
-      for (const s of ['dash', 'status', 'engine', 'clients', 'users', 'behaviour', 'vault']) {
-        $('tab-' + s).classList.toggle('hidden', s !== b.dataset.tab)
+  // ── tabs + settings subnav ──────────────────────────────────────────────
+  const MAIN_TABS = ['dash', 'status', 'engine', 'clients', 'users', 'behaviour', 'settings', 'vault']
+  for (const b of document.querySelectorAll('#main-nav button[data-tab]')) {
+    b.onclick = (ev) => {
+      const btn = ev.currentTarget
+      const tab = btn.getAttribute('data-tab')
+      for (const o of document.querySelectorAll('#main-nav button[data-tab]')) {
+        if (o === btn) o.setAttribute('aria-current', 'true')
+        else o.removeAttribute('aria-current')
+      }
+      for (const s of MAIN_TABS) {
+        $('tab-' + s).classList.toggle('hidden', s !== tab)
       }
     }
+  }
+  for (const b of document.querySelectorAll('#settings-subnav button[data-settings]')) {
+    b.onclick = (ev) => {
+      const btn = ev.currentTarget
+      const id = btn.getAttribute('data-settings')
+      for (const o of document.querySelectorAll('#settings-subnav button[data-settings]')) {
+        if (o === btn) o.setAttribute('aria-current', 'true')
+        else o.removeAttribute('aria-current')
+      }
+      for (const pane of ['appearance', 'language', 'interface']) {
+        $('settings-' + pane).classList.toggle('hidden', pane !== id)
+      }
+    }
+  }
+  const localeBar = $('locale-bar')
+  if (localeBar) {
+    localeBar.addEventListener('click', (ev) => {
+      const opt = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-locale')
+      if (opt) applyLocale(opt)
+    })
+  }
+  const densityBar = $('density-bar')
+  if (densityBar) {
+    densityBar.addEventListener('click', (ev) => {
+      const opt = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-density')
+      if (opt) applyDensity(opt)
+    })
   }
 
   $('login-form').onsubmit = login
@@ -809,9 +1064,15 @@ export function renderAdminPage(origin: string): string {
   $('reindex').onclick = reindex
   $('add').onclick = addToken
   $('claim').onclick = claim
+
+  try {
+    applyDensity(localStorage.getItem('pomnia-ui-density') || 'comfortable')
+  } catch (e) { applyDensity('comfortable') }
+  applyLocale(locale)
   void restore()
 })()
 </script>
+<script>${themeScript()}${brandSkyScript()}</script>
 </body>
 </html>
 `

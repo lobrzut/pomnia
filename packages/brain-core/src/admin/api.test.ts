@@ -50,7 +50,18 @@ beforeEach(async () => {
     currentOllama: () => ({ ...live }),
     claimVault: vi.fn(async () => ({ previous: 'Pomnia Desktop', owner: 'pomnia-server' })),
     startReindex: vi.fn(() => ({ started: true })),
-    vaultState: () => ({ writable: !readOnlyFlag, owner: 'Pomnia Desktop', readOnlyFlag }),
+    vaultState: () => ({
+      // Default = replica held by Desktop (the case claim is for).
+      writable: false,
+      owner: 'Pomnia Desktop',
+      readOnlyFlag,
+      path: '/var/lib/pomnia/vault',
+      hostPath: '/share/Container/pomnia-kvm/vault',
+      label: 'katalog testowy (e2e)',
+      where:
+        'Na hoście Pomni, katalog testowy (e2e) — to nie vault z Windows (C:\\Vault) i nie share produkcyjny (Sejf).',
+      smbPath: '(tylko lokalny katalog kontenera - ustaw Sejf)',
+    }),
     health: vi.fn(async () => ({
       ok: true,
       status: 'ok',
@@ -176,8 +187,15 @@ describe('health', () => {
 })
 
 describe('vault', () => {
-  it('reports ownership', async () => {
-    expect((await call('GET', '/admin/vault')).body).toMatchObject({ owner: 'Pomnia Desktop' })
+  it('reports ownership and human vault location', async () => {
+    expect((await call('GET', '/admin/vault')).body).toMatchObject({
+      owner: 'Pomnia Desktop',
+      path: '/var/lib/pomnia/vault',
+      hostPath: '/share/Container/pomnia-kvm/vault',
+      label: 'katalog testowy (e2e)',
+      where: expect.stringMatching(/e2e/),
+      smbPath: expect.stringMatching(/ustaw Sejf/),
+    })
   })
 
   it('claims the vault and warns about the previous owner', async () => {
@@ -185,6 +203,20 @@ describe('vault', () => {
     expect(r.status).toBe(200)
     expect(deps.claimVault).toHaveBeenCalled()
     expect((r.body as { warning: string }).warning).toMatch(/Pomnia Desktop/)
+  })
+
+  it('no-ops without rewriting when this host already owns the vault', async () => {
+    deps.vaultState = () => ({
+      writable: true,
+      owner: 'pomnia-server',
+      readOnlyFlag: false,
+      path: '/var/lib/pomnia/vault',
+    })
+    const r = await call('POST', '/admin/vault/claim')
+    expect(r.status).toBe(200)
+    expect(deps.claimVault).not.toHaveBeenCalled()
+    expect(r.body).toMatchObject({ alreadyOwner: true, owner: 'pomnia-server' })
+    expect((r.body as { warning?: string }).warning).toBeUndefined()
   })
 
   /** The unit file is the operator's instruction, not a suggestion. */
