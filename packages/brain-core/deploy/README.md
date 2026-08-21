@@ -86,7 +86,8 @@ stay public. Full numbers: Bearer on `/healthz`, or the panel at `/admin`.
 | `/healthz` | optional | Health. Verdict public; reasons and counts need a token. |
 | `/mcp` | **required** | The MCP endpoint. Point agents here. |
 | `/mcp/activity` | **required** | Last tool call — echoes query text, so it is gated. |
-| `/sync/plan`, `/sync/file`, `/sync/reindex` | **admin** on a vault this host owns, any token on a replica | Write intake. Where the desktop puts what it distils. |
+| `/sync/plan`, `/sync/file`, `/sync/reindex` | **admin** on a vault this host owns, any token on a replica | Write intake (push). Where the desktop puts what it distils. |
+| `/sync/manifest`, `/sync/fetch` | any valid token | Read surface for pull — client runs `planSync` locally. |
 | `/archive/hashes`, `/archive/plan`, `/archive/blob/:hash`, `/archive/manifest` | same write gate as sync | TOR B archive: content-addressed blobs + JSON manifest merge (`{ manifest, referencedBlobs }`). |
 
 Everything else 404s, including `/.well-known/*` and `/register` — some MCP
