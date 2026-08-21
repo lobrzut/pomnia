@@ -35,7 +35,13 @@ import {
 } from '../storage/vaultOwner.js'
 import { checkVaultPresence, writeStamp, countVaultNotes } from '../storage/vaultStamp.js'
 import { MAX_FILE_BYTES, SYNC_DIRS } from '../sync/paths.js'
-import { applyFile, planSync, type ManifestEntry } from '../sync/receive.js'
+import { buildSyncManifest } from '../sync/manifest.js'
+import {
+  applyFile,
+  planSync,
+  readSyncFile,
+  type ManifestEntry,
+} from '../sync/receive.js'
 import { handleAdmin, readAdminBody, sendAdmin, type AdminDeps } from '../admin/api.js'
 import { readSettings } from '../admin/settings.js'
 import { touchToken } from '../admin/tokens.js'
@@ -532,8 +538,13 @@ export async function createBrainServer(
         // else gets a 404 — matches Python mcp-proxy behavior + means
         // `/register` / `/.well-known/*` OAuth discovery probes get a proper
         // 404 instead of stalling. See project memory desktop-mcp-remote-fix.
-        const isSync =
+        // Write intake vs read (pull): both are /sync/*, but only writes need
+        // admin when this host owns the vault. Manifest + fetch let the other
+        // side run planSync locally — same handshake, opposite direction.
+        const isSyncWrite =
           pathOnly === '/sync/plan' || pathOnly === '/sync/file' || pathOnly === '/sync/reindex'
+        const isSyncRead = pathOnly === '/sync/manifest' || pathOnly === '/sync/fetch'
+        const isSync = isSyncWrite || isSyncRead
         const isAdmin = pathOnly.startsWith('/admin/')
         if (!req.url?.startsWith('/mcp') && !isSync && !isAdmin) {
           res.statusCode = 404
@@ -919,7 +930,12 @@ export async function createBrainServer(
           res.end(JSON.stringify(body))
         }
         if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' })
-        if (vaultOwnership?.writable && auth.role !== 'admin') {
+
+        const isWrite =
+          path === '/sync/plan' || path === '/sync/file' || path === '/sync/reindex'
+        // Pull reads the peer's surface so the client can run planSync locally.
+        // Any valid token may read; only writes need admin on an owned vault.
+        if (isWrite && vaultOwnership?.writable && auth.role !== 'admin') {
           const who = vaultOwnership.owner
             ? describeOwner(vaultOwnership.owner)
             : 'this instance'
@@ -928,10 +944,32 @@ export async function createBrainServer(
             hint:
               `This instance owns the vault (${who}), so a push here writes the source of truth. ` +
               'That needs an admin token: `brain-core --add-token <name> --role admin`. ' +
-              'An agent token can still push to a read-only replica.',
+              'An agent token can still push to a read-only replica, and may always pull via /sync/manifest + /sync/fetch.',
           })
         }
         try {
+          if (path === '/sync/manifest') {
+            // Compact path+hash+size list. Bodies are hashed one file at a time
+            // and discarded — ~2400 notes do not land in memory together.
+            const { entries, skipped } = await buildSyncManifest(ctx!.vaultRoot)
+            return json(200, { entries, skipped })
+          }
+          if (path === '/sync/fetch') {
+            const body = (await readJsonBody(req, 64 * 1024)) as { path?: string }
+            if (!body?.path || typeof body.path !== 'string') {
+              return json(400, { error: 'path_required' })
+            }
+            const got = await readSyncFile({ vaultRoot: ctx!.vaultRoot, path: body.path })
+            if (!got.ok) {
+              return json(got.reason === 'not-found' ? 404 : 400, got)
+            }
+            return json(200, {
+              path: got.path,
+              sha256: got.sha256,
+              size: got.size,
+              contentBase64: got.content.toString('base64'),
+            })
+          }
           if (path === '/sync/reindex') {
             // Files a replica has but never indexed are files no agent can
             // find — the sync would report success over an unchanged search.
