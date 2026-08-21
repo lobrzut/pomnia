@@ -36,6 +36,17 @@ import {
 import { checkVaultPresence, writeStamp, countVaultNotes } from '../storage/vaultStamp.js'
 import { MAX_FILE_BYTES, SYNC_DIRS } from '../sync/paths.js'
 import { applyFile, planSync, type ManifestEntry } from '../sync/receive.js'
+import { MAX_BLOB_BYTES, BLOB_HASH_RE } from '../archive/paths.js'
+import {
+  applyArchiveBlob,
+  applyArchiveManifest,
+  listBlobHashes,
+  planArchive,
+} from '../archive/receive.js'
+import {
+  applyMergedManifest,
+  type MergeableVaultManifest,
+} from '../archive/manifestMerge.js'
 import { handleAdmin, readAdminBody, sendAdmin, type AdminDeps } from '../admin/api.js'
 import { readSettings } from '../admin/settings.js'
 import { touchToken } from '../admin/tokens.js'
@@ -534,8 +545,14 @@ export async function createBrainServer(
         // 404 instead of stalling. See project memory desktop-mcp-remote-fix.
         const isSync =
           pathOnly === '/sync/plan' || pathOnly === '/sync/file' || pathOnly === '/sync/reindex'
+        // TOR B archive intake — separate from surface /sync/* (no 8 MB cap, no .cvb there).
+        const isArchive =
+          pathOnly === '/archive/hashes' ||
+          pathOnly === '/archive/plan' ||
+          pathOnly === '/archive/manifest' ||
+          pathOnly.startsWith('/archive/blob/')
         const isAdmin = pathOnly.startsWith('/admin/')
-        if (!req.url?.startsWith('/mcp') && !isSync && !isAdmin) {
+        if (!req.url?.startsWith('/mcp') && !isSync && !isArchive && !isAdmin) {
           res.statusCode = 404
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ error: 'not_found', hint: 'MCP endpoint is at /mcp' }))
@@ -550,10 +567,10 @@ export async function createBrainServer(
           if (isAdmin && (await serveAdminSession(pathOnly, req, res))) return
 
           // Gate everything under /mcp, activity included — that endpoint
-          // echoes the last query text, which is vault content. /sync/* is
-          // gated by the same token: it writes to the vault. /admin/* needs
-          // more than that — an agent token must not be able to repoint the
-          // embedder, mint itself credentials, or take the vault.
+          // echoes the last query text, which is vault content. /sync/* and
+          // /archive/* are gated by the same token: they write to the vault.
+          // /admin/* needs more than that — an agent token must not be able to
+          // repoint the embedder, mint itself credentials, or take the vault.
           const auth = await gate.check(req, isAdmin ? 'admin' : undefined)
           if (!auth.ok) {
             res.statusCode =
@@ -606,6 +623,11 @@ export async function createBrainServer(
 
           if (isSync) {
             await serveSync(pathOnly, req, res, auth)
+            return
+          }
+
+          if (isArchive) {
+            await serveArchive(pathOnly, req, res, auth)
             return
           }
 
@@ -983,6 +1005,130 @@ export async function createBrainServer(
             sha256: body.sha256,
           })
           return json(result.ok ? 200 : 400, result)
+        } catch (e) {
+          return json(400, { error: 'bad_request', detail: (e as Error).message })
+        }
+      }
+
+      /**
+       * Content-addressed blob archive intake (TOR B1).
+       *
+       * Not /sync/file: that path is the knowledge surface (8 MB, text only).
+       * Archive blobs are large, binary, and verified by sha256(bytes) === name.
+       * manifest.cvb is accepted last by client contract — no B2 merge here.
+       */
+      async function serveArchive(
+        path: string,
+        req: IncomingMessage,
+        res: ServerResponse,
+        auth: { role?: 'agent' | 'admin'; name?: string },
+      ): Promise<void> {
+        const json = (code: number, body: unknown): void => {
+          res.statusCode = code
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify(body))
+        }
+        const requireWriteAdmin = (): boolean => {
+          if (vaultOwnership?.writable && auth.role !== 'admin') {
+            const who = vaultOwnership.owner
+              ? describeOwner(vaultOwnership.owner)
+              : 'this instance'
+            json(403, {
+              error: 'write_needs_admin',
+              hint:
+                `This instance owns the vault (${who}), so archive writes need an admin token. ` +
+                '`brain-core --add-token <name> --role admin`.',
+            })
+            return false
+          }
+          return true
+        }
+
+        const readRawBody = async (limit: number): Promise<Buffer> => {
+          const chunks: Buffer[] = []
+          let total = 0
+          for await (const c of req) {
+            total += (c as Buffer).length
+            if (total > limit) throw new Error(`body exceeds ${limit} bytes`)
+            chunks.push(c as Buffer)
+          }
+          return Buffer.concat(chunks)
+        }
+
+        try {
+          if (path === '/archive/hashes') {
+            if (req.method !== 'GET') return json(405, { error: 'method_not_allowed' })
+            const hashes = await listBlobHashes(ctx!.vaultRoot)
+            return json(200, { hashes, count: hashes.length })
+          }
+
+          if (path === '/archive/plan') {
+            if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' })
+            const body = (await readJsonBody(req, 32 * 1024 * 1024)) as { hashes?: string[] }
+            if (!Array.isArray(body?.hashes)) return json(400, { error: 'hashes_required' })
+            const plan = await planArchive({ vaultRoot: ctx!.vaultRoot, hashes: body.hashes })
+            return json(200, plan)
+          }
+
+          if (path === '/archive/manifest') {
+            if (req.method !== 'PUT' && req.method !== 'POST') {
+              return json(405, { error: 'method_not_allowed' })
+            }
+            if (!requireWriteAdmin()) return
+            const content = await readRawBody(MAX_BLOB_BYTES)
+            const ctype = String(req.headers['content-type'] ?? '')
+            // B2 JSON merge: { manifest, referencedBlobs }. Opaque CVB1 / raw
+            // bytes keep the B1 replace path (still durable .prev + fsync).
+            if (ctype.includes('application/json') || content[0] === 0x7b /* '{' */) {
+              let body: {
+                manifest?: MergeableVaultManifest
+                referencedBlobs?: string[]
+              }
+              try {
+                body = JSON.parse(content.toString('utf8')) as typeof body
+              } catch {
+                return json(400, { error: 'bad_json' })
+              }
+              if (!body?.manifest || !Array.isArray(body.referencedBlobs)) {
+                return json(400, {
+                  error: 'manifest_and_referencedBlobs_required',
+                  hint: 'send { manifest, referencedBlobs } after every referenced blob is on the target',
+                })
+              }
+              const result = await applyMergedManifest({
+                vaultRoot: ctx!.vaultRoot,
+                incoming: body.manifest,
+                referencedBlobs: body.referencedBlobs,
+              })
+              return json(result.ok ? 200 : 400, result)
+            }
+            const result = await applyArchiveManifest({ vaultRoot: ctx!.vaultRoot, content })
+            return json(result.ok ? 200 : 400, result)
+          }
+
+          if (path.startsWith('/archive/blob/')) {
+            if (req.method !== 'POST' && req.method !== 'PUT') {
+              return json(405, { error: 'method_not_allowed' })
+            }
+            if (!requireWriteAdmin()) return
+            const hash = path.slice('/archive/blob/'.length)
+            if (!BLOB_HASH_RE.test(hash)) {
+              return json(400, {
+                ok: false,
+                path: `blobs/${hash}.cvb`,
+                reason: 'bad-hash',
+              })
+            }
+            const content = await readRawBody(MAX_BLOB_BYTES)
+            const result = await applyArchiveBlob({
+              vaultRoot: ctx!.vaultRoot,
+              hash,
+              content,
+            })
+            return json(result.ok ? 200 : 400, result)
+          }
+
+          return json(404, { error: 'not_found' })
         } catch (e) {
           return json(400, { error: 'bad_request', detail: (e as Error).message })
         }
