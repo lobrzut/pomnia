@@ -386,7 +386,7 @@ ${brandSkyHtml()}
       dashRecent: 'Ostatnie zapytania', refresh: 'Odśwież', save: 'Zapisz',
       statusTitle: 'Stan serwera',
       engineTitle: 'Silnik wyszukiwania',
-      engineOllama: 'Adres Ollamy', engineModel: 'Model embeddingów',
+      engineOllama: 'Ollama (tylko embeddingi)', engineModel: 'Model embeddingów',
       engineProbe: 'Sprawdź embedder', engineReindex: 'Przebuduj indeks',
       clientsTitle: 'Klienci',
       clientsLead: 'Tokeny dla urządzeń i agentów — nie konta ludzi.',
@@ -785,8 +785,8 @@ ${brandSkyHtml()}
       const backend = h.embed?.backend || 'ollama'
       msg(box, c?.state === 'ok' ? 'ok' : 'warn',
         c?.state === 'ok'
-          ? (backend === 'fastembed' ? 'Embedder lokalny gotowy.' : 'Ollama odpowiada.')
-          : (c?.detail || 'Embedder niedostępny — search semantyczny będzie pusty.'))
+          ? (backend === 'fastembed' ? 'Embedder lokalny gotowy.' : 'Ollama gotowa.')
+          : (c?.detail || 'Embedder niedostępny.'))
     } catch (e) { msg(box, 'err', e.message) }
   }
 
