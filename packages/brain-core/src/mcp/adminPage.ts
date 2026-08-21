@@ -229,7 +229,7 @@ ${brandSkyHtml()}
 
     <section class="card hidden" id="tab-engine">
       <h2 data-i18n="engineTitle">Silnik wyszukiwania</h2>
-      <p class="lead" id="engine-lead" data-i18n="engineLeadOllama" hidden>Ollama: embeddingi teraz · destylacja gdy ten serwer zapisuje (w toku).</p>
+      <p class="lead" id="engine-lead" data-i18n="engineLeadOllama" hidden>Ollama: embeddingi teraz; destylacja gdy ten serwer zapisuje (w toku).</p>
       <div id="embed-status" class="msg" style="margin:0 0 1rem"></div>
       <label for="ollama" data-i18n="engineOllama">Adres Ollamy</label>
       <input id="ollama" type="url" spellcheck="false" placeholder="http://127.0.0.1:11434">
@@ -387,8 +387,8 @@ ${brandSkyHtml()}
       dashRecent: 'Ostatnie zapytania', refresh: 'Odśwież', save: 'Zapisz',
       statusTitle: 'Stan serwera',
       engineTitle: 'Silnik wyszukiwania',
-      engineLeadOllama: 'Ollama: embeddingi teraz · destylacja gdy ten serwer zapisuje (w toku).',
-      engineLeadFast: 'Embeddingi lokalne (bez Ollamy). Destylacja — poza tym appliance.',
+      engineLeadOllama: 'Ollama: embeddingi teraz; destylacja gdy ten serwer zapisuje (w toku).',
+      engineLeadFast: 'Embeddingi lokalne (bez Ollamy). Destylacja poza tym appliance.',
       engineOllama: 'Adres Ollamy', engineModel: 'Model embeddingów',
       engineProbe: 'Sprawdź embedder', engineReindex: 'Przebuduj indeks',
       clientsTitle: 'Klienci',
@@ -448,7 +448,7 @@ ${brandSkyHtml()}
       dashRecent: 'Recent calls', refresh: 'Refresh', save: 'Save',
       statusTitle: 'Server status',
       engineTitle: 'Search engine',
-      engineLeadOllama: 'Ollama: embeddings now · distill when this server writes (in progress).',
+      engineLeadOllama: 'Ollama: embeddings now; distill when this server writes (in progress).',
       engineLeadFast: 'Local embeddings (no Ollama). Distill stays off this appliance.',
       engineOllama: 'Ollama URL', engineModel: 'Embedding model',
       engineProbe: 'Probe embedder', engineReindex: 'Rebuild index',
@@ -780,7 +780,7 @@ ${brandSkyHtml()}
     if (c.state === 'ok') {
       label = backend === 'fastembed'
         ? 'Embedder OK (lokalny)'
-        : (h.writable ? 'Ollama OK · embed (+ destylacja gdy włączona)' : 'Ollama OK · embed (destylacja wymaga zapisu)')
+        : (h.writable ? 'Ollama OK — embed (+ destylacja gdy włączona)' : 'Ollama OK — embed (destylacja wymaga zapisu)')
     } else {
       label = (STATE_PL[c.state] || c.state) + (c.detail ? ' — ' + c.detail : '')
     }
