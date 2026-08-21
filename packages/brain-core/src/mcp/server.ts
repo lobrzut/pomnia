@@ -33,6 +33,7 @@ import {
   resolveVaultOwnership,
   type OwnershipVerdict,
 } from '../storage/vaultOwner.js'
+import { checkVaultPresence, writeStamp, countVaultNotes } from '../storage/vaultStamp.js'
 import { MAX_FILE_BYTES, SYNC_DIRS } from '../sync/paths.js'
 import { applyFile, planSync, type ManifestEntry } from '../sync/receive.js'
 import { handleAdmin, readAdminBody, sendAdmin, type AdminDeps } from '../admin/api.js'
@@ -289,6 +290,16 @@ export async function createBrainServer(
       // if either is broken (fail-fast beats accepting requests we can't serve).
       // library.db stays under dataDir (AppData) even when vaultRoot is portable.
       const vault = resolveVault()
+
+      // Before anything creates or claims a directory: was this vault full the
+      // last time we looked? An unmounted share is an ordinary empty directory,
+      // and every step after this would handle it correctly - create it, claim
+      // it, write notes into it - until the real share mounts on top and hides
+      // the lot, with no error anywhere.
+      const presence = checkVaultPresence(vault.root, config.dataDir)
+      if (!presence.ok) throw new Error(presence.message)
+      writeStamp(config.dataDir, vault.root, presence.notes || countVaultNotes(vault.root))
+
       const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
 
       // Saved settings win over the unit for the two fields the panel owns.
