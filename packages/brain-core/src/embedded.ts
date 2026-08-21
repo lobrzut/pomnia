@@ -35,7 +35,7 @@ import { basename } from 'node:path'
 import process from 'node:process'
 
 import { defaultConfig, type BrainConfig } from './config/index.js'
-import { EmbedClient } from './rag/embed.js'
+import { embedClientFromConfig } from './rag/embed.js'
 import {
   indexDir,
   indexDocument,
@@ -215,7 +215,7 @@ async function handleReindex(dir: string): Promise<void> {
     // per-batch write transactions keep contention negligible at MVP scale.
     const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
     try {
-      const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
+      const embedder = embedClientFromConfig(config)
       // Refuse rather than "succeed" with an empty index — see EmbedClient.preflight.
       await embedder.preflight()
       const stats = await indexDir(db, embedder, dir, (p) => send({ type: 'reindex-progress', ...p }), ac.signal)
@@ -277,7 +277,7 @@ async function handleIndexDocument(doc: IndexDocumentInput): Promise<void> {
   try {
     const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
     try {
-      const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
+      const embedder = embedClientFromConfig(config)
       // Refuse rather than "succeed" with an empty index — see EmbedClient.preflight.
       await embedder.preflight()
       const stats = await indexDocument(db, embedder, doc, (p) => send({ type: 'index-progress', ...p }), ac.signal)
@@ -312,7 +312,7 @@ async function handleIndexFiles(paths: string[]): Promise<void> {
   try {
     const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
     try {
-      const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
+      const embedder = embedClientFromConfig(config)
       // Refuse rather than "succeed" with an empty index — see EmbedClient.preflight.
       await embedder.preflight()
       const files = paths.map((p) => ({

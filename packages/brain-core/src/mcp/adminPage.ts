@@ -202,19 +202,18 @@ export function renderAdminPage(origin: string): string {
     <section class="card hidden" id="tab-engine">
       <h2>Silnik wyszukiwania</h2>
       <p class="lead">
-        Gdzie stoi Ollama i jakim modelem liczone są embeddingi. Adres jest
-        walidowany — serwer odmówi pobierania z adresów link-local i metadanych
-        chmury. brain-core Node wymaga Ollamy; obraz Docker z ONNX/fastembed
-        to osobna ścieżka Python hub (edge), nie ten daemon.
+        Embeddingi: <strong>fastembed</strong> (ONNX nomic w procesie — domyślne na KVM,
+        bez Ollamy) albo <strong>ollama</strong> (HTTP). Adres Ollamy jest używany
+        tylko w trybie ollama i jest walidowany (odmowa link-local / metadata cloud).
       </p>
-      <div id="ollama-status" class="msg" style="margin:0 0 1rem"></div>
-      <label for="ollama">Adres Ollamy</label>
+      <div id="embed-status" class="msg" style="margin:0 0 1rem"></div>
+      <label for="ollama">Adres Ollamy <span class="mono" style="color:var(--ink-faint)">(tylko backend ollama)</span></label>
       <input id="ollama" type="url" spellcheck="false" placeholder="http://127.0.0.1:11434">
-      <label for="model">Model embeddingów</label>
+      <label for="model">Model embeddingów (Ollama tag)</label>
       <input id="model" spellcheck="false" placeholder="nomic-embed-text">
       <div class="row">
         <button id="save-engine">Zapisz</button>
-        <button id="probe-ollama" class="ghost">Sprawdź Ollamę</button>
+        <button id="probe-ollama" class="ghost">Sprawdź embedder</button>
         <button id="reindex" class="ghost">Przebuduj indeks</button>
       </div>
       <div id="engine-msg"></div>
@@ -503,7 +502,7 @@ export function renderAdminPage(origin: string): string {
 
   // ── status ──────────────────────────────────────────────────────────────
   const STATE_PL = { ok: 'sprawne', degraded: 'ograniczone', down: 'nie działa' }
-  const NAMES = { db: 'Baza', index: 'Indeks', vault: 'Vault', disk: 'Dysk / zapis', ollama: 'Embeddingi (Ollama)' }
+  const NAMES = { db: 'Baza', index: 'Indeks', vault: 'Vault', disk: 'Dysk / zapis' }
 
   async function loadStatus() {
     const tb = $('checks')
@@ -530,26 +529,38 @@ export function renderAdminPage(origin: string): string {
     add('Wersja', 'brain-core ' + h.version)
     add('Zapis', h.writable ? 'ten serwer jest właścicielem' : 'tylko odczyt (replika)')
     add('Właściciel vaultu', h.vaultOwner || '—')
+    const backend = h.embed?.backend || 'ollama'
+    add('Embed backend', backend + (h.embed?.ready === false ? ' · niegotowy' : h.embed?.ready ? ' · gotowy' : ''))
+    if (h.embed?.model) add('Model embed', h.embed.model)
     if (h.index && typeof h.index.files === 'number') {
       add('Indeks', h.index.files.toLocaleString('pl') + ' plików · ' + h.index.chunks.toLocaleString('pl') + ' fragmentów')
     } else {
       add('Indeks', 'liczniki niedostępne')
     }
-    for (const key of ['db', 'index', 'vault', 'disk', 'ollama']) {
+    for (const key of ['db', 'index', 'vault', 'disk']) {
       const c = h.checks[key]
       add(NAMES[key], STATE_PL[c.state] + (c.detail ? ' — ' + c.detail : ''))
     }
-    paintOllamaStatus(h)
+    const emb = h.checks.ollama
+    const embName = backend === 'fastembed' ? 'Embeddingi (fastembed / ONNX)' : 'Embeddingi (Ollama)'
+    add(embName, STATE_PL[emb.state] + (emb.detail ? ' — ' + emb.detail : ''))
+    paintEmbedStatus(h)
   }
 
-  function paintOllamaStatus(h) {
-    const box = $('ollama-status')
+  function paintEmbedStatus(h) {
+    const box = $('embed-status')
     if (!box || !h?.checks?.ollama) return
     const c = h.checks.ollama
+    const backend = h.embed?.backend || 'ollama'
     const kind = c.state === 'ok' ? 'ok' : c.state === 'degraded' ? 'warn' : 'err'
-    const label = c.state === 'ok'
-      ? 'Ollama OK — embeddingi dostępne'
-      : (STATE_PL[c.state] || c.state) + (c.detail ? ' — ' + c.detail : '')
+    let label
+    if (c.state === 'ok') {
+      label = backend === 'fastembed'
+        ? 'fastembed OK — ONNX nomic w procesie (Ollama nie jest wymagana)'
+        : 'Ollama OK — embeddingi dostępne'
+    } else {
+      label = (STATE_PL[c.state] || c.state) + (c.detail ? ' — ' + c.detail : '')
+    }
     msg(box, kind, label)
   }
 
@@ -558,12 +569,15 @@ export function renderAdminPage(origin: string): string {
     msg(box, 'ok', 'sprawdzam…')
     try {
       const h = await api('GET', '/admin/health')
-      paintOllamaStatus(h)
+      paintEmbedStatus(h)
       const c = h.checks?.ollama
+      const backend = h.embed?.backend || 'ollama'
       msg(box, c?.state === 'ok' ? 'ok' : 'warn',
         c?.state === 'ok'
-          ? 'Ollama odpowiada; model embed gotowy.'
-          : (c?.detail || 'Ollama niedostępna — search semantyczny będzie pusty.'))
+          ? (backend === 'fastembed'
+            ? 'Embedder lokalny (fastembed) gotowy — search bez Ollamy.'
+            : 'Ollama odpowiada; model embed gotowy.')
+          : (c?.detail || 'Embedder niedostępny — search semantyczny będzie pusty.'))
     } catch (e) { msg(box, 'err', e.message) }
   }
 
