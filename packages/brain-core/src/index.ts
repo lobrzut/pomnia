@@ -36,3 +36,25 @@ export type { VaultConfig } from './storage/vault.js'
 // Config (env + optional TOML/JSON file)
 export { loadConfig, defaultConfig } from './config/index.js'
 export type { BrainConfig } from './config/index.js'
+
+// Surface sync (knowledge layer — not blobs / library.db)
+export {
+  SYNC_DIRS,
+  SYNC_ROOT_FILES,
+  MAX_FILE_BYTES,
+  safeVaultPath,
+  planSync,
+  applyFile,
+  sha256,
+  buildSyncManifest,
+  DISTILL_LEDGER_REL,
+  mergeDistillLedgerBytes,
+  MAX_MANIFEST_ENTRIES,
+} from './sync/index.js'
+export type {
+  PathRejection,
+  ManifestEntry,
+  SyncPlan,
+  ApplyResult,
+  BuildManifestResult,
+} from './sync/index.js'

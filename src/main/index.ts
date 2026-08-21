@@ -50,7 +50,7 @@ import {
   runDoctor,
   saveIndex,
   searchIndex,
-  syncVaultToReplica,
+  syncVaultSurface,
   setLogSink,
   initFileLog,
   syncSkills,
@@ -1358,7 +1358,7 @@ function registerIpc(): void {
     const root = brainVaultRoot(vaultPath)
     activity.update({ kind: 'indexing', phase: 'reindex', detail: m().replicaComparing })
     try {
-      const r = await syncVaultToReplica({
+      const r = await syncVaultSurface({
         vaultRoot: root,
         target: url,
         token: token?.trim() || undefined,
@@ -1369,38 +1369,45 @@ function registerIpc(): void {
             detail: m().replicaSending(done, total, basename(path)),
           }),
       })
-      // Uploading files a replica does not index changes nothing an agent can
-      // find, so the count that matters is the one after the reindex, not the
-      // one after the upload.
+      const uploaded = r.push.uploaded
+      const downloaded = r.pull.downloaded
+      const unchanged = r.push.unchanged + r.pull.unchanged
+      const failed = [...r.push.failed, ...r.pull.failed]
+      const conflicts = [...r.push.conflicts, ...r.pull.conflicts]
+      const bytes = r.push.bytesUploaded + r.pull.bytesDownloaded
       const toast =
-        r.failed.length > 0
+        failed.length > 0
           ? {
               kind: 'warn' as const,
-              title: m().replicaPartialTitle(r.uploaded, r.failed.length),
-              detail: r.failed
+              title: m().replicaPartialTitle(uploaded + downloaded, failed.length),
+              detail: failed
                 .slice(0, 3)
                 .map((f) => `${basename(f.path)}: ${f.reason}`)
                 .join(' · '),
             }
-          : r.uploaded === 0
+          : uploaded + downloaded === 0
             ? {
                 kind: 'info' as const,
                 title: m().replicaUpToDateTitle,
-                detail: m().replicaUpToDateDetail(r.unchanged),
+                detail: m().replicaUpToDateDetail(unchanged),
               }
             : {
                 kind: 'success' as const,
-                title: m().replicaSyncedTitle(r.uploaded),
+                title: m().replicaSyncedTitle(uploaded + downloaded),
                 detail:
-                  `${r.unchanged} bez zmian · ${r.bytesUploaded > 0 ? `${(r.bytesUploaded / 1024).toFixed(0)} kB` : '0 kB'}` +
-                  (r.extraOnReplica.length
-                    ? m().replicaExtraSuffix(r.extraOnReplica.length)
-                    : ''),
+                  `${unchanged} unchanged · ${bytes > 0 ? `${(bytes / 1024).toFixed(0)} kB` : '0 kB'}` +
+                  (r.pull.extraLocal.length || r.push.extraOnReplica.length
+                    ? m().replicaExtraSuffix(r.pull.extraLocal.length + r.push.extraOnReplica.length)
+                    : '') +
+                  (conflicts.length ? ` · ${conflicts.length} conflict(s) kept` : ''),
               }
       sendAppToast(toast)
-      if (r.failed.length) log.warn('vault sync failures:', r.failed.slice(0, 10))
-      if (r.skipped.length) log.warn('vault sync skipped locally:', r.skipped.slice(0, 10))
-      return r
+      if (failed.length) log.warn('vault sync failures:', failed.slice(0, 10))
+      if (conflicts.length) log.warn('vault sync conflicts:', conflicts.slice(0, 10))
+      if (r.push.skipped.length || r.pull.skipped.length) {
+        log.warn('vault sync skipped:', [...r.push.skipped, ...r.pull.skipped].slice(0, 10))
+      }
+      return { ...r.push, pull: r.pull, downloaded, conflicts }
     } finally {
       activity.idle('indexing')
     }
@@ -1420,27 +1427,33 @@ function registerIpc(): void {
     if (!s.replicaAutoSync || !target || !vaultPath) return
 
     try {
-      const r = await syncVaultToReplica({
+      const r = await syncVaultSurface({
         vaultRoot: brainVaultRoot(vaultPath),
         target,
         token: s.replicaToken?.trim() || undefined,
       })
+      const failed = [...r.push.failed, ...r.pull.failed]
+      const uploaded = r.push.uploaded + r.pull.downloaded
+      const unchanged = r.push.unchanged + r.pull.unchanged
       await setAppSettings({
         lastReplication: {
           at: new Date().toISOString(),
-          ok: r.failed.length === 0,
-          uploaded: r.uploaded,
-          unchanged: r.unchanged,
-          failed: r.failed.length,
-          ...(r.failed.length ? { error: r.failed[0].reason } : {}),
+          ok: failed.length === 0,
+          uploaded,
+          unchanged,
+          failed: failed.length,
+          ...(failed.length ? { error: failed[0].reason } : {}),
         },
       })
-      log.info(`auto-replication after ${reason}: ${r.uploaded} uploaded, ${r.failed.length} failed`)
-      if (r.failed.length) {
+      log.info(
+        `auto-replication after ${reason}: push ${r.push.uploaded}, pull ${r.pull.downloaded}, ` +
+          `${failed.length} failed`,
+      )
+      if (failed.length) {
         sendAppToast({
           kind: 'warn',
-          title: m().replicaAutoFailedTitle(r.failed.length),
-          detail: m().replicaAutoFailedDetail(r.uploaded, r.failed[0].reason),
+          title: m().replicaAutoFailedTitle(failed.length),
+          detail: m().replicaAutoFailedDetail(uploaded, failed[0].reason),
         })
       }
     } catch (e) {

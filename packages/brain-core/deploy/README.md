@@ -91,7 +91,8 @@ on `/healthz`, or the panel at `/admin` (Stan / Silnik).
 | `/healthz` | optional | Health. Verdict public; reasons and counts need a token. |
 | `/mcp` | **required** | The MCP endpoint. Point agents here. |
 | `/mcp/activity` | **required** | Last tool call — echoes query text, so it is gated. |
-| `/sync/plan`, `/sync/file`, `/sync/reindex` | **admin** on a vault this host owns, any token on a replica | Write intake. Where the desktop puts what it distils. |
+| `/sync/plan`, `/sync/file`, `/sync/reindex` | **admin** on a vault this host owns, any token on a replica | Write intake (push). |
+| `/sync/manifest`, `/sync/fetch` | any valid token | Read surface for pull — client runs `planSync` locally. |
 
 Everything else 404s, including `/.well-known/*` and `/register` — some MCP
 clients probe those for OAuth and stall on anything but a clean 404.

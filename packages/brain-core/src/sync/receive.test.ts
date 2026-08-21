@@ -159,10 +159,80 @@ describe('applyFile', () => {
     await expect(readFile(join(root, 'sessions/x.md.sync-tmp'), 'utf8')).rejects.toThrow()
   })
 
-  it('overwrites an older copy of the same note', async () => {
+  it('leaves an older copy in place and writes the incoming under a suffix', async () => {
     await put('sessions/x.md', 'old')
     const body = Buffer.from('new', 'utf8')
-    await applyFile({ vaultRoot: root, path: 'sessions/x.md', content: body, sha256: sha256(body) })
-    expect(await readFile(join(root, 'sessions/x.md'), 'utf8')).toBe('new')
+    const r = await applyFile({
+      vaultRoot: root,
+      path: 'sessions/x.md',
+      content: body,
+      sha256: sha256(body),
+    })
+    expect(r).toMatchObject({
+      ok: true,
+      path: 'sessions/x-2.md',
+      conflict: { kept: 'sessions/x.md', wrote: 'sessions/x-2.md' },
+    })
+    expect(await readFile(join(root, 'sessions/x.md'), 'utf8')).toBe('old')
+    expect(await readFile(join(root, 'sessions/x-2.md'), 'utf8')).toBe('new')
+  })
+
+  it('is a no-op when the content hash already matches', async () => {
+    await put('sessions/x.md', 'same')
+    const body = Buffer.from('same', 'utf8')
+    const r = await applyFile({
+      vaultRoot: root,
+      path: 'sessions/x.md',
+      content: body,
+      sha256: sha256(body),
+    })
+    expect(r).toMatchObject({ ok: true, unchanged: true, path: 'sessions/x.md' })
+  })
+})
+
+describe('distill-ledger set-union on apply', () => {
+  const ledger = (ids: string[]) =>
+    JSON.stringify(
+      {
+        schemaVersion: 2,
+        owners: {
+          default: {
+            processed: Object.fromEntries(ids.map((id) => [id, '2026-01-01T00:00:00.000Z'])),
+          },
+        },
+      },
+      null,
+      2,
+    )
+
+  it('unions ids instead of replacing the local ledger', async () => {
+    await put('state/distill-ledger.json', ledger(['aaa', 'bbb']))
+    const incoming = Buffer.from(ledger(['bbb', 'ccc']), 'utf8')
+    const r = await applyFile({
+      vaultRoot: root,
+      path: 'state/distill-ledger.json',
+      content: incoming,
+      sha256: sha256(incoming),
+    })
+    expect(r).toMatchObject({ ok: true, ledgerMerged: true })
+    const parsed = JSON.parse(await readFile(join(root, 'state/distill-ledger.json'), 'utf8'))
+    expect(Object.keys(parsed.owners.default.processed).sort()).toEqual(['aaa', 'bbb', 'ccc'])
+  })
+})
+
+describe('planSync pull shape', () => {
+  it('wants only peer files that differ locally (resume after partial pull)', async () => {
+    await put('sessions/have.md', 'identical')
+    await put('sessions/stale.md', 'old')
+    const plan = await planSync({
+      vaultRoot: root,
+      manifest: [
+        entry('sessions/have.md', 'identical'),
+        entry('sessions/stale.md', 'fresh'),
+        entry('sessions/peer-only.md', 'from peer'),
+      ],
+    })
+    expect(plan.unchanged).toBe(1)
+    expect(plan.wanted.sort()).toEqual(['sessions/peer-only.md', 'sessions/stale.md'])
   })
 })

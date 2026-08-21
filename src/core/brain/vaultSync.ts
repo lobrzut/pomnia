@@ -1,46 +1,38 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+﻿// SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
 /**
- * Sending half of vault replication: push this machine's vault to a replica.
+ * Surface sync client: push and pull the knowledge layer (~12 MB), not blobs.
  *
- * Until now "the server has a copy" meant a tar somebody ran once. That is
- * fine for standing a replica up and useless afterwards — the copy starts
- * rotting the moment the next conversation is saved, and nothing says so.
+ * Push (existing): offer local manifest -> peer planSync -> upload wanted files.
+ * Pull (A1): fetch peer manifest -> local planSync -> download wanted files.
+ * Same handshake both ways — no separate protocol.
  *
- * Direction is deliberate and one-way. The desktop owns the vault (see
- * `state/vault-writer.json`), so it is the only side that can be right when
- * the two disagree. A replica that could push back would be able to resurrect
- * notes the owner deleted.
+ * Conflicts keep both versions (suffix incoming). distill-ledger.json merges as
+ * set-union of ids inside applyFile on whichever side receives it.
  *
- * The manifest handshake exists because the alternative does not get used:
- * uploading 2000 files to discover three changed is a button nobody presses
- * twice. Blobs are excluded — 2.51 GB the replica's search never reads.
+ * Interrupted runs resume: the next plan only wants paths whose content hash
+ * still differs, so completed transfers are not re-sent.
  */
 
-import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 
+import {
+  applyFile,
+  buildSyncManifest,
+  planSync,
+  sha256,
+  SYNC_DIRS,
+  SYNC_ROOT_FILES,
+  type ApplyResult,
+  type ManifestEntry,
+} from '../../../packages/brain-core/src/sync/index.js'
 import { log } from '../log.js'
 
 /** Mirrors brain-core's SYNC_DIRS — the replica rejects anything else anyway. */
-export const SYNCED_DIRS = [
-  'sessions',
-  'distilled',
-  'notes',
-  'digests',
-  'skills',
-  'chats',
-  'state',
-] as const
+export const SYNCED_DIRS = SYNC_DIRS
 
-export const SYNCED_ROOT_FILES = ['USER.md', 'AGENTS.md'] as const
-
-const ALLOWED_EXT = /\.(md|markdown|txt|json|ya?ml)$/i
-
-/** Mirrors brain-core's MACHINE_STATE_FILES — see safeVaultPath. */
-const MACHINE_STATE_FILES = new Set(['state/vault-writer.json'])
-const MAX_FILE_BYTES = 8 * 1024 * 1024
+export const SYNCED_ROOT_FILES = SYNC_ROOT_FILES
 
 export interface SyncManifestEntry {
   path: string
@@ -59,71 +51,32 @@ export interface VaultSyncResult {
   /** Present on the replica, absent here. Reported only; nothing is deleted. */
   extraOnReplica: string[]
   bytesUploaded: number
+  /** Peer kept its file and wrote ours under a suffix. */
+  conflicts: Array<{ kept: string; wrote: string }>
 }
 
-function sha256(buf: Buffer): string {
-  return createHash('sha256').update(buf).digest('hex')
+export interface VaultPullResult {
+  unchanged: number
+  downloaded: number
+  failed: Array<{ path: string; reason: string }>
+  skipped: Array<{ path: string; reason: string }>
+  /** Present here, absent on the peer — reported; never deleted. */
+  extraLocal: string[]
+  bytesDownloaded: number
+  conflicts: Array<{ kept: string; wrote: string }>
+  ledgerMerged: boolean
 }
 
-/** Walk the synced subset of a vault, newest-relevant files included. */
+export interface VaultSurfaceSyncResult {
+  push: VaultSyncResult
+  pull: VaultPullResult
+}
+
+/** Walk the synced subset of a vault (shared with brain-core). */
 export async function buildVaultManifest(
   vaultRoot: string,
 ): Promise<{ entries: SyncManifestEntry[]; skipped: Array<{ path: string; reason: string }> }> {
-  const entries: SyncManifestEntry[] = []
-  const skipped: Array<{ path: string; reason: string }> = []
-
-  const consider = async (abs: string, rel: string): Promise<void> => {
-    if (!ALLOWED_EXT.test(rel)) return
-    // Never offer the ownership marker. state/ replicates because the
-    // distillation ledger belongs with the notes; this file in the same folder
-    // records which machine owns the vault, and sending it would overwrite the
-    // receiver's record of owning its own — leaving a server that reads someone
-    // else's name and demotes itself to read-only over a corpus it holds.
-    //
-    // The replica refuses it too, as 'machine-state'. Refused twice on purpose:
-    // this one keeps it out of the manifest, so it is not reported as a
-    // rejection on every single sync, and a rejection list people learn to
-    // ignore is a rejection list that hides the next real one.
-    if (MACHINE_STATE_FILES.has(rel)) return
-    let stat
-    try {
-      stat = await fs.stat(abs)
-    } catch (e) {
-      // Absent is not skipped. A vault with no AGENTS.md is an ordinary vault,
-      // and listing it as a problem trains people to ignore the problem list.
-      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
-        skipped.push({ path: rel, reason: (e as Error).message })
-      }
-      return
-    }
-    if (stat.size > MAX_FILE_BYTES) {
-      skipped.push({ path: rel, reason: `${(stat.size / 1024 / 1024).toFixed(1)} MB — over the 8 MB limit` })
-      return
-    }
-    try {
-      entries.push({ path: rel, sha256: sha256(await fs.readFile(abs)), size: stat.size })
-    } catch (e) {
-      skipped.push({ path: rel, reason: (e as Error).message })
-    }
-  }
-
-  const walk = async (dirRel: string): Promise<void> => {
-    let items
-    try {
-      items = await fs.readdir(join(vaultRoot, dirRel), { withFileTypes: true })
-    } catch {
-      return // a vault without `chats/` is normal, not an error
-    }
-    for (const it of items) {
-      const rel = `${dirRel}/${it.name}`
-      if (it.isDirectory()) await walk(rel)
-      else await consider(join(vaultRoot, rel), rel)
-    }
-  }
-
-  for (const d of SYNCED_DIRS) await walk(d)
-  for (const f of SYNCED_ROOT_FILES) await consider(join(vaultRoot, f), f)
-  return { entries, skipped }
+  return buildSyncManifest(vaultRoot)
 }
 
 async function post(
@@ -151,20 +104,6 @@ async function post(
   if (!r.ok) {
     const p = parsed as { error?: string; hint?: string; detail?: string }
     const err = p?.error ?? ''
-    // Ownership refusals in plain language — a bare "409" reads as a network
-    // glitch, and the codes are jargon for "you pushed at something that will
-    // not take it".
-    //
-    // Plain language leads, but the code stays in the message and on the error.
-    // It is what someone greps out of a log when a user reports this, and the
-    // wording above it is ours to reword at any time. The server's hint is
-    // deliberately not the whole message — it is remote text, so it follows our
-    // sentence rather than replacing it.
-    //
-    // Both codes are handled because both are live. `write_needs_admin` is what
-    // a current server says; `not_a_replica` is what every server before it
-    // said, and the desktop updates itself from GitHub while a server is
-    // upgraded by hand, so talking to an older one is the ordinary case.
     const refusal: Record<string, string> = {
       write_needs_admin:
         'The target owns this vault, so writing to it needs an admin token — reissue the Connect token with --role admin.',
@@ -183,9 +122,13 @@ async function post(
   return parsed
 }
 
+function normalizeBase(target: string): string {
+  return target.replace(/\/+$/, '').replace(/\/mcp$/, '')
+}
+
 export interface VaultSyncOptions {
   vaultRoot: string
-  /** Replica base URL, e.g. https://brain.example.com */
+  /** Peer base URL, e.g. https://brain.example.com */
   target: string
   token?: string
   onProgress?: (done: number, total: number, path: string) => void
@@ -193,14 +136,13 @@ export interface VaultSyncOptions {
 }
 
 /**
- * Replicate the vault to `target`.
+ * Push this vault's surface to `target`.
  *
- * Never deletes. Files present on the replica and absent here come back as
- * `extraOnReplica` for a human to look at — a sync that prunes on a manifest
- * it cannot fully verify is a sync that can destroy the only copy.
+ * Never deletes. Files present on the peer and absent here come back as
+ * `extraOnReplica`. Content-hash resume: already-identical files are unchanged.
  */
 export async function syncVaultToReplica(opts: VaultSyncOptions): Promise<VaultSyncResult> {
-  const base = opts.target.replace(/\/+$/, '').replace(/\/mcp$/, '')
+  const base = normalizeBase(opts.target)
   const { entries, skipped } = await buildVaultManifest(opts.vaultRoot)
 
   const plan = (await post(base, '/sync/plan', opts.token, { manifest: entries, reportExtras: true }, 120_000)) as {
@@ -217,56 +159,151 @@ export async function syncVaultToReplica(opts: VaultSyncOptions): Promise<VaultS
     skipped,
     extraOnReplica: plan.extra ?? [],
     bytesUploaded: 0,
+    conflicts: [],
   }
 
   const byPath = new Map(entries.map((e) => [e.path, e]))
   let done = 0
   for (const rel of plan.wanted) {
     if (opts.signal?.aborted) {
-      result.failed.push({ path: rel, reason: 'anulowane' })
+      result.failed.push({ path: rel, reason: 'cancelled' })
       break
     }
     const entry = byPath.get(rel)
     if (!entry) {
-      // The replica asked for something we never offered.
       result.failed.push({ path: rel, reason: 'not in local manifest' })
       continue
     }
     opts.onProgress?.(++done, plan.wanted.length, rel)
     try {
       const content = await fs.readFile(join(opts.vaultRoot, rel))
-      // Re-hash what we are actually sending rather than trusting the manifest:
-      // the file may have changed between building the manifest and getting here.
-      await post(
+      const applied = (await post(
         base,
         '/sync/file',
         opts.token,
         { path: rel, sha256: sha256(content), contentBase64: content.toString('base64') },
         60_000,
-      )
-      result.uploaded++
-      result.bytesUploaded += content.length
+      )) as ApplyResult
+      if (!applied.ok) {
+        result.failed.push({ path: rel, reason: applied.reason })
+        continue
+      }
+      if (applied.conflict) result.conflicts.push(applied.conflict)
+      if (!applied.unchanged) {
+        result.uploaded++
+        result.bytesUploaded += content.length
+      } else {
+        result.unchanged++
+      }
     } catch (e) {
       result.failed.push({ path: rel, reason: (e as Error).message })
     }
   }
 
-  // Files a replica holds but never indexed are files no agent can find, so
-  // the upload is only half the job. Fire-and-forget: the replica reindexes in
-  // the background and the count lands in its log, not in this result.
-  if (result.uploaded > 0) {
+  if (result.uploaded > 0 || result.conflicts.length > 0) {
     try {
       await post(base, '/sync/reindex', opts.token, {}, 15_000)
     } catch (e) {
-      result.failed.push({ path: '(reindeks repliki)', reason: (e as Error).message })
+      result.failed.push({ path: '(replica reindex)', reason: (e as Error).message })
     }
   }
 
   log.info(
-    `vault sync → ${base}: ${result.uploaded} uploaded, ${result.unchanged} unchanged, ` +
-      `${result.failed.length} failed, ${result.extraOnReplica.length} extra on replica`,
+    `vault sync push → ${base}: ${result.uploaded} uploaded, ${result.unchanged} unchanged, ` +
+      `${result.conflicts.length} conflicts, ${result.failed.length} failed, ` +
+      `${result.extraOnReplica.length} extra on replica`,
   )
   return result
+}
+
+/**
+ * Pull the peer's surface into this vault using the same planSync handshake.
+ *
+ * 1. Fetch peer manifest (path + content hash)
+ * 2. planSync locally → wanted
+ * 3. fetch + applyFile one path at a time (conflict suffix / ledger union)
+ */
+export async function pullVaultFromPeer(opts: VaultSyncOptions): Promise<VaultPullResult> {
+  const base = normalizeBase(opts.target)
+  const remote = (await post(base, '/sync/manifest', opts.token, {}, 120_000)) as {
+    entries: ManifestEntry[]
+    skipped?: Array<{ path: string; reason: string }>
+  }
+  const manifest = Array.isArray(remote.entries) ? remote.entries : []
+
+  const plan = await planSync({
+    vaultRoot: opts.vaultRoot,
+    manifest,
+    scanDirs: SYNC_DIRS,
+  })
+
+  const result: VaultPullResult = {
+    unchanged: plan.unchanged,
+    downloaded: 0,
+    failed: plan.rejected.map((r) => ({ path: r.path, reason: `local refused: ${r.reason}` })),
+    skipped: remote.skipped ?? [],
+    extraLocal: plan.extra,
+    bytesDownloaded: 0,
+    conflicts: [],
+    ledgerMerged: false,
+  }
+
+  let done = 0
+  for (const rel of plan.wanted) {
+    if (opts.signal?.aborted) {
+      result.failed.push({ path: rel, reason: 'cancelled' })
+      break
+    }
+    opts.onProgress?.(++done, plan.wanted.length, rel)
+    try {
+      const fetched = (await post(base, '/sync/fetch', opts.token, { path: rel }, 60_000)) as {
+        path: string
+        sha256: string
+        contentBase64: string
+        size: number
+      }
+      const content = Buffer.from(fetched.contentBase64, 'base64')
+      const applied = await applyFile({
+        vaultRoot: opts.vaultRoot,
+        path: fetched.path ?? rel,
+        content,
+        sha256: fetched.sha256,
+      })
+      if (!applied.ok) {
+        result.failed.push({ path: rel, reason: applied.reason })
+        continue
+      }
+      if (applied.conflict) result.conflicts.push(applied.conflict)
+      if (applied.ledgerMerged) result.ledgerMerged = true
+      if (applied.unchanged) {
+        result.unchanged++
+      } else {
+        result.downloaded++
+        result.bytesDownloaded += content.length
+      }
+    } catch (e) {
+      result.failed.push({ path: rel, reason: (e as Error).message })
+    }
+  }
+
+  log.info(
+    `vault sync pull ← ${base}: ${result.downloaded} downloaded, ${result.unchanged} unchanged, ` +
+      `${result.conflicts.length} conflicts, ${result.failed.length} failed, ` +
+      `${result.extraLocal.length} extra local`,
+  )
+  return result
+}
+
+/**
+ * Bidirectional surface sync: pull then push.
+ *
+ * Pull first so local gains peer notes (and ledger ids) before offering ours.
+ * Manual Connect button and post-distill auto-sync both use this.
+ */
+export async function syncVaultSurface(opts: VaultSyncOptions): Promise<VaultSurfaceSyncResult> {
+  const pull = await pullVaultFromPeer(opts)
+  const push = await syncVaultToReplica(opts)
+  return { pull, push }
 }
 
 /** Relative path in POSIX form, for callers that have an absolute one. */
