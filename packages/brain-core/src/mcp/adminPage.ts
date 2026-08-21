@@ -361,8 +361,9 @@ ${brandSkyHtml()}
       </p>
       <table><tbody id="vault-info"></tbody></table>
       <div id="vault-tech"></div>
+      <p id="claim-hint" class="lead" hidden></p>
       <div class="row">
-        <button id="claim" class="danger" data-i18n="claimBtn" title="">Przejmij własność</button>
+        <button id="claim" class="danger" hidden data-i18n="claimBtn" title="">Przejmij własność</button>
       </div>
       <div id="vault-msg"></div>
     </section>
@@ -429,9 +430,12 @@ ${brandSkyHtml()}
       behaviourLabel: 'Nazwa tej instancji',
       behaviourLabelHint: 'Jak serwer się przedstawia przy przejęciu sejfu.',
       claimBtn: 'Przejmij własność',
-      claimOwned: 'Ten serwer już zapisuje do tego sejfu.',
-      claimPinned: 'Ten serwer jest na stałe tylko do odczytu — nie da się przejąć z panelu.',
+      claimOwned: 'Ten serwer już zapisuje do tego sejfu — przejmowanie nie jest potrzebne.',
+      claimPinned:
+        'Żeby ten serwer zapisywał, zdejmij tryb tylko-odczyt w konfiguracji usługi (--read-only / BRAIN_READ_ONLY) i zrestartuj. Potem: brain-core --claim-vault (nie z panelu, póki flaga trzyma RO).',
       claimReady: 'Przejmij zapis od innej instancji (zsynchronizuj ją najpierw).',
+      claimHeld:
+        'Inna instancja trzyma zapis. Ten host nie jest przypięty RO — możesz przejąć świadomie (sync najpierw).',
       vaultLead: 'Tylko jedna instancja może zapisywać naraz.',
       vaultForYou: 'Dla Ciebie',
       vaultOnServer: 'Na serwerze',
@@ -498,9 +502,12 @@ ${brandSkyHtml()}
       behaviourLabel: 'This instance’s name',
       behaviourLabelHint: 'How the server introduces itself when it claims the vault.',
       claimBtn: 'Take ownership',
-      claimOwned: 'This server already writes to this vault.',
-      claimPinned: 'This server is permanently read-only — cannot claim from the panel.',
+      claimOwned: 'This server already writes to this vault — claiming is not needed.',
+      claimPinned:
+        'To let this server write, remove read-only from the unit (--read-only / BRAIN_READ_ONLY) and restart. Then: brain-core --claim-vault (not from the panel while the flag pins RO).',
       claimReady: 'Take write ownership from the other instance (sync it first).',
+      claimHeld:
+        'Another instance holds the write lock. This host is not pinned RO — you can claim deliberately (sync first).',
       vaultLead: 'Only one instance may write at a time.',
       vaultForYou: 'For you',
       vaultOnServer: 'On the server',
@@ -1090,20 +1097,47 @@ ${brandSkyHtml()}
       }
     }
     $('claim').disabled = v.writable || v.readOnlyFlag
+    // ready = can actually succeed from the panel (not owner, not pinned RO).
     const state = v.readOnlyFlag ? 'pinned' : v.writable ? 'owned' : 'ready'
     $('claim').dataset.claimState = state
-    paintClaimTitle(state)
+    paintClaim(state)
+  }
+
+  /**
+   * Truth in the Sejf tab: never show a disabled red "claim" that cannot work.
+   * Button only when POST /admin/vault/claim would actually take ownership.
+   */
+  function paintClaim(state) {
+    const btn = $('claim')
+    const hint = $('claim-hint')
+    if (!btn) return
+    btn.dataset.claimState = state
+    if (state === 'ready') {
+      btn.hidden = false
+      btn.disabled = false
+      btn.title = t('claimReady')
+      if (hint) {
+        hint.hidden = false
+        hint.textContent = t('claimHeld')
+      }
+    } else {
+      btn.hidden = true
+      btn.disabled = true
+      btn.title = ''
+      if (hint) {
+        hint.hidden = false
+        hint.textContent = state === 'pinned' ? t('claimPinned') : t('claimOwned')
+      }
+    }
   }
 
   function paintClaimTitle(state) {
-    const btn = $('claim')
-    if (!btn) return
-    btn.title = state === 'pinned' ? t('claimPinned')
-      : state === 'owned' ? t('claimOwned')
-      : t('claimReady')
+    paintClaim(state)
   }
 
   async function claim() {
+    const btn = $('claim')
+    if (!btn || btn.hidden || btn.disabled) return
     if (!window.confirm(
       'Przejąć własność vaultu?\\n\\n' +
       'Dotychczasowy właściciel natychmiast przestanie móc zapisywać. ' +

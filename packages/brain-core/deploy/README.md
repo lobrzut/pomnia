@@ -189,6 +189,16 @@ every MCP client on the network, and those must be able to read and to save
 conversations, not to rewrite the corpus everyone reads from. A replica keeps
 the lower bar: any valid token, because a bad push to a copy costs a resync.
 
+## Vault claim from the panel
+
+`POST /admin/vault/claim` only succeeds when this host is **not** pinned
+(`--read-only` / `BRAIN_READ_ONLY`) and is **not** already the writer. The Sejf
+tab shows the red button **only in that case**. If the host already owns the
+vault, or is pinned read-only (typical Linux replica), the panel shows a plain
+status line — never a disabled danger button that cannot work. Pinned RO needs
+a unit/env change + restart (then `brain-core --claim-vault` if you still want
+CLI takeover).
+
 ## Getting a vault onto it
 
 From Pomnia Desktop: **Connect → push changes to the server**. It sends only

@@ -41,12 +41,16 @@ describe('the panel script', () => {
     const script = inlineScript()
     // Every id the script reaches for must exist in the markup, and every
     // button the markup declares must be reachable from the script.
-    for (const id of ['login-form', 'logout', 'adduser', 'save-behaviour', 'save-engine', 'probe-ollama', 'add', 'claim', 'refresh', 'dash-refresh', 'tiles', 'vault-banner', 'sync-checks', 'sync-conflicts']) {
+    for (const id of ['login-form', 'logout', 'adduser', 'save-behaviour', 'save-engine', 'probe-ollama', 'add', 'claim', 'claim-hint', 'refresh', 'dash-refresh', 'tiles', 'vault-banner', 'sync-checks', 'sync-conflicts']) {
       expect(page, `markup is missing #${id}`).toContain(`id="${id}"`)
       expect(script, `script never touches #${id}`).toContain(`'${id}'`)
     }
     expect(script).toContain('/admin/health')
     expect(page).toContain('/status')
+    // Claim CTA starts hidden — only paintClaim('ready') unhides it.
+    expect(page).toMatch(/id="claim"[^>]*\bhidden\b/)
+    expect(script).toContain("state === 'ready'")
+    expect(script).toContain('btn.hidden = false')
   })
 
   it('reaches every tab section the nav offers', () => {
