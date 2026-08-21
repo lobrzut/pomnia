@@ -62,6 +62,8 @@ describe('collectHealth', () => {
       archiveLastAt: null,
     })
     expect(h.distill).toEqual({ enabled: false, runnable: false, phase: 'idle', model: '' })
+    expect(h.ollamaRuntime).toBeDefined()
+    expect(h.ollamaRuntime.accelerator).toBeTruthy()
   })
 
   /**
@@ -157,6 +159,8 @@ describe('redactHealth', () => {
     expect(r.embed.model).toBe('')
     expect(r.distill.model).toBe('')
     expect(r.sync.lastReceivedAt).toBeNull()
+    expect(r.ollamaRuntime.running).toEqual([])
+    expect(r.ollamaRuntime.accelerator).toBe(h.ollamaRuntime.accelerator)
   })
 })
 

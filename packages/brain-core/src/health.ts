@@ -31,6 +31,10 @@ import { join } from 'node:path'
 
 import type Database from 'better-sqlite3'
 
+import {
+  probeOllamaRuntime,
+  type OllamaRuntimeSnapshot,
+} from './ollama/runtime.js'
 import type { EmbedBackendName, EmbedClient } from './rag/embed.js'
 import type { SyncHealthSnapshot } from './sync/status.js'
 
@@ -142,6 +146,11 @@ export interface HealthReport {
     /** Chat model id — redacted on public /healthz. */
     model: string
   }
+  /**
+   * Ollama /api/ps honesty for Silnik. Public: accelerator + summary only
+   * (no model list on anonymous — tags can hint at private stacks).
+   */
+  ollamaRuntime: OllamaRuntimeSnapshot
 }
 
 /**
@@ -180,6 +189,12 @@ export function redactHealth(h: HealthReport): HealthReport {
       runnable: h.distill.runnable,
       phase: h.distill.phase,
       model: '',
+    },
+    ollamaRuntime: {
+      reachable: h.ollamaRuntime.reachable,
+      accelerator: h.ollamaRuntime.accelerator,
+      summary: h.ollamaRuntime.summary,
+      running: [],
     },
     checks: {
       db: bare(h.checks.db),
@@ -237,6 +252,11 @@ export async function collectHealth(opts: {
   sync?: SyncHealthSnapshot
   /** Distill worker snapshot; omit → feature-off idle. */
   distill?: { enabled: boolean; runnable: boolean; phase: string; model: string }
+  /**
+   * Optional Ollama base URL for /api/ps. Defaults to embedder.config.ollamaUrl
+   * when backend is ollama. Empty → skip probe (fastembed appliance).
+   */
+  ollamaUrl?: string
 }): Promise<HealthReport> {
   let db: Check = { state: 'ok' }
   let index: Check = { state: 'ok' }
@@ -286,6 +306,19 @@ export async function collectHealth(opts: {
   const model = opts.embedder?.config.modelId ?? ''
   const embedReady = effectiveEmbed.state === 'ok'
 
+  const ollamaUrl =
+    opts.ollamaUrl ??
+    (backend === 'ollama' ? (opts.embedder?.config.ollamaUrl ?? '') : '')
+  const ollamaRuntime =
+    backend === 'fastembed' && !opts.ollamaUrl
+      ? {
+          reachable: false,
+          accelerator: 'n/a' as const,
+          summary: 'Embedder lokalny (ONNX) — bez Ollamy na ścieżce search.',
+          running: [],
+        }
+      : await probeOllamaRuntime(ollamaUrl)
+
   const status = worstOf([db, index, vault, disk, effectiveEmbed])
   return {
     ok: status !== 'down',
@@ -306,5 +339,6 @@ export async function collectHealth(opts: {
     distill: opts.distill
       ? { ...opts.distill }
       : { enabled: false, runnable: false, phase: 'idle', model: '' },
+    ollamaRuntime,
   }
 }
