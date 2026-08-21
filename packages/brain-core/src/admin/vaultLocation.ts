@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
 /**
- * Human-facing vault location for /admin → Vault.
+ * Human-facing vault location for /admin → Sejf.
  *
- * Operators (and helluk) need "where is my memory", not only container bind
- * paths. Compose sets POMNIA_VAULT_LABEL / POMNIA_VAULT_SMB; we never invent
- * Sejf when the bind is the e2e test folder.
- *
- * Host vendor is optional via POMNIA_HOST_LABEL (QNAP | Synology | PC | …).
- * Empty = vendor-agnostic “Na hoście Pomni”.
+ * Env hints (POMNIA_VAULT_SMB / HOST_PATH / LABEL) are optional. When empty or
+ * junk (migration notes, non-UNC placeholders), the UI builds from real paths
+ * alone — never invents "e2e", C:\Vault, or "ustaw Sejf".
  */
 
 export interface VaultLocationFields {
@@ -16,59 +13,53 @@ export interface VaultLocationFields {
   path: string
   /** Host bind path when it differs from path (operator hint). */
   hostPath: string | null
-  /** Short label from POMNIA_VAULT_LABEL (e.g. "katalog testowy (e2e)"). */
+  /** Optional short label from POMNIA_VAULT_LABEL (sanitized). */
   label: string | null
-  /** One Polish sentence: where the memory actually lives. */
+  /**
+   * Optional one-line override from POMNIA_VAULT_WHERE only.
+   * Prefer letting the panel compose from smbPath / hostPath when unset.
+   */
   where: string | null
-  /** Windows / SMB hint from POMNIA_VAULT_SMB or VAULT_SMB_UNC. */
+  /** Real Windows/SMB UNC from POMNIA_VAULT_SMB or VAULT_SMB_UNC (else null). */
   smbPath: string | null
 }
 
-/** Vendor-agnostic default; override with POMNIA_HOST_LABEL. */
-export function hostPlace(hostLabel: string | null | undefined): string {
-  const t = hostLabel?.trim()
-  if (!t) return 'Na hoście Pomni'
-  return `Na ${t}`
+/** True UNC share path — not a parenthetical note. */
+export function looksLikeUnc(s: string): boolean {
+  return /^\\\\[^\\]+\\/.test(s) || /^\/\/[^/]+\//.test(s)
 }
 
-function looksLikeUnc(s: string): boolean {
-  return /^\\\\[^\\]/.test(s) || /^\/\/[^/]/.test(s)
+/** Drop migration / placeholder labels that must never reach product UI. */
+export function sanitizeVaultLabel(raw: string | null | undefined): string | null {
+  const t = raw?.trim() || null
+  if (!t) return null
+  if (/e2e/i.test(t)) return null
+  if (/ustaw\s+Sejf/i.test(t)) return null
+  if (/katalog\s+testowy/i.test(t)) return null
+  if (/C:\\Vault/i.test(t)) return null
+  if (/^\(.*\)$/.test(t)) return null
+  return t
 }
 
-function looksLikeE2e(hostPath: string | null, label: string | null): boolean {
-  if (label && /e2e/i.test(label)) return true
-  if (hostPath && /pomnia-kvm\/vault|Container\/pomnia-kvm/i.test(hostPath)) return true
-  return false
+/** Keep only a real UNC; discard notes like "(tylko lokalny…)". */
+export function sanitizeSmbPath(raw: string | null | undefined): string | null {
+  const t = raw?.trim() || null
+  if (!t) return null
+  if (!looksLikeUnc(t)) return null
+  return t
 }
 
-function looksLikeSejf(hostPath: string | null, smbPath: string | null): boolean {
-  if (smbPath && looksLikeUnc(smbPath) && /Sejf/i.test(smbPath)) return true
-  if (hostPath && /Pomnia\/Sejf|\/Sejf\b/i.test(hostPath)) return true
-  return false
-}
-
-/** Build the one-sentence "where" line from env hints — never claim Sejf for e2e. */
+/**
+ * Optional prose override. Empty when unset — the panel shows paths instead.
+ * Never synthesizes e2e / Desktop / Sejf comparison copy.
+ */
 export function deriveVaultWhere(opts: {
   label: string | null
   smbPath: string | null
   hostPath: string | null
   hostLabel?: string | null
 }): string | null {
-  const { label, smbPath, hostPath } = opts
-  const place = hostPlace(opts.hostLabel)
-  if (looksLikeE2e(hostPath, label)) {
-    return (
-      `${place}, katalog testowy (e2e) — to nie vault z Windows (C:\\Vault)` +
-      ' i nie share produkcyjny (Sejf).'
-    )
-  }
-  if (looksLikeSejf(hostPath, smbPath)) {
-    const share = label && !/e2e/i.test(label) ? label : 'Pomnia\\Sejf'
-    return smbPath && looksLikeUnc(smbPath)
-      ? `${place}: share ${share} (${smbPath}).`
-      : `${place}: share ${share}.`
-  }
-  if (label) return `Lokalizacja: ${label}.`
+  void opts
   return null
 }
 
@@ -80,11 +71,10 @@ export function resolveVaultLocation(
   const hostHint =
     env.POMNIA_VAULT_HOST_PATH?.trim() || env.BRAIN_VAULT_HOST_PATH?.trim() || null
   const hostPath = hostHint && hostHint !== path ? hostHint : null
-  const label = env.POMNIA_VAULT_LABEL?.trim() || null
-  const smbPath = env.POMNIA_VAULT_SMB?.trim() || env.VAULT_SMB_UNC?.trim() || null
-  const hostLabel = env.POMNIA_HOST_LABEL?.trim() || null
+  const label = sanitizeVaultLabel(env.POMNIA_VAULT_LABEL)
+  const smbPath = sanitizeSmbPath(env.POMNIA_VAULT_SMB || env.VAULT_SMB_UNC)
   const whereExplicit = env.POMNIA_VAULT_WHERE?.trim() || null
-  const where =
-    whereExplicit || deriveVaultWhere({ label, smbPath, hostPath, hostLabel })
+  // Explicit override only — never invent product marketing from env heuristics.
+  const where = whereExplicit || null
   return { path, hostPath, label, where, smbPath }
 }

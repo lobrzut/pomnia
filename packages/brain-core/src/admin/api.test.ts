@@ -57,10 +57,9 @@ beforeEach(async () => {
       readOnlyFlag,
       path: '/var/lib/pomnia/vault',
       hostPath: '/share/Container/pomnia-kvm/vault',
-      label: 'katalog testowy (e2e)',
-      where:
-        'Na hoście Pomni, katalog testowy (e2e) — to nie vault z Windows (C:\\Vault) i nie share produkcyjny (Sejf).',
-      smbPath: '(tylko lokalny katalog kontenera - ustaw Sejf)',
+      label: null,
+      where: null,
+      smbPath: null,
     }),
     health: vi.fn(async () => ({
       ok: true,
@@ -187,14 +186,14 @@ describe('health', () => {
 })
 
 describe('vault', () => {
-  it('reports ownership and human vault location', async () => {
+  it('reports ownership and vault paths without e2e junk', async () => {
     expect((await call('GET', '/admin/vault')).body).toMatchObject({
       owner: 'Pomnia Desktop',
       path: '/var/lib/pomnia/vault',
       hostPath: '/share/Container/pomnia-kvm/vault',
-      label: 'katalog testowy (e2e)',
-      where: expect.stringMatching(/e2e/),
-      smbPath: expect.stringMatching(/ustaw Sejf/),
+      label: null,
+      where: null,
+      smbPath: null,
     })
   })
 
