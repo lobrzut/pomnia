@@ -229,7 +229,6 @@ ${brandSkyHtml()}
 
     <section class="card hidden" id="tab-engine">
       <h2 data-i18n="engineTitle">Silnik wyszukiwania</h2>
-      <p class="lead" data-i18n="engineLead">Skąd serwer bierze embeddingi — i kiedy przebudować indeks.</p>
       <div id="embed-status" class="msg" style="margin:0 0 1rem"></div>
       <label for="ollama" data-i18n="engineOllama">Adres Ollamy</label>
       <input id="ollama" type="url" spellcheck="false" placeholder="http://127.0.0.1:11434">
@@ -387,7 +386,6 @@ ${brandSkyHtml()}
       dashRecent: 'Ostatnie zapytania', refresh: 'Odśwież', save: 'Zapisz',
       statusTitle: 'Stan serwera',
       engineTitle: 'Silnik wyszukiwania',
-      engineLead: 'Skąd serwer bierze embeddingi — i kiedy przebudować indeks.',
       engineOllama: 'Adres Ollamy', engineModel: 'Model embeddingów',
       engineProbe: 'Sprawdź embedder', engineReindex: 'Przebuduj indeks',
       clientsTitle: 'Klienci',
@@ -428,8 +426,8 @@ ${brandSkyHtml()}
       vaultOwnerId: 'Id właściciela',
       vaultLabel: 'Etykieta',
       vaultBannerRw: 'Ten serwer zapisuje.',
-      vaultBannerOther: 'Inna instancja zapisuje.',
-      vaultBannerRo: 'Tylko odczyt.',
+      vaultBannerOther: 'Właściciel:',
+      vaultBannerRo: 'Tylko odczyt — ten host nie zapisuje.',
       tileFiles: 'plików w indeksie', tileChunks: 'fragmentów', tileWait: 'czeka na indeks',
       tileReq: 'zapytań / 24 h', tileClients: 'aktywnych klientów', tileUp: 'działa',
     },
@@ -447,7 +445,6 @@ ${brandSkyHtml()}
       dashRecent: 'Recent calls', refresh: 'Refresh', save: 'Save',
       statusTitle: 'Server status',
       engineTitle: 'Search engine',
-      engineLead: 'Where embeddings come from — and when to rebuild the index.',
       engineOllama: 'Ollama URL', engineModel: 'Embedding model',
       engineProbe: 'Probe embedder', engineReindex: 'Rebuild index',
       clientsTitle: 'Clients',
@@ -488,8 +485,8 @@ ${brandSkyHtml()}
       vaultOwnerId: 'Owner id',
       vaultLabel: 'Label',
       vaultBannerRw: 'This server writes.',
-      vaultBannerOther: 'Another instance writes.',
-      vaultBannerRo: 'Read-only.',
+      vaultBannerOther: 'Owner:',
+      vaultBannerRo: 'Read-only — this host does not write.',
       tileFiles: 'files in index', tileChunks: 'chunks', tileWait: 'waiting to index',
       tileReq: 'requests / 24 h', tileClients: 'active clients', tileUp: 'uptime',
     },
@@ -758,7 +755,7 @@ ${brandSkyHtml()}
       add(NAMES[key], STATE_PL[c.state] + (c.detail ? ' — ' + c.detail : ''))
     }
     const emb = h.checks.ollama
-    const embName = backend === 'fastembed' ? 'Embeddingi (fastembed / ONNX)' : 'Embeddingi (Ollama)'
+    const embName = backend === 'fastembed' ? 'Embeddingi (lokalne)' : 'Embeddingi (Ollama)'
     add(embName, STATE_PL[emb.state] + (emb.detail ? ' — ' + emb.detail : ''))
     paintEmbedStatus(h)
   }
@@ -771,9 +768,7 @@ ${brandSkyHtml()}
     const kind = c.state === 'ok' ? 'ok' : c.state === 'degraded' ? 'warn' : 'err'
     let label
     if (c.state === 'ok') {
-      label = backend === 'fastembed'
-        ? 'fastembed OK — ONNX nomic w procesie (Ollama nie jest wymagana)'
-        : 'Ollama OK — embeddingi dostępne'
+      label = backend === 'fastembed' ? 'Embedder OK (lokalny)' : 'Ollama OK'
     } else {
       label = (STATE_PL[c.state] || c.state) + (c.detail ? ' — ' + c.detail : '')
     }
@@ -790,9 +785,7 @@ ${brandSkyHtml()}
       const backend = h.embed?.backend || 'ollama'
       msg(box, c?.state === 'ok' ? 'ok' : 'warn',
         c?.state === 'ok'
-          ? (backend === 'fastembed'
-            ? 'Embedder lokalny (fastembed) gotowy — search bez Ollamy.'
-            : 'Ollama odpowiada; model embed gotowy.')
+          ? (backend === 'fastembed' ? 'Embedder lokalny gotowy.' : 'Ollama odpowiada.')
           : (c?.detail || 'Embedder niedostępny — search semantyczny będzie pusty.'))
     } catch (e) { msg(box, 'err', e.message) }
   }
@@ -971,7 +964,9 @@ ${brandSkyHtml()}
     } else {
       ban.className = 'banner ro'
       badge.textContent = t('vaultRo')
-      detail.textContent = v.owner ? t('vaultBannerOther') : t('vaultBannerRo')
+      detail.textContent = v.owner
+        ? (t('vaultBannerOther') + ' ' + v.owner)
+        : t('vaultBannerRo')
     }
   }
 
@@ -1004,6 +999,7 @@ ${brandSkyHtml()}
       if (v.path) lines.push(t('vaultInContainer') + ': ' + v.path)
       if (v.owner) lines.push(t('vaultOwnerId') + ': ' + v.owner)
       if (v.label) lines.push(t('vaultLabel') + ': ' + v.label)
+      if (v.readOnlyFlag) lines.push('Pinned: --read-only')
       if (lines.length) {
         const d = document.createElement('details')
         d.className = 'tech'
