@@ -213,7 +213,7 @@ async function addUserAndExit(config: BrainConfig, argv: string[]): Promise<neve
     process.exit(1)
   }
   console.error(`[brain-core] konto „${r.summary.username}" (${r.summary.role}) utworzone`)
-  console.error(`[brain-core] zaloguj się w panelu: http://${config.host}:${config.port}/admin`)
+  console.error(`[brain-core] zaloguj się w panelu: http://${config.host}:${config.port}/`)
   process.exit(0)
 }
 

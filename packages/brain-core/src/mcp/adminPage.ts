@@ -221,6 +221,16 @@ ${brandSkyHtml()}
     <section class="card hidden" id="tab-status">
       <h2 data-i18n="statusTitle">Stan serwera</h2>
       <table><tbody id="checks"></tbody></table>
+      <h3 style="margin:1.25rem 0 0.5rem;font-size:0.95rem" data-i18n="syncTitle">Synchronizacja</h3>
+      <table><tbody id="sync-checks"></tbody></table>
+      <table style="margin-top:0.75rem">
+        <thead><tr>
+          <th data-i18n="syncColPath">Plik</th>
+          <th data-i18n="syncColWrote">Wersja z sufiksem</th>
+          <th data-i18n="syncColWhen">Czas</th>
+        </tr></thead>
+        <tbody id="sync-conflicts"></tbody>
+      </table>
       <div class="row">
         <button id="refresh" class="ghost" data-i18n="refresh">Odśwież</button>
       </div>
@@ -358,7 +368,7 @@ ${brandSkyHtml()}
     </section>
   </div>
 
-  <footer>Pomnia · <a href="${esc(origin)}/">strona statusu</a> · AGPL-3.0</footer>
+  <footer>Pomnia · <a href="${esc(origin)}/status">strona statusu</a> · AGPL-3.0</footer>
 </main>
 
 <script>
@@ -386,6 +396,14 @@ ${brandSkyHtml()}
       dashActors: 'Kto pyta (ostatnie 24 h)',
       dashRecent: 'Ostatnie zapytania', refresh: 'Odśwież', save: 'Zapisz',
       statusTitle: 'Stan serwera',
+      syncTitle: 'Synchronizacja',
+      syncColPath: 'Plik',
+      syncColWrote: 'Wersja z sufiksem',
+      syncColWhen: 'Czas',
+      syncNone: 'Brak konfliktów od startu serwera.',
+      syncNever: 'nic jeszcze nie przyszło',
+      syncMode: 'tryb',
+      syncReceiveOnly: 'tylko przyjmuje (push)',
       engineTitle: 'Silnik wyszukiwania',
       engineLeadOllama: 'Ollama: embeddingi teraz; destylacja gdy ten serwer zapisuje (w toku).',
       engineLeadFast: 'Embeddingi lokalne (bez Ollamy). Destylacja poza tym appliance.',
@@ -447,6 +465,14 @@ ${brandSkyHtml()}
       dashActors: 'Who asked (last 24 h)',
       dashRecent: 'Recent calls', refresh: 'Refresh', save: 'Save',
       statusTitle: 'Server status',
+      syncTitle: 'Sync',
+      syncColPath: 'File',
+      syncColWrote: 'Suffixed version',
+      syncColWhen: 'When',
+      syncNone: 'No conflicts since server start.',
+      syncNever: 'nothing received yet',
+      syncMode: 'mode',
+      syncReceiveOnly: 'receive-only (push)',
       engineTitle: 'Search engine',
       engineLeadOllama: 'Ollama: embeddings now; distill when this server writes (in progress).',
       engineLeadFast: 'Local embeddings (no Ollama). Distill stays off this appliance.',
@@ -763,6 +789,45 @@ ${brandSkyHtml()}
     const embName = backend === 'fastembed' ? 'Embeddingi (lokalne)' : 'Embeddingi (Ollama)'
     add(embName, STATE_PL[emb.state] + (emb.detail ? ' — ' + emb.detail : ''))
     paintEmbedStatus(h)
+
+    const syncTb = $('sync-checks')
+    if (syncTb) {
+      syncTb.innerHTML = ''
+      const sadd = (k, v, cls) => {
+        const tr = document.createElement('tr')
+        const th = document.createElement('td'); th.textContent = k; th.style.color = 'var(--ink-faint)'
+        const td = document.createElement('td'); td.textContent = v; td.className = cls || 'mono'
+        tr.append(th, td); syncTb.appendChild(tr)
+      }
+      const s = h.sync || {}
+      sadd('Ostatni transfer', s.lastReceivedAt || t('syncNever'))
+      sadd('Peer', s.lastPeer || '—')
+      sadd('Pliki (ostatni transfer)', String(typeof s.filesReceived === 'number' ? s.filesReceived : 0), 'mono')
+      sadd('Konflikty (od startu)', String(typeof s.conflicts === 'number' ? s.conflicts : 0), 'mono')
+      sadd('Archiwum (ostatnie)', s.archiveLastAt || '—')
+      if (s.mode) sadd(t('syncMode'), s.mode === 'receive-only' ? t('syncReceiveOnly') : s.mode)
+      if (s.peer) sadd('Peer (config)', s.peer)
+      if (s.archiveTarget) sadd('Archive target (config)', s.archiveTarget)
+    }
+    const confBody = $('sync-conflicts')
+    if (confBody) {
+      const rows = Array.isArray(h.sync?.recentConflicts) ? h.sync.recentConflicts : []
+      if (!rows.length) {
+        confBody.innerHTML = '<tr><td colspan="3" style="color:var(--ink-faint)">' + t('syncNone') + '</td></tr>'
+      } else {
+        confBody.innerHTML = ''
+        for (const c of rows.slice(0, 50)) {
+          const tr = document.createElement('tr')
+          const a = document.createElement('td'); a.textContent = c.path || '—'; a.className = 'mono'
+          const b = document.createElement('td'); b.textContent = c.wrote || '—'; b.className = 'mono'
+          const d = document.createElement('td')
+          const ts = Date.parse(c.at)
+          d.textContent = Number.isFinite(ts) ? ago(ts) : (c.at || '—')
+          d.className = 'mono'
+          tr.append(a, b, d); confBody.appendChild(tr)
+        }
+      }
+    }
   }
 
   function paintEmbedStatus(h) {

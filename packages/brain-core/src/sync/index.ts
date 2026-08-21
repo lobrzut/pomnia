@@ -30,3 +30,11 @@ export {
   mergeDistillLedgerBytes,
   serializeDistillLedger,
 } from './ledgerMerge.js'
+
+export {
+  SyncIntakeTracker,
+  sanitizePeerLabel,
+  type SyncHealthSnapshot,
+  type SyncAdminSnapshot,
+  type SyncConflictRecord,
+} from './status.js'

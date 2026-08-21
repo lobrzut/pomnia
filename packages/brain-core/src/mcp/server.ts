@@ -42,6 +42,7 @@ import {
   readSyncFile,
   type ManifestEntry,
 } from '../sync/receive.js'
+import { SyncIntakeTracker, sanitizePeerLabel } from '../sync/status.js'
 import { MAX_BLOB_BYTES, BLOB_HASH_RE } from '../archive/paths.js'
 import {
   applyArchiveBlob,
@@ -259,6 +260,18 @@ export async function createBrainServer(
    * uptime true across a jump and follows the clock instead of fighting it.
    */
   const startedAt = (): number => Date.now() - Math.round(process.uptime() * 1000)
+  const syncIntake = new SyncIntakeTracker({
+    peer: config.syncPeer,
+    archiveTarget: config.archiveTarget,
+  })
+  /** Token name + remote host for /healthz lastPeer — never the bearer secret. */
+  const peerFrom = (auth: { name?: string }, req: IncomingMessage): string => {
+    const name =
+      auth.name && auth.name !== 'loopback' ? sanitizePeerLabel(auth.name) : null
+    const host = (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '') || null
+    if (name && host) return `${name}@${host}`
+    return name || host || 'unknown'
+  }
   const sessions = createSessionStore()
   /**
    * Failed logins per address. Separate from the bearer gate's counter: a
@@ -436,6 +449,7 @@ export async function createBrainServer(
                 ? describeOwner(vaultOwnership.owner)
                 : (ctx?.authoritativeVaultHint ?? null),
               startedAt: startedAt(),
+              sync: syncIntake.snapshot(),
             })
             const authed = await gate.peek(req)
             const h = authed ? health : redactHealth(health)
@@ -502,6 +516,7 @@ export async function createBrainServer(
                 ? describeOwner(vaultOwnership.owner)
                 : (ctx?.authoritativeVaultHint ?? null),
               startedAt: startedAt(),
+              sync: syncIntake.snapshot(),
             })
             // The verdict is public — a monitor has to be able to see a broken
             // server. The reasons are not: they name the vault path, the Ollama
@@ -528,11 +543,15 @@ export async function createBrainServer(
           })
           return
         }
-        // The panel itself is a static page and carries no data: everything it
-        // shows comes from /admin/* calls that need an admin token. Serving the
-        // shell unauthenticated means a wrong token shows a login, not a 401
-        // page nobody can act on.
-        if (pathOnly === '/admin' || pathOnly === '/admin/') {
+        // Panel shell (login gate + app). Served at `/` so a human opening the
+        // host lands on login, not a public status dump. `/admin` stays as the
+        // same shell for bookmarks and install.sh copy.
+        if (
+          pathOnly === '/' ||
+          pathOnly === '/index.html' ||
+          pathOnly === '/admin' ||
+          pathOnly === '/admin/'
+        ) {
           const host = req.headers.host ?? `${config.host}:${config.port}`
           const proto = String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0].trim()
           res.statusCode = 200
@@ -551,10 +570,10 @@ export async function createBrainServer(
           res.end(renderAdminPage(`${proto === 'https' ? 'https' : 'http'}://${host}`))
           return
         }
-        // A human typing the address gets a page instead of `not_found`.
+        // Public status page — moved off `/` so the homepage is login.
         // Exact paths only: `/.well-known/*` and `/register` must keep their
         // 404 (see below), and a prefix match would swallow them.
-        if (pathOnly === '/' || pathOnly === '/index.html') {
+        if (pathOnly === '/status' || pathOnly === '/status/') {
           const host = req.headers.host ?? `${config.host}:${config.port}`
           const proto = String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0].trim()
           void (async () => {
@@ -570,6 +589,7 @@ export async function createBrainServer(
                 ? describeOwner(vaultOwnership.owner)
                 : (ctx?.authoritativeVaultHint ?? null),
               startedAt: startedAt(),
+              sync: syncIntake.snapshot(),
             })
             // Per-check reasons name paths and models, so they follow the same
             // rule as every other detail: behind the token. The overall verdict
@@ -979,8 +999,8 @@ export async function createBrainServer(
               ...loc,
             }
           },
-          health: () =>
-            collectHealth({
+          health: async () => {
+            const h = await collectHealth({
               db: ctx?.db ?? null,
               embedder: ctx?.embedder ?? null,
               vaultRoot: ctx?.vaultRoot ?? '',
@@ -992,7 +1012,11 @@ export async function createBrainServer(
                 ? describeOwner(vaultOwnership.owner)
                 : (ctx?.authoritativeVaultHint ?? null),
               startedAt: startedAt(),
-            }),
+              sync: syncIntake.snapshot(),
+            })
+            // Conflict paths + peer/archive config — admin only, not public /healthz.
+            return { ...h, sync: syncIntake.adminSnapshot() }
+          },
         }
       }
 
@@ -1109,6 +1133,7 @@ export async function createBrainServer(
               reportExtras?: boolean
             }
             if (!Array.isArray(body?.manifest)) return json(400, { error: 'manifest_required' })
+            syncIntake.beginSurfaceTransfer(peerFrom(auth, req))
             const plan = await planSync({
               vaultRoot: ctx!.vaultRoot,
               manifest: body.manifest,
@@ -1131,6 +1156,12 @@ export async function createBrainServer(
             content: Buffer.from(body.contentBase64, 'base64'),
             sha256: body.sha256,
           })
+          if (result.ok) {
+            syncIntake.recordSurfaceFile({
+              peer: peerFrom(auth, req),
+              conflict: result.conflict,
+            })
+          }
           return json(result.ok ? 200 : 400, result)
         } catch (e) {
           return json(400, { error: 'bad_request', detail: (e as Error).message })
@@ -1227,9 +1258,11 @@ export async function createBrainServer(
                 incoming: body.manifest,
                 referencedBlobs: body.referencedBlobs,
               })
+              if (result.ok) syncIntake.recordArchive(peerFrom(auth, req))
               return json(result.ok ? 200 : 400, result)
             }
             const result = await applyArchiveManifest({ vaultRoot: ctx!.vaultRoot, content })
+            if (result.ok) syncIntake.recordArchive(peerFrom(auth, req))
             return json(result.ok ? 200 : 400, result)
           }
 
@@ -1252,6 +1285,7 @@ export async function createBrainServer(
               hash,
               content,
             })
+            if (result.ok) syncIntake.recordArchive(peerFrom(auth, req))
             return json(result.ok ? 200 : 400, result)
           }
 
@@ -1309,7 +1343,7 @@ export async function createBrainServer(
             // — the log is the only place that difference is visible.
             const a = http?.address()
             const bound = a && typeof a === 'object' ? `${a.address}:${a.port}` : `${config.host}:${config.port}`
-            console.error(`[brain-core] listening on http://${bound} (MCP /mcp · panel /admin)`)
+            console.error(`[brain-core] listening on http://${bound} (MCP /mcp · panel / · status /status)`)
             resolve()
           }
           http?.once('error', onErr)

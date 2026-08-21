@@ -80,6 +80,19 @@ export interface BrainConfig {
    */
   instanceLabel?: string
 
+  /**
+   * Notes-surface peer (URL or human label). Who pushes `/sync/*` here, or
+   * the peer this host would pull from later. Not the archive destination and
+   * not the old Desktop `deployTarget` SMB path.
+   */
+  syncPeer?: string
+
+  /**
+   * Blob archive destination (URL or path). TOR B `/archive/*` target — large
+   * CVB blobs, not markdown. Separate knob from `syncPeer` on purpose.
+   */
+  archiveTarget?: string
+
   /** Ollama base URL — reachable http endpoint. Unused when embedBackend is fastembed. */
   ollamaUrl: string
   /** Embedding model name known to Ollama (nomic-embed-text-v1.5 → dim 768). */
@@ -154,6 +167,8 @@ const KNOWN_FLAGS = new Set([
   '--read-only',
   '--vault-owner',
   '--instance-label',
+  '--sync-peer',
+  '--archive-target',
   '--tokens-file',
   // daemon.ts one-shot modes
   '--add-token',
@@ -200,6 +215,8 @@ export async function loadConfig(
   if (env.BRAIN_READ_ONLY === '1' || env.BRAIN_READ_ONLY === 'true') cfg.readOnly = true
   if (env.BRAIN_VAULT_OWNER) cfg.authoritativeVaultHint = env.BRAIN_VAULT_OWNER
   if (env.BRAIN_INSTANCE_LABEL) cfg.instanceLabel = env.BRAIN_INSTANCE_LABEL
+  if (env.BRAIN_SYNC_PEER) cfg.syncPeer = env.BRAIN_SYNC_PEER
+  if (env.BRAIN_ARCHIVE_TARGET) cfg.archiveTarget = env.BRAIN_ARCHIVE_TARGET
 
   // CLI overrides (simple, no getopt dependency)
   const dataDirBefore = cfg.dataDir
@@ -238,6 +255,8 @@ export async function loadConfig(
     else if (arg === '--read-only') cfg.readOnly = true
     else if (arg === '--vault-owner' && next) cfg.authoritativeVaultHint = next
     else if (arg === '--instance-label' && next) cfg.instanceLabel = next
+    else if (arg === '--sync-peer' && next) cfg.syncPeer = next
+    else if (arg === '--archive-target' && next) cfg.archiveTarget = next
     else if (arg === '--tokens-file' && next) {
       cfg.auth.tokensFile = next
       tokensFileExplicit = true

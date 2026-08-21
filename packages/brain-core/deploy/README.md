@@ -78,20 +78,67 @@ into a full one.
 without wiping `library.db`. See `docs/BRAIN-SERVER-EMBEDDED-MODEL.md`.
 
 Public `/healthz` without a Bearer token redacts index counts (`index: null`)
-and check *reasons*. The overall `status` and `embed.{backend,ready,model}`
-stay public. Full numbers: Bearer on `/healthz`, or the panel at `/admin`.
+and check *reasons*. The overall `status`, `embed.{backend,ready}` and the
+`sync` intake block stay public. Full numbers: Bearer on `/healthz`, or the
+panel at `/` (or `/admin`).
+
+## Pages (browser)
+
+| Path | What it is |
+| --- | --- |
+| `/` | **Login + panel** (same gold gate as `/admin`). Session cookie still scoped to `/admin` API routes. |
+| `/admin` | Alias of `/` — bookmarks and older install copy keep working. |
+| `/status` | Public status page (what used to be `/`). No login required. |
+| `/healthz` | JSON health probe (monitors / install.sh). |
 
 ## Endpoints
 
 | Path | Auth | What it is |
 | --- | --- | --- |
-| `/` | optional | Status page. Adds per-check detail when the request carries a token. |
-| `/healthz` | optional | Health. Verdict public; reasons and counts need a token. |
+| `/` | session for panel | Login gate; after login the admin panel. |
+| `/status` | optional | Public HTML status. Detail with Bearer. |
+| `/healthz` | optional | Health. Verdict + `sync` + `embed` public; reasons and index counts need a token. |
 | `/mcp` | **required** | The MCP endpoint. Point agents here. |
 | `/mcp/activity` | **required** | Last tool call — echoes query text, so it is gated. |
 | `/sync/plan`, `/sync/file`, `/sync/reindex` | **admin** on a vault this host owns, any token on a replica | Write intake (push). Where the desktop puts what it distils. |
 | `/sync/manifest`, `/sync/fetch` | any valid token | Read surface for pull — client runs `planSync` locally. |
 | `/archive/hashes`, `/archive/plan`, `/archive/blob/:hash`, `/archive/manifest` | same write gate as sync | TOR B archive: content-addressed blobs + JSON manifest merge (`{ manifest, referencedBlobs }`). |
+
+## Sync visibility (`/healthz.sync`)
+
+Fresh process:
+
+```json
+{"sync":{"lastReceivedAt":null,"lastPeer":null,"filesReceived":0,"conflicts":0,"archiveLastAt":null}}
+```
+
+`lastReceivedAt: null` means nothing has ever arrived — that is intentional and
+useful. After a push: ISO time, peer label (token *name* and/or remote host —
+**never the bearer secret**), and `filesReceived` for that transfer.
+`conflicts` counts keep-both events since start; recent rows (path, suffixed
+name, time) show under **Stan** in the panel (`/admin/health`).
+
+### Receive-only (decision)
+
+This server **only accepts** push on `/sync/*` and `/archive/*`. It does not
+initiate pull against a peer. Distill runs on a GPU client; the client pushes
+here. Server-side pull (peer URL + token + interval) is deferred until a real
+scenario needs the KVM to catch up on its own.
+
+### Peer vs archive target — two settings
+
+Do **not** reuse Desktop `deployTarget` (old SMB auto-deploy path). Notes and
+blobs are different traffic:
+
+| | Peer (surface) | Archive target (blobs) |
+| --- | --- | --- |
+| Flag | `--sync-peer` | `--archive-target` |
+| Env | `BRAIN_SYNC_PEER` | `BRAIN_ARCHIVE_TARGET` |
+| What | notes / ledger via `/sync/*` | CVB blobs via `/archive/*` |
+| Size | ~MB, often | ~GB, rare |
+
+Both are optional labels/URLs for operators (and echoed in the panel). They are
+independent — one field must not mean both.
 
 Everything else 404s, including `/.well-known/*` and `/register` — some MCP
 clients probe those for OAuth and stall on anything but a clean 404.
@@ -290,6 +337,8 @@ host with a different Node version yields a binary for the wrong
 | `--embed-model` | `BRAIN_EMBED_MODEL` | `nomic-embed-text` |
 | `--instance-label` | `BRAIN_INSTANCE_LABEL` | hostname |
 | `--vault-owner` | `BRAIN_VAULT_OWNER` | — |
+| `--sync-peer` | `BRAIN_SYNC_PEER` | — (notes peer URL/label; not archive) |
+| `--archive-target` | `BRAIN_ARCHIVE_TARGET` | — (blob archive URL/path; not `deployTarget`) |
 | `--tokens-file` | — | `<data-dir>/mcp-tokens.json` |
 | `--read-only` | `BRAIN_READ_ONLY` | off |
 | `--reindex` | — | build the index on start, serving meanwhile |
