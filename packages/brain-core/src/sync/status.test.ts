@@ -59,16 +59,34 @@ describe('SyncIntakeTracker', () => {
     expect(s.conflicts).toBe(0)
   })
 
-  it('resets filesReceived on a new plan', () => {
+  it('counts the new transfer from one, not from the old total', () => {
     const t = new SyncIntakeTracker()
     t.beginSurfaceTransfer('a')
     t.recordSurfaceFile({ peer: 'a' })
     t.recordSurfaceFile({ peer: 'a' })
     t.beginSurfaceTransfer('b')
-    expect(t.snapshot().filesReceived).toBe(0)
     t.recordSurfaceFile({ peer: 'b' })
     expect(t.snapshot().filesReceived).toBe(1)
     expect(t.snapshot().lastPeer).toBe('b')
+  })
+
+  it('a plan that delivers nothing does not erase the last real transfer', () => {
+    // Found live: two instances, a real 1-file push, then an idle poll. The
+    // timestamp survived and the count did not, so /healthz read "arrived at
+    // 11:25, brought nothing" over a transfer that brought a file. Any client
+    // polling /sync/plan erased the evidence, which is what this tracker was
+    // written to stop. The two fields describe one event; they move together.
+    const t = new SyncIntakeTracker()
+    t.beginSurfaceTransfer('a')
+    t.recordSurfaceFile({ peer: 'a' })
+    const after = t.snapshot()
+
+    t.beginSurfaceTransfer('a') // poll: nothing to send
+    const polled = t.snapshot()
+
+    expect(polled.filesReceived).toBe(1)
+    expect(polled.lastReceivedAt).toBe(after.lastReceivedAt)
+    expect(polled.lastReceivedAt).not.toBeNull()
   })
 
   it('increments conflicts, keeps recent rows, warns', () => {

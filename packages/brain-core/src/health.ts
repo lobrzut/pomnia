@@ -37,6 +37,7 @@ import {
 } from './ollama/runtime.js'
 import { EMBED_DIMS } from './rag/embed.js'
 import type { EmbedBackendName, EmbedClient } from './rag/embed.js'
+import { SYNC_DIRS } from './sync/paths.js'
 import type { SyncHealthSnapshot } from './sync/status.js'
 
 export type CheckState = 'ok' | 'degraded' | 'down'
@@ -233,6 +234,33 @@ function countRow(db: Database.Database, sql: string): number {
 }
 
 /**
+ * Does the vault hold anything worth indexing? Stops at the first note.
+ *
+ * Deliberately a first-hit scan, not a count: this runs on every /healthz,
+ * which a container probes every 30 seconds, and the answer only has to
+ * separate "empty vault" from "has notes".
+ */
+async function vaultHasNotes(vaultRoot: string): Promise<boolean> {
+  for (const rel of SYNC_DIRS) {
+    const stack = [join(vaultRoot, rel)]
+    while (stack.length > 0) {
+      const dir = stack.pop() as string
+      let entries
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true })
+      } catch {
+        continue
+      }
+      for (const e of entries) {
+        if (e.isDirectory()) stack.push(join(dir, e.name))
+        else if (e.name.endsWith('.md')) return true
+      }
+    }
+  }
+  return false
+}
+
+/**
  * Embedder is checked with a short timeout when already warm. A cold fastembed
  * load can take tens of seconds (~0.5 GB ONNX) — allow that once, otherwise a
  * health endpoint that hangs forever is worse than reporting degraded.
@@ -289,7 +317,16 @@ export async function collectHealth(opts: {
       if (counts.chunks === 0) {
         // Serving an empty index is the single most misleading state a Pomnia
         // server can be in: everything answers, every search comes back empty.
-        index = { state: 'down', detail: 'index is empty — run brain-core --reindex' }
+        //
+        // That is only true when there is something to find. A vault with no
+        // notes and an index with no chunks agree with each other, and calling
+        // that `down` made every correct fresh install look broken: the Docker
+        // HEALTHCHECK exits non-zero on 503, so a new container went unhealthy
+        // while working exactly as intended, and install.sh waited out its full
+        // readiness loop because `curl -f` treats 503 as failure.
+        index = (await vaultHasNotes(opts.vaultRoot))
+          ? { state: 'down', detail: 'index is empty — run brain-core --reindex' }
+          : { state: 'degraded', detail: 'nothing indexed yet — the vault has no notes' }
       }
     } catch (e) {
       db = { state: 'down', detail: (e as Error).message }
