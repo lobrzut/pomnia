@@ -24,6 +24,15 @@ files:
   - resources/icon.png
   - "!**/*.{map,md}"
   - "!**/*.bak*"
+  # Server-only embedding stack. brain-core declares @huggingface/transformers so
+  # a KVM appliance can embed without Ollama; npm workspaces hoist it to the root,
+  # so electron-builder walked into it from @pomnia/brain-core and packed
+  # onnxruntime-node -- every platform it supports, including the two this build
+  # can never load. The desktop has no code path that selects that backend, and
+  # the import is dynamic, so excluding it costs nothing and saves ~175 MB.
+  - "!**/node_modules/@huggingface/**"
+  - "!**/node_modules/onnxruntime-node/**"
+  - "!**/node_modules/onnxruntime-common/**"
   # npm workspaces → junction/symlink; electron-builder skips them unless copied explicitly.
   # Main should bundle doc-parser + mammoth/unpdf/bluebird (electron.vite.config).
   # Safety net: still ship those packages into asar if any bare import remains.

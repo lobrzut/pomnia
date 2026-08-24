@@ -48,6 +48,35 @@ mkdirSync(stage, { recursive: true })
 console.log('[stage-brain-core] copy dist →', stage)
 cpSync(dist, stage, { recursive: true })
 
+/**
+ * brain-core dependencies minus the ones only its server roles can reach.
+ *
+ * `@huggingface/transformers` exists so a KVM appliance embeds without Ollama.
+ * The desktop never selects that backend — nothing in src/main or src/core sets
+ * BRAIN_EMBED_BACKEND, and the default is ollama — but the dependency still
+ * dragged onnxruntime-node into the installer twice, once here and once through
+ * workspace hoisting into the asar. Each copy carries every platform the
+ * runtime supports, so a Windows build shipped Linux and macOS binaries it
+ * cannot load: 318 MB installed against 143 MB before the dependency existed.
+ *
+ * Safe to drop because the import is dynamic (`await import(...)` in embed.ts)
+ * inside a try/catch. Forcing the backend by hand on a desktop build now fails
+ * with "fastembed model unavailable: Cannot find module", which is the truth,
+ * instead of silently costing every downloader 175 MB for a path they cannot
+ * take. The server tarball is packed from the real manifest and keeps it.
+ */
+const DESKTOP_UNREACHABLE = ['@huggingface/transformers']
+function desktopDeps(deps) {
+  const kept = Object.fromEntries(
+    Object.entries(deps ?? {}).filter(([name]) => !DESKTOP_UNREACHABLE.includes(name))
+  )
+  const dropped = Object.keys(deps ?? {}).filter((n) => DESKTOP_UNREACHABLE.includes(n))
+  if (dropped.length > 0) {
+    console.log(`[stage-brain-core] omitting server-only deps: ${dropped.join(', ')}`)
+  }
+  return kept
+}
+
 writeFileSync(
   join(stage, 'package.json'),
   JSON.stringify(
@@ -62,7 +91,7 @@ writeFileSync(
       version: bcPkg.version,
       private: true,
       type: 'module',
-      dependencies: bcPkg.dependencies
+      dependencies: desktopDeps(bcPkg.dependencies)
     },
     null,
     2
