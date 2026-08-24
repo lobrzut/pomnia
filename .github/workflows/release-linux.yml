@@ -69,6 +69,22 @@ jobs:
           cp -r packages/brain-core/deploy "$STAGE/"
 
           npm ci --omit=dev --workspace @pomnia/brain-core --include-workspace-root=false
+
+          # onnxruntime-node bundles every platform it supports inside the npm
+          # package -- its postinstall only fetches extras like the CUDA EP, so
+          # `npm ci` on Linux still lands darwin and win32 binaries. The binding
+          # resolves napi-v6/${process.platform}/${process.arch}, so a linux-x64
+          # tarball needs exactly one of those directories and carries the rest
+          # as dead weight: 178 MB of 211 MB measured on 1.24.3.
+          ORT=node_modules/onnxruntime-node/bin/napi-v6
+          if [ -d "$ORT" ]; then
+            before=$(du -sm node_modules | cut -f1)
+            find "$ORT" -mindepth 1 -maxdepth 1 ! -name linux -exec rm -rf {} +
+            find "$ORT/linux" -mindepth 1 -maxdepth 1 ! -name x64 -exec rm -rf {} +
+            test -f "$ORT/linux/x64/onnxruntime_binding.node"               || { echo "prune removed the binary this tarball runs on"; exit 1; }
+            echo "onnxruntime pruned to linux/x64: ${before} MB -> $(du -sm node_modules | cut -f1) MB"
+          fi
+
           cp -r node_modules "$STAGE/"
 
           TARBALL="release/pomnia-brain-core-${VERSION}-linux-x64.tar.gz"
@@ -208,6 +224,22 @@ jobs:
           # runner's Node — which is why this is packed on Linux and not on the
           # Windows box the desktop is built on.
           npm ci --omit=dev --workspace @pomnia/brain-core --include-workspace-root=false
+
+          # onnxruntime-node bundles every platform it supports inside the npm
+          # package -- its postinstall only fetches extras like the CUDA EP, so
+          # `npm ci` on Linux still lands darwin and win32 binaries. The binding
+          # resolves napi-v6/${process.platform}/${process.arch}, so a linux-x64
+          # tarball needs exactly one of those directories and carries the rest
+          # as dead weight: 178 MB of 211 MB measured on 1.24.3.
+          ORT=node_modules/onnxruntime-node/bin/napi-v6
+          if [ -d "$ORT" ]; then
+            before=$(du -sm node_modules | cut -f1)
+            find "$ORT" -mindepth 1 -maxdepth 1 ! -name linux -exec rm -rf {} +
+            find "$ORT/linux" -mindepth 1 -maxdepth 1 ! -name x64 -exec rm -rf {} +
+            test -f "$ORT/linux/x64/onnxruntime_binding.node"               || { echo "prune removed the binary this tarball runs on"; exit 1; }
+            echo "onnxruntime pruned to linux/x64: ${before} MB -> $(du -sm node_modules | cut -f1) MB"
+          fi
+
           cp -r node_modules "$STAGE/"
 
           TARBALL="release/pomnia-brain-core-${VERSION}-linux-x64.tar.gz"
