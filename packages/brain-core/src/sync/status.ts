@@ -16,7 +16,15 @@ export interface SyncHealthSnapshot {
   lastReceivedAt: string | null
   /** Token *name* and/or remote host — never the bearer secret. */
   lastPeer: string | null
-  /** Files accepted in the current/last surface transfer (reset on /sync/plan). */
+  /**
+   * Files accepted in the last transfer that actually delivered one.
+   *
+   * Deliberately paired with `lastReceivedAt`: both describe the same event.
+   * An earlier version zeroed this on every /sync/plan while leaving the
+   * timestamp alone, so a client that merely polled turned a real transfer
+   * into "arrived at 11:25, brought nothing" — the exact forgetting this
+   * tracker exists to prevent.
+   */
   filesReceived: number
   /** Conflict events since process start (keep-both + report). */
   conflicts: number
@@ -73,6 +81,8 @@ export class SyncIntakeTracker {
   private lastReceivedAt: string | null = null
   private lastPeer: string | null = null
   private filesReceived = 0
+  /** Current transfer only. Published to filesReceived once a file lands. */
+  private inFlight = 0
   private conflicts = 0
   private archiveLastAt: string | null = null
   private recentConflicts: SyncConflictRecord[] = []
@@ -84,9 +94,14 @@ export class SyncIntakeTracker {
     this.archiveTargetConfig = opts?.archiveTarget?.trim() || null
   }
 
-  /** Call on /sync/plan — starts a new transfer counter. */
+  /**
+   * Call on /sync/plan — starts a new transfer counter.
+   *
+   * The published count is left alone: a plan that turns out to have nothing
+   * to send must not erase the record of the last transfer that did.
+   */
   beginSurfaceTransfer(peer: string): void {
-    this.filesReceived = 0
+    this.inFlight = 0
     this.lastPeer = sanitizePeerLabel(peer)
   }
 
@@ -99,7 +114,8 @@ export class SyncIntakeTracker {
     const at = new Date().toISOString()
     this.lastPeer = peer
     this.lastReceivedAt = at
-    this.filesReceived += 1
+    this.inFlight += 1
+    this.filesReceived = this.inFlight
     if (opts.conflict) {
       this.conflicts += 1
       const row: SyncConflictRecord = {

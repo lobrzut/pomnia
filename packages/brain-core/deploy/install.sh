@@ -203,6 +203,9 @@ echo
 # The embedder decides whether anything else is worth suggesting, so read it
 # directly instead of inferring from the overall verdict.
 OLLAMA_STATE=$(printf '%s' "$HEALTH" | sed -n 's/.*"ollama":{"state":"\([a-z]*\)".*/\1/p')
+# Empty index over an empty vault is degraded, not down: there is nothing to
+# index yet. Only the index state separates "push me a vault" from "reindex".
+INDEX_STATE=$(printf '%s' "$HEALTH" | sed -n 's/.*"index":{"state":"\([a-z]*\)".*/\1/p')
 
 EMBED_MODEL=nomic-embed-text
 
@@ -279,7 +282,14 @@ fi
 case "$STATUS" in
   ok) ok "serving" ;;
   degraded)
-    echo "  Degraded — it serves, but not everything it should. See /admin → Stan."
+    if [[ "${INDEX_STATE:-}" == "degraded" ]]; then
+      echo "  Serving, with an empty vault — nothing to search yet."
+      echo "  Push one from Pomnia Desktop (Connect → push changes),"
+      echo "  or put notes in $VAULT_ROOT and build the index:"
+      echo "      sudo -u $USER_NAME node $PREFIX/dist/daemon.js --data-dir $DATA --vault-root $VAULT_ROOT --reindex"
+    else
+      echo "  Degraded — it serves, but not everything it should. See /admin → Stan."
+    fi
     if [[ "${EMBED_READY:-false}" != "true" ]]; then
       echo "  Embedder not ready — check journalctl -u pomnia-brain-core"
     fi

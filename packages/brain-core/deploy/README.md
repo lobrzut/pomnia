@@ -143,10 +143,17 @@ independent — one field must not mean both.
 Everything else 404s, including `/.well-known/*` and `/register` — some MCP
 clients probe those for OAuth and stall on anything but a clean 404.
 
-`/healthz` answers **503** when the server cannot actually serve: an empty
-index, an unreadable vault, a database that will not open. It is not a liveness
-probe. A process that is up but returns nothing for every search is precisely
-the state this reports, because it used to be the state that looked healthy.
+`/healthz` answers **503** when the server cannot actually serve: an index that
+is empty while the vault holds notes, an unreadable vault, a database that will
+not open. It is not a liveness probe. A process that is up but returns nothing
+for every search is precisely the state this reports, because it used to be the
+state that looked healthy.
+
+An empty index over an **empty vault** is `degraded`, not down, and answers
+**200**. The two agree with each other and there is nothing to be misled about
+— a fresh install has not failed, it has nothing yet. The distinction is not
+cosmetic: the container HEALTHCHECK exits non-zero on 503, so treating this as
+down reported every correct new deployment as unhealthy.
 
 ```json
 {"ok":true,"status":"degraded","embed":{"backend":"fastembed","ready":false},"checks":{"ollama":{"state":"degraded"}}}
