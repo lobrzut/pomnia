@@ -26,6 +26,9 @@ import { join } from 'node:path'
 
 export const EMBED_DIMS = 768
 
+/** Reachability probe budget. Generous on purpose — see the call site. */
+export const PREFLIGHT_TIMEOUT_MS = 60_000
+
 /** HuggingFace id used by Python fastembed — same ONNX weights, ~0.5 GB. */
 export const FASTEMBED_MODEL_ID = 'nomic-ai/nomic-embed-text-v1.5'
 
@@ -184,7 +187,17 @@ export class EmbedClient {
     }
     let models: string[]
     try {
-      const r = await fetch(`${this.url}/api/tags`, { signal: AbortSignal.timeout(8_000) })
+      // 8 s was 37x stricter than the embed calls this probe clears the way
+      // for, which get 300 s. On a shared Ollama — a homelab box carrying
+      // dozens of models for several projects — another workload pulling a 9 GB
+      // model into VRAM makes /api/tags queue behind it. The probe then failed
+      // and printed "DEGRADED — semantic search will return nothing" over a
+      // server that was merely busy, while the embeds it was gating went on
+      // succeeding. Measured idle on that host: 13-28 ms, so this is headroom
+      // for contention, not for slowness.
+      const r = await fetch(`${this.url}/api/tags`, {
+        signal: AbortSignal.timeout(PREFLIGHT_TIMEOUT_MS),
+      })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       const j = (await r.json()) as { models?: { name?: string }[] }
       models = (j.models ?? []).map((m) => m.name ?? '').filter(Boolean)
