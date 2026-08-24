@@ -9,7 +9,7 @@ describe('classifyOllamaPs', () => {
     const s = classifyOllamaPs([])
     expect(s.accelerator).toBe('idle')
     expect(s.reachable).toBe(true)
-    expect(s.summary).toMatch(/brak załadowanego modelu/)
+    expect(s.summary).toMatch(/no model loaded/)
   })
 
   it('reports gpu when size_vram > 0', () => {

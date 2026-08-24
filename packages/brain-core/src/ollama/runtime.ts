@@ -33,7 +33,7 @@ type PsModel = {
 const EMPTY_NA: OllamaRuntimeSnapshot = {
   reachable: false,
   accelerator: 'n/a',
-  summary: 'Embedder lokalny (bez Ollamy na tej ścieżce).',
+  summary: 'Local embedder — no Ollama on this path.',
   running: [],
 }
 
@@ -49,7 +49,7 @@ export function classifyOllamaPs(models: PsModel[]): OllamaRuntimeSnapshot {
       reachable: true,
       accelerator: 'idle',
       summary:
-        'Ollama osiągalna · brak załadowanego modelu · GPU jeśli Ollama tak skonfiguruje przy load',
+        'Ollama reachable · no model loaded · GPU only if Ollama chooses it at load time',
       running,
     }
   }
@@ -76,7 +76,7 @@ export function classifyOllamaPs(models: PsModel[]): OllamaRuntimeSnapshot {
   return {
     reachable: true,
     accelerator: 'unknown',
-    summary: `Ollama · ${names} · akcelerator niewykryty tanio (/api/ps)`,
+    summary: `Ollama · ${names} · accelerator not cheaply detectable from /api/ps`,
     running,
   }
 }
@@ -110,7 +110,7 @@ export async function probeOllamaRuntime(
     return {
       reachable: false,
       accelerator: 'unknown',
-      summary: `Ollama niedostępna: ${(e as Error).message}`,
+      summary: `Ollama unreachable: ${(e as Error).message}`,
       running: [],
     }
   }

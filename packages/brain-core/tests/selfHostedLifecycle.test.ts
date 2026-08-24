@@ -227,6 +227,10 @@ describe('what the operator is told', () => {
     const r = await fetch(`${BASE}/status`)
     const html = await r.text()
     expect(r.status).toBe(200)
-    expect(html).toContain('brain-core')
+    // The page renamed itself to the product; this assertion did not follow and
+    // had been red on the branch before anyone noticed. The rename is still
+    // partial — the MCP handshake and /healthz `service` both answer
+    // "brain-core" — so this deliberately pins the page only.
+    expect(html).toContain('Pomnia')
   })
 })
