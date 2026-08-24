@@ -29,8 +29,31 @@
  * what happened.
  */
 
-/** Semantic floor. Below this, meaning contributed nothing worth trusting. */
-export const SEM_MEANINGFUL = 0.1
+/**
+ * Semantic floor. Below this, meaning contributed nothing worth trusting.
+ *
+ * Re-measured after the v2 reindex, which moved it. Removing the YAML header
+ * from the embedded text sharpened the *noise* along with the signal: a note
+ * titled "Google Coral Edge TPU", no longer diluted by session ids and file
+ * paths, embeds more purely as Coral — and therefore closer to "coral reef
+ * bleaching". That query's semantic score doubled, 0.0821 to 0.1632, while two
+ * genuine hits sat below it at 0.0706 and 0.0770.
+ *
+ * So on this corpus neither signal separates that case: semantic score and
+ * keyword count both put the false positive among the true ones. The floor is
+ * therefore set above the worst measured noise rather than below the weakest
+ * hit, which pushes roughly half of the true hits into `lexical`.
+ *
+ * That is a real loss of confidence, not a bug: results are still returned,
+ * labelled as leads to verify. Claiming a match is about meaning when the
+ * measurement cannot show that would be the actual failure. Separating these
+ * properly needs a reranker, which scores the query against the chunk directly
+ * instead of comparing two independent embeddings.
+ *
+ *   after v2   hits  0.0706 – 0.3174   (p25 0.1615, median 0.2107)
+ *              noise 0.0145 – 0.1632   (median 0.0443)
+ */
+export const SEM_MEANINGFUL = 0.17
 
 export type Grounding = 'strong' | 'lexical' | 'none'
 

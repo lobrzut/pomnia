@@ -23,8 +23,14 @@ import { basename, join } from 'node:path'
 import type Database from 'better-sqlite3'
 
 import { chunkText, CHUNKER_VERSION } from './chunk.js'
+import { noteDateFrom, noteQualityFrom, splitNote } from './noteFields.js'
 import { applyEmbedPrefix, EMBED_DIMS } from './embed.js'
-import { assertFingerprint, writeFingerprint, type IndexFingerprint } from '../storage/indexFingerprint.js'
+import {
+  assertFingerprint,
+  readFingerprint,
+  writeFingerprint,
+  type IndexFingerprint,
+} from '../storage/indexFingerprint.js'
 import type { EmbedClient } from './embed.js'
 import { vecToBlob } from './vec.js'
 
@@ -175,7 +181,8 @@ export async function indexFiles(
   const selIds = db.prepare('SELECT id FROM chunks WHERE pdf_path = ?')
   const delChunks = db.prepare('DELETE FROM chunks WHERE pdf_path = ?')
   const insChunk = db.prepare(
-    'INSERT INTO chunks (pdf_path, pdf_name, page_num, chunk_idx, text, char_count) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO chunks (pdf_path, pdf_name, page_num, chunk_idx, text, char_count, note_date, note_source, note_quality) ' +
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
   )
   const insVec = db.prepare('INSERT INTO chunks_vec (rowid, embedding) VALUES (?, ?)')
 
@@ -198,7 +205,15 @@ export async function indexFiles(
       wipe(oldIds)
     }
 
-    const chunks = chunkText(f.text)
+    // The YAML header describes the note; it is not the note. Embedding it
+    // spent 14% of the index on session ids and Windows paths, and put those
+    // tokens into the keyword lane where they earn false matches. Removing it
+    // measured +3.0% mean cosine over 14 queries against 250 real notes.
+    const { meta, body } = splitNote(f.text)
+    const noteDate = noteDateFrom(meta)
+    const noteSource = meta.source ?? null
+    const noteQuality = noteQualityFrom(meta)
+    const chunks = chunkText(body)
     if (chunks.length === 0) {
       stats.empty += 1
       const st = fileStatMeta(f.path)
@@ -222,7 +237,10 @@ export async function indexFiles(
       }
       const write = db.transaction(() => {
         for (let j = 0; j < batch.length; j++) {
-          const info = insChunk.run(f.path, name, 1n, BigInt(i + j), batch[j], BigInt(batch[j].length))
+          const info = insChunk.run(
+            f.path, name, 1n, BigInt(i + j), batch[j], BigInt(batch[j].length),
+            noteDate, noteSource, noteQuality,
+          )
           insVec.run(BigInt(info.lastInsertRowid), vecToBlob(vecs[j]))
         }
       })
@@ -472,6 +490,43 @@ export async function indexDir(
 ): Promise<IndexStats> {
   const fingerprint = currentFingerprint(embedder)
   if (fingerprint) assertFingerprint(db, fingerprint)
+
+  // A chunker change is invisible to the incremental pass and would otherwise
+  // stamp the new version over rows the old one produced.
+  //
+  // Nothing on disk changed, so every file compares equal on mtime, size and
+  // content hash, and gets skipped — the run walks the whole corpus, re-chunks
+  // nothing, and finishes by claiming it was built by a chunker it never ran.
+  // That is the exact failure the stamp exists to prevent, arriving through the
+  // stamp's own front door. An index with no stamp counts as different: it was
+  // built before any of this and there is no way to know what produced it.
+  if (fingerprint) {
+    const stored = readFingerprint(db)
+    if (!stored || stored.chunker !== fingerprint.chunker) {
+      const was = stored?.chunker ?? 'unstamped'
+
+      // The rows have to go, not just their bookkeeping. Clearing indexed_files
+      // alone was tried and did nothing: classifyForIndex falls back to "this
+      // path already has chunks, adopt them and skip", which exists so an index
+      // predating the fingerprint table is not thrown away. That fallback reads
+      // the chunks, not the metadata, so deleting metadata left every old row in
+      // place. The run reported "2543 unchanged" and stamped v2 over a corpus
+      // chunked by v1 — the stamp lying about itself, through its own guard.
+      const gone = db.transaction(() => {
+        db.exec('DELETE FROM chunks_vec')
+        const rows = db.prepare('DELETE FROM chunks').run().changes
+        db.prepare('DELETE FROM indexed_files').run()
+        return rows
+      })()
+
+      console.error(
+        `[brain-core] chunker ${was} -> ${fingerprint.chunker}: dropped ${gone} ` +
+          `chunk(s), re-embedding the whole vault; the incremental pass cannot ` +
+          `see a chunker change`,
+      )
+    }
+  }
+
   const paths = listTextFiles(rootDir)
   const selMeta = db.prepare(
     'SELECT content_hash, mtime_ms, size FROM indexed_files WHERE pdf_path = ?',

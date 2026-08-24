@@ -22,7 +22,7 @@
  * changed, so an incremental pass would skip every one of them and report
  * success. The stamp is what turns that into a refusal.
  */
-export const CHUNKER_VERSION = 'v1'
+export const CHUNKER_VERSION = 'v2'
 
 export const CHUNK_CHAR = 1800
 export const CHUNK_OVERLAP = 200

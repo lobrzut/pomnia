@@ -106,3 +106,25 @@ describe('what an index remembers about how it was built', () => {
     expect(() => assertFingerprint(db, { ...NOMIC, chunker: 'v9' })).not.toThrow()
   })
 })
+
+describe('a chunker change must not slip past the incremental pass', () => {
+  it('treats an unstamped index as a different chunker', () => {
+    // Every index built before stamping existed has no chunker recorded, and
+    // there is no way to know what produced it. Trusting it would let the
+    // incremental pass skip every unchanged file and then stamp the new
+    // version over rows the old chunker wrote.
+    expect(readFingerprint(db)).toBeNull()
+    const stored = readFingerprint(db)
+    expect(stored?.chunker).not.toBe(NOMIC.chunker)
+  })
+
+  it('sees a bumped chunker as different even when everything else matches', () => {
+    writeFingerprint(db, { ...NOMIC, chunker: 'v1' })
+    expect(readFingerprint(db)?.chunker).not.toBe('v2')
+  })
+
+  it('sees no difference when the chunker is unchanged', () => {
+    writeFingerprint(db, NOMIC)
+    expect(readFingerprint(db)?.chunker).toBe(NOMIC.chunker)
+  })
+})

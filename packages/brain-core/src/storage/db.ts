@@ -77,6 +77,22 @@ export function openDb(opts: OpenDbOptions): Database.Database {
         updated_at TEXT NOT NULL
       );
     `)
+
+    // Additive columns for note metadata lifted out of the embedded text.
+    // CREATE TABLE IF NOT EXISTS cannot add these to a database that already
+    // exists, and a rebuild would throw away an index that is otherwise fine,
+    // so they arrive by ALTER and stay null on rows written before them.
+    for (const col of [
+      'note_date TEXT',
+      'note_source TEXT',
+      'note_quality REAL',
+    ]) {
+      try {
+        db.exec(`ALTER TABLE chunks ADD COLUMN ${col}`)
+      } catch {
+        // already present
+      }
+    }
   }
 
   return db

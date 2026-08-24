@@ -13,7 +13,7 @@ import { z } from 'zod'
 import type Database from 'better-sqlite3'
 import type { EmbedClient } from '../../rag/embed.js'
 import { search, type SearchSource } from '../../rag/search.js'
-import { classifyGrounding, keywordHits, noteDate, semanticScore } from '../../rag/grounding.js'
+import { classifyGrounding, keywordHits, noteDate, semanticScore, SEM_MEANINGFUL } from '../../rag/grounding.js'
 
 export const searchLibrarySchema = {
   type: 'object' as const,
@@ -76,8 +76,8 @@ export async function runSearchLibrary(
     return {
       ...h,
       matched:
-        sem >= 0.1 && kw > 0 ? 'meaning and words'
-        : sem >= 0.1 ? 'meaning'
+        sem >= SEM_MEANINGFUL && kw > 0 ? 'meaning and words'
+        : sem >= SEM_MEANINGFUL ? 'meaning'
         : kw > 0 ? 'words only'
         : 'weak on both',
       dated: noteDate(String((h.meta as { name?: unknown })?.name ?? '')),

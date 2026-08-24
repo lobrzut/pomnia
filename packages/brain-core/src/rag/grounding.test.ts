@@ -12,7 +12,7 @@ const row = (sem: number, kwName = 0, kwText = 0, score = 0.5) => ({
 describe('what the agent is told about its own retrieval', () => {
   it('calls a real topic strong', () => {
     // "brain-core MCP server" on the live vault: sem 0.2198, 7 keyword hits.
-    expect(classifyGrounding([row(0.2198, 3, 4)]).grounding).toBe('strong')
+    expect(classifyGrounding([row(0.2107, 3, 4)]).grounding).toBe('strong')
   })
 
   it('refuses to call an unrelated query an answer', () => {
@@ -23,23 +23,24 @@ describe('what the agent is told about its own retrieval', () => {
   })
 
   it('names a words-only match instead of passing it off as meaning', () => {
-    // The measured worst case: "coral reef bleaching" reached 0.5200 overall
-    // against a note titled "Google Coral Edge TPU" on a semantic score of
-    // 0.0821. The blended score cannot express that; this must.
-    const v = classifyGrounding([row(0.0821, 2)])
+    // "coral reef bleaching" against a note titled "Google Coral Edge TPU".
+    // After the v2 reindex its semantic score doubled to 0.1632 — stripping the
+    // YAML header sharpened the noise as well as the signal — which is why the
+    // floor sits above it rather than below the weakest true hit.
+    const v = classifyGrounding([row(0.1632, 1, 2)])
     expect(v.grounding).toBe('lexical')
     expect(v.note).toMatch(/words, not on meaning/i)
   })
 
   it('never answers "nothing" while a keyword matched', () => {
     // "electron-builder instalator" is a true hit carried entirely by the
-    // words: sem 0.0731, below the floor. Suppressing it would lose a real
+    // words: sem 0.0706, below the floor and below the coral false positive. Suppressing it would lose a real
     // answer, so a keyword hit downgrades the verdict rather than erasing it.
-    expect(classifyGrounding([row(0.0731, 1, 2)]).grounding).toBe('lexical')
+    expect(classifyGrounding([row(0.0706, 1, 2)]).grounding).toBe('lexical')
   })
 
   it('judges the set by its best row, not its worst', () => {
-    expect(classifyGrounding([row(0.02), row(0.25, 1), row(0.03)]).grounding).toBe('strong')
+    expect(classifyGrounding([row(0.02), row(0.3174, 1), row(0.03)]).grounding).toBe('strong')
   })
 
   it('says so when there is nothing indexed at all', () => {
