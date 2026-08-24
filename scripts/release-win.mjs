@@ -63,6 +63,13 @@ if (checkCleanOnly) {
   process.exit(0)
 }
 
+// The previous release left better-sqlite3 compiled for Electron's ABI: step 7
+// stages brain-core, which runs @electron/rebuild against the root node_modules.
+// Node then refuses the binding it finds -- "NODE_MODULE_VERSION 130 ... requires
+// 137" -- and 34 tests fail at once, which reads as a code regression and is not.
+// Rebuilding for Node here makes a second consecutive release run behave like the
+// first; step 7 rebuilds it for Electron again when it needs to.
+run('npm rebuild better-sqlite3')
 run('npm run build:brain-core && npm run build:doc-parser')
 run('npm run typecheck')
 run('npm test')
