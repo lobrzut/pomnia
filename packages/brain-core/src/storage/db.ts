@@ -61,6 +61,14 @@ export function openDb(opts: OpenDbOptions): Database.Database {
 
       -- Fingerprints for incremental reindex (skip unchanged files). Additive;
       -- existing library.db opens fine without wipe.
+      -- What this index was built with. Read before a reindex so a changed
+      -- model, dimension or prefix is refused instead of silently returning
+      -- vectors that mean nothing. See storage/indexFingerprint.ts.
+      CREATE TABLE IF NOT EXISTS index_meta (
+        key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS indexed_files (
         pdf_path TEXT PRIMARY KEY NOT NULL,
         content_hash TEXT NOT NULL,

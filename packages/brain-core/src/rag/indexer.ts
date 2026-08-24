@@ -22,7 +22,9 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import type Database from 'better-sqlite3'
 
-import { chunkText } from './chunk.js'
+import { chunkText, CHUNKER_VERSION } from './chunk.js'
+import { applyEmbedPrefix, EMBED_DIMS } from './embed.js'
+import { assertFingerprint, writeFingerprint, type IndexFingerprint } from '../storage/indexFingerprint.js'
 import type { EmbedClient } from './embed.js'
 import { vecToBlob } from './vec.js'
 
@@ -130,6 +132,30 @@ function fileStatMeta(path: string): { mtimeMs: number; size: number } | null {
     return { mtimeMs: st.mtimeMs, size: st.size }
   } catch {
     return null
+  }
+}
+
+/**
+ * What this embedder would stamp on an index it built.
+ *
+ * The prefixes are read through `applyEmbedPrefix` rather than copied, so the
+ * stamp cannot drift from the thing it describes: if someone edits the prefix
+ * table, the fingerprint changes with it and every existing index correctly
+ * stops matching.
+ */
+function currentFingerprint(embedder: EmbedClient): IndexFingerprint | null {
+  // A double without a config is not a mismatch, it is an absence. Refusing to
+  // index because a test stub carries no model metadata would break callers
+  // over bookkeeping; a real EmbedClient always exposes this.
+  const cfg = embedder.config as { modelId?: string } | undefined
+  if (!cfg?.modelId) return null
+  return {
+    backend: embedder.backend,
+    model: cfg.modelId,
+    dims: EMBED_DIMS,
+    docPrefix: applyEmbedPrefix('', 'document'),
+    queryPrefix: applyEmbedPrefix('', 'query'),
+    chunker: CHUNKER_VERSION,
   }
 }
 
@@ -444,6 +470,8 @@ export async function indexDir(
   onProgress?: (p: IndexProgressEvent) => void,
   signal?: AbortSignal,
 ): Promise<IndexStats> {
+  const fingerprint = currentFingerprint(embedder)
+  if (fingerprint) assertFingerprint(db, fingerprint)
   const paths = listTextFiles(rootDir)
   const selMeta = db.prepare(
     'SELECT content_hash, mtime_ms, size FROM indexed_files WHERE pdf_path = ?',
@@ -477,6 +505,11 @@ export async function indexDir(
 
   const stats = await indexFiles(db, embedder, toIndex, embedProgress, signal)
   stats.skipped = skipped
+
+  // Stamped after the run, not before: a crash halfway leaves the index
+  // unstamped and the next pass treats it as legacy rather than trusting a
+  // claim the run never earned.
+  if (fingerprint) writeFingerprint(db, fingerprint)
 
   stats.prunedFiles = pruneIndex(db, rootDir, { paths, signal })
   return stats

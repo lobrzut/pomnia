@@ -14,6 +14,16 @@
  *     boundary in the second half of the window. Overlap by `overlap` chars.
  */
 
+/**
+ * Bumped whenever chunk boundaries or chunk text composition change.
+ *
+ * An index stamped with an older value cannot be reused: the vectors describe
+ * text this chunker would no longer produce, and nothing about the files
+ * changed, so an incremental pass would skip every one of them and report
+ * success. The stamp is what turns that into a refusal.
+ */
+export const CHUNKER_VERSION = 'v1'
+
 export const CHUNK_CHAR = 1800
 export const CHUNK_OVERLAP = 200
 
