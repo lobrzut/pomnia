@@ -35,6 +35,7 @@ import {
   probeOllamaRuntime,
   type OllamaRuntimeSnapshot,
 } from './ollama/runtime.js'
+import { EMBED_DIMS } from './rag/embed.js'
 import type { EmbedBackendName, EmbedClient } from './rag/embed.js'
 import type { SyncHealthSnapshot } from './sync/status.js'
 
@@ -99,6 +100,19 @@ export interface HealthEmbedInfo {
   /** Ollama tag or HuggingFace id actually used for vectors. */
   model: string
   ready: boolean
+  /**
+   * Vector width the index was built against.
+   *
+   * The one number that silently invalidates an index. Change the embedding
+   * model to one with a different width and every stored vector becomes
+   * meaningless, while an incremental reindex fixes nothing — file contents did
+   * not change, so the indexer skips them all and reports success. Reporting it
+   * costs a constant and gives an operator something to compare.
+   *
+   * Public: unlike `model` this is not redacted. A width is not a secret, and
+   * hiding it removes the only field that makes an index mismatch visible.
+   */
+  dim: number
 }
 
 export interface HealthReport {
@@ -181,6 +195,7 @@ export function redactHealth(h: HealthReport): HealthReport {
       backend: h.embed.backend,
       model: '',
       ready: h.embed.ready,
+      dim: h.embed.dim,
     },
     // sync block is intentional public telemetry (no secrets, no vault paths).
     sync: { ...h.sync },
@@ -314,7 +329,7 @@ export async function collectHealth(opts: {
       ? {
           reachable: false,
           accelerator: 'n/a' as const,
-          summary: 'Embedder lokalny (ONNX) — bez Ollamy na ścieżce search.',
+          summary: 'Local ONNX embedder — no Ollama on the search path.',
           running: [],
         }
       : await probeOllamaRuntime(ollamaUrl)
@@ -332,7 +347,7 @@ export async function collectHealth(opts: {
     // read by a panel and by monitors, and "running for minus two hours" is not
     // a fact any of them can act on — the live server printed -7028.
     uptimeSec: Math.max(0, Math.round((Date.now() - opts.startedAt) / 1000)),
-    embed: { backend, model, ready: embedReady },
+    embed: { backend, model, ready: embedReady, dim: EMBED_DIMS },
     checks: { db, index, vault, disk, ollama: effectiveEmbed },
     index: counts,
     sync: opts.sync ? { ...opts.sync } : { ...EMPTY_SYNC_HEALTH },
