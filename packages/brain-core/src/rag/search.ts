@@ -8,10 +8,20 @@
  * ("same query, same DB → same top-K, same order") is meaningful going
  * forward.
  *
- * Why hybrid: nomic-embed-text is English-centric. Mixed Polish/English
- * queries ("tunel WireGuard MikroTik") get scattered embeddings. Literal
- * keyword matches in filename/path/content give a strong signal we must
- * use, otherwise we'd miss well-tagged notes.
+ * Why hybrid: literal keyword matches in filename/path/content give a signal
+ * the vectors miss — an exact command, an error string, a filename.
+ *
+ * This used to say nomic-embed-text is English-centric and that keywords are
+ * what carry Polish queries. Measured on the live vault that does not hold up:
+ * ten concepts asked once in each language scored PL 0.2197 against EN 0.1871
+ * on semantic similarity alone, with English ahead in only two — and the corpus
+ * is 53% English-only against 31% Polish-only, so a language-match explanation
+ * does not cover it either. The measurement has a real weakness: both phrasings
+ * were written by the same author in one sitting, so the Polish ones may track
+ * this vault's vocabulary more closely than a stranger's would.
+ *
+ * What is safe to say is narrower: hybrid earns its place on literal matches,
+ * not on rescuing one language from the model.
  * No user language switch — always hybrid PL+EN (app uiLocale is chrome-only).
  */
 
