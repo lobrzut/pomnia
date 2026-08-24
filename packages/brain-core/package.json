@@ -1,6 +1,6 @@
 {
   "name": "@pomnia/brain-core",
-  "version": "0.1.65",
+  "version": "0.1.67",
   "private": true,
   "description": "Brain-in-Node: MCP server + RAG for Pomnia desktop and standalone deploy. Successor to the Python brain.",
   "type": "module",
@@ -13,7 +13,8 @@
     ".": "./dist/index.js",
     "./vault": "./dist/storage/vault.js",
     "./daemon": "./dist/daemon.js",
-    "./embedded": "./dist/embedded.js"
+    "./embedded": "./dist/embedded.js",
+    "./sync": "./dist/sync/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -24,6 +25,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.11.1",
     "sqlite-vec": "^0.1.9",

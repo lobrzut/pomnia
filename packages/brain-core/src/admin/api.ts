@@ -52,13 +52,40 @@ export interface AdminDeps {
   /** Take write ownership of the vault for this instance. */
   claimVault(): Promise<{ previous: string | null; owner: string }>
   startReindex(): { started: boolean; reason?: string }
-  vaultState(): { writable: boolean; owner: string | null; readOnlyFlag: boolean }
+  vaultState(): {
+    writable: boolean
+    owner: string | null
+    readOnlyFlag: boolean
+    /** Absolute vault root this process is using (container/host path as seen by the daemon). */
+    path: string
+    /**
+     * Optional operator hint for the bind on the host (e.g. POMNIA_VAULT_HOST_PATH /
+     * BRAIN_VAULT_HOST_PATH). Shown when the in-process path is a container mount.
+     */
+    hostPath?: string | null
+    /** Optional short label (POMNIA_VAULT_LABEL), sanitized — never e2e junk. */
+    label?: string | null
+    /** Optional override (POMNIA_VAULT_WHERE). Prefer smbPath / hostPath in the UI. */
+    where?: string | null
+    /** Real Windows UNC (POMNIA_VAULT_SMB / VAULT_SMB_UNC); fake notes become null. */
+    smbPath?: string | null
+  }
   /**
    * Full health report for the panel. `/healthz` redacts counts and reasons
    * without a bearer token; the session cookie is not one, so the Stan tab
    * must not curl the public probe.
    */
   health(): Promise<unknown>
+  /** Distill worker: status + start/cancel. Absent when feature compiled out — always present now. */
+  distill: {
+    status(): unknown
+    start(opts: { dryRun?: boolean; conversations?: unknown[] }): {
+      started: boolean
+      reason?: string
+      status: unknown
+    }
+    cancel(): { cancelled: boolean }
+  }
 }
 
 export interface RuntimeSettings {
@@ -278,7 +305,16 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
       return j(409, {
         error: 'pinned_read_only',
         detail:
-          'Ten serwer jest przypięty jako replika (--read-only w unicie systemd). Usuń tę flagę i zrestartuj, zanim przejmiesz vault.',
+          'Ten serwer jest na stałe tylko do odczytu. Zmień to w konfiguracji hosta i zrestartuj, zanim przejmiesz sejf.',
+      })
+    }
+    if (state.writable) {
+      // Already ours — do not rewrite the marker or warn about "previous owner".
+      return j(200, {
+        ok: true,
+        previous: state.owner,
+        owner: state.owner,
+        alreadyOwner: true,
       })
     }
     const r = await deps.claimVault()
@@ -290,6 +326,29 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
         ? `${r.previous} zacznie odmawiać zapisów do tego vaultu. Zsynchronizuj go, zanim cokolwiek jeszcze zapisze.`
         : undefined,
     })
+  }
+
+  // ── distill ─────────────────────────────────────────────────────────────
+  if (path === '/admin/distill' && method === 'GET') {
+    return j(200, deps.distill.status())
+  }
+
+  if (path === '/admin/distill' && method === 'POST') {
+    const b = (req.body ?? {}) as {
+      dryRun?: unknown
+      conversations?: unknown
+    }
+    const dryRun = b.dryRun === true
+    const conversations = Array.isArray(b.conversations) ? b.conversations : undefined
+    const r = deps.distill.start({ dryRun, conversations })
+    if (r.started) audit(req.actor, dryRun ? 'distill dry-run' : 'distill start')
+    return j(r.started ? 202 : 409, r)
+  }
+
+  if (path === '/admin/distill/cancel' && method === 'POST') {
+    const r = deps.distill.cancel()
+    if (r.cancelled) audit(req.actor, 'distill cancel')
+    return j(200, r)
   }
 
   // ── index ───────────────────────────────────────────────────────────────

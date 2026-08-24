@@ -3,15 +3,20 @@
 /**
  * Config resolution: CLI flags > env vars > config file > defaults.
  *
- * Kept small on purpose — brain-core is Ollama-only for MVP (see
- * brain-in-node-rewrite-plan in project memory). No embed backend switching,
- * no multi-tenant, no cloud API. Add complexity when a real user asks for it.
+ * Embed backend: `BRAIN_EMBED_BACKEND=ollama|fastembed`. Desktop default is
+ * ollama (user's local install). KVM install.sh / Dockerfile set fastembed so
+ * search works with no Ollama and no chat model on the box.
  */
 
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { validateOllamaUrl } from '../admin/settings.js'
+import {
+  defaultEmbedCacheDir,
+  parseEmbedBackend,
+  type EmbedBackendName,
+} from '../rag/embed.js'
 
 export interface BrainConfig {
   /** Host to bind. `127.0.0.1` when embedded in Pomnia, `0.0.0.0` on server deploys. */
@@ -75,10 +80,39 @@ export interface BrainConfig {
    */
   instanceLabel?: string
 
-  /** Ollama base URL — reachable http endpoint. */
+  /**
+   * Notes-surface peer (URL or human label). Who pushes `/sync/*` here, or
+   * the peer this host would pull from later. Not the archive destination and
+   * not the old Desktop `deployTarget` SMB path.
+   */
+  syncPeer?: string
+
+  /**
+   * Blob archive destination (URL or path). TOR B `/archive/*` target — large
+   * CVB blobs, not markdown. Separate knob from `syncPeer` on purpose.
+   */
+  archiveTarget?: string
+
+  /** Ollama base URL — reachable http endpoint. Unused when embedBackend is fastembed. */
   ollamaUrl: string
   /** Embedding model name known to Ollama (nomic-embed-text-v1.5 → dim 768). */
   embedModel: string
+  /**
+   * Where embeddings come from.
+   * - `ollama` — POST /api/embed (desktop MVP, GPU hosts)
+   * - `fastembed` — in-process ONNX nomic-ai/nomic-embed-text-v1.5 (~0.5 GB)
+   */
+  embedBackend: EmbedBackendName
+  /** ONNX model cache for fastembed. Under dataDir so ProtectSystem=strict can write it. */
+  embedCacheDir: string
+
+  /**
+   * Server-side distillation (Ollama chat /api/generate). Separate from embed model.
+   * KVM sets BRAIN_DISTILL=0. Linux SoT enables when writable vault + Ollama.
+   */
+  distillEnabled: boolean
+  /** Chat model for distill (default qwen2.5:14b). Env: BRAIN_DISTILL_MODEL. */
+  distillModel: string
 
   /**
    * Bearer auth. Skipped when host === 127.0.0.1 (localhost trust, Pomnia-embedded
@@ -110,6 +144,10 @@ export function defaultConfig(): BrainConfig {
       ? `http://${process.env.OLLAMA_HOST.replace(/^https?:\/\//, '')}`
       : 'http://127.0.0.1:11434',
     embedModel: 'nomic-embed-text',
+    embedBackend: 'ollama',
+    embedCacheDir: defaultEmbedCacheDir(dataDir),
+    distillEnabled: true,
+    distillModel: 'qwen2.5:14b',
     auth: {
       tokensFile: join(dataDir, 'mcp-tokens.json'),
       maxFailsPerMinute: 20,
@@ -132,18 +170,28 @@ const KNOWN_FLAGS = new Set([
   '--data-dir',
   '--ollama-url',
   '--embed-model',
+  '--embed-backend',
+  '--embed-cache',
   '--vault-root',
   '--skills-root',
   '--read-only',
   '--vault-owner',
   '--instance-label',
+  '--sync-peer',
+  '--archive-target',
   '--tokens-file',
+  '--distill-model',
   // daemon.ts one-shot modes
   '--add-token',
   '--add-user',
   '--claim-vault',
   '--reindex',
+  '--distill',
+  '--distill-dry-run',
+  '--dry-run',
+  '--file',
   '--role',
+  '--prefetch-embed',
 ])
 
 /**
@@ -173,15 +221,28 @@ export async function loadConfig(
   if (env.BRAIN_PORT) cfg.port = parsePort(env.BRAIN_PORT, 'BRAIN_PORT')
   if (env.BRAIN_OLLAMA_URL) cfg.ollamaUrl = env.BRAIN_OLLAMA_URL
   if (env.BRAIN_EMBED_MODEL) cfg.embedModel = env.BRAIN_EMBED_MODEL
+  // Canonical: BRAIN_EMBED_BACKEND. Alias: EMBED_PROVIDER=local|ollama (KVM docs).
+  if (env.BRAIN_EMBED_BACKEND) cfg.embedBackend = parseEmbedBackend(env.BRAIN_EMBED_BACKEND)
+  else if (env.EMBED_PROVIDER) cfg.embedBackend = parseEmbedBackend(env.EMBED_PROVIDER)
+  if (env.BRAIN_EMBED_CACHE) cfg.embedCacheDir = env.BRAIN_EMBED_CACHE
   if (env.BRAIN_VAULT_ROOT) cfg.vaultRoot = env.BRAIN_VAULT_ROOT
   if (env.BRAIN_SKILLS_ROOT) cfg.skillsRoot = env.BRAIN_SKILLS_ROOT
   if (env.BRAIN_READ_ONLY === '1' || env.BRAIN_READ_ONLY === 'true') cfg.readOnly = true
   if (env.BRAIN_VAULT_OWNER) cfg.authoritativeVaultHint = env.BRAIN_VAULT_OWNER
   if (env.BRAIN_INSTANCE_LABEL) cfg.instanceLabel = env.BRAIN_INSTANCE_LABEL
+  if (env.BRAIN_SYNC_PEER) cfg.syncPeer = env.BRAIN_SYNC_PEER
+  if (env.BRAIN_ARCHIVE_TARGET) cfg.archiveTarget = env.BRAIN_ARCHIVE_TARGET
+  // Distill off when BRAIN_DISTILL=0|false. Default on — KVM compose must set 0.
+  if (env.BRAIN_DISTILL === '0' || env.BRAIN_DISTILL === 'false') cfg.distillEnabled = false
+  if (env.BRAIN_DISTILL === '1' || env.BRAIN_DISTILL === 'true') cfg.distillEnabled = true
+  if (env.BRAIN_DISTILL_MODEL) cfg.distillModel = env.BRAIN_DISTILL_MODEL
+  // Alias used in older docs / Continuum-era notes.
+  if (!env.BRAIN_DISTILL_MODEL && env.BRAIN_CHAT_MODEL) cfg.distillModel = env.BRAIN_CHAT_MODEL
 
   // CLI overrides (simple, no getopt dependency)
   const dataDirBefore = cfg.dataDir
   let tokensFileExplicit = false
+  let embedCacheExplicit = Boolean(env.BRAIN_EMBED_CACHE)
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     const next = argv[i + 1]
@@ -202,6 +263,11 @@ export async function loadConfig(
     else if (arg === '--data-dir' && next) cfg.dataDir = next
     else if (arg === '--ollama-url' && next) cfg.ollamaUrl = next
     else if (arg === '--embed-model' && next) cfg.embedModel = next
+    else if (arg === '--embed-backend' && next) cfg.embedBackend = parseEmbedBackend(next)
+    else if (arg === '--embed-cache' && next) {
+      cfg.embedCacheDir = next
+      embedCacheExplicit = true
+    }
     // A server deploy usually keeps the vault on its own volume, separate from
     // the data dir holding library.db. Without these the vault could only ever
     // live at <dataDir>/vault.
@@ -210,6 +276,9 @@ export async function loadConfig(
     else if (arg === '--read-only') cfg.readOnly = true
     else if (arg === '--vault-owner' && next) cfg.authoritativeVaultHint = next
     else if (arg === '--instance-label' && next) cfg.instanceLabel = next
+    else if (arg === '--sync-peer' && next) cfg.syncPeer = next
+    else if (arg === '--archive-target' && next) cfg.archiveTarget = next
+    else if (arg === '--distill-model' && next) cfg.distillModel = next
     else if (arg === '--tokens-file' && next) {
       cfg.auth.tokensFile = next
       tokensFileExplicit = true
@@ -222,28 +291,25 @@ export async function loadConfig(
   if (!tokensFileExplicit && cfg.dataDir !== dataDirBefore) {
     cfg.auth.tokensFile = join(cfg.dataDir, 'mcp-tokens.json')
   }
+  if (!embedCacheExplicit && cfg.dataDir !== dataDirBefore) {
+    cfg.embedCacheDir = defaultEmbedCacheDir(cfg.dataDir)
+  }
 
-  // Same SSRF gate as the admin panel — refuse link-local / credentialed /
-  // non-http Ollama URLs before the daemon ever fetches them.
-  //
-  // Rejected, not fatal. Throwing here stopped the daemon from starting, and
-  // with Restart=on-failure + StartLimitBurst=5 the unit then gave up for good
-  // — over one bad URL. The unit file argues the opposite case in its own
-  // comments: it deliberately declares no ordering on Ollama because "refusing
-  // to start would turn a partial outage into a full one". A bad embedder URL
-  // costs semantic search; skills, the profile, note reads and the panel all
-  // still work, and /healthz already reports the degradation.
-  const ollama = validateOllamaUrl(cfg.ollamaUrl)
-  if (ollama.ok) {
-    cfg.ollamaUrl = ollama.url
-  } else {
-    cfg.ollamaUrlError = `${ollama.reason}: ${ollama.detail}`
-    // Blank it so nothing can fetch the address we just refused.
-    cfg.ollamaUrl = ''
-    console.error(
-      `[brain-core] REFUSED Ollama URL (${cfg.ollamaUrlError}) — starting without embeddings; ` +
-        'semantic search will return nothing until this is fixed',
-    )
+  // Ollama URL gate only matters when that backend is active. fastembed ignores
+  // the URL; refusing it would print a scary "without embeddings" line on a
+  // KVM that never needed Ollama.
+  if (cfg.embedBackend === 'ollama') {
+    const ollama = validateOllamaUrl(cfg.ollamaUrl)
+    if (ollama.ok) {
+      cfg.ollamaUrl = ollama.url
+    } else {
+      cfg.ollamaUrlError = `${ollama.reason}: ${ollama.detail}`
+      cfg.ollamaUrl = ''
+      console.error(
+        `[brain-core] REFUSED Ollama URL (${cfg.ollamaUrlError}) — starting without embeddings; ` +
+          'semantic search will return nothing until this is fixed (or set BRAIN_EMBED_BACKEND=fastembed)',
+      )
+    }
   }
 
   return cfg

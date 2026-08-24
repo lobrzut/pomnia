@@ -17,8 +17,8 @@ export type { ToolDef, ToolContext } from './mcp/tools/index.js'
 
 // RAG core (embed + cosine + chunking)
 // Re-exports live here so tools/, tests/ and consumers stay decoupled from the file layout.
-export { EmbedClient, EMBED_DIMS } from './rag/embed.js'
-export type { EmbedClientConfig } from './rag/embed.js'
+export { EmbedClient, EMBED_DIMS, FASTEMBED_MODEL_ID, parseEmbedBackend, prefetchFastembed, defaultEmbedCacheDir, embedClientFromConfig, applyEmbedPrefix } from './rag/embed.js'
+export type { EmbedClientConfig, EmbedBackendName, EmbedKind } from './rag/embed.js'
 export { chunkText, CHUNK_CHAR, CHUNK_OVERLAP } from './rag/chunk.js'
 export { vecToBlob, blobToVec } from './rag/vec.js'
 export { search } from './rag/search.js'
@@ -36,3 +36,70 @@ export type { VaultConfig } from './storage/vault.js'
 // Config (env + optional TOML/JSON file)
 export { loadConfig, defaultConfig } from './config/index.js'
 export type { BrainConfig } from './config/index.js'
+
+// Distill (server-side Ollama chat → distilled/)
+export {
+  createDistillJob,
+  distillRunnable,
+  distillConversation,
+  isWorthDistilling,
+  GARBAGE_THRESHOLD,
+  DEFAULT_DISTILL_MODEL,
+  assembleNote,
+  scoreFields,
+  deployDistilledNotes,
+} from './distill/index.js'
+export type {
+  DistillJobStatus,
+  DistillConversation,
+  DistilledNote,
+} from './distill/index.js'
+
+// Surface sync (knowledge layer — not blobs / library.db)
+export {
+  SYNC_DIRS,
+  SYNC_ROOT_FILES,
+  MAX_FILE_BYTES,
+  safeVaultPath,
+  planSync,
+  applyFile,
+  sha256,
+  buildSyncManifest,
+  DISTILL_LEDGER_REL,
+  mergeDistillLedgerBytes,
+  MAX_MANIFEST_ENTRIES,
+} from './sync/index.js'
+export type {
+  PathRejection,
+  ManifestEntry,
+  SyncPlan,
+  ApplyResult,
+  BuildManifestResult,
+} from './sync/index.js'
+
+// Archive replication (TOR B — content-addressed blobs + snapshot-union merge)
+export {
+  BLOB_HASH_RE,
+  MAX_BLOB_BYTES,
+  safeBlobPath,
+  listBlobHashes,
+  applyArchiveBlob,
+  applyArchiveManifest,
+  applyMergedManifest,
+  mergeSnapshotsById,
+  planArchive,
+  pushArchive,
+  localArchiveBlobs,
+  sha256 as archiveSha256,
+  atomicWrite,
+  writeFileKeepingPrev,
+} from './archive/index.js'
+export type {
+  ArchivePathRejection,
+  ApplyBlobResult,
+  ApplyManifestResult,
+  ApplyMergedManifestResult,
+  ArchivePushOptions,
+  ArchivePushResult,
+  MergeableVaultManifest,
+} from './archive/index.js'

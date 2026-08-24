@@ -41,16 +41,14 @@ The installer creates a system user, writes the unit, starts the service, and
 **checks that it answers before telling you it worked**. It prints the first
 token once. Re-running upgrades in place and never rotates that token.
 
-Search needs an embedding model, and Ollama is where it comes from. If none is
-answering, the installer asks whether to install it and pull `nomic-embed-text`
-(~275 MB), then restarts and checks that the server can actually reach it. Say
-no and everything else still works — skills, the profile, saved notes — only
-meaning-based search is off, and it says so rather than looking broken. Add
-`--with-ollama` to answer yes up front on an unattended run.
+Search needs an embedding model. The KVM / install path uses **in-process
+ONNX** (`BRAIN_EMBED_BACKEND=fastembed`, `nomic-ai/nomic-embed-text-v1.5`,
+~0.5 GB) — no Ollama, no chat model, no manual `ollama pull`. Distillation
+stays on GPU clients. Pass `--with-ollama` only if you want the Ollama HTTP
+backend instead.
 
-Already running Ollama somewhere? Skip that and point the unit at it with
-`--ollama-url http://host:11434`. It is a shared service by design: one model
-serves Pomnia and everything else on the box.
+Already running Ollama somewhere and prefer it? `sudo ./install.sh --with-ollama`
+or set `BRAIN_EMBED_BACKEND=ollama` and `--ollama-url http://host:11434`.
 
 On a fresh install this host claims the empty vault and becomes the writer, so
 an agent can save to it straight away — no desktop required. That loop is
@@ -63,46 +61,102 @@ picks it up, and `search_library` returns the words back.
 | | |
 | --- | --- |
 | Node | 22 or newer (tarball native addons are built on GitHub Actions Node 22) |
-| Ollama | for embeddings — `ollama pull nomic-embed-text` |
-| Disk | the vault, plus roughly half its size again for the index |
-| RAM | ~200 MB serving; indexing peaks higher, capped at 2 GB by the unit |
+| Ollama | optional — only when `BRAIN_EMBED_BACKEND=ollama` |
+| Disk | the vault, plus roughly half its size again for the index, plus ~0.5 GB ONNX cache when using fastembed |
+| RAM | ~200 MB serving; indexing / ONNX load peaks higher, capped at 3 GB by the unit |
 
-Ollama is `Wants=`, not `Requires=`. Without it the server still starts and
-still serves skills, profile and note reads; only semantic search stops, and
-`/healthz` reports `degraded` instead of pretending. Refusing to start would
-turn a partial outage into a full one.
+Default KVM path is **fastembed** (in-process ONNX, `nomic-ai/nomic-embed-text-v1.5`).
+No chat model is bundled. Distillation stays on a GPU machine.
 
-**Embeddings honesty:** this Node daemon talks to Ollama only
-(`POST /api/embed`). The zero-Ollama ONNX/fastembed path lives in the older
-Python Brain hub Docker image (`BRAIN_EMBED_BACKEND=fastembed`) — see
-`docs/BRAIN-SERVER-EMBEDDED-MODEL.md`. The Dockerfile in this folder does
-**not** bake an ONNX model; do not expect `docker run` of brain-core to search
-without a reachable Ollama (or a future Node ONNX backend).
+`BRAIN_EMBED_BACKEND=ollama` is optional for hosts that already run Ollama.
+Without Ollama on the fastembed path the server still starts; `/healthz` reports
+`embed.backend` + `embed.ready`. Refusing to start would turn a partial outage
+into a full one.
+
+**Embeddings:** Node supports both backends (`BRAIN_EMBED_BACKEND`). Prefixes
+`search_document: ` / `search_query: ` are applied in code and must not change
+without wiping `library.db`. See `docs/BRAIN-SERVER-EMBEDDED-MODEL.md`.
 
 Public `/healthz` without a Bearer token redacts index counts (`index: null`)
-and check *reasons*. The overall `status` stays public. Full numbers: Bearer
-on `/healthz`, or the panel at `/admin` (Stan / Silnik).
+and check *reasons*. The overall `status`, `embed.{backend,ready}` and the
+`sync` intake block stay public. Full numbers: Bearer on `/healthz`, or the
+panel at `/` (or `/admin`).
+
+## Pages (browser)
+
+| Path | What it is |
+| --- | --- |
+| `/` | **Login + panel** (same gold gate as `/admin`). Session cookie still scoped to `/admin` API routes. |
+| `/admin` | Alias of `/` — bookmarks and older install copy keep working. |
+| `/status` | Public status page (what used to be `/`). No login required. |
+| `/healthz` | JSON health probe (monitors / install.sh). |
 
 ## Endpoints
 
 | Path | Auth | What it is |
 | --- | --- | --- |
-| `/` | optional | Status page. Adds per-check detail when the request carries a token. |
-| `/healthz` | optional | Health. Verdict public; reasons and counts need a token. |
+| `/` | session for panel | Login gate; after login the admin panel. |
+| `/status` | optional | Public HTML status. Detail with Bearer. |
+| `/healthz` | optional | Health. Verdict + `sync` + `embed` public; reasons and index counts need a token. |
 | `/mcp` | **required** | The MCP endpoint. Point agents here. |
 | `/mcp/activity` | **required** | Last tool call — echoes query text, so it is gated. |
-| `/sync/plan`, `/sync/file`, `/sync/reindex` | **admin** on a vault this host owns, any token on a replica | Write intake. Where the desktop puts what it distils. |
+| `/sync/plan`, `/sync/file`, `/sync/reindex` | **admin** on a vault this host owns, any token on a replica | Write intake (push). Where the desktop puts what it distils. |
+| `/sync/manifest`, `/sync/fetch` | any valid token | Read surface for pull — client runs `planSync` locally. |
+| `/archive/hashes`, `/archive/plan`, `/archive/blob/:hash`, `/archive/manifest` | same write gate as sync | TOR B archive: content-addressed blobs + JSON manifest merge (`{ manifest, referencedBlobs }`). |
+
+## Sync visibility (`/healthz.sync`)
+
+Fresh process:
+
+```json
+{"sync":{"lastReceivedAt":null,"lastPeer":null,"filesReceived":0,"conflicts":0,"archiveLastAt":null}}
+```
+
+`lastReceivedAt: null` means nothing has ever arrived — that is intentional and
+useful. After a push: ISO time, peer label (token *name* and/or remote host —
+**never the bearer secret**), and `filesReceived` for that transfer.
+`conflicts` counts keep-both events since start; recent rows (path, suffixed
+name, time) show under **Stan** in the panel (`/admin/health`).
+
+### Receive-only (decision)
+
+This server **only accepts** push on `/sync/*` and `/archive/*`. It does not
+initiate pull against a peer. Distill runs on a GPU client; the client pushes
+here. Server-side pull (peer URL + token + interval) is deferred until a real
+scenario needs the KVM to catch up on its own.
+
+### Peer vs archive target — two settings
+
+Do **not** reuse Desktop `deployTarget` (old SMB auto-deploy path). Notes and
+blobs are different traffic:
+
+| | Peer (surface) | Archive target (blobs) |
+| --- | --- | --- |
+| Flag | `--sync-peer` | `--archive-target` |
+| Env | `BRAIN_SYNC_PEER` | `BRAIN_ARCHIVE_TARGET` |
+| What | notes / ledger via `/sync/*` | CVB blobs via `/archive/*` |
+| Size | ~MB, often | ~GB, rare |
+
+Both are optional labels/URLs for operators (and echoed in the panel). They are
+independent — one field must not mean both.
 
 Everything else 404s, including `/.well-known/*` and `/register` — some MCP
 clients probe those for OAuth and stall on anything but a clean 404.
 
-`/healthz` answers **503** when the server cannot actually serve: an empty
-index, an unreadable vault, a database that will not open. It is not a liveness
-probe. A process that is up but returns nothing for every search is precisely
-the state this reports, because it used to be the state that looked healthy.
+`/healthz` answers **503** when the server cannot actually serve: an index that
+is empty while the vault holds notes, an unreadable vault, a database that will
+not open. It is not a liveness probe. A process that is up but returns nothing
+for every search is precisely the state this reports, because it used to be the
+state that looked healthy.
+
+An empty index over an **empty vault** is `degraded`, not down, and answers
+**200**. The two agree with each other and there is nothing to be misled about
+— a fresh install has not failed, it has nothing yet. The distinction is not
+cosmetic: the container HEALTHCHECK exits non-zero on 503, so treating this as
+down reported every correct new deployment as unhealthy.
 
 ```json
-{"ok":true,"status":"degraded","checks":{"ollama":{"state":"degraded"}}}
+{"ok":true,"status":"degraded","embed":{"backend":"fastembed","ready":false},"checks":{"ollama":{"state":"degraded"}}}
 ```
 
 ## Who may write
@@ -141,6 +195,16 @@ An agent token is refused there with `write_needs_admin` — agent tokens go to
 every MCP client on the network, and those must be able to read and to save
 conversations, not to rewrite the corpus everyone reads from. A replica keeps
 the lower bar: any valid token, because a bad push to a copy costs a resync.
+
+## Vault claim from the panel
+
+`POST /admin/vault/claim` only succeeds when this host is **not** pinned
+(`--read-only` / `BRAIN_READ_ONLY`) and is **not** already the writer. The Sejf
+tab shows the red button **only in that case**. If the host already owns the
+vault, or is pinned read-only (typical Linux replica), the panel shows a plain
+status line — never a disabled danger button that cannot work. Pinned RO needs
+a unit/env change + restart (then `brain-core --claim-vault` if you still want
+CLI takeover).
 
 ## Getting a vault onto it
 
@@ -290,6 +354,8 @@ host with a different Node version yields a binary for the wrong
 | `--embed-model` | `BRAIN_EMBED_MODEL` | `nomic-embed-text` |
 | `--instance-label` | `BRAIN_INSTANCE_LABEL` | hostname |
 | `--vault-owner` | `BRAIN_VAULT_OWNER` | — |
+| `--sync-peer` | `BRAIN_SYNC_PEER` | — (notes peer URL/label; not archive) |
+| `--archive-target` | `BRAIN_ARCHIVE_TARGET` | — (blob archive URL/path; not `deployTarget`) |
 | `--tokens-file` | — | `<data-dir>/mcp-tokens.json` |
 | `--read-only` | `BRAIN_READ_ONLY` | off |
 | `--reindex` | — | build the index on start, serving meanwhile |

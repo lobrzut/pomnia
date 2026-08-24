@@ -123,3 +123,44 @@ describe('paths derived from --data-dir', () => {
     expect(cfg.auth.tokensFile).toBe('/etc/pomnia/tokens.json')
   })
 })
+
+describe('sync peer vs archive target', () => {
+  it('keeps peer and archive as separate settings', async () => {
+    const cfg = await loadConfig(
+      [...base, '--sync-peer', 'http://peer:7865', '--archive-target', '\\\\nas\\blobs'],
+      {},
+    )
+    expect(cfg.syncPeer).toBe('http://peer:7865')
+    expect(cfg.archiveTarget).toBe('\\\\nas\\blobs')
+    expect(cfg.syncPeer).not.toBe(cfg.archiveTarget)
+  })
+
+  it('reads them from env without sharing one field', async () => {
+    const cfg = await loadConfig([...base], {
+      BRAIN_SYNC_PEER: 'desktop-label',
+      BRAIN_ARCHIVE_TARGET: '/mnt/archive',
+    } as NodeJS.ProcessEnv)
+    expect(cfg.syncPeer).toBe('desktop-label')
+    expect(cfg.archiveTarget).toBe('/mnt/archive')
+  })
+})
+
+describe('distill config', () => {
+  it('defaults distill on with qwen2.5:14b', async () => {
+    const cfg = await loadConfig([...base], {})
+    expect(cfg.distillEnabled).toBe(true)
+    expect(cfg.distillModel).toBe('qwen2.5:14b')
+  })
+
+  it('turns distill off with BRAIN_DISTILL=0', async () => {
+    const cfg = await loadConfig([...base], { BRAIN_DISTILL: '0' } as NodeJS.ProcessEnv)
+    expect(cfg.distillEnabled).toBe(false)
+  })
+
+  it('takes BRAIN_DISTILL_MODEL / --distill-model', async () => {
+    const cfg = await loadConfig([...base, '--distill-model', 'qwen2.5:32b'], {
+      BRAIN_DISTILL_MODEL: 'qwen2.5:7b',
+    } as NodeJS.ProcessEnv)
+    expect(cfg.distillModel).toBe('qwen2.5:32b')
+  })
+})

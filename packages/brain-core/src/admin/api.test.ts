@@ -50,7 +50,17 @@ beforeEach(async () => {
     currentOllama: () => ({ ...live }),
     claimVault: vi.fn(async () => ({ previous: 'Pomnia Desktop', owner: 'pomnia-server' })),
     startReindex: vi.fn(() => ({ started: true })),
-    vaultState: () => ({ writable: !readOnlyFlag, owner: 'Pomnia Desktop', readOnlyFlag }),
+    vaultState: () => ({
+      // Default = replica held by Desktop (the case claim is for).
+      writable: false,
+      owner: 'Pomnia Desktop',
+      readOnlyFlag,
+      path: '/var/lib/pomnia/vault',
+      hostPath: '/share/Container/pomnia-kvm/vault',
+      label: null,
+      where: null,
+      smbPath: null,
+    }),
     health: vi.fn(async () => ({
       ok: true,
       status: 'ok',
@@ -59,6 +69,34 @@ beforeEach(async () => {
       writable: false,
       vaultOwner: 'Pomnia Desktop',
     })),
+    distill: {
+      status: vi.fn(() => ({
+        phase: 'idle',
+        enabled: true,
+        runnable: false,
+        reason: 'vault not writable',
+        model: 'qwen2.5:14b',
+        ollamaUrl: 'http://127.0.0.1:11434',
+        dryRun: false,
+        startedAt: null,
+        finishedAt: null,
+        done: 0,
+        total: 0,
+        ok: 0,
+        stubs: 0,
+        garbage: 0,
+        skipped: 0,
+        failed: 0,
+        written: [],
+        lastError: null,
+      })),
+      start: vi.fn(() => ({
+        started: false,
+        reason: 'vault not writable',
+        status: { phase: 'idle' },
+      })),
+      cancel: vi.fn(() => ({ cancelled: false })),
+    },
   }
 })
 afterEach(async () => {
@@ -176,8 +214,15 @@ describe('health', () => {
 })
 
 describe('vault', () => {
-  it('reports ownership', async () => {
-    expect((await call('GET', '/admin/vault')).body).toMatchObject({ owner: 'Pomnia Desktop' })
+  it('reports ownership and vault paths without e2e junk', async () => {
+    expect((await call('GET', '/admin/vault')).body).toMatchObject({
+      owner: 'Pomnia Desktop',
+      path: '/var/lib/pomnia/vault',
+      hostPath: '/share/Container/pomnia-kvm/vault',
+      label: null,
+      where: null,
+      smbPath: null,
+    })
   })
 
   it('claims the vault and warns about the previous owner', async () => {
@@ -185,6 +230,20 @@ describe('vault', () => {
     expect(r.status).toBe(200)
     expect(deps.claimVault).toHaveBeenCalled()
     expect((r.body as { warning: string }).warning).toMatch(/Pomnia Desktop/)
+  })
+
+  it('no-ops without rewriting when this host already owns the vault', async () => {
+    deps.vaultState = () => ({
+      writable: true,
+      owner: 'pomnia-server',
+      readOnlyFlag: false,
+      path: '/var/lib/pomnia/vault',
+    })
+    const r = await call('POST', '/admin/vault/claim')
+    expect(r.status).toBe(200)
+    expect(deps.claimVault).not.toHaveBeenCalled()
+    expect(r.body).toMatchObject({ alreadyOwner: true, owner: 'pomnia-server' })
+    expect((r.body as { warning?: string }).warning).toBeUndefined()
   })
 
   /** The unit file is the operator's instruction, not a suggestion. */
@@ -323,5 +382,19 @@ describe('health', () => {
       vaultOwner: 'Pomnia Desktop',
     })
     expect(deps.health).toHaveBeenCalled()
+  })
+})
+
+describe('distill admin API', () => {
+  it('returns status', async () => {
+    const r = await call('GET', '/admin/distill')
+    expect(r.status).toBe(200)
+    expect(r.body).toMatchObject({ phase: 'idle', model: 'qwen2.5:14b' })
+  })
+
+  it('posts start and surfaces refusal when not runnable', async () => {
+    const r = await call('POST', '/admin/distill', { dryRun: false })
+    expect(r.status).toBe(409)
+    expect(r.body).toMatchObject({ started: false })
   })
 })

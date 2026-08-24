@@ -13,8 +13,9 @@ import { renderAdminPage } from './adminPage.js'
 const html = (): string => renderAdminPage('http://192.168.1.201:7865')
 
 function inlineScript(): string {
+  // First <script> is the panel; brand chrome may add a second (theme + sky).
   const m = html().match(/<script>([\s\S]*?)<\/script>/)
-  expect(m, 'the panel must carry exactly one inline script').toBeTruthy()
+  expect(m, 'the panel must carry an inline script').toBeTruthy()
   return m![1]
 }
 
@@ -40,35 +41,61 @@ describe('the panel script', () => {
     const script = inlineScript()
     // Every id the script reaches for must exist in the markup, and every
     // button the markup declares must be reachable from the script.
-    for (const id of ['login-form', 'logout', 'adduser', 'save-behaviour', 'save-engine', 'probe-ollama', 'add', 'claim', 'refresh', 'dash-refresh', 'tiles', 'vault-banner']) {
+    for (const id of ['login-form', 'logout', 'adduser', 'save-behaviour', 'save-engine', 'probe-ollama', 'add', 'claim', 'claim-hint', 'refresh', 'dash-refresh', 'tiles', 'vault-banner', 'sync-checks', 'sync-conflicts', 'distill-start', 'distill-dry', 'nav-distill']) {
       expect(page, `markup is missing #${id}`).toContain(`id="${id}"`)
       expect(script, `script never touches #${id}`).toContain(`'${id}'`)
     }
     expect(script).toContain('/admin/health')
+    expect(page).toContain('/status')
+    // Claim CTA starts hidden — only paintClaim('ready') unhides it.
+    expect(page).toMatch(/id="claim"[^>]*\bhidden\b/)
+    expect(script).toContain("state === 'ready'")
+    expect(script).toContain('btn.hidden = false')
   })
 
   it('reaches every tab section the nav offers', () => {
     const page = html()
-    for (const tab of ['dash', 'status', 'engine', 'clients', 'users', 'behaviour', 'vault']) {
+    for (const tab of ['dash', 'status', 'engine', 'distill', 'clients', 'users', 'behaviour', 'settings', 'vault']) {
       expect(page, `no section for the ${tab} tab`).toContain(`id="tab-${tab}"`)
       expect(page, `no nav button for ${tab}`).toContain(`data-tab="${tab}"`)
     }
+    expect(page).toContain('id="settings-appearance"')
+    expect(page).toContain('id="settings-language"')
+    expect(page).toContain('id="settings-interface"')
+    expect(page).not.toContain('data-tab="appearance"')
+    // PL default chrome: Vault tab is Sejf; logout stays on the nav row.
+    expect(page).toContain('data-i18n="tabVault">Sejf')
+    expect(page).toContain('nav #logout')
+    expect(page).toContain("tabVault: 'Sejf'")
+    expect(page).toContain("tabVault: 'Vault'")
+  })
+
+  it('hides distill chrome when feature is off', () => {
+    const page = renderAdminPage('http://192.168.1.150:7865', { distillFeature: false })
+    expect(page).not.toContain('id="tab-distill"')
+    expect(page).not.toContain('data-tab="distill"')
+    expect(page).toContain('DISTILL_FEATURE = false')
   })
 })
 
 describe('the panel page', () => {
   it('fetches nothing from anywhere', () => {
     const page = html()
-    expect(page).not.toMatch(/<link\b/i)
-    expect(page).not.toMatch(/\ssrc=/i)
+    // Favicon / apple-touch are same-origin paths served by this process — not a CDN.
+    expect(page).not.toMatch(/<link[^>]+https?:/i)
+    expect(page).not.toMatch(/\ssrc=["']https?:/i)
     expect(page).not.toMatch(/@import/i)
     expect(page).not.toMatch(/url\(\s*['"]?https?:/i)
   })
 
-  /** The session cookie is HttpOnly; script must not try to read a credential. */
-  it('never touches browser storage', () => {
+  /** Session / CSRF must not land in storage; chrome prefs (locale/density) may. */
+  it('never stores session credentials in browser storage', () => {
     const script = inlineScript()
-    expect(script).not.toMatch(/localStorage|sessionStorage|document\.cookie/)
+    expect(script).not.toMatch(/document\.cookie/)
+    expect(script).not.toMatch(/sessionStorage/)
+    // Prefs only — same pattern as themeScript in the second <script>.
+    expect(script).toMatch(/localStorage\.(get|set)Item\('pomnia-ui-locale'/)
+    expect(script).toMatch(/localStorage\.(get|set)Item\('pomnia-ui-density'/)
   })
 
   it('sends the CSRF header on mutations and credentials same-origin', () => {

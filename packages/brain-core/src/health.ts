@@ -13,14 +13,17 @@
  * So health is assembled from the things that have to be true for a search to
  * come back with an answer, each reported separately with its own reason:
  *
- *   ollama   the embedder answers and has the model — no model, no query vector
+ *   embed    the active backend answers (Ollama model, or ONNX fastembed)
  *   index    there are chunks to search
  *   vault    the corpus is readable
  *   db       the database opens and answers
  *
  * `degraded` is a real state and is used: a server that can still serve skills
- * and read notes while Ollama is down is not `down`, and calling it `down`
+ * and read notes while the embedder is down is not `down`, and calling it `down`
  * would train people to ignore the field.
+ *
+ * `checks.ollama` is kept as an alias of embed readiness for older probes and
+ * the install.sh parser; new code should read `embed.backend` + `embed.ready`.
  */
 
 import { promises as fs } from 'node:fs'
@@ -28,9 +31,25 @@ import { join } from 'node:path'
 
 import type Database from 'better-sqlite3'
 
-import type { EmbedClient } from './rag/embed.js'
+import {
+  probeOllamaRuntime,
+  type OllamaRuntimeSnapshot,
+} from './ollama/runtime.js'
+import { EMBED_DIMS } from './rag/embed.js'
+import type { EmbedBackendName, EmbedClient } from './rag/embed.js'
+import { SYNC_DIRS } from './sync/paths.js'
+import type { SyncHealthSnapshot } from './sync/status.js'
 
 export type CheckState = 'ok' | 'degraded' | 'down'
+
+/** Fresh process: nothing received yet. Public /healthz must show this. */
+export const EMPTY_SYNC_HEALTH: SyncHealthSnapshot = {
+  lastReceivedAt: null,
+  lastPeer: null,
+  filesReceived: 0,
+  conflicts: 0,
+  archiveLastAt: null,
+}
 
 export interface Check {
   state: CheckState
@@ -77,6 +96,26 @@ async function checkDisk(dataDir: string): Promise<Check> {
   return { state: 'ok' }
 }
 
+export interface HealthEmbedInfo {
+  backend: EmbedBackendName
+  /** Ollama tag or HuggingFace id actually used for vectors. */
+  model: string
+  ready: boolean
+  /**
+   * Vector width the index was built against.
+   *
+   * The one number that silently invalidates an index. Change the embedding
+   * model to one with a different width and every stored vector becomes
+   * meaningless, while an incremental reindex fixes nothing — file contents did
+   * not change, so the indexer skips them all and reports success. Reporting it
+   * costs a constant and gives an operator something to compare.
+   *
+   * Public: unlike `model` this is not redacted. A width is not a secret, and
+   * hiding it removes the only field that makes an index mismatch visible.
+   */
+  dim: number
+}
+
 export interface HealthReport {
   /** Kept for compatibility: true unless something makes the server useless. */
   ok: boolean
@@ -88,11 +127,14 @@ export interface HealthReport {
   writable: boolean
   vaultOwner: string | null
   uptimeSec: number
+  /** Which embed backend is configured and whether preflight passed. */
+  embed: HealthEmbedInfo
   checks: {
     db: Check
     index: Check
     vault: Check
     disk: Check
+    /** Embedder readiness. Key kept as `ollama` for older clients / install.sh. */
     ollama: Check
   }
   /**
@@ -102,6 +144,28 @@ export interface HealthReport {
    * was born. Counts require a token (or `/admin/health`).
    */
   index: { files: number; chunks: number } | null
+  /**
+   * Surface + archive intake visibility. Stays public (like `embed.backend`):
+   * operators need to see "nothing ever arrived" without a token. Conflict
+   * *paths* live only under `/admin`, not here.
+   */
+  sync: SyncHealthSnapshot
+  /**
+   * Distillation worker visibility. Public enough for monitors: enabled /
+   * busy / model redacted on anonymous. Full status under /admin/distill.
+   */
+  distill: {
+    enabled: boolean
+    runnable: boolean
+    phase: string
+    /** Chat model id — redacted on public /healthz. */
+    model: string
+  }
+  /**
+   * Ollama /api/ps honesty for Silnik. Public: accelerator + summary only
+   * (no model list on anonymous — tags can hint at private stacks).
+   */
+  ollamaRuntime: OllamaRuntimeSnapshot
 }
 
 /**
@@ -116,12 +180,38 @@ export interface HealthReport {
  *
  * Index counts become `null`, never `{files:0,chunks:0}` — a redacted empty
  * object reads as "the index is empty" while the check state still says ok.
+ *
+ * `embed.backend` and `embed.ready` stay public: operators and install.sh need
+ * them without a token. The model id is redacted (paths / HF cache hints).
+ *
+ * `sync.*` stays public the same way — `lastReceivedAt: null` is how you tell
+ * "nothing ever arrived" from a monitor without credentials.
  */
 export function redactHealth(h: HealthReport): HealthReport {
   const bare = (c: Check): Check => ({ state: c.state })
   return {
     ...h,
     index: null,
+    embed: {
+      backend: h.embed.backend,
+      model: '',
+      ready: h.embed.ready,
+      dim: h.embed.dim,
+    },
+    // sync block is intentional public telemetry (no secrets, no vault paths).
+    sync: { ...h.sync },
+    distill: {
+      enabled: h.distill.enabled,
+      runnable: h.distill.runnable,
+      phase: h.distill.phase,
+      model: '',
+    },
+    ollamaRuntime: {
+      reachable: h.ollamaRuntime.reachable,
+      accelerator: h.ollamaRuntime.accelerator,
+      summary: h.ollamaRuntime.summary,
+      running: [],
+    },
     checks: {
       db: bare(h.checks.db),
       index: bare(h.checks.index),
@@ -144,21 +234,49 @@ function countRow(db: Database.Database, sql: string): number {
 }
 
 /**
- * Ollama is checked with its own short timeout rather than the embedder's
- * 5-minute one: a health endpoint that hangs for five minutes is worse than
- * one that reports `down`, because whatever polls it hangs too.
+ * Does the vault hold anything worth indexing? Stops at the first note.
+ *
+ * Deliberately a first-hit scan, not a count: this runs on every /healthz,
+ * which a container probes every 30 seconds, and the answer only has to
+ * separate "empty vault" from "has notes".
  */
-async function checkOllama(embedder: EmbedClient): Promise<Check> {
+async function vaultHasNotes(vaultRoot: string): Promise<boolean> {
+  for (const rel of SYNC_DIRS) {
+    const stack = [join(vaultRoot, rel)]
+    while (stack.length > 0) {
+      const dir = stack.pop() as string
+      let entries
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true })
+      } catch {
+        continue
+      }
+      for (const e of entries) {
+        if (e.isDirectory()) stack.push(join(dir, e.name))
+        else if (e.name.endsWith('.md')) return true
+      }
+    }
+  }
+  return false
+}
+
+/**
+ * Embedder is checked with a short timeout when already warm. A cold fastembed
+ * load can take tens of seconds (~0.5 GB ONNX) — allow that once, otherwise a
+ * health endpoint that hangs forever is worse than reporting degraded.
+ */
+async function checkEmbedder(embedder: EmbedClient): Promise<Check> {
+  const timeoutMs = embedder.backend === 'fastembed' && !embedder.ready ? 90_000 : 5_000
   try {
     await Promise.race([
       embedder.preflight(),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timed out after 5s')), 5_000)),
+      new Promise((_, rej) =>
+        setTimeout(() => rej(new Error(`timed out after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs),
+      ),
     ])
-    return { state: 'ok' }
+    return { state: 'ok', detail: `${embedder.backend} ready (${embedder.config.modelId})` }
   } catch (e) {
     const why = (e as Error).message
-    // Missing model and unreachable host are different problems with different
-    // fixes, and the message from preflight already says which.
     return { state: 'down', detail: why }
   }
 }
@@ -173,6 +291,15 @@ export async function collectHealth(opts: {
   writable: boolean
   vaultOwner: string | null
   startedAt: number
+  /** Intake counters; omit → empty (fresh / tests). */
+  sync?: SyncHealthSnapshot
+  /** Distill worker snapshot; omit → feature-off idle. */
+  distill?: { enabled: boolean; runnable: boolean; phase: string; model: string }
+  /**
+   * Optional Ollama base URL for /api/ps. Defaults to embedder.config.ollamaUrl
+   * when backend is ollama. Empty → skip probe (fastembed appliance).
+   */
+  ollamaUrl?: string
 }): Promise<HealthReport> {
   let db: Check = { state: 'ok' }
   let index: Check = { state: 'ok' }
@@ -190,7 +317,16 @@ export async function collectHealth(opts: {
       if (counts.chunks === 0) {
         // Serving an empty index is the single most misleading state a Pomnia
         // server can be in: everything answers, every search comes back empty.
-        index = { state: 'down', detail: 'index is empty — run brain-core --reindex' }
+        //
+        // That is only true when there is something to find. A vault with no
+        // notes and an index with no chunks agree with each other, and calling
+        // that `down` made every correct fresh install look broken: the Docker
+        // HEALTHCHECK exits non-zero on 503, so a new container went unhealthy
+        // while working exactly as intended, and install.sh waited out its full
+        // readiness loop because `curl -f` treats 503 as failure.
+        index = (await vaultHasNotes(opts.vaultRoot))
+          ? { state: 'down', detail: 'index is empty — run brain-core --reindex' }
+          : { state: 'degraded', detail: 'nothing indexed yet — the vault has no notes' }
       }
     } catch (e) {
       db = { state: 'down', detail: (e as Error).message }
@@ -208,16 +344,34 @@ export async function collectHealth(opts: {
 
   const disk = await checkDisk(opts.dataDir)
 
-  const ollama = opts.embedder
-    ? await checkOllama(opts.embedder)
+  const embedCheck = opts.embedder
+    ? await checkEmbedder(opts.embedder)
     : { state: 'down' as const, detail: 'embedder not configured' }
 
-  // Ollama being down degrades rather than kills: skills, profile and note
+  // Embedder being down degrades rather than kills: skills, profile and note
   // reads still work, only semantic search stops. Saying `down` for a server
   // that is still useful teaches people to ignore the field.
-  const effectiveOllama: Check = ollama.state === 'down' ? { ...ollama, state: 'degraded' } : ollama
+  const effectiveEmbed: Check =
+    embedCheck.state === 'down' ? { ...embedCheck, state: 'degraded' } : embedCheck
 
-  const status = worstOf([db, index, vault, disk, effectiveOllama])
+  const backend: EmbedBackendName = opts.embedder?.backend ?? 'ollama'
+  const model = opts.embedder?.config.modelId ?? ''
+  const embedReady = effectiveEmbed.state === 'ok'
+
+  const ollamaUrl =
+    opts.ollamaUrl ??
+    (backend === 'ollama' ? (opts.embedder?.config.ollamaUrl ?? '') : '')
+  const ollamaRuntime =
+    backend === 'fastembed' && !opts.ollamaUrl
+      ? {
+          reachable: false,
+          accelerator: 'n/a' as const,
+          summary: 'Local ONNX embedder — no Ollama on the search path.',
+          running: [],
+        }
+      : await probeOllamaRuntime(ollamaUrl)
+
+  const status = worstOf([db, index, vault, disk, effectiveEmbed])
   return {
     ok: status !== 'down',
     service: 'brain-core',
@@ -230,7 +384,13 @@ export async function collectHealth(opts: {
     // read by a panel and by monitors, and "running for minus two hours" is not
     // a fact any of them can act on — the live server printed -7028.
     uptimeSec: Math.max(0, Math.round((Date.now() - opts.startedAt) / 1000)),
-    checks: { db, index, vault, disk, ollama: effectiveOllama },
+    embed: { backend, model, ready: embedReady, dim: EMBED_DIMS },
+    checks: { db, index, vault, disk, ollama: effectiveEmbed },
     index: counts,
+    sync: opts.sync ? { ...opts.sync } : { ...EMPTY_SYNC_HEALTH },
+    distill: opts.distill
+      ? { ...opts.distill }
+      : { enabled: false, runnable: false, phase: 'idle', model: '' },
+    ollamaRuntime,
   }
 }

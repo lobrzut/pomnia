@@ -35,8 +35,27 @@ import {
 } from '../storage/vaultOwner.js'
 import { checkVaultPresence, writeStamp, countVaultNotes } from '../storage/vaultStamp.js'
 import { MAX_FILE_BYTES, SYNC_DIRS } from '../sync/paths.js'
-import { applyFile, planSync, type ManifestEntry } from '../sync/receive.js'
+import { buildSyncManifest } from '../sync/manifest.js'
+import {
+  applyFile,
+  planSync,
+  readSyncFile,
+  type ManifestEntry,
+} from '../sync/receive.js'
+import { SyncIntakeTracker, sanitizePeerLabel } from '../sync/status.js'
+import { MAX_BLOB_BYTES, BLOB_HASH_RE } from '../archive/paths.js'
+import {
+  applyArchiveBlob,
+  applyArchiveManifest,
+  listBlobHashes,
+  planArchive,
+} from '../archive/receive.js'
+import {
+  applyMergedManifest,
+  type MergeableVaultManifest,
+} from '../archive/manifestMerge.js'
 import { handleAdmin, readAdminBody, sendAdmin, type AdminDeps } from '../admin/api.js'
+import { resolveVaultLocation } from '../admin/vaultLocation.js'
 import { readSettings } from '../admin/settings.js'
 import { touchToken } from '../admin/tokens.js'
 import {
@@ -50,9 +69,11 @@ import {
 import { authenticate, touchLogin } from '../admin/users.js'
 import { collectOverview, createActivityRing, type ActivityRing } from '../admin/overview.js'
 import { collectHealth, redactHealth } from '../health.js'
-import { indexDir } from '../rag/indexer.js'
+import { indexDir, indexFiles } from '../rag/indexer.js'
+import { createDistillJob, parseConversation } from '../distill/index.js'
 import { renderAdminPage } from './adminPage.js'
 import { renderStatusPage } from './statusPage.js'
+import { APPLE_TOUCH_B64, FAVICON_ICO_B64, ICON_PNG_B64 } from './brandAssets.js'
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
@@ -62,7 +83,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 
 import type { BrainConfig } from '../config/index.js'
-import { EmbedClient } from '../rag/embed.js'
+import { embedClientFromConfig } from '../rag/embed.js'
 import { openDb } from '../storage/db.js'
 import { defaultVaultConfig, vaultConfigFromRoot, type VaultConfig } from '../storage/vault.js'
 import { createAuthGate } from './auth.js'
@@ -240,6 +261,18 @@ export async function createBrainServer(
    * uptime true across a jump and follows the clock instead of fighting it.
    */
   const startedAt = (): number => Date.now() - Math.round(process.uptime() * 1000)
+  const syncIntake = new SyncIntakeTracker({
+    peer: config.syncPeer,
+    archiveTarget: config.archiveTarget,
+  })
+  /** Token name + remote host for /healthz lastPeer — never the bearer secret. */
+  const peerFrom = (auth: { name?: string }, req: IncomingMessage): string => {
+    const name =
+      auth.name && auth.name !== 'loopback' ? sanitizePeerLabel(auth.name) : null
+    const host = (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '') || null
+    if (name && host) return `${name}@${host}`
+    return name || host || 'unknown'
+  }
   const sessions = createSessionStore()
   /**
    * Failed logins per address. Separate from the bearer gate's counter: a
@@ -248,6 +281,25 @@ export async function createBrainServer(
    */
   const loginFails = new Map<string, number[]>()
   let adopted = false
+
+  const distillJob = createDistillJob(() => ({
+    enabled: config.distillEnabled !== false,
+    model: config.distillModel || 'qwen2.5:14b',
+    ollamaUrl: config.ollamaUrl,
+    vaultRoot: ctx?.vaultRoot ?? config.vaultRoot ?? join(config.dataDir, 'vault'),
+    writable: vaultOwnership?.writable ?? false,
+    readOnlyFlag: config.readOnly === true,
+  }))
+
+  const distillHealthSnap = () => {
+    const s = distillJob.status()
+    return {
+      enabled: s.enabled,
+      runnable: s.runnable,
+      phase: s.phase,
+      model: s.model,
+    }
+  }
 
   const url = `http://${config.host}:${config.port}/mcp`
 
@@ -309,10 +361,7 @@ export async function createBrainServer(
       if (saved.ollamaUrl) config.ollamaUrl = saved.ollamaUrl
       if (saved.embedModel) config.embedModel = saved.embedModel
 
-      const embedder = new EmbedClient({
-        ollamaUrl: config.ollamaUrl,
-        embedModel: config.embedModel,
-      })
+      const embedder = embedClientFromConfig(config)
       // Who may write is decided by the vault, not by this process's flags.
       // `--read-only` still pins a replica, but an instance without it no
       // longer gets to assume it owns a corpus another instance is holding.
@@ -382,6 +431,85 @@ export async function createBrainServer(
 
       http = createServer((req: IncomingMessage, res: ServerResponse) => {
         const pathOnly = req.url?.split('?')[0] ?? ''
+        // Brand icons from pomnia-landing (embedded). Same assets as pomnia.ai.
+        if (pathOnly === '/favicon.ico') {
+          res.statusCode = 200
+          res.setHeader('content-type', 'image/x-icon')
+          res.setHeader('cache-control', 'public, max-age=86400')
+          res.end(Buffer.from(FAVICON_ICO_B64, 'base64'))
+          return
+        }
+        if (pathOnly === '/icon.png') {
+          res.statusCode = 200
+          res.setHeader('content-type', 'image/png')
+          res.setHeader('cache-control', 'public, max-age=86400')
+          res.end(Buffer.from(ICON_PNG_B64, 'base64'))
+          return
+        }
+        if (pathOnly === '/apple-touch-icon.png') {
+          res.statusCode = 200
+          res.setHeader('content-type', 'image/png')
+          res.setHeader('cache-control', 'public, max-age=86400')
+          res.end(Buffer.from(APPLE_TOUCH_B64, 'base64'))
+          return
+        }
+        // NetDash legacy Brain tile expected `/stats` with notes/sessions/….
+        // Map Pomnia /healthz into that shape so the widget keeps working.
+        if (pathOnly === '/stats' || pathOnly === '/stats/') {
+          void (async () => {
+            const health = await collectHealth({
+              db: ctx?.db ?? null,
+              embedder: ctx?.embedder ?? null,
+              vaultRoot: ctx?.vaultRoot ?? '',
+              dataDir: config.dataDir,
+              version: BRAIN_CORE_VERSION,
+              authRequired: gate.required,
+              writable: vaultOwnership?.writable ?? false,
+              vaultOwner: vaultOwnership?.owner
+                ? describeOwner(vaultOwnership.owner)
+                : (ctx?.authoritativeVaultHint ?? null),
+              startedAt: startedAt(),
+              sync: syncIntake.snapshot(),
+              distill: distillHealthSnap(),
+            })
+            const authed = await gate.peek(req)
+            const h = authed ? health : redactHealth(health)
+            const files = h.index?.files ?? 0
+            const chunks = h.index?.chunks ?? 0
+            res.statusCode = h.ok ? 200 : 503
+            res.setHeader('content-type', 'application/json')
+            res.setHeader('cache-control', 'no-store')
+            res.end(
+              JSON.stringify({
+                // Legacy NetDash Brain fields (mapped):
+                notes: files,
+                sessions: 0,
+                library_docs: files,
+                code_files: 0,
+                graph_nodes: chunks,
+                last_session_at: null,
+                activity_7d: [],
+                // Pomnia-native (widget can prefer these when present):
+                ok: h.ok,
+                service: h.service,
+                version: h.version,
+                status: h.status,
+                vaultOwner: h.vaultOwner,
+                uptimeSec: h.uptimeSec,
+                embed: h.embed,
+                index: h.index,
+                writable: h.writable,
+              }),
+            )
+          })().catch((e: unknown) => {
+            if (!res.headersSent) {
+              res.statusCode = 503
+              res.setHeader('content-type', 'application/json')
+              res.end(JSON.stringify({ ok: false, error: (e as Error).message }))
+            }
+          })
+          return
+        }
         // Public: systemd and Docker probe it before any token exists.
         //
         // It reports whether the server can actually answer, not merely whether
@@ -409,6 +537,8 @@ export async function createBrainServer(
                 ? describeOwner(vaultOwnership.owner)
                 : (ctx?.authoritativeVaultHint ?? null),
               startedAt: startedAt(),
+              sync: syncIntake.snapshot(),
+              distill: distillHealthSnap(),
             })
             // The verdict is public — a monitor has to be able to see a broken
             // server. The reasons are not: they name the vault path, the Ollama
@@ -435,11 +565,15 @@ export async function createBrainServer(
           })
           return
         }
-        // The panel itself is a static page and carries no data: everything it
-        // shows comes from /admin/* calls that need an admin token. Serving the
-        // shell unauthenticated means a wrong token shows a login, not a 401
-        // page nobody can act on.
-        if (pathOnly === '/admin' || pathOnly === '/admin/') {
+        // Panel shell (login gate + app). Served at `/` so a human opening the
+        // host lands on login, not a public status dump. `/admin` stays as the
+        // same shell for bookmarks and install.sh copy.
+        if (
+          pathOnly === '/' ||
+          pathOnly === '/index.html' ||
+          pathOnly === '/admin' ||
+          pathOnly === '/admin/'
+        ) {
           const host = req.headers.host ?? `${config.host}:${config.port}`
           const proto = String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0].trim()
           res.statusCode = 200
@@ -455,13 +589,17 @@ export async function createBrainServer(
           res.setHeader('referrer-policy', 'no-referrer')
           res.setHeader('x-content-type-options', 'nosniff')
           res.setHeader('cache-control', 'no-store')
-          res.end(renderAdminPage(`${proto === 'https' ? 'https' : 'http'}://${host}`))
+          res.end(
+            renderAdminPage(`${proto === 'https' ? 'https' : 'http'}://${host}`, {
+              distillFeature: config.distillEnabled !== false,
+            }),
+          )
           return
         }
-        // A human typing the address gets a page instead of `not_found`.
+        // Public status page — moved off `/` so the homepage is login.
         // Exact paths only: `/.well-known/*` and `/register` must keep their
         // 404 (see below), and a prefix match would swallow them.
-        if (pathOnly === '/' || pathOnly === '/index.html') {
+        if (pathOnly === '/status' || pathOnly === '/status/') {
           const host = req.headers.host ?? `${config.host}:${config.port}`
           const proto = String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0].trim()
           void (async () => {
@@ -477,6 +615,8 @@ export async function createBrainServer(
                 ? describeOwner(vaultOwnership.owner)
                 : (ctx?.authoritativeVaultHint ?? null),
               startedAt: startedAt(),
+              sync: syncIntake.snapshot(),
+              distill: distillHealthSnap(),
             })
             // Per-check reasons name paths and models, so they follow the same
             // rule as every other detail: behind the token. The overall verdict
@@ -514,7 +654,13 @@ export async function createBrainServer(
                         { name: 'Index', ...health.checks.index },
                         { name: 'Vault', ...health.checks.vault },
                         { name: 'Disk / write', ...health.checks.disk },
-                        { name: 'Embeddings (Ollama)', ...health.checks.ollama },
+                        {
+                          name:
+                            health.embed.backend === 'fastembed'
+                              ? 'Embeddings (fastembed)'
+                              : 'Embeddings (Ollama)',
+                          ...health.checks.ollama,
+                        },
                       ],
                     }
                   : {}),
@@ -532,10 +678,21 @@ export async function createBrainServer(
         // else gets a 404 — matches Python mcp-proxy behavior + means
         // `/register` / `/.well-known/*` OAuth discovery probes get a proper
         // 404 instead of stalling. See project memory desktop-mcp-remote-fix.
-        const isSync =
+        // Write intake vs read (pull): both are /sync/*, but only writes need
+        // admin when this host owns the vault. Manifest + fetch let the other
+        // side run planSync locally — same handshake, opposite direction.
+        const isSyncWrite =
           pathOnly === '/sync/plan' || pathOnly === '/sync/file' || pathOnly === '/sync/reindex'
+        const isSyncRead = pathOnly === '/sync/manifest' || pathOnly === '/sync/fetch'
+        const isSync = isSyncWrite || isSyncRead
+        // TOR B archive intake — separate from surface /sync/* (no 8 MB cap, no .cvb there).
+        const isArchive =
+          pathOnly === '/archive/hashes' ||
+          pathOnly === '/archive/plan' ||
+          pathOnly === '/archive/manifest' ||
+          pathOnly.startsWith('/archive/blob/')
         const isAdmin = pathOnly.startsWith('/admin/')
-        if (!req.url?.startsWith('/mcp') && !isSync && !isAdmin) {
+        if (!req.url?.startsWith('/mcp') && !isSync && !isArchive && !isAdmin) {
           res.statusCode = 404
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ error: 'not_found', hint: 'MCP endpoint is at /mcp' }))
@@ -550,10 +707,10 @@ export async function createBrainServer(
           if (isAdmin && (await serveAdminSession(pathOnly, req, res))) return
 
           // Gate everything under /mcp, activity included — that endpoint
-          // echoes the last query text, which is vault content. /sync/* is
-          // gated by the same token: it writes to the vault. /admin/* needs
-          // more than that — an agent token must not be able to repoint the
-          // embedder, mint itself credentials, or take the vault.
+          // echoes the last query text, which is vault content. /sync/* and
+          // /archive/* are gated by the same token: they write to the vault.
+          // /admin/* needs more than that — an agent token must not be able to
+          // repoint the embedder, mint itself credentials, or take the vault.
           const auth = await gate.check(req, isAdmin ? 'admin' : undefined)
           if (!auth.ok) {
             res.statusCode =
@@ -606,6 +763,11 @@ export async function createBrainServer(
 
           if (isSync) {
             await serveSync(pathOnly, req, res, auth)
+            return
+          }
+
+          if (isArchive) {
+            await serveArchive(pathOnly, req, res, auth)
             return
           }
 
@@ -847,18 +1009,25 @@ export async function createBrainServer(
             }
           },
           startReindex: () => startReindex(),
-          vaultState: () => ({
-            writable: vaultOwnership?.writable ?? false,
-            // Same fallback /healthz and the write refusal use: a pinned
-            // replica has no marker of its own, so the operator's hint is all
-            // there is, and showing "—" for the owner helps nobody.
-            owner: vaultOwnership?.owner
-              ? describeOwner(vaultOwnership.owner)
-              : (ctx?.authoritativeVaultHint ?? null),
-            readOnlyFlag: config.readOnly === true,
-          }),
-          health: () =>
-            collectHealth({
+          vaultState: () => {
+            const path =
+              (ctx?.vaultRoot ?? config.vaultRoot ?? '').trim() ||
+              join(config.dataDir, 'vault')
+            const loc = resolveVaultLocation(path)
+            return {
+              writable: vaultOwnership?.writable ?? false,
+              // Same fallback /healthz and the write refusal use: a pinned
+              // replica has no marker of its own, so the operator's hint is all
+              // there is, and showing "—" for the owner helps nobody.
+              owner: vaultOwnership?.owner
+                ? describeOwner(vaultOwnership.owner)
+                : (ctx?.authoritativeVaultHint ?? null),
+              readOnlyFlag: config.readOnly === true,
+              ...loc,
+            }
+          },
+          health: async () => {
+            const h = await collectHealth({
               db: ctx?.db ?? null,
               embedder: ctx?.embedder ?? null,
               vaultRoot: ctx?.vaultRoot ?? '',
@@ -870,7 +1039,41 @@ export async function createBrainServer(
                 ? describeOwner(vaultOwnership.owner)
                 : (ctx?.authoritativeVaultHint ?? null),
               startedAt: startedAt(),
-            }),
+              sync: syncIntake.snapshot(),
+              distill: distillHealthSnap(),
+            })
+            // Conflict paths + peer/archive config — admin only, not public /healthz.
+            return { ...h, sync: syncIntake.adminSnapshot() }
+          },
+          distill: {
+            status: () => distillJob.status(),
+            start(opts) {
+              const conversations = Array.isArray(opts.conversations)
+                ? opts.conversations
+                    .map((c) => parseConversation(c))
+                    .filter((c): c is NonNullable<typeof c> => c !== null)
+                : undefined
+              return distillJob.start({
+                dryRun: opts.dryRun === true,
+                conversations,
+                onWritten: async (paths) => {
+                  if (!ctx || paths.length === 0) return
+                  const { readFile } = await import('node:fs/promises')
+                  const files = []
+                  for (const path of paths) {
+                    if (/[/\\]_review[/\\]/i.test(path)) continue
+                    try {
+                      files.push({ path, text: await readFile(path, 'utf8') })
+                    } catch {
+                      /* skip */
+                    }
+                  }
+                  if (files.length) await indexFiles(ctx.db, ctx.embedder, files)
+                },
+              })
+            },
+            cancel: () => distillJob.cancel(),
+          },
         }
       }
 
@@ -919,7 +1122,12 @@ export async function createBrainServer(
           res.end(JSON.stringify(body))
         }
         if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' })
-        if (vaultOwnership?.writable && auth.role !== 'admin') {
+
+        const isWrite =
+          path === '/sync/plan' || path === '/sync/file' || path === '/sync/reindex'
+        // Pull reads the peer's surface so the client can run planSync locally.
+        // Any valid token may read; only writes need admin on an owned vault.
+        if (isWrite && vaultOwnership?.writable && auth.role !== 'admin') {
           const who = vaultOwnership.owner
             ? describeOwner(vaultOwnership.owner)
             : 'this instance'
@@ -928,10 +1136,32 @@ export async function createBrainServer(
             hint:
               `This instance owns the vault (${who}), so a push here writes the source of truth. ` +
               'That needs an admin token: `brain-core --add-token <name> --role admin`. ' +
-              'An agent token can still push to a read-only replica.',
+              'An agent token can still push to a read-only replica, and may always pull via /sync/manifest + /sync/fetch.',
           })
         }
         try {
+          if (path === '/sync/manifest') {
+            // Compact path+hash+size list. Bodies are hashed one file at a time
+            // and discarded — ~2400 notes do not land in memory together.
+            const { entries, skipped } = await buildSyncManifest(ctx!.vaultRoot)
+            return json(200, { entries, skipped })
+          }
+          if (path === '/sync/fetch') {
+            const body = (await readJsonBody(req, 64 * 1024)) as { path?: string }
+            if (!body?.path || typeof body.path !== 'string') {
+              return json(400, { error: 'path_required' })
+            }
+            const got = await readSyncFile({ vaultRoot: ctx!.vaultRoot, path: body.path })
+            if (!got.ok) {
+              return json(got.reason === 'not-found' ? 404 : 400, got)
+            }
+            return json(200, {
+              path: got.path,
+              sha256: got.sha256,
+              size: got.size,
+              contentBase64: got.content.toString('base64'),
+            })
+          }
           if (path === '/sync/reindex') {
             // Files a replica has but never indexed are files no agent can
             // find — the sync would report success over an unchanged search.
@@ -960,6 +1190,7 @@ export async function createBrainServer(
               reportExtras?: boolean
             }
             if (!Array.isArray(body?.manifest)) return json(400, { error: 'manifest_required' })
+            syncIntake.beginSurfaceTransfer(peerFrom(auth, req))
             const plan = await planSync({
               vaultRoot: ctx!.vaultRoot,
               manifest: body.manifest,
@@ -982,7 +1213,140 @@ export async function createBrainServer(
             content: Buffer.from(body.contentBase64, 'base64'),
             sha256: body.sha256,
           })
+          if (result.ok) {
+            syncIntake.recordSurfaceFile({
+              peer: peerFrom(auth, req),
+              conflict: result.conflict,
+            })
+          }
           return json(result.ok ? 200 : 400, result)
+        } catch (e) {
+          return json(400, { error: 'bad_request', detail: (e as Error).message })
+        }
+      }
+
+      /**
+       * Content-addressed blob archive intake (TOR B1).
+       *
+       * Not /sync/file: that path is the knowledge surface (8 MB, text only).
+       * Archive blobs are large, binary, and verified by sha256(bytes) === name.
+       * manifest.cvb is accepted last by client contract — no B2 merge here.
+       */
+      async function serveArchive(
+        path: string,
+        req: IncomingMessage,
+        res: ServerResponse,
+        auth: { role?: 'agent' | 'admin'; name?: string },
+      ): Promise<void> {
+        const json = (code: number, body: unknown): void => {
+          res.statusCode = code
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify(body))
+        }
+        const requireWriteAdmin = (): boolean => {
+          if (vaultOwnership?.writable && auth.role !== 'admin') {
+            const who = vaultOwnership.owner
+              ? describeOwner(vaultOwnership.owner)
+              : 'this instance'
+            json(403, {
+              error: 'write_needs_admin',
+              hint:
+                `This instance owns the vault (${who}), so archive writes need an admin token. ` +
+                '`brain-core --add-token <name> --role admin`.',
+            })
+            return false
+          }
+          return true
+        }
+
+        const readRawBody = async (limit: number): Promise<Buffer> => {
+          const chunks: Buffer[] = []
+          let total = 0
+          for await (const c of req) {
+            total += (c as Buffer).length
+            if (total > limit) throw new Error(`body exceeds ${limit} bytes`)
+            chunks.push(c as Buffer)
+          }
+          return Buffer.concat(chunks)
+        }
+
+        try {
+          if (path === '/archive/hashes') {
+            if (req.method !== 'GET') return json(405, { error: 'method_not_allowed' })
+            const hashes = await listBlobHashes(ctx!.vaultRoot)
+            return json(200, { hashes, count: hashes.length })
+          }
+
+          if (path === '/archive/plan') {
+            if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' })
+            const body = (await readJsonBody(req, 32 * 1024 * 1024)) as { hashes?: string[] }
+            if (!Array.isArray(body?.hashes)) return json(400, { error: 'hashes_required' })
+            const plan = await planArchive({ vaultRoot: ctx!.vaultRoot, hashes: body.hashes })
+            return json(200, plan)
+          }
+
+          if (path === '/archive/manifest') {
+            if (req.method !== 'PUT' && req.method !== 'POST') {
+              return json(405, { error: 'method_not_allowed' })
+            }
+            if (!requireWriteAdmin()) return
+            const content = await readRawBody(MAX_BLOB_BYTES)
+            const ctype = String(req.headers['content-type'] ?? '')
+            // B2 JSON merge: { manifest, referencedBlobs }. Opaque CVB1 / raw
+            // bytes keep the B1 replace path (still durable .prev + fsync).
+            if (ctype.includes('application/json') || content[0] === 0x7b /* '{' */) {
+              let body: {
+                manifest?: MergeableVaultManifest
+                referencedBlobs?: string[]
+              }
+              try {
+                body = JSON.parse(content.toString('utf8')) as typeof body
+              } catch {
+                return json(400, { error: 'bad_json' })
+              }
+              if (!body?.manifest || !Array.isArray(body.referencedBlobs)) {
+                return json(400, {
+                  error: 'manifest_and_referencedBlobs_required',
+                  hint: 'send { manifest, referencedBlobs } after every referenced blob is on the target',
+                })
+              }
+              const result = await applyMergedManifest({
+                vaultRoot: ctx!.vaultRoot,
+                incoming: body.manifest,
+                referencedBlobs: body.referencedBlobs,
+              })
+              if (result.ok) syncIntake.recordArchive(peerFrom(auth, req))
+              return json(result.ok ? 200 : 400, result)
+            }
+            const result = await applyArchiveManifest({ vaultRoot: ctx!.vaultRoot, content })
+            if (result.ok) syncIntake.recordArchive(peerFrom(auth, req))
+            return json(result.ok ? 200 : 400, result)
+          }
+
+          if (path.startsWith('/archive/blob/')) {
+            if (req.method !== 'POST' && req.method !== 'PUT') {
+              return json(405, { error: 'method_not_allowed' })
+            }
+            if (!requireWriteAdmin()) return
+            const hash = path.slice('/archive/blob/'.length)
+            if (!BLOB_HASH_RE.test(hash)) {
+              return json(400, {
+                ok: false,
+                path: `blobs/${hash}.cvb`,
+                reason: 'bad-hash',
+              })
+            }
+            const content = await readRawBody(MAX_BLOB_BYTES)
+            const result = await applyArchiveBlob({
+              vaultRoot: ctx!.vaultRoot,
+              hash,
+              content,
+            })
+            if (result.ok) syncIntake.recordArchive(peerFrom(auth, req))
+            return json(result.ok ? 200 : 400, result)
+          }
+
+          return json(404, { error: 'not_found' })
         } catch (e) {
           return json(400, { error: 'bad_request', detail: (e as Error).message })
         }
@@ -1036,7 +1400,7 @@ export async function createBrainServer(
             // — the log is the only place that difference is visible.
             const a = http?.address()
             const bound = a && typeof a === 'object' ? `${a.address}:${a.port}` : `${config.host}:${config.port}`
-            console.error(`[brain-core] listening on http://${bound} (MCP /mcp · panel /admin)`)
+            console.error(`[brain-core] listening on http://${bound} (MCP /mcp · panel / · status /status)`)
             resolve()
           }
           http?.once('error', onErr)

@@ -215,10 +215,22 @@ describe('what the operator is told', () => {
     expect(body.uptimeSec).toBeGreaterThanOrEqual(0)
   })
 
-  it('serves the status page without a token, naming itself', async () => {
+  it('serves the login panel at /, not the public status page', async () => {
     const r = await fetch(`${BASE}/`)
     const html = await r.text()
     expect(r.status).toBe(200)
-    expect(html).toContain('brain-core')
+    expect(html).toMatch(/login|Zaloguj|Sign in/i)
+    expect(html).not.toMatch(/Not serving|Operational/)
+  })
+
+  it('serves the public status page at /status without a token', async () => {
+    const r = await fetch(`${BASE}/status`)
+    const html = await r.text()
+    expect(r.status).toBe(200)
+    // The page renamed itself to the product; this assertion did not follow and
+    // had been red on the branch before anyone noticed. The rename is still
+    // partial — the MCP handshake and /healthz `service` both answer
+    // "brain-core" — so this deliberately pins the page only.
+    expect(html).toContain('Pomnia')
   })
 })

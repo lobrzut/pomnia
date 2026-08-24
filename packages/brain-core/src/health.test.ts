@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -10,8 +10,14 @@ import type { EmbedClient } from './rag/embed.js'
 
 let vaultRoot: string
 
-const okEmbedder = { preflight: vi.fn(async () => {}) } as unknown as EmbedClient
+const okEmbedder = {
+  backend: 'ollama' as const,
+  config: { backend: 'ollama' as const, ollamaUrl: 'http://127.0.0.1:11434', embedModel: 'nomic-embed-text', modelId: 'nomic-embed-text' },
+  preflight: vi.fn(async () => {}),
+} as unknown as EmbedClient
 const deadEmbedder = {
+  backend: 'ollama' as const,
+  config: { backend: 'ollama' as const, ollamaUrl: 'http://127.0.0.1:11434', embedModel: 'nomic-embed-text', modelId: 'nomic-embed-text' },
   preflight: vi.fn(async () => {
     throw new Error('ollama unreachable at http://127.0.0.1:11434 (fetch failed)')
   }),
@@ -36,6 +42,13 @@ const base = {
 beforeEach(async () => {
   vaultRoot = await mkdtemp(join(tmpdir(), 'pomnia-health-'))
 })
+
+/** A vault with something in it. Empty vault and empty index agree; a vault
+ *  with notes and an empty index is the state that lies to every search. */
+async function seedNote(): Promise<void> {
+  await mkdir(join(vaultRoot, 'sessions'), { recursive: true })
+  await writeFile(join(vaultRoot, 'sessions', 'note.md'), '# note')
+}
 afterEach(async () => {
   await rm(vaultRoot, { recursive: true, force: true })
   vi.clearAllMocks()
@@ -47,18 +60,42 @@ describe('collectHealth', () => {
     expect(h.status).toBe('ok')
     expect(h.ok).toBe(true)
     expect(h.index).toEqual({ files: 10, chunks: 44 })
+    expect(h.embed).toEqual({ backend: 'ollama', model: 'nomic-embed-text', ready: true, dim: 768 })
+    expect(h.sync).toEqual({
+      lastReceivedAt: null,
+      lastPeer: null,
+      filesReceived: 0,
+      conflicts: 0,
+      archiveLastAt: null,
+    })
+    expect(h.distill).toEqual({ enabled: false, runnable: false, phase: 'idle', model: '' })
+    expect(h.ollamaRuntime).toBeDefined()
+    expect(h.ollamaRuntime.accelerator).toBeTruthy()
   })
 
   /**
    * The state this whole module exists for: everything answers, every search
    * comes back empty, and the old /healthz called that healthy.
    */
-  it('calls an empty index down, not ok', async () => {
+  it('calls an empty index down when the vault has notes to find', async () => {
+    await seedNote()
     const h = await collectHealth({ ...base, db: db({ files: 0, chunks: 0 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot })
     expect(h.checks.index.state).toBe('down')
     expect(h.checks.index.detail).toMatch(/reindex/)
     expect(h.status).toBe('down')
     expect(h.ok).toBe(false)
+  })
+
+  it('does not call a fresh install broken — empty vault, empty index', async () => {
+    // Both are empty, so they agree, and there is nothing to be misled about.
+    // Calling this `down` made every correct fresh install look broken: the
+    // Docker HEALTHCHECK exits non-zero on 503, so a new container reported
+    // unhealthy while working, and install.sh burned its whole readiness loop
+    // because `curl -f` treats 503 as a failure. Verified live on 7873.
+    const h = await collectHealth({ ...base, db: db({ files: 0, chunks: 0 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot })
+    expect(h.checks.index.state).toBe('degraded')
+    expect(h.checks.index.detail).toMatch(/no notes/)
+    expect(h.ok).toBe(true)
   })
 
   /** Skills, profile and note reads still work without Ollama. */
@@ -99,6 +136,8 @@ describe('collectHealth', () => {
   /** A health endpoint that hangs makes whatever polls it hang too. */
   it('does not wait on a hanging Ollama', async () => {
     const hanging = {
+      backend: 'ollama' as const,
+      config: { backend: 'ollama' as const, ollamaUrl: 'http://127.0.0.1:11434', embedModel: 'nomic-embed-text', modelId: 'nomic-embed-text' },
       preflight: vi.fn(() => new Promise<void>(() => {})),
     } as unknown as EmbedClient
     const t0 = Date.now()
@@ -106,6 +145,7 @@ describe('collectHealth', () => {
     expect(Date.now() - t0).toBeLessThan(9_000)
     expect(h.checks.ollama.state).toBe('degraded')
     expect(h.checks.ollama.detail).toMatch(/timed out/)
+    expect(h.embed.ready).toBe(false)
   }, 15_000)
 
   it('carries ownership through, so a client can see who may write', async () => {
@@ -134,6 +174,13 @@ describe('redactHealth', () => {
     expect(r.checks.index.detail).toBeUndefined()
     expect(r.status).toBe(h.status)
     expect(r.vaultOwner).toBe('Pomnia Desktop')
+    expect(r.embed.backend).toBe('ollama')
+    expect(r.embed.ready).toBe(true)
+    expect(r.embed.model).toBe('')
+    expect(r.distill.model).toBe('')
+    expect(r.sync.lastReceivedAt).toBeNull()
+    expect(r.ollamaRuntime.running).toEqual([])
+    expect(r.ollamaRuntime.accelerator).toBe(h.ollamaRuntime.accelerator)
   })
 })
 

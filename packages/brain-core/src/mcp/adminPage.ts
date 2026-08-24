@@ -20,9 +20,10 @@
  *                   echoed in a header on every mutation. SameSite already
  *                   stops the cross-site POST; this also covers the
  *                   same-site-but-untrusted case, and costs one header.
- *   no storage      not localStorage, not sessionStorage, never document.cookie
- *                   from script. The only thing the page holds is the CSRF
- *                   token, in a closure, for as long as the tab lives.
+ *   prefs only     session / CSRF never in localStorage or document.cookie
+ *                   from script — CSRF lives in a closure for the tab lifetime.
+ *                   UI prefs only (theme / language / density) may use
+ *                   localStorage; that is chrome, not auth.
  *   inline only     one file, no fetch of anything but this server's own API.
  *                   The CSP the server sends says exactly that, so an edit that
  *                   reaches for a CDN breaks loudly instead of phoning out.
@@ -34,39 +35,43 @@
  * deliberately left out while there is one person.
  */
 
-export function renderAdminPage(origin: string): string {
+import {
+  BRAND_HEAD_LINKS,
+  brandChromeCss,
+  brandSkyHtml,
+  brandSkyScript,
+  brandWordmarkHtml,
+  themeScript,
+  themeSwitcherHtml,
+} from './brandChrome.js'
+
+export function renderAdminPage(
+  origin: string,
+  opts?: { distillFeature?: boolean },
+): string {
+  const distillFeature = opts?.distillFeature !== false
   const esc = (s: string): string =>
     s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
 
   return `<!doctype html>
-<html lang="pl">
+<html lang="pl" data-theme="mint">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
+${BRAND_HEAD_LINKS}
 <title>Pomnia · panel</title>
 <style>
+  ${brandChromeCss()}
   :root {
-    --bg:#060a08; --bg-2:#0a110d; --panel:rgba(17,31,24,.58); --border:rgba(255,255,255,.09);
-    --ink:#e9f5ee; --ink-dim:#8fa89a; --ink-faint:#5b7868;
-    --mint:#34d399; --iris:#2dd4bf; --amber:#fbbf24; --rose:#fb7185;
-    --glow:rgba(45,212,191,.10);
     --font:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
     --mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
   }
-  @media (prefers-color-scheme:light){:root{
-    --bg:#f4f8f6;--bg-2:#e8f0eb;--panel:rgba(255,255,255,.74);--border:rgba(0,0,0,.09);
-    --ink:#10241a;--ink-dim:#46614f;--ink-faint:#6d8577;--glow:rgba(45,212,191,.18);}}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;font-family:var(--font);color:var(--ink);line-height:1.5;
-    background:radial-gradient(1100px 620px at 18% -12%,var(--glow),transparent),
-               linear-gradient(160deg,var(--bg),var(--bg-2));
-    padding:2rem 1.25rem;display:flex;justify-content:center}
+    background:var(--bg);padding:2rem 1.25rem;display:flex;justify-content:center}
   main{width:100%;max-width:46rem}
-  h1{margin:0;font-size:1.6rem;font-weight:800;letter-spacing:-.025em;
-    background:linear-gradient(120deg,#1a5c3a,var(--mint) 48%,var(--iris));
-    -webkit-background-clip:text;background-clip:text;color:transparent}
   .top{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem}
   .who{margin-left:auto;font-size:.8rem;color:var(--ink-faint);font-family:var(--mono)}
   .card{border:1px solid var(--border);background:var(--panel);backdrop-filter:blur(14px);
@@ -76,26 +81,37 @@ export function renderAdminPage(origin: string): string {
   label{display:block;font-size:.78rem;color:var(--ink-faint);margin:.9rem 0 .3rem}
   input,select{width:100%;padding:.6rem .8rem;border-radius:12px;border:1px solid var(--border);
     background:rgba(0,0,0,.22);color:var(--ink);font-family:var(--mono);font-size:.85rem}
-  @media (prefers-color-scheme:light){input,select{background:rgba(255,255,255,.7)}}
   input:focus,select:focus{outline:2px solid color-mix(in srgb,var(--mint) 70%,transparent);outline-offset:1px}
   button{font-family:var(--font);font-size:.83rem;font-weight:600;padding:.55rem 1rem;
-    border-radius:12px;border:1px solid var(--border);background:rgba(52,211,153,.14);
+    border-radius:12px;border:1px solid var(--border);background:color-mix(in srgb,var(--mint) 14%,transparent);
     color:var(--mint);cursor:pointer}
-  button:hover{background:rgba(52,211,153,.22)}
+  button:hover{background:color-mix(in srgb,var(--mint) 22%,transparent)}
   button[disabled]{opacity:.5;cursor:not-allowed}
   button.ghost{background:transparent;color:var(--ink-dim)}
   button.danger{background:rgba(251,113,133,.13);color:var(--rose)}
   .row{display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap;margin-top:1rem}
   .row>*{flex:1 1 10rem}
   .row>button{flex:0 0 auto}
-  nav{display:flex;gap:.4rem;margin-bottom:1rem;flex-wrap:wrap}
-  nav button{background:transparent;color:var(--ink-dim);border-color:transparent}
-  nav button[aria-current="true"]{background:rgba(52,211,153,.14);color:var(--mint);border-color:var(--border)}
+  /* One row when possible; logout stays on the tab row (not a lone wrap line). */
+  nav{display:flex;gap:.35rem;margin-bottom:1rem;flex-wrap:nowrap;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  nav button{background:transparent;color:var(--ink-dim);border-color:transparent;flex:0 0 auto;white-space:nowrap;padding:.45rem .7rem}
+  nav button[aria-current="true"]{background:color-mix(in srgb,var(--mint) 14%,transparent);color:var(--mint);border-color:var(--border)}
+  nav #logout{margin-left:auto}
+  @media (max-width:520px){
+    nav{flex-wrap:wrap}
+    nav #logout{margin-left:0}
+  }
   table{width:100%;border-collapse:collapse;font-size:.83rem}
   th{text-align:left;font-weight:600;color:var(--ink-faint);font-size:.75rem;
     padding:.4rem .5rem;border-bottom:1px solid var(--border)}
   td{padding:.55rem .5rem;border-bottom:1px solid var(--border);vertical-align:middle}
   td.mono,.mono{font-family:var(--mono);font-size:.8rem}
+  td.plain{font-family:var(--font);font-size:.85rem;line-height:1.45}
+  details.tech{margin-top:1rem;font-size:.8rem;color:var(--ink-dim)}
+  details.tech summary{cursor:pointer;color:var(--ink-faint);user-select:none}
+  details.tech summary:hover{color:var(--ink-dim)}
+  details.tech .tech-body{margin-top:.55rem;padding:.65rem .8rem;border-radius:12px;
+    border:1px solid var(--border);background:rgba(0,0,0,.18);font-family:var(--mono);font-size:.78rem}
   .tag{display:inline-block;padding:.08rem .5rem;border-radius:999px;font-size:.72rem;font-weight:700}
   .tag.admin{background:color-mix(in srgb,var(--amber) 18%,transparent);color:var(--amber)}
   .tag.agent{background:color-mix(in srgb,var(--iris) 16%,transparent);color:var(--iris)}
@@ -114,7 +130,6 @@ export function renderAdminPage(origin: string): string {
   .banner .detail{color:var(--ink-dim);flex:1 1 12rem}
   .secret{font-family:var(--mono);font-size:.8rem;word-break:break-all;
     background:rgba(0,0,0,.3);padding:.6rem .8rem;border-radius:10px;margin-top:.5rem}
-  @media (prefers-color-scheme:light){.secret{background:rgba(0,0,0,.06)}}
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr));gap:.7rem;margin-bottom:1.4rem}
   .tile{border:1px solid var(--border);border-radius:14px;padding:.8rem .9rem}
   .tile .n{font-size:1.45rem;font-weight:800;letter-spacing:-.02em;line-height:1.15}
@@ -128,29 +143,48 @@ export function renderAdminPage(origin: string): string {
   .hidden{display:none}
   footer{margin-top:1.5rem;color:var(--ink-faint);font-size:.76rem;text-align:center}
   a{color:var(--iris)}
+  .subnav{display:flex;gap:.35rem;flex-wrap:wrap;margin:0 0 1.1rem}
+  .subnav button{font-size:.78rem;padding:.35rem .75rem;border-radius:999px}
+  .subnav button[aria-current="true"]{color:var(--mint);background:color-mix(in srgb,var(--mint) 14%,transparent);
+    border-color:color-mix(in srgb,var(--mint) 35%,var(--border))}
+  .settings-pane.hidden{display:none}
+  html[data-density='compact'] .card{padding:1.1rem}
+  html[data-density='compact'] .lead{margin-bottom:.75rem}
+  html[data-density='compact'] .tile .n{font-size:1.2rem}
+  html[data-density='compact'] td{padding:.4rem .45rem}
+  .pref-bar{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}
+  .pref-bar .lbl{font-size:.72rem;color:var(--ink-faint);margin-right:.25rem}
+  .pref-bar button{
+    font-family:inherit;font-size:.75rem;font-weight:600;padding:.28rem .65rem;border-radius:999px;
+    border:1px solid var(--border);background:transparent;color:var(--ink-dim);cursor:pointer;
+  }
+  .pref-bar button[aria-checked="true"]{
+    color:var(--mint);background:color-mix(in srgb,var(--mint) 14%,transparent);
+    border-color:color-mix(in srgb,var(--mint) 35%,var(--border));
+  }
 </style>
 </head>
 <body>
-<main>
+${brandSkyHtml()}
+<main class="page-root">
   <div class="top">
-    <h1>Pomnia</h1>
+    ${brandWordmarkHtml('h1')}
     <span class="who" id="who"></span>
   </div>
 
   <!-- ── login ──────────────────────────────────────────────────────────── -->
   <section class="card" id="gate">
-    <h2>Logowanie</h2>
-    <p class="lead">
-      Nie masz jeszcze konta? Na serwerze:
-      <code class="mono">brain-core --add-user login --role admin</code>
+    <h2 data-i18n="loginTitle">Logowanie</h2>
+    <p class="lead" data-i18n-html="loginLead">
+      Konto zakłada administrator serwera.
     </p>
     <form id="login-form" autocomplete="on">
-      <label for="user">Login</label>
+      <label for="user" data-i18n="loginUser">Login</label>
       <input id="user" name="username" autocomplete="username" spellcheck="false" autocapitalize="off">
-      <label for="pass">Hasło</label>
+      <label for="pass" data-i18n="loginPass">Hasło</label>
       <input id="pass" name="password" type="password" autocomplete="current-password">
       <div class="row">
-        <button type="submit" id="login">Zaloguj</button>
+        <button type="submit" id="login" data-i18n="loginBtn">Zaloguj</button>
       </div>
     </form>
     <div id="gate-msg"></div>
@@ -162,173 +196,445 @@ export function renderAdminPage(origin: string): string {
       <span class="badge" id="vault-badge">…</span>
       <span class="detail" id="vault-banner-detail">ładowanie stanu vaultu…</span>
     </div>
-    <nav>
-      <button data-tab="dash" aria-current="true">Pulpit</button>
-      <button data-tab="status">Stan</button>
-      <button data-tab="engine">Silnik</button>
-      <button data-tab="clients">Klienci</button>
-      <button data-tab="users">Konta</button>
-      <button data-tab="behaviour">Zachowanie</button>
-      <button data-tab="vault">Vault</button>
-      <button id="logout" class="ghost" style="margin-left:auto">Wyloguj</button>
+    <nav id="main-nav">
+      <button data-tab="dash" data-i18n="tabDash" aria-current="true">Pulpit</button>
+      <button data-tab="status" data-i18n="tabStatus">Stan</button>
+      <button data-tab="engine" data-i18n="tabEngine">Silnik</button>
+      ${distillFeature ? `<button data-tab="distill" data-i18n="tabDistill" id="nav-distill" hidden>Destylacja</button>` : ''}
+      <button data-tab="clients" data-i18n="tabClients">Klienci</button>
+      <button data-tab="users" data-i18n="tabUsers">Konta</button>
+      <button data-tab="behaviour" data-i18n="tabBehaviour">Zachowanie</button>
+      <button data-tab="settings" data-i18n="tabSettings">Ustawienia</button>
+      <button data-tab="vault" data-i18n="tabVault">Sejf</button>
+      <button id="logout" class="ghost" data-i18n="logout">Wyloguj</button>
     </nav>
 
     <section class="card" id="tab-dash">
-      <h2>Pulpit</h2>
-      <p class="lead">Co ten serwer ma i co się z nim dzieje.</p>
+      <h2 data-i18n="dashTitle">Pulpit</h2>
+      <p class="lead" data-i18n="dashLead">Indeks, klienci, uptime.</p>
       <div class="tiles" id="tiles"></div>
-      <h3 class="sub-h">Vault na dysku</h3>
+      <h3 class="sub-h" data-i18n="dashDisk" id="dash-disk-h">Katalogi na dysku</h3>
       <table><tbody id="vault-rows"></tbody></table>
-      <h3 class="sub-h">Kto pyta (ostatnie 24 h)</h3>
+      <h3 class="sub-h" data-i18n="dashActors">Kto pyta (ostatnie 24 h)</h3>
       <table><tbody id="actor-rows"></tbody></table>
-      <h3 class="sub-h">Ostatnie zapytania</h3>
+      <h3 class="sub-h" data-i18n="dashRecent">Ostatnie zapytania</h3>
       <table><tbody id="act-rows"></tbody></table>
-      <div class="row"><button id="dash-refresh" class="ghost">Odśwież</button></div>
+      <div class="row"><button id="dash-refresh" class="ghost" data-i18n="refresh">Odśwież</button></div>
       <div id="dash-msg"></div>
     </section>
 
     <section class="card hidden" id="tab-status">
-      <h2>Stan serwera</h2>
-      <p class="lead">
-        To samo, co <code class="mono">/healthz</code> — z powodami, bo jesteś zalogowany.
-      </p>
+      <h2 data-i18n="statusTitle">Stan serwera</h2>
       <table><tbody id="checks"></tbody></table>
+      <h3 style="margin:1.25rem 0 0.5rem;font-size:0.95rem" data-i18n="syncTitle">Synchronizacja</h3>
+      <table><tbody id="sync-checks"></tbody></table>
+      <table style="margin-top:0.75rem">
+        <thead><tr>
+          <th data-i18n="syncColPath">Plik</th>
+          <th data-i18n="syncColWrote">Wersja z sufiksem</th>
+          <th data-i18n="syncColWhen">Czas</th>
+        </tr></thead>
+        <tbody id="sync-conflicts"></tbody>
+      </table>
       <div class="row">
-        <button id="refresh" class="ghost">Odśwież</button>
+        <button id="refresh" class="ghost" data-i18n="refresh">Odśwież</button>
       </div>
       <div id="status-msg"></div>
     </section>
 
     <section class="card hidden" id="tab-engine">
-      <h2>Silnik wyszukiwania</h2>
-      <p class="lead">
-        Gdzie stoi Ollama i jakim modelem liczone są embeddingi. Adres jest
-        walidowany — serwer odmówi pobierania z adresów link-local i metadanych
-        chmury. brain-core Node wymaga Ollamy; obraz Docker z ONNX/fastembed
-        to osobna ścieżka Python hub (edge), nie ten daemon.
-      </p>
-      <div id="ollama-status" class="msg" style="margin:0 0 1rem"></div>
-      <label for="ollama">Adres Ollamy</label>
+      <h2 data-i18n="engineTitle">Silnik wyszukiwania</h2>
+      <p class="lead" id="engine-lead" data-i18n="engineLeadOllama" hidden>Ollama: embeddingi teraz; destylacja gdy ten serwer zapisuje (w toku).</p>
+      <div id="embed-status" class="msg" style="margin:0 0 1rem"></div>
+      <table style="margin:0 0 1rem"><tbody id="engine-runtime"></tbody></table>
+      <label for="ollama" data-i18n="engineOllama">Adres Ollamy</label>
       <input id="ollama" type="url" spellcheck="false" placeholder="http://127.0.0.1:11434">
-      <label for="model">Model embeddingów</label>
+      <label for="model" data-i18n="engineModel">Model embeddingów</label>
       <input id="model" spellcheck="false" placeholder="nomic-embed-text">
       <div class="row">
-        <button id="save-engine">Zapisz</button>
-        <button id="probe-ollama" class="ghost">Sprawdź Ollamę</button>
-        <button id="reindex" class="ghost">Przebuduj indeks</button>
+        <button id="save-engine" data-i18n="save">Zapisz</button>
+        <button id="probe-ollama" class="ghost" data-i18n="engineProbe">Sprawdź embedder</button>
+        <button id="reindex" class="ghost" data-i18n="engineReindex">Przebuduj indeks</button>
       </div>
       <div id="engine-msg"></div>
     </section>
 
+    ${
+      distillFeature
+        ? `<section class="card hidden" id="tab-distill">
+      <h2 data-i18n="distillTitle">Destylacja</h2>
+      <p class="lead" data-i18n="distillLead">Destylacja sesji na GPU Ollama (qwen) — zapis do distilled/.</p>
+      <table><tbody id="distill-info"></tbody></table>
+      <div class="row">
+        <button id="distill-start" data-i18n="distillStart">Uruchom (inbox)</button>
+        <button id="distill-dry" class="ghost" data-i18n="distillDry">Dry-run Ollama</button>
+        <button id="distill-cancel" class="ghost" data-i18n="distillCancel">Anuluj</button>
+        <button id="distill-refresh" class="ghost" data-i18n="refresh">Odśwież</button>
+      </div>
+      <div id="distill-msg"></div>
+    </section>`
+        : ''
+    }
+
     <section class="card hidden" id="tab-clients">
-      <h2>Klienci</h2>
-      <p class="lead">
-        Pomnia jest jednoosobowa — to nie są konta użytkowników, tylko urządzenia
-        i agenci, którym wydajesz dostęp. <strong>agent</strong> sięga po MCP
-        i replikację; <strong>admin</strong> dodatkowo po ten panel.
-      </p>
+      <h2 data-i18n="clientsTitle">Klienci</h2>
+      <p class="lead" data-i18n="clientsLead">Tokeny dla urządzeń i agentów — nie konta ludzi.</p>
       <table>
-        <thead><tr><th>Nazwa</th><th>Rola</th><th>Ostatnio</th><th></th></tr></thead>
+        <thead><tr><th data-i18n="colName">Nazwa</th><th data-i18n="colRole">Rola</th><th data-i18n="colLast">Ostatnio</th><th></th></tr></thead>
         <tbody id="tokens"></tbody>
       </table>
       <div class="row">
         <div>
-          <label for="newname">Nowy klient</label>
+          <label for="newname" data-i18n="clientsNew">Nowy klient</label>
           <input id="newname" placeholder="laptop" spellcheck="false">
         </div>
         <div style="flex:0 0 9rem">
-          <label for="newrole">Rola</label>
+          <label for="newrole" data-i18n="colRole">Rola</label>
           <select id="newrole"><option value="agent">agent</option><option value="admin">admin</option></select>
         </div>
-        <button id="add">Wydaj token</button>
+        <button id="add" data-i18n="clientsIssue">Wydaj token</button>
       </div>
       <div id="clients-msg"></div>
     </section>
 
     <section class="card hidden" id="tab-users">
-      <h2>Konta panelu</h2>
-      <p class="lead">
-        Ludzie logujący się tutaj — to co innego niż tokeny, którymi łączą się
-        maszyny. Zmiana hasła natychmiast kończy wszystkie sesje tego konta.
-      </p>
+      <h2 data-i18n="usersTitle">Konta panelu</h2>
+      <p class="lead" data-i18n="usersLead">Konta do tego panelu. Nowe hasło kończy stare sesje.</p>
       <table>
-        <thead><tr><th>Login</th><th>Rola</th><th>Ostatnie logowanie</th><th></th></tr></thead>
+        <thead><tr><th data-i18n="colLogin">Login</th><th data-i18n="colRole">Rola</th><th data-i18n="colLastLogin">Ostatnie logowanie</th><th></th></tr></thead>
         <tbody id="users"></tbody>
       </table>
       <div class="row">
         <div>
-          <label for="nu">Nowe konto</label>
+          <label for="nu" data-i18n="usersNew">Nowe konto</label>
           <input id="nu" spellcheck="false" autocapitalize="off" placeholder="login">
         </div>
         <div>
-          <label for="np">Hasło (min. 12 znaków)</label>
+          <label for="np" data-i18n="usersPass">Hasło (min. 12 znaków)</label>
           <input id="np" type="password" autocomplete="new-password">
         </div>
-        <button id="adduser">Utwórz</button>
+        <button id="adduser" data-i18n="usersCreate">Utwórz</button>
       </div>
       <div id="users-msg"></div>
     </section>
 
+    <section class="card hidden" id="tab-settings">
+      <h2 data-i18n="settingsTitle">Ustawienia</h2>
+      <div class="subnav" id="settings-subnav" role="tablist" aria-label="Ustawienia">
+        <button type="button" data-settings="appearance" aria-current="true" data-i18n="setAppearance">Wygląd</button>
+        <button type="button" data-settings="language" data-i18n="setLanguage">Język</button>
+        <button type="button" data-settings="interface" data-i18n="setInterface">Interfejs</button>
+      </div>
+
+      <div class="settings-pane" id="settings-appearance">
+        <h3 class="sub-h" data-i18n="setAppearance">Wygląd</h3>
+        ${themeSwitcherHtml()}
+      </div>
+
+      <div class="settings-pane hidden" id="settings-language">
+        <h3 class="sub-h" data-i18n="setLanguage">Język</h3>
+        <div class="pref-bar" id="locale-bar" role="radiogroup" aria-label="Język">
+          <span class="lbl" data-i18n="languageLabel">Interfejs</span>
+          <button type="button" role="radio" data-locale="pl" aria-checked="true">PL</button>
+          <button type="button" role="radio" data-locale="en" aria-checked="false">EN</button>
+        </div>
+      </div>
+
+      <div class="settings-pane hidden" id="settings-interface">
+        <h3 class="sub-h" data-i18n="setInterface">Interfejs</h3>
+        <div class="pref-bar" id="density-bar" role="radiogroup" aria-label="Gęstość">
+          <span class="lbl" data-i18n="densityLabel">Gęstość</span>
+          <button type="button" role="radio" data-density="comfortable" aria-checked="true" data-i18n="densityComfortable">Wygodna</button>
+          <button type="button" role="radio" data-density="compact" aria-checked="false" data-i18n="densityCompact">Zwarta</button>
+        </div>
+      </div>
+    </section>
+
     <section class="card hidden" id="tab-behaviour">
-      <h2>Zachowanie agentów</h2>
-      <p class="lead">
-        Te ustawienia trafiają do opisów narzędzi, które czyta każdy podłączony
-        agent — działają od następnego wywołania, bez restartu.
-      </p>
-      <label for="phrase">Fraza handshake</label>
+      <h2 data-i18n="behaviourTitle">Zachowanie agentów</h2>
+      <p class="lead" data-i18n="behaviourLead">Wpływa na to, co widzą podłączeni agenci — od razu.</p>
+      <label for="phrase" data-i18n="behaviourPhrase">Fraza handshake</label>
       <input id="phrase" spellcheck="false" placeholder="OK to Go Go Go">
-      <p class="lead" style="margin:.4rem 0 0">
-        Agent otwiera nią pierwszą odpowiedź — to dowód, że Pomnia jest naprawdę podpięta.
+      <p class="lead" style="margin:.4rem 0 0" data-i18n="behaviourPhraseHint">
+        Pierwsza odpowiedź agenta — dowód, że Pomnia jest podpięta.
       </p>
       <div class="row">
         <label style="display:flex;align-items:center;gap:.5rem;color:var(--ink);font-size:.83rem;margin:0">
-          <input id="hs-on" type="checkbox" style="width:auto"> Wymagaj frazy
+          <input id="hs-on" type="checkbox" style="width:auto"> <span data-i18n="behaviourRequire">Wymagaj frazy</span>
         </label>
         <label style="display:flex;align-items:center;gap:.5rem;color:var(--ink);font-size:.83rem;margin:0">
-          <input id="ac-on" type="checkbox" style="width:auto"> Pozwól na auto-checkpoint
+          <input id="ac-on" type="checkbox" style="width:auto"> <span data-i18n="behaviourCheckpoint">Pozwól na auto-checkpoint</span>
         </label>
       </div>
-      <label for="label">Nazwa tej instancji</label>
+      <label for="label" data-i18n="behaviourLabel">Nazwa tej instancji</label>
       <input id="label" spellcheck="false" placeholder="pomnia-server">
-      <p class="lead" style="margin:.4rem 0 0">
-        Pod tą nazwą serwer przedstawia się, gdy przejmie vault.
+      <p class="lead" style="margin:.4rem 0 0" data-i18n="behaviourLabelHint">
+        Jak serwer się przedstawia przy przejęciu sejfu.
       </p>
       <div class="row">
-        <button id="save-behaviour">Zapisz</button>
+        <button id="save-behaviour" data-i18n="save">Zapisz</button>
       </div>
       <div id="behaviour-msg"></div>
     </section>
 
     <section class="card hidden" id="tab-vault">
-      <h2>Vault</h2>
-      <p class="lead">
-        Zapisywać może tylko jedna instancja naraz — inaczej dwie kopie pamięci
-        cicho się rozjeżdżają. Przejęcie jest świadome i natychmiast odbiera
-        prawo zapisu poprzedniemu właścicielowi.
+      <h2 data-i18n="tabVault">Sejf</h2>
+      <p class="lead" data-i18n-html="vaultLead">
+        Tylko jedna instancja może zapisywać naraz.
       </p>
       <table><tbody id="vault-info"></tbody></table>
+      <div id="vault-tech"></div>
+      <p id="claim-hint" class="lead" hidden></p>
       <div class="row">
-        <button id="claim" class="danger">Przejmij własność</button>
+        <button id="claim" class="danger" hidden data-i18n="claimBtn" title="">Przejmij własność</button>
       </div>
       <div id="vault-msg"></div>
     </section>
   </div>
 
-  <footer>brain-core · <a href="${esc(origin)}/">strona statusu</a> · AGPL-3.0</footer>
+  <footer>Pomnia · <a href="${esc(origin)}/status">strona statusu</a> · AGPL-3.0</footer>
 </main>
 
 <script>
 (() => {
   'use strict'
-  // The session lives in an HttpOnly cookie the browser attaches for us, which
-  // means script cannot read it and an XSS on this origin cannot steal it. What
-  // we do hold is the CSRF token — deliberately NOT in a cookie, because the
-  // whole point is that a cross-site page cannot read it to replay.
+  // Session lives in an HttpOnly cookie. CSRF is NOT in a cookie. UI prefs
+  // (theme / locale / density) may use localStorage — chrome only, not auth.
   let csrf = null
   let me = null
+  const DISTILL_FEATURE = ${distillFeature ? 'true' : 'false'}
 
   const $ = (id) => document.getElementById(id)
   const text = (el, s) => { el.textContent = s }
+
+  const I18N = {
+    pl: {
+      loginTitle: 'Logowanie',
+      loginLead: 'Konto zakłada administrator serwera.',
+      loginUser: 'Login', loginPass: 'Hasło', loginBtn: 'Zaloguj', logout: 'Wyloguj',
+      tabDash: 'Pulpit', tabStatus: 'Stan', tabEngine: 'Silnik', tabDistill: 'Destylacja', tabClients: 'Klienci',
+      tabUsers: 'Konta', tabBehaviour: 'Zachowanie', tabSettings: 'Ustawienia', tabVault: 'Sejf',
+      dashTitle: 'Pulpit',
+      dashLead: 'Indeks, klienci, uptime.',
+      dashDisk: 'Katalogi na dysku',
+      dashDiskGap: 'Katalogi na dysku (luka indeksu)',
+      dashActors: 'Kto pyta (ostatnie 24 h)',
+      dashRecent: 'Ostatnie zapytania', refresh: 'Odśwież', save: 'Zapisz',
+      statusTitle: 'Stan serwera',
+      syncTitle: 'Synchronizacja',
+      syncColPath: 'Plik',
+      syncColWrote: 'Wersja z sufiksem',
+      syncColWhen: 'Czas',
+      syncNone: 'Brak konfliktów od startu serwera.',
+      syncNever: 'nic jeszcze nie przyszło',
+      syncMode: 'tryb',
+      syncReceiveOnly: 'tylko przyjmuje (push)',
+      engineTitle: 'Silnik wyszukiwania',
+      engineLeadOllama: 'Ollama: embeddingi + destylacja gdy serwer zapisuje.',
+      engineLeadFast: 'Embeddingi lokalne (bez Ollamy). Destylacja poza tym appliance.',
+      engineOllama: 'Adres Ollamy', engineModel: 'Model embeddingów',
+      engineRuntime: 'Runtime Ollama',
+      engineAccel: 'Akcelerator',
+      engineLoaded: 'Załadowane',
+      engineDistillNote: 'Destylacja',
+      engineDistillRo: 'ukryta — sejf tylko do odczytu (wymaga zapisu)',
+      engineDistillOff: 'wyłączona na tym appliance (BRAIN_DISTILL=0)',
+      engineDistillOn: 'włączona — zakładka Destylacja',
+      engineProbe: 'Sprawdź embedder', engineReindex: 'Przebuduj indeks',
+      distillTitle: 'Destylacja',
+      distillLead: 'Kolejka 1×1: state/distill-inbox/*.json → Ollama chat → distilled/.',
+      distillStart: 'Uruchom (inbox)',
+      distillDry: 'Dry-run Ollama',
+      distillCancel: 'Anuluj',
+      distillModel: 'Model chat',
+      distillPhase: 'Faza',
+      distillRunnable: 'Gotowe',
+      distillProgress: 'Postęp',
+      distillWritten: 'Zapisane',
+      distillNeedWrite: 'Destylacja wymaga zapisu do sejfu (writable).',
+      clientsTitle: 'Klienci',
+      clientsLead: 'Tokeny dla urządzeń i agentów — nie konta ludzi.',
+      clientsNew: 'Nowy klient', clientsIssue: 'Wydaj token',
+      usersTitle: 'Konta panelu',
+      usersLead: 'Konta do tego panelu. Nowe hasło kończy stare sesje.',
+      usersNew: 'Nowe konto', usersPass: 'Hasło (min. 12 znaków)', usersCreate: 'Utwórz',
+      colName: 'Nazwa', colRole: 'Rola', colLast: 'Ostatnio', colLogin: 'Login', colLastLogin: 'Ostatnie logowanie',
+      settingsTitle: 'Ustawienia',
+      setAppearance: 'Wygląd', setLanguage: 'Język', setInterface: 'Interfejs',
+      languageLabel: 'Interfejs',
+      densityLabel: 'Gęstość', densityComfortable: 'Wygodna', densityCompact: 'Zwarta',
+      behaviourTitle: 'Zachowanie agentów',
+      behaviourLead: 'Wpływa na to, co widzą podłączeni agenci — od razu.',
+      behaviourPhrase: 'Fraza handshake',
+      behaviourPhraseHint: 'Pierwsza odpowiedź agenta — dowód, że Pomnia jest podpięta.',
+      behaviourRequire: 'Wymagaj frazy',
+      behaviourCheckpoint: 'Pozwól na auto-checkpoint',
+      behaviourLabel: 'Nazwa tej instancji',
+      behaviourLabelHint: 'Jak serwer się przedstawia przy przejęciu sejfu.',
+      claimBtn: 'Przejmij własność',
+      claimOwned: 'Ten serwer już zapisuje do tego sejfu — przejmowanie nie jest potrzebne.',
+      claimPinned:
+        'Żeby ten serwer zapisywał, zdejmij tryb tylko-odczyt w konfiguracji usługi (--read-only / BRAIN_READ_ONLY) i zrestartuj. Potem: brain-core --claim-vault (nie z panelu, póki flaga trzyma RO).',
+      claimReady: 'Przejmij zapis od innej instancji (zsynchronizuj ją najpierw).',
+      claimHeld:
+        'Inna instancja trzyma zapis. Ten host nie jest przypięty RO — możesz przejąć świadomie (sync najpierw).',
+      vaultLead: 'Tylko jedna instancja może zapisywać naraz.',
+      vaultForYou: 'Dla Ciebie',
+      vaultOnServer: 'Na serwerze',
+      vaultWrite: 'Zapis',
+      vaultWriteSelf: 'Ten serwer zapisuje',
+      vaultWriteOther: 'Inna instancja zapisuje',
+      vaultWriteRo: 'Tylko odczyt',
+      vaultRo: 'Tylko odczyt',
+      vaultRoYes: 'tak',
+      vaultRoNo: 'nie',
+      vaultTech: 'Szczegóły techniczne',
+      vaultInContainer: 'W kontenerze',
+      vaultOwnerId: 'Id właściciela',
+      vaultLabel: 'Etykieta',
+      vaultBannerRw: 'Ten serwer zapisuje.',
+      vaultBannerOther: 'Właściciel:',
+      vaultBannerRo: 'Tylko odczyt — ten host nie zapisuje.',
+      tileFiles: 'plików w indeksie', tileChunks: 'fragmentów', tileWait: 'czeka na indeks',
+      tileReq: 'zapytań / 24 h', tileClients: 'aktywnych klientów', tileUp: 'działa',
+    },
+    en: {
+      loginTitle: 'Sign in',
+      loginLead: 'Accounts are created by the server administrator.',
+      loginUser: 'Username', loginPass: 'Password', loginBtn: 'Sign in', logout: 'Sign out',
+      tabDash: 'Dashboard', tabStatus: 'Status', tabEngine: 'Engine', tabDistill: 'Distill', tabClients: 'Clients',
+      tabUsers: 'Accounts', tabBehaviour: 'Behaviour', tabSettings: 'Settings', tabVault: 'Vault',
+      dashTitle: 'Dashboard',
+      dashLead: 'Index, clients, uptime.',
+      dashDisk: 'On-disk dirs',
+      dashDiskGap: 'On-disk dirs (index gap)',
+      dashActors: 'Who asked (last 24 h)',
+      dashRecent: 'Recent calls', refresh: 'Refresh', save: 'Save',
+      statusTitle: 'Server status',
+      syncTitle: 'Sync',
+      syncColPath: 'File',
+      syncColWrote: 'Suffixed version',
+      syncColWhen: 'When',
+      syncNone: 'No conflicts since server start.',
+      syncNever: 'nothing received yet',
+      syncMode: 'mode',
+      syncReceiveOnly: 'receive-only (push)',
+      engineTitle: 'Search engine',
+      engineLeadOllama: 'Ollama: embeddings + distill when this server writes.',
+      engineLeadFast: 'Local embeddings (no Ollama). Distill stays off this appliance.',
+      engineOllama: 'Ollama URL', engineModel: 'Embedding model',
+      engineRuntime: 'Ollama runtime',
+      engineAccel: 'Accelerator',
+      engineLoaded: 'Loaded',
+      engineDistillNote: 'Distill',
+      engineDistillRo: 'hidden — vault read-only (needs write)',
+      engineDistillOff: 'off on this appliance (BRAIN_DISTILL=0)',
+      engineDistillOn: 'on — Distill tab',
+      engineProbe: 'Probe embedder', engineReindex: 'Rebuild index',
+      distillTitle: 'Distillation',
+      distillLead: 'One-at-a-time queue: state/distill-inbox/*.json → Ollama chat → distilled/.',
+      distillStart: 'Run (inbox)',
+      distillDry: 'Dry-run Ollama',
+      distillCancel: 'Cancel',
+      distillModel: 'Chat model',
+      distillPhase: 'Phase',
+      distillRunnable: 'Runnable',
+      distillProgress: 'Progress',
+      distillWritten: 'Written',
+      distillNeedWrite: 'Distill needs a writable vault.',
+      clientsTitle: 'Clients',
+      clientsLead: 'Tokens for devices and agents — not people accounts.',
+      clientsNew: 'New client', clientsIssue: 'Issue token',
+      usersTitle: 'Panel accounts',
+      usersLead: 'Accounts for this panel. A new password ends old sessions.',
+      usersNew: 'New account', usersPass: 'Password (min. 12 chars)', usersCreate: 'Create',
+      colName: 'Name', colRole: 'Role', colLast: 'Last seen', colLogin: 'Login', colLastLogin: 'Last sign-in',
+      settingsTitle: 'Settings',
+      setAppearance: 'Appearance', setLanguage: 'Language', setInterface: 'Interface',
+      languageLabel: 'Interface',
+      densityLabel: 'Density', densityComfortable: 'Comfortable', densityCompact: 'Compact',
+      behaviourTitle: 'Agent behaviour',
+      behaviourLead: 'What connected agents see — takes effect immediately.',
+      behaviourPhrase: 'Handshake phrase',
+      behaviourPhraseHint: 'The agent’s first reply — proof Pomnia is wired.',
+      behaviourRequire: 'Require phrase',
+      behaviourCheckpoint: 'Allow auto-checkpoint',
+      behaviourLabel: 'This instance’s name',
+      behaviourLabelHint: 'How the server introduces itself when it claims the vault.',
+      claimBtn: 'Take ownership',
+      claimOwned: 'This server already writes to this vault — claiming is not needed.',
+      claimPinned:
+        'To let this server write, remove read-only from the unit (--read-only / BRAIN_READ_ONLY) and restart. Then: brain-core --claim-vault (not from the panel while the flag pins RO).',
+      claimReady: 'Take write ownership from the other instance (sync it first).',
+      claimHeld:
+        'Another instance holds the write lock. This host is not pinned RO — you can claim deliberately (sync first).',
+      vaultLead: 'Only one instance may write at a time.',
+      vaultForYou: 'For you',
+      vaultOnServer: 'On the server',
+      vaultWrite: 'Write',
+      vaultWriteSelf: 'This server writes',
+      vaultWriteOther: 'Another instance writes',
+      vaultWriteRo: 'Read-only',
+      vaultRo: 'Read-only',
+      vaultRoYes: 'yes',
+      vaultRoNo: 'no',
+      vaultTech: 'Technical details',
+      vaultInContainer: 'In container',
+      vaultOwnerId: 'Owner id',
+      vaultLabel: 'Label',
+      vaultBannerRw: 'This server writes.',
+      vaultBannerOther: 'Owner:',
+      vaultBannerRo: 'Read-only — this host does not write.',
+      tileFiles: 'files in index', tileChunks: 'chunks', tileWait: 'waiting to index',
+      tileReq: 'requests / 24 h', tileClients: 'active clients', tileUp: 'uptime',
+    },
+  }
+  let locale = 'pl'
+  try { locale = localStorage.getItem('pomnia-ui-locale') === 'en' ? 'en' : 'pl' } catch (e) {}
+  const t = (k) => (I18N[locale] && I18N[locale][k]) || I18N.pl[k] || k
+
+  function applyLocale(next) {
+    locale = next === 'en' ? 'en' : 'pl'
+    try { localStorage.setItem('pomnia-ui-locale', locale) } catch (e) {}
+    document.documentElement.setAttribute('lang', locale)
+    for (const el of document.querySelectorAll('[data-i18n]')) {
+      const key = el.getAttribute('data-i18n')
+      if (key && I18N.pl[key] !== undefined) el.textContent = t(key)
+    }
+    for (const el of document.querySelectorAll('[data-i18n-html]')) {
+      const key = el.getAttribute('data-i18n-html')
+      if (key && I18N.pl[key] !== undefined) el.innerHTML = t(key)
+    }
+    const bar = $('locale-bar')
+    if (bar) {
+      for (const b of bar.querySelectorAll('[data-locale]')) {
+        b.setAttribute('aria-checked', String(b.getAttribute('data-locale') === locale))
+      }
+    }
+    // Shared chrome defaults to English (public status page); retitle for PL admin.
+    const themes = $('theme-bar')
+    if (themes) {
+      const colors = locale === 'en' ? 'Colors' : 'Kolorystyka'
+      themes.setAttribute('aria-label', colors)
+      const lbl = themes.querySelector('.lbl')
+      if (lbl) lbl.textContent = colors
+      const glass = themes.querySelector('[data-theme-opt="glass"]')
+      if (glass) glass.textContent = locale === 'en' ? 'Glass' : 'Szkło'
+    }
+    const claim = $('claim')
+    if (claim && claim.dataset.claimState) paintClaimTitle(claim.dataset.claimState)
+  }
+
+  function applyDensity(d) {
+    const density = d === 'compact' ? 'compact' : 'comfortable'
+    document.documentElement.setAttribute('data-density', density)
+    try { localStorage.setItem('pomnia-ui-density', density) } catch (e) {}
+    const bar = $('density-bar')
+    if (!bar) return
+    for (const b of bar.querySelectorAll('[data-density]')) {
+      b.setAttribute('aria-checked', String(b.getAttribute('data-density') === density))
+    }
+  }
 
   function msg(el, kind, s) {
     if (!el) return
@@ -479,18 +785,22 @@ export function renderAdminPage(origin: string): string {
     try { o = await api('GET', '/admin/overview') } catch (e) { msg($('dash-msg'), 'err', e.message); return }
     msg($('dash-msg'), null, null)
 
-    const t = $('tiles'); t.innerHTML = ''
-    tile(t, fmt(o.index.files), 'plików w indeksie')
-    tile(t, fmt(o.index.chunks), 'fragmentów')
+    const tEl = $('tiles'); tEl.innerHTML = ''
+    tile(tEl, fmt(o.index.files), t('tileFiles'))
+    tile(tEl, fmt(o.index.chunks), t('tileChunks'))
     // The number worth a colour: notes on disk the index has never seen.
-    tile(t, fmt(o.unindexed), 'czeka na indeks', o.unindexed > 0 ? 'warn' : 'good')
-    tile(t, fmt(o.activity.last24h), 'zapytań / 24 h', o.activity.last24h > 0 ? 'good' : '')
-    tile(t, String(o.activity.actors.length), 'aktywnych klientów')
-    tile(t, uptime(o.uptimeSec), 'działa')
+    tile(tEl, fmt(o.unindexed), t('tileWait'), o.unindexed > 0 ? 'warn' : 'good')
+    tile(tEl, fmt(o.activity.last24h), t('tileReq'), o.activity.last24h > 0 ? 'good' : '')
+    tile(tEl, String(o.activity.actors.length), t('tileClients'))
+    tile(tEl, uptime(o.uptimeSec), t('tileUp'))
+
+    // Do not scream "index gap" when the gap is zero.
+    const diskH = $('dash-disk-h')
+    if (diskH) diskH.textContent = o.unindexed > 0 ? t('dashDiskGap') : t('dashDisk')
 
     rows($('vault-rows'), o.vault,
       (v) => [[v.dir + (v.indexable ? '' : '  · nie indeksowane')], [fmt(v.files) + ' plików', 'mono'], [bytes(v.bytes), 'mono']],
-      'Vault jest pusty — nic tu jeszcze nie trafiło.')
+      'Sejf jest pusty — nic tu jeszcze nie trafiło.')
 
     rows($('actor-rows'), o.activity.actors,
       (a) => [[a.name], [fmt(a.calls) + ' zapytań', 'mono'], [ago(a.last), 'mono']],
@@ -503,7 +813,7 @@ export function renderAdminPage(origin: string): string {
 
   // ── status ──────────────────────────────────────────────────────────────
   const STATE_PL = { ok: 'sprawne', degraded: 'ograniczone', down: 'nie działa' }
-  const NAMES = { db: 'Baza', index: 'Indeks', vault: 'Vault', disk: 'Dysk / zapis', ollama: 'Embeddingi (Ollama)' }
+  const NAMES = { db: 'Baza', index: 'Indeks', vault: 'Sejf', disk: 'Dysk / zapis' }
 
   async function loadStatus() {
     const tb = $('checks')
@@ -527,30 +837,124 @@ export function renderAdminPage(origin: string): string {
       tr.append(th, td); tb.appendChild(tr)
     }
     add('Ogólnie', STATE_PL[h.status] || h.status)
-    add('Wersja', 'brain-core ' + h.version)
+    add('Wersja', 'Pomnia ' + h.version)
     add('Zapis', h.writable ? 'ten serwer jest właścicielem' : 'tylko odczyt (replika)')
     add('Właściciel vaultu', h.vaultOwner || '—')
+    const backend = h.embed?.backend || 'ollama'
+    add('Embed backend', backend + (h.embed?.ready === false ? ' · niegotowy' : h.embed?.ready ? ' · gotowy' : ''))
+    if (h.embed?.model) add('Model embed', h.embed.model)
     if (h.index && typeof h.index.files === 'number') {
       add('Indeks', h.index.files.toLocaleString('pl') + ' plików · ' + h.index.chunks.toLocaleString('pl') + ' fragmentów')
     } else {
       add('Indeks', 'liczniki niedostępne')
     }
-    for (const key of ['db', 'index', 'vault', 'disk', 'ollama']) {
+    for (const key of ['db', 'index', 'vault', 'disk']) {
       const c = h.checks[key]
       add(NAMES[key], STATE_PL[c.state] + (c.detail ? ' — ' + c.detail : ''))
     }
-    paintOllamaStatus(h)
+    const emb = h.checks.ollama
+    const embName = backend === 'fastembed' ? 'Embeddingi (lokalne)' : 'Embeddingi (Ollama)'
+    add(embName, STATE_PL[emb.state] + (emb.detail ? ' — ' + emb.detail : ''))
+    paintEmbedStatus(h)
+
+    const syncTb = $('sync-checks')
+    if (syncTb) {
+      syncTb.innerHTML = ''
+      const sadd = (k, v, cls) => {
+        const tr = document.createElement('tr')
+        const th = document.createElement('td'); th.textContent = k; th.style.color = 'var(--ink-faint)'
+        const td = document.createElement('td'); td.textContent = v; td.className = cls || 'mono'
+        tr.append(th, td); syncTb.appendChild(tr)
+      }
+      const s = h.sync || {}
+      sadd('Ostatni transfer', s.lastReceivedAt || t('syncNever'))
+      sadd('Peer', s.lastPeer || '—')
+      sadd('Pliki (ostatni transfer)', String(typeof s.filesReceived === 'number' ? s.filesReceived : 0), 'mono')
+      sadd('Konflikty (od startu)', String(typeof s.conflicts === 'number' ? s.conflicts : 0), 'mono')
+      sadd('Archiwum (ostatnie)', s.archiveLastAt || '—')
+      if (s.mode) sadd(t('syncMode'), s.mode === 'receive-only' ? t('syncReceiveOnly') : s.mode)
+      if (s.peer) sadd('Peer (config)', s.peer)
+      if (s.archiveTarget) sadd('Archive target (config)', s.archiveTarget)
+    }
+    const confBody = $('sync-conflicts')
+    if (confBody) {
+      const rows = Array.isArray(h.sync?.recentConflicts) ? h.sync.recentConflicts : []
+      if (!rows.length) {
+        confBody.innerHTML = '<tr><td colspan="3" style="color:var(--ink-faint)">' + t('syncNone') + '</td></tr>'
+      } else {
+        confBody.innerHTML = ''
+        for (const c of rows.slice(0, 50)) {
+          const tr = document.createElement('tr')
+          const a = document.createElement('td'); a.textContent = c.path || '—'; a.className = 'mono'
+          const b = document.createElement('td'); b.textContent = c.wrote || '—'; b.className = 'mono'
+          const d = document.createElement('td')
+          const ts = Date.parse(c.at)
+          d.textContent = Number.isFinite(ts) ? ago(ts) : (c.at || '—')
+          d.className = 'mono'
+          tr.append(a, b, d); confBody.appendChild(tr)
+        }
+      }
+    }
   }
 
-  function paintOllamaStatus(h) {
-    const box = $('ollama-status')
+  function paintEmbedStatus(h) {
+    const box = $('embed-status')
+    const lead = $('engine-lead')
+    const runtime = $('engine-runtime')
+    const backend = h.embed?.backend || 'ollama'
+    if (lead) {
+      lead.hidden = false
+      lead.textContent = backend === 'fastembed' ? t('engineLeadFast') : t('engineLeadOllama')
+    }
     if (!box || !h?.checks?.ollama) return
     const c = h.checks.ollama
     const kind = c.state === 'ok' ? 'ok' : c.state === 'degraded' ? 'warn' : 'err'
-    const label = c.state === 'ok'
-      ? 'Ollama OK — embeddingi dostępne'
-      : (STATE_PL[c.state] || c.state) + (c.detail ? ' — ' + c.detail : '')
+    const rt = h.ollamaRuntime
+    let label
+    if (c.state === 'ok') {
+      if (backend === 'fastembed') {
+        label = 'Embedder OK (lokalny ONNX)'
+      } else if (rt?.summary) {
+        label = rt.summary
+      } else {
+        label = h.writable
+          ? 'Ollama OK — embed (+ destylacja gdy włączona)'
+          : 'Ollama OK — embed (destylacja wymaga zapisu)'
+      }
+    } else {
+      label = (STATE_PL[c.state] || c.state) + (c.detail ? ' — ' + c.detail : '')
+    }
     msg(box, kind, label)
+
+    if (runtime) {
+      runtime.innerHTML = ''
+      const add = (k, v) => {
+        const tr = document.createElement('tr')
+        const th = document.createElement('td')
+        th.style.color = 'var(--ink-faint)'
+        th.textContent = k
+        const td = document.createElement('td')
+        td.className = 'mono'
+        td.textContent = v
+        tr.append(th, td)
+        runtime.appendChild(tr)
+      }
+      if (rt) {
+        add(t('engineAccel'), rt.accelerator || '—')
+        const loaded = Array.isArray(rt.running) && rt.running.length
+          ? rt.running.map((m) => m.name + (m.sizeVram > 0 ? ' (VRAM)' : ' (CPU)')).join(', ')
+          : '—'
+        add(t('engineLoaded'), loaded)
+      }
+      const d = h.distill
+      if (d) {
+        let note
+        if (!d.enabled) note = t('engineDistillOff')
+        else if (!h.writable) note = t('engineDistillRo') + (d.model ? ' · model ' + d.model : '')
+        else note = t('engineDistillOn') + (d.model ? ' · ' + d.model : '')
+        add(t('engineDistillNote'), note)
+      }
+    }
   }
 
   async function probeOllama() {
@@ -558,12 +962,13 @@ export function renderAdminPage(origin: string): string {
     msg(box, 'ok', 'sprawdzam…')
     try {
       const h = await api('GET', '/admin/health')
-      paintOllamaStatus(h)
+      paintEmbedStatus(h)
       const c = h.checks?.ollama
+      const backend = h.embed?.backend || 'ollama'
       msg(box, c?.state === 'ok' ? 'ok' : 'warn',
         c?.state === 'ok'
-          ? 'Ollama odpowiada; model embed gotowy.'
-          : (c?.detail || 'Ollama niedostępna — search semantyczny będzie pusty.'))
+          ? (backend === 'fastembed' ? 'Embedder lokalny gotowy.' : 'Ollama gotowa.')
+          : (c?.detail || 'Embedder niedostępny.'))
     } catch (e) { msg(box, 'err', e.message) }
   }
 
@@ -723,6 +1128,12 @@ export function renderAdminPage(origin: string): string {
   }
 
   // ── vault ───────────────────────────────────────────────────────────────
+  function vaultWriteLabel(v) {
+    if (v.writable) return t('vaultWriteSelf')
+    if (v.owner) return t('vaultWriteOther')
+    return t('vaultWriteRo')
+  }
+
   function paintVaultBanner(v) {
     const ban = $('vault-banner')
     const badge = $('vault-badge')
@@ -730,38 +1141,157 @@ export function renderAdminPage(origin: string): string {
     if (!ban || !badge || !detail) return
     if (v.writable) {
       ban.className = 'banner rw'
-      badge.textContent = 'Zapis'
-      detail.textContent = 'Ten serwer jest właścicielem vaultu' +
-        (v.owner ? ' (' + v.owner + ').' : '.')
+      badge.textContent = t('vaultWrite')
+      detail.textContent = t('vaultBannerRw')
     } else {
       ban.className = 'banner ro'
-      badge.textContent = 'Tylko odczyt'
-      const pin = v.readOnlyFlag ? ' · przypięty --read-only w systemd' : ''
-      detail.textContent = (v.owner
-        ? 'Replika — właściciel: ' + v.owner
-        : 'Replika — właściciel nieznany') + pin +
-        '. Push z Desktop (Connect) aktualizuje kopię; ten host nie zapisuje notatek agentów.'
+      badge.textContent = t('vaultRo')
+      detail.textContent = v.owner
+        ? (t('vaultBannerOther') + ' ' + v.owner)
+        : t('vaultBannerRo')
     }
   }
 
   async function loadVault() {
     const tb = $('vault-info')
+    const tech = $('vault-tech')
     tb.innerHTML = ''
+    if (tech) tech.innerHTML = ''
     const v = await api('GET', '/admin/vault')
     paintVaultBanner(v)
+    const add = (k, val, plain) => {
+      const tr = document.createElement('tr')
+      const a = document.createElement('td'); a.textContent = k; a.style.color = 'var(--ink-faint)'
+      const b = document.createElement('td')
+      b.className = plain ? 'plain' : 'mono'
+      b.textContent = val
+      tr.append(a, b); tb.appendChild(tr)
+    }
+    // Facts first: UNC for the human, host path on the box — never e2e notes.
+    if (v.smbPath) add(t('vaultForYou'), v.smbPath, false)
+    if (v.hostPath) add(t('vaultOnServer'), v.hostPath, false)
+    else if (v.where) add(t('vaultOnServer'), v.where, true)
+    else if (v.path && !String(v.path).startsWith('/var/')) {
+      add(t('vaultOnServer'), v.path, false)
+    }
+    add(t('vaultWrite'), vaultWriteLabel(v), true)
+    add(t('vaultRo'), v.readOnlyFlag ? t('vaultRoYes') : t('vaultRoNo'), true)
+    if (tech) {
+      const lines = []
+      if (v.path) lines.push(t('vaultInContainer') + ': ' + v.path)
+      if (v.owner) lines.push(t('vaultOwnerId') + ': ' + v.owner)
+      if (v.label) lines.push(t('vaultLabel') + ': ' + v.label)
+      if (v.readOnlyFlag) lines.push('Pinned: --read-only')
+      if (lines.length) {
+        const d = document.createElement('details')
+        d.className = 'tech'
+        const s = document.createElement('summary')
+        s.textContent = t('vaultTech')
+        const body = document.createElement('div')
+        body.className = 'tech-body'
+        body.textContent = lines.join('\\n')
+        d.append(s, body)
+        tech.appendChild(d)
+      }
+    }
+    $('claim').disabled = v.writable || v.readOnlyFlag
+    // ready = can actually succeed from the panel (not owner, not pinned RO).
+    const state = v.readOnlyFlag ? 'pinned' : v.writable ? 'owned' : 'ready'
+    $('claim').dataset.claimState = state
+    paintClaim(state)
+    paintDistillNav(v.writable === true && !v.readOnlyFlag)
+  }
+
+  function paintDistillNav(show) {
+    if (!DISTILL_FEATURE) return
+    const nav = $('nav-distill')
+    if (nav) nav.hidden = !show
+    // If the open tab is distill but vault became RO, bounce to engine.
+    if (!show) {
+      const distillTab = $('tab-distill')
+      if (distillTab && !distillTab.classList.contains('hidden')) {
+        const eng = document.querySelector('#main-nav button[data-tab="engine"]')
+        if (eng) eng.click()
+      }
+    }
+  }
+
+  async function loadDistill() {
+    if (!DISTILL_FEATURE || !$('distill-info')) return
+    const tb = $('distill-info')
+    tb.innerHTML = ''
+    const d = await api('GET', '/admin/distill')
     const add = (k, val) => {
       const tr = document.createElement('tr')
       const a = document.createElement('td'); a.textContent = k; a.style.color = 'var(--ink-faint)'
       const b = document.createElement('td'); b.className = 'mono'; b.textContent = val
       tr.append(a, b); tb.appendChild(tr)
     }
-    add('Zapis', v.writable ? 'ten serwer jest właścicielem' : 'tylko odczyt (replika)')
-    add('Właściciel', v.owner || '—')
-    add('Przypięty --read-only', v.readOnlyFlag ? 'tak (w unicie systemd)' : 'nie')
-    $('claim').disabled = v.writable || v.readOnlyFlag
+    add(t('distillModel'), d.model || '—')
+    add(t('distillPhase'), d.phase + (d.current ? ' · ' + d.current.title : ''))
+    add(t('distillRunnable'), d.runnable ? 'yes' : ('no' + (d.reason ? ' — ' + d.reason : '')))
+    const L = d.last || {}
+    add(t('distillProgress'), 'queue=' + (d.queueDepth || 0) +
+      ' · ok=' + (L.ok || 0) + ' stub=' + (L.stubs || 0) + ' garbage=' + (L.garbage || 0) +
+      ' skip=' + (L.skipped || 0) + ' fail=' + (L.failed || 0))
+    add(t('distillWritten'), String(L.written || 0))
+    const busy = d.phase === 'running' || d.phase === 'dry-run'
+    if ($('distill-start')) $('distill-start').disabled = busy || !d.runnable
+    if ($('distill-dry')) $('distill-dry').disabled = busy || !d.enabled
+    if ($('distill-cancel')) $('distill-cancel').disabled = !busy
+  }
+
+  async function distillStart(dryRun) {
+    try {
+      const r = await api('POST', '/admin/distill', { dryRun: !!dryRun })
+      if (!r.started) msg($('distill-msg'), 'warn', r.reason || 'not started')
+      else msg($('distill-msg'), 'ok', dryRun ? 'Dry-run…' : 'Destylacja…')
+      await loadDistill()
+    } catch (e) { msg($('distill-msg'), 'err', e.message) }
+  }
+
+  async function distillCancel() {
+    try {
+      await api('POST', '/admin/distill/cancel', {})
+      await loadDistill()
+    } catch (e) { msg($('distill-msg'), 'err', e.message) }
+  }
+
+  /**
+   * Truth in the Sejf tab: never show a disabled red "claim" that cannot work.
+   * Button only when POST /admin/vault/claim would actually take ownership.
+   */
+  function paintClaim(state) {
+    const btn = $('claim')
+    const hint = $('claim-hint')
+    if (!btn) return
+    btn.dataset.claimState = state
+    if (state === 'ready') {
+      btn.hidden = false
+      btn.disabled = false
+      btn.title = t('claimReady')
+      if (hint) {
+        hint.hidden = false
+        hint.textContent = t('claimHeld')
+      }
+    } else {
+      btn.hidden = true
+      btn.disabled = true
+      btn.title = ''
+      if (hint) {
+        hint.hidden = false
+        hint.textContent = state === 'pinned' ? t('claimPinned') : t('claimOwned')
+      }
+    }
+  }
+
+  function paintClaimTitle(state) {
+    paintClaim(state)
   }
 
   async function claim() {
+    const btn = $('claim')
+    if (!btn || btn.hidden || btn.disabled) return
     if (!window.confirm(
       'Przejąć własność vaultu?\\n\\n' +
       'Dotychczasowy właściciel natychmiast przestanie móc zapisywać. ' +
@@ -774,14 +1304,51 @@ export function renderAdminPage(origin: string): string {
     } catch (e) { msg($('vault-msg'), 'err', e.message) }
   }
 
-  // ── tabs ────────────────────────────────────────────────────────────────
-  for (const b of document.querySelectorAll('nav button')) {
-    b.onclick = () => {
-      for (const o of document.querySelectorAll('nav button')) o.setAttribute('aria-current', String(o === b))
-      for (const s of ['dash', 'status', 'engine', 'clients', 'users', 'behaviour', 'vault']) {
-        $('tab-' + s).classList.toggle('hidden', s !== b.dataset.tab)
+  // ── tabs + settings subnav ──────────────────────────────────────────────
+  const MAIN_TABS = DISTILL_FEATURE
+    ? ['dash', 'status', 'engine', 'distill', 'clients', 'users', 'behaviour', 'settings', 'vault']
+    : ['dash', 'status', 'engine', 'clients', 'users', 'behaviour', 'settings', 'vault']
+  for (const b of document.querySelectorAll('#main-nav button[data-tab]')) {
+    b.onclick = (ev) => {
+      const btn = ev.currentTarget
+      const tab = btn.getAttribute('data-tab')
+      for (const o of document.querySelectorAll('#main-nav button[data-tab]')) {
+        if (o === btn) o.setAttribute('aria-current', 'true')
+        else o.removeAttribute('aria-current')
+      }
+      for (const s of MAIN_TABS) {
+        const el = $('tab-' + s)
+        if (el) el.classList.toggle('hidden', s !== tab)
+      }
+      if (tab === 'distill') loadDistill().catch(() => {})
+    }
+  }
+  for (const b of document.querySelectorAll('#settings-subnav button[data-settings]')) {
+    b.onclick = (ev) => {
+      const btn = ev.currentTarget
+      const id = btn.getAttribute('data-settings')
+      for (const o of document.querySelectorAll('#settings-subnav button[data-settings]')) {
+        if (o === btn) o.setAttribute('aria-current', 'true')
+        else o.removeAttribute('aria-current')
+      }
+      for (const pane of ['appearance', 'language', 'interface']) {
+        $('settings-' + pane).classList.toggle('hidden', pane !== id)
       }
     }
+  }
+  const localeBar = $('locale-bar')
+  if (localeBar) {
+    localeBar.addEventListener('click', (ev) => {
+      const opt = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-locale')
+      if (opt) applyLocale(opt)
+    })
+  }
+  const densityBar = $('density-bar')
+  if (densityBar) {
+    densityBar.addEventListener('click', (ev) => {
+      const opt = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-density')
+      if (opt) applyDensity(opt)
+    })
   }
 
   $('login-form').onsubmit = login
@@ -795,9 +1362,21 @@ export function renderAdminPage(origin: string): string {
   $('reindex').onclick = reindex
   $('add').onclick = addToken
   $('claim').onclick = claim
+  if (DISTILL_FEATURE) {
+    if ($('distill-start')) $('distill-start').onclick = () => distillStart(false)
+    if ($('distill-dry')) $('distill-dry').onclick = () => distillStart(true)
+    if ($('distill-cancel')) $('distill-cancel').onclick = distillCancel
+    if ($('distill-refresh')) $('distill-refresh').onclick = () => loadDistill().catch(() => {})
+  }
+
+  try {
+    applyDensity(localStorage.getItem('pomnia-ui-density') || 'comfortable')
+  } catch (e) { applyDensity('comfortable') }
+  applyLocale(locale)
   void restore()
 })()
 </script>
+<script>${themeScript()}${brandSkyScript()}</script>
 </body>
 </html>
 `

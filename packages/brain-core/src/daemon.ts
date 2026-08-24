@@ -8,6 +8,9 @@
  *   brain-core                          # reads config from env / ~/.pomnia/brain-core.toml
  *   brain-core --port 7862 --data-dir ~/.pomnia/brain
  *   brain-core --reindex                # (re)build the index from the vault on start
+ *   brain-core --distill                # one-shot: process distill-inbox (needs writable)
+ *   brain-core --distill --file c.json  # distill explicit conversations JSON
+ *   brain-core --distill-dry-run        # probe Ollama generate, no vault writes
  *   brain-core --claim-vault            # take write ownership of the vault, then exit
  *   brain-core --add-token ops --role admin   # issue a machine credential, print it once
  *   brain-core --add-user helluk --role admin # create a panel account (password on stdin)
@@ -20,13 +23,25 @@
 import process from 'node:process'
 import { hostname } from 'node:os'
 import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
 import { loadConfig, type BrainConfig } from './config/index.js'
 import { createBrainServer } from './mcp/server.js'
-import { EmbedClient } from './rag/embed.js'
+import {
+  createDistillJob,
+  distillRunnable,
+  parseConversation,
+  parseConversationsJson,
+} from './distill/index.js'
+import { embedClientFromConfig, prefetchFastembed } from './rag/embed.js'
 import { indexDir } from './rag/indexer.js'
 import { openDb } from './storage/db.js'
 import { defaultVaultConfig, vaultConfigFromRoot } from './storage/vault.js'
-import { claimVault, describeOwner, localWriterIdentity } from './storage/vaultOwner.js'
+import {
+  claimVault,
+  describeOwner,
+  localWriterIdentity,
+  resolveVaultOwnership,
+} from './storage/vaultOwner.js'
 import { createToken } from './admin/tokens.js'
 import { createUser } from './admin/users.js'
 
@@ -44,7 +59,7 @@ async function reindexInBackground(config: Awaited<ReturnType<typeof loadConfig>
   const vaultRoot = (
     config.vaultRoot ? vaultConfigFromRoot(config.vaultRoot) : defaultVaultConfig(config.dataDir)
   ).root
-  const embedder = new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel })
+  const embedder = embedClientFromConfig(config)
   try {
     await embedder.preflight()
   } catch (err) {
@@ -90,6 +105,90 @@ async function claimAndExit(config: BrainConfig): Promise<never> {
       : `[brain-core] vault owned by ${describeOwner(owner)}`,
   )
   process.exit(0)
+}
+
+/**
+ * One-shot distill (or dry-run). Does not start the HTTP server.
+ *
+ * Dry-run only needs Ollama. Full distill needs writable vault + inbox JSON
+ * under state/distill-inbox/ (or `--file conversations.json`).
+ * Does NOT remove `--read-only` / claim production — helluk flips that.
+ */
+async function distillAndExit(config: BrainConfig, dryRun: boolean): Promise<never> {
+  const vaultRoot = config.vaultRoot ?? join(config.dataDir, 'vault')
+  let writable = false
+  if (!dryRun) {
+    const me = await localWriterIdentity(config.dataDir, config.instanceLabel ?? hostname())
+    const ownership = await resolveVaultOwnership({
+      vaultRoot,
+      me,
+      forceReadOnly: config.readOnly === true,
+    })
+    writable = ownership.writable
+  }
+  const jobCfg = {
+    enabled: config.distillEnabled !== false,
+    model: config.distillModel || 'qwen2.5:14b',
+    ollamaUrl: config.ollamaUrl,
+    vaultRoot,
+    writable,
+    readOnlyFlag: config.readOnly === true,
+  }
+  const job = createDistillJob(() => jobCfg)
+
+  if (!dryRun) {
+    const r = distillRunnable(jobCfg)
+    if (!r.ok) {
+      console.error(`[brain-core] distill refused: ${r.reason}`)
+      process.exit(1)
+    }
+  } else if (!config.ollamaUrl || config.distillEnabled === false) {
+    console.error(
+      `[brain-core] distill dry-run refused: ${
+        config.distillEnabled === false ? 'BRAIN_DISTILL=0' : 'no Ollama URL'
+      }`,
+    )
+    process.exit(1)
+  }
+
+  const fileIdx = process.argv.indexOf('--file')
+  const filePath = fileIdx >= 0 ? process.argv[fileIdx + 1] : undefined
+  let conversations: ReturnType<typeof parseConversationsJson> | undefined
+  if (filePath && !dryRun) {
+    const raw = await readFile(filePath, 'utf8')
+    conversations = parseConversationsJson(raw)
+      .map((c) => parseConversation(c) ?? c)
+      .filter((c) => !!c?.messages?.length)
+  }
+
+  const started = job.start({ dryRun, conversations })
+  if (!started.started) {
+    console.error(`[brain-core] distill not started: ${started.reason}`)
+    process.exit(1)
+  }
+  console.error(`[brain-core] distill ${dryRun ? 'dry-run' : 'job'} started…`)
+
+  for (;;) {
+    await new Promise((r) => setTimeout(r, 500))
+    const s = job.status()
+    if (s.phase === 'running' || s.phase === 'dry-run') {
+      if (s.current) {
+        console.error(`[brain-core] distill: ${s.current.title} (${s.current.id.slice(0, 8)})`)
+      }
+      continue
+    }
+    if (s.last) {
+      const L = s.last
+      console.error(
+        `[brain-core] distill done — ok=${L.ok} stub=${L.stubs} garbage=${L.garbage} ` +
+          `skip=${L.skipped} fail=${L.failed} written=${L.written}` +
+          (L.error ? ` (${L.error})` : ''),
+      )
+      process.exit(L.error && L.written === 0 && L.ok === 0 ? 1 : 0)
+    }
+    console.error(`[brain-core] distill ${s.phase}: ${s.reason ?? ''}`)
+    process.exit(1)
+  }
 }
 
 /**
@@ -213,7 +312,7 @@ async function addUserAndExit(config: BrainConfig, argv: string[]): Promise<neve
     process.exit(1)
   }
   console.error(`[brain-core] konto „${r.summary.username}" (${r.summary.role}) utworzone`)
-  console.error(`[brain-core] zaloguj się w panelu: http://${config.host}:${config.port}/admin`)
+  console.error(`[brain-core] zaloguj się w panelu: http://${config.host}:${config.port}/`)
   process.exit(0)
 }
 
@@ -224,6 +323,14 @@ async function main(): Promise<void> {
   if (process.argv.includes('--add-user')) await addUserAndExit(config, process.argv)
   if (process.argv.includes('--add-token')) await addTokenAndExit(config, process.argv)
   if (process.argv.includes('--claim-vault')) await claimAndExit(config)
+  if (process.argv.includes('--distill-dry-run')) await distillAndExit(config, true)
+  if (process.argv.includes('--distill')) await distillAndExit(config, false)
+  if (process.argv.includes('--prefetch-embed')) {
+    console.error(`[brain-core] prefetching fastembed into ${config.embedCacheDir}…`)
+    await prefetchFastembed(config.embedCacheDir)
+    console.error('[brain-core] embed cache ready')
+    process.exit(0)
+  }
 
   const server = await createBrainServer(config)
   await server.start()
@@ -238,8 +345,13 @@ async function main(): Promise<void> {
   // to a working one in the log, which is where an operator actually looks.
   void (async () => {
     try {
-      await new EmbedClient({ ollamaUrl: config.ollamaUrl, embedModel: config.embedModel }).preflight()
-      console.error(`[brain-core] embeddings ready (${config.embedModel} via ${config.ollamaUrl})`)
+      const embedder = embedClientFromConfig(config)
+      await embedder.preflight()
+      const where =
+        config.embedBackend === 'fastembed'
+          ? `fastembed ${embedder.config.modelId}`
+          : `${config.embedModel} via ${config.ollamaUrl}`
+      console.error(`[brain-core] embeddings ready (${where})`)
     } catch (e) {
       console.error(
         `[brain-core] DEGRADED — semantic search will return nothing: ${(e as Error).message}`,
