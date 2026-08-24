@@ -13,6 +13,7 @@ import { z } from 'zod'
 import type Database from 'better-sqlite3'
 import type { EmbedClient } from '../../rag/embed.js'
 import { search, type SearchSource } from '../../rag/search.js'
+import { classifyGrounding, keywordHits, noteDate, semanticScore } from '../../rag/grounding.js'
 
 export const searchLibrarySchema = {
   type: 'object' as const,
@@ -56,8 +57,32 @@ export async function runSearchLibrary(
     source: source as SearchSource,
   })
 
+  const verdict = classifyGrounding(hits)
+
   if (hits.length === 0) {
-    return JSON.stringify({ hits: [], message: 'no results' })
+    return JSON.stringify({ hits: [], ...verdict, message: 'no results' })
   }
-  return JSON.stringify({ hits })
+
+  // Two things the caller could not previously see. `matched` says whether a row
+  // earned its place by meaning or by sharing words, which the blended score
+  // hides -- a note titled "Google Coral Edge TPU" ranks for "coral reef" on the
+  // word alone. `dated` puts the note's own date in front of the model, because
+  // a corpus spanning months contains decisions that were later reversed, and
+  // without a date the reader has no way to prefer the newer one. The date is
+  // already parsed for the recency boost; it just never reached the answer.
+  const annotated = hits.map((h) => {
+    const sem = semanticScore(h)
+    const kw = keywordHits(h)
+    return {
+      ...h,
+      matched:
+        sem >= 0.1 && kw > 0 ? 'meaning and words'
+        : sem >= 0.1 ? 'meaning'
+        : kw > 0 ? 'words only'
+        : 'weak on both',
+      dated: noteDate(String((h.meta as { name?: unknown })?.name ?? '')),
+    }
+  })
+
+  return JSON.stringify({ hits: annotated, ...verdict })
 }
