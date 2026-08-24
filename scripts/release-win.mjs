@@ -93,8 +93,7 @@ const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).ver
 const bcPath = join(root, 'packages', 'brain-core', 'package.json')
 const bc = JSON.parse(readFileSync(bcPath, 'utf8'))
 if (bc.version !== version) {
-  writeFileSync(bcPath, JSON.stringify({ ...bc, version }, null, 2) + '
-', 'utf8')
+  writeFileSync(bcPath, JSON.stringify({ ...bc, version }, null, 2) + '\n', 'utf8')
   console.log(`brain-core ${bc.version} -> ${version}`)
 }
 
