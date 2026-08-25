@@ -21,6 +21,7 @@
  * can search).
  */
 
+import { cpus } from 'node:os'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -87,6 +88,32 @@ type FeatureExtractor = (
 let fastembedLoader: Promise<FeatureExtractor> | null = null
 let fastembedCacheDir: string | undefined
 
+/**
+ * How many CPU threads the ONNX runtime may take for one embedding pass.
+ *
+ * Left alone, onnxruntime grabs every core it can see. On a workstation that is
+ * what you want. On the appliance role -- the one sold as "a small VM or a NAS"
+ * -- it is how a first sync takes the whole box down: pushing 3452 notes and
+ * reindexing them pinned a QNAP hard enough that the server stopped answering
+ * /healthz at all, while the machine still replied to ping. The memory cap in
+ * the unit does not help, because nothing was short of memory.
+ *
+ * Half the cores, at least one, at most four. Indexing takes longer and the
+ * machine stays usable, which is the right trade for a box whose job is to be
+ * reachable. `BRAIN_EMBED_THREADS` overrides it for a host that can spare more.
+ */
+function embedThreadBudget(): number {
+  const raw = Number(process.env.BRAIN_EMBED_THREADS)
+  if (Number.isFinite(raw) && raw >= 1) return Math.floor(raw)
+  let cores = 4
+  try {
+    cores = cpus().length || 4
+  } catch {
+    // container without /proc access; the default is deliberately small
+  }
+  return Math.max(1, Math.min(4, Math.floor(cores / 2)))
+}
+
 async function loadFastembedExtractor(cacheDir?: string): Promise<FeatureExtractor> {
   if (fastembedLoader && fastembedCacheDir === cacheDir) return fastembedLoader
   fastembedCacheDir = cacheDir
@@ -101,11 +128,19 @@ async function loadFastembedExtractor(cacheDir?: string): Promise<FeatureExtract
     }
     transformers.env.allowLocalModels = true
     // fp32 matches Python fastembed's onnx/model.onnx (~0.52 GB), not the q8 path.
+    const threads = embedThreadBudget()
     const extractor = await transformers.pipeline(
       'feature-extraction',
       FASTEMBED_MODEL_ID,
-      { dtype: 'fp32' },
+      {
+        dtype: 'fp32',
+        // Passed through to onnxruntime. interOp stays at 1: this workload is
+        // one graph at a time, so parallel graph execution buys nothing and
+        // spends cores the rest of the process needs to stay responsive.
+        session_options: { intraOpNumThreads: threads, interOpNumThreads: 1 },
+      } as Parameters<typeof transformers.pipeline>[2],
     )
+    console.error(`[pomnia-core] fastembed: ${threads} ONNX thread(s)`)
     return extractor as unknown as FeatureExtractor
   })()
   return fastembedLoader

@@ -108,6 +108,12 @@ ReadWritePaths=/var/lib/pomnia
 ; Indexing a large vault is the memory peak. ONNX nomic fp32 alone is ~0.5–1 GB
 ; resident after load; leave headroom so a leak gets killed instead of the host.
 MemoryMax=3G
+; Memory was capped and CPU was not, which is the wrong half for this workload:
+; a reindex never ran out of memory, it ran out of machine. Left alone the ONNX
+; runtime takes every core, and on the appliance role -- the one recommended for
+; a NAS -- a first sync pinned the host until it stopped answering /healthz.
+; 150% lets it use one and a half cores and leaves the rest for serving.
+CPUQuota=150%
 TasksMax=256
 LimitNOFILE=8192
 

@@ -37,6 +37,16 @@ import { vecToBlob } from './vec.js'
 /** Embed batch size — matches Python BATCH = 32. */
 const BATCH = 32
 
+/**
+ * Pause between embed batches, so a long reindex cannot starve the HTTP server.
+ * Set BRAIN_INDEX_BREATH_MS higher on a machine that must stay responsive under
+ * load, or to 0 on one that has nothing else to do.
+ */
+const INDEX_BREATH_MS = (() => {
+  const raw = Number(process.env.BRAIN_INDEX_BREATH_MS)
+  return Number.isFinite(raw) && raw >= 0 ? raw : 25
+})()
+
 /** File extensions the embedded indexer ingests as plain text. */
 const TEXT_EXTS = new Set(['.md', '.txt', '.markdown'])
 
@@ -232,6 +242,14 @@ export async function indexFiles(
       // EmbedClient; Ollama's template does NOT add it, contrary to what this
       // comment used to claim (measured: cosine 0.92 between prefixed and bare).
       const vecs = await embedder.embedBatch(batch, 'document', signal)
+
+      // Hand the machine back between batches. The ONNX threads are native and
+      // do not yield on their own, so on a small box a long reindex starved the
+      // HTTP server badly enough that /healthz stopped answering entirely --
+      // the appliance looked dead while it was merely busy. A few milliseconds
+      // per batch costs almost nothing over a run and keeps the server able to
+      // say what it is doing.
+      await new Promise((r) => setTimeout(r, INDEX_BREATH_MS))
       if (vecs.length !== batch.length) {
         throw new Error(`embed count mismatch: got ${vecs.length} for ${batch.length} chunks (${name})`)
       }
