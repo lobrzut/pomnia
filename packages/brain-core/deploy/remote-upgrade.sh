@@ -30,19 +30,59 @@ cd "$PREFIX"
 stamp=$(date +%s)
 backup="dist.bak.${stamp}"
 cp -a dist "$backup"
+# package.json and node_modules get replaced too, so they need backing up too.
+# Restoring dist alone once left a server whose manifest said 0.1.69 while every
+# file under dist was 0.1.67 -- and version.ts reads the manifest, so it
+# reported a version it was not running.
+cp -a package.json "package.json.bak.${stamp}"
+have_nm=0
+[ -d node_modules ] && { cp -a node_modules "node_modules.bak.${stamp}"; have_nm=1; }
 
 restore() {
   echo "!! upgrade failed — restoring ${backup}" >&2
   rm -rf dist
   cp -a "$backup" dist
+  cp -a "package.json.bak.${stamp}" package.json
+  if [ "$have_nm" = 1 ]; then rm -rf node_modules; cp -a "node_modules.bak.${stamp}" node_modules; fi
   systemctl restart "$UNIT" || true
   echo "!! restored the previous dist; service restarted from it" >&2
   journalctl -u "$UNIT" -n 40 --no-pager >&2 || true
 }
 
-tar -xzf "$TGZ"
+# The published artifact nests everything under pomnia-brain-core/, while this
+# script unpacks straight into $PREFIX -- which would have produced
+# /opt/pomnia-brain-core/pomnia-brain-core/dist and left the running dist
+# untouched, so the service would restart on the old code and report success.
+# bootstrap.sh already tolerates both shapes; this did not, which meant the
+# documented upgrade path could not consume the published tarball.
+staging=$(mktemp -d)
+trap 'rm -rf "$staging"' EXIT
+tar -xzf "$TGZ" -C "$staging" || echo "! tar reported errors (often workspace symlinks)" >&2
+if [ -d "$staging/pomnia-brain-core/dist" ]; then
+  src="$staging/pomnia-brain-core"
+elif [ -d "$staging/dist" ]; then
+  src="$staging"
+else
+  echo "!! tarball contains no dist/ -- refusing to touch the install" >&2
+  restore
+  exit 1
+fi
+rm -rf dist
+cp -a "$src/dist" dist
+cp -a "$src/package.json" package.json
+[ -d "$src/deploy" ] && cp -a "$src/deploy" deploy
+[ -d "$src/node_modules" ] && { rm -rf node_modules; cp -a "$src/node_modules" node_modules; }
 chown -R root:root dist package.json deploy 2>/dev/null || true
 # Never replace Linux-native node_modules from a Windows build artifact.
+# The tarball carries better-sqlite3 built for the Node the release CI used. A
+# host on a different major fails to load it with ERR_DLOPEN_FAILED and a
+# NODE_MODULE_VERSION mismatch -- what happened feeding a Node 22 build to a
+# Node 20 box. Rebuild rather than restart into a crash loop.
+if ! node -e "require('./node_modules/better-sqlite3')" >/dev/null 2>&1; then
+  echo "native binding will not load under $(node --version); rebuilding"
+  npm rebuild better-sqlite3 >/dev/null 2>&1 || echo "! rebuild failed; restart will show why" >&2
+fi
+
 systemctl restart "$UNIT"
 
 ok=0
