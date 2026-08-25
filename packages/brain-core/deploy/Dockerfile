@@ -66,11 +66,23 @@ EXPOSE 7865
 # Reads BRAIN_PORT so overriding the port cannot leave the probe checking a
 # different one than the server bound — a green healthcheck for a port the
 # outside world cannot reach is worse than no healthcheck.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+# A reindex on CPU can hold the box for a long time, and the probe has to
+# outlast it rather than declare a busy server dead. 15s and 5 retries means
+# a container is only unhealthy after ~75 seconds of genuinely not answering.
+HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=5 \
   CMD node -e "const p=process.env.BRAIN_PORT||7865;fetch('http://127.0.0.1:'+p+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # 0.0.0.0 makes the port reachable outside the container, which turns Bearer
 # auth on. Put tokens in /var/lib/pomnia/mcp-tokens.json before exposing it —
 # with no tokens file every request is refused, by design.
+# Run it with a CPU limit. The image cannot set one for itself, and without it
+# the ONNX embedder takes every core the host has: on a NAS a first sync
+# pinned the machine until the server stopped answering at all.
+#
+#   docker run --cpus 1.5 --memory 3g ...
+#
+# BRAIN_EMBED_THREADS caps the ONNX thread count independently, and
+# BRAIN_INDEX_BREATH_MS lengthens the pause between embed batches.
+
 ENTRYPOINT ["node", "dist/daemon.js"]
 CMD ["--host", "0.0.0.0", "--data-dir", "/var/lib/pomnia", "--vault-root", "/var/lib/pomnia/vault"]
