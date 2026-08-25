@@ -68,6 +68,7 @@ import {
 } from '../admin/sessions.js'
 import { authenticate, touchLogin } from '../admin/users.js'
 import { collectOverview, createActivityRing, type ActivityRing } from '../admin/overview.js'
+import { isPomniaService } from '../serviceName.js'
 import { collectHealth, redactHealth } from '../health.js'
 import { indexDir, indexFiles } from '../rag/indexer.js'
 import { createDistillJob, parseConversation } from '../distill/index.js'
@@ -106,7 +107,7 @@ async function healthzOk(host: string, port: number): Promise<boolean> {
     try {
       const res = await fetch(url, { signal: ac.signal })
       const body = (await res.json().catch(() => null)) as { service?: string } | null
-      return body?.service === 'brain-core'
+      return isPomniaService(body?.service)
     } finally {
       clearTimeout(t)
     }

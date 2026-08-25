@@ -20,6 +20,7 @@ import { fork, spawn, execSync, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { app, utilityProcess, type UtilityProcess } from 'electron'
+import { isPomniaService } from '../../packages/brain-core/src/serviceName.js'
 
 /** Cold start under AV scan can exceed 20s; IPC ready usually lands in 1–4s when healthy. */
 const START_TIMEOUT_MS = 45_000
@@ -292,7 +293,7 @@ async function probeBrainHealthz(host: string, port: number): Promise<string | n
     const res = await fetch(url, { signal: AbortSignal.timeout(800) })
     if (!res.ok) return null
     const body = (await res.json()) as { ok?: boolean; service?: string }
-    if (body?.ok === true && body?.service === 'brain-core') {
+    if (body?.ok === true && isPomniaService(body?.service)) {
       return `http://${host}:${port}/mcp`
     }
   } catch {

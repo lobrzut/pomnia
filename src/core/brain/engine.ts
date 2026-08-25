@@ -1,3 +1,4 @@
+import { isPomniaService } from '../../../packages/brain-core/src/serviceName.js'
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
 /**
@@ -56,7 +57,7 @@ const UNKNOWN: EngineInfo = {
  */
 export function identifyEngine(data: Record<string, unknown> | undefined | null): EngineInfo {
   if (!data || typeof data !== 'object') return UNKNOWN
-  if (data.service === 'brain-core') return BRAIN_CORE
+  if (isPomniaService(data.service)) return BRAIN_CORE
   // The proxy names what it fronts; brain-core has nothing in front of it.
   if (typeof data.upstream === 'string' && data.upstream) return LEGACY
   if (typeof data.tokens === 'number' && data.service === undefined) return LEGACY

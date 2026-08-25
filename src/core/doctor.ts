@@ -26,6 +26,7 @@ import { ledgerPathInVault, ownerProcessed, parseLedger } from './brain/ledgerSt
 import { pingBrain } from './brain/status.js'
 import { appDataRoot, currentOS, homeDir } from './platform.js'
 import type { SourceId } from './model.js'
+import { isPomniaService } from '../../packages/brain-core/src/serviceName.js'
 
 export type DoctorLevel = 'OK' | 'WARN' | 'FAIL'
 
@@ -899,13 +900,13 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
     const okHealthz =
       ping.reachable &&
       (ping.url.includes('/healthz') ||
-        (ping.data && ping.data.ok === true && ping.data.service === 'brain-core'))
+        (ping.data && ping.data.ok === true && isPomniaService(ping.data.service)))
     if (okHealthz || (ping.reachable && ping.status === 200)) {
       // Prefer explicit healthz semantics when available.
       const serviceOk =
         !ping.data ||
         ping.data.service === undefined ||
-        ping.data.service === 'brain-core'
+        isPomniaService(ping.data.service)
       if (ping.reachable && serviceOk) {
         checks.push({
           id: 'brain',
