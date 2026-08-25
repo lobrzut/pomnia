@@ -82,6 +82,12 @@ export function assembleNote(
         '',
         '## Open Questions',
         bullets(fields.openQuestions),
+        // Rendered only when it has something. 694 chunks already carry an
+        // empty-section placeholder; a sixth that is usually blank would spend
+        // embedding budget on the word "none".
+        ...(fields.attemptsFailed.length > 0
+          ? ['', '## Attempts that failed', bullets(fields.attemptsFailed)]
+          : []),
       ].join('\n')
 
   return {
@@ -108,9 +114,10 @@ export function coerceFields(raw: string): DistilledFields {
       solutions: arr(j.solutions),
       facts: arr(j.facts),
       openQuestions: arr(j.open_questions ?? j.openQuestions),
+      attemptsFailed: arr(j.attempts_failed ?? j.attemptsFailed),
     }
   } catch {
-    return { summary: '', decisions: [], solutions: [], facts: [], openQuestions: [] }
+    return { summary: '', decisions: [], solutions: [], facts: [], openQuestions: [], attemptsFailed: [] }
   }
 }
 

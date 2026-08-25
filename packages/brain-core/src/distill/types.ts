@@ -30,6 +30,16 @@ export interface DistilledFields {
   solutions: string[]
   facts: string[]
   openQuestions: string[]
+  /**
+   * What was tried and did not work.
+   *
+   * The section an agent needs most and the corpus had least of: across 1809
+   * distilled notes there were exactly zero, because nothing asked for them.
+   * A note that records "tried X, failed because Y" stops the next session
+   * proposing X again — which is the cheapest hallucination to prevent, since
+   * the answer is already in the vault.
+   */
+  attemptsFailed: string[]
 }
 
 export interface DistilledNote {

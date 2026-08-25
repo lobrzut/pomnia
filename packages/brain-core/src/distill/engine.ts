@@ -16,10 +16,12 @@ Rules:
 - Mixed PL+EN vaults are normal: preserve each note/session in its original language; never force a single language across the vault.
 - Be concrete: real commands, file paths, numbers, config, decisions made. No chit-chat, no pleasantries.
 - Prefer terse bullet phrases over sentences.
+- Record what was TRIED AND FAILED as carefully as what worked: the approach, and why it failed. A dead end nobody wrote down gets walked again.
 - If the conversation contains nothing durable, return empty arrays and an empty summary.
 Respond with ONLY a JSON object matching exactly this schema:
 {"title": string (<=80 chars), "summary": string (1-3 sentences),
- "decisions": string[], "solutions": string[], "facts": string[], "open_questions": string[]}`
+ "decisions": string[], "solutions": string[], "facts": string[], "open_questions": string[],
+ "attempts_failed": string[]}`
 
 const MIN_MESSAGES = 3
 const MIN_CONTENT_CHARS = 200

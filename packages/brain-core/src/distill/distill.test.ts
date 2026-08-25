@@ -37,6 +37,7 @@ describe('quality gate', () => {
       solutions: ['Use POST /admin/distill + brain-core --distill'],
       facts: ['Ollama at http://192.168.1.201:11434', 'GARBAGE_THRESHOLD=5.0'],
       openQuestions: [],
+      attemptsFailed: [],
     })
     expect(score).toBeGreaterThanOrEqual(GARBAGE_THRESHOLD)
   })
@@ -48,6 +49,7 @@ describe('quality gate', () => {
       solutions: [],
       facts: [],
       openQuestions: [],
+      attemptsFailed: [],
     }, 'qwen2.5:14b')
     expect(note.quality).toBe('stub')
     expect(note.score).toBe(0)
@@ -167,5 +169,44 @@ describe('engine + deploy (mock generate)', () => {
     })
     expect(r.note?.quality).toBe('ok')
     expect(r.written).toBeUndefined()
+  })
+})
+
+describe('what was tried and did not work', () => {
+  const base = {
+    summary: 'Upgraded .201 to 0.1.69',
+    decisions: ['Rebuild the native binding for the host Node'],
+    solutions: ['npm rebuild better-sqlite3'],
+    facts: ['Server runs Node 20; the tarball ships a Node 22 build'],
+    openQuestions: [],
+  }
+
+  it('renders the section when the model reported failures', () => {
+    // The section an agent needs most and the corpus had least of: zero across
+    // 1809 distilled notes, because the prompt never asked for it. A dead end
+    // nobody wrote down gets walked again.
+    const note = assembleNote(sampleConv(), {
+      ...base,
+      attemptsFailed: ['Restoring dist alone — left the manifest claiming a version the code was not'],
+    }, 'qwen2.5:14b')
+    expect(note.markdown).toMatch(/## Attempts that failed/)
+    expect(note.markdown).toMatch(/Restoring dist alone/)
+  })
+
+  it('omits the heading entirely when there were none', () => {
+    // 694 chunks already carry an empty-section placeholder. A sixth section
+    // that is usually blank would spend embedding budget on the word "none".
+    const note = assembleNote(sampleConv(), { ...base, attemptsFailed: [] }, 'qwen2.5:14b')
+    expect(note.markdown).not.toMatch(/Attempts that failed/)
+  })
+
+  it('reads both the snake_case the prompt asks for and the camelCase a model might return', () => {
+    expect(coerceFields('{"attempts_failed":["a"]}').attemptsFailed).toEqual(['a'])
+    expect(coerceFields('{"attemptsFailed":["b"]}').attemptsFailed).toEqual(['b'])
+  })
+
+  it('is an empty array, never undefined, when the model omits the key', () => {
+    expect(coerceFields('{"summary":"x"}').attemptsFailed).toEqual([])
+    expect(coerceFields('not json').attemptsFailed).toEqual([])
   })
 })
