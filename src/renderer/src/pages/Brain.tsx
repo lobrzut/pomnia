@@ -180,13 +180,20 @@ export default function Brain() {
   const [doctorReport, setDoctorReport] = useState<DoctorReportView | null>(null)
   const [doctorCopyBusy, setDoctorCopyBusy] = useState(false)
 
-  function persistDoctorResult(report: Pick<DoctorReportView, 'ok' | 'warn' | 'fail' | 'exitCode' | 'generatedAt'>) {
+  function persistDoctorResult(report: DoctorReportView) {
+    // Stamp the build the verdict describes, so a badge cannot outlive its evidence
+    // across an upgrade. The build check carries `build <identity>`; absent on a
+    // doctor crash, where the age cap is the only guard.
+    const build = report.checks
+      ?.find((c) => c.id === 'build')
+      ?.message.replace(/^build /, '')
     saveDoctorLastResult({
       ok: report.ok,
       warn: report.warn,
       fail: report.fail,
       hasFail: report.fail > 0 || report.exitCode === 1,
       at: report.generatedAt || new Date().toISOString(),
+      ...(build ? { build } : {}),
     })
   }
 

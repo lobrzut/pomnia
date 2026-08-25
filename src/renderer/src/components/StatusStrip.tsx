@@ -47,7 +47,13 @@ export function StatusStrip() {
 
   const refresh = useCallback(async () => {
     setChecking(true)
-    setDoctorHasFail(loadDoctorLastResult()?.hasFail === true)
+    // Re-read against the running build: a FAIL recorded on an older build (or a
+    // stale one) is discarded rather than shown next to five green live probes.
+    const identity = await api
+      .appVersion()
+      .then((v) => v.identity)
+      .catch(() => undefined)
+    setDoctorHasFail(loadDoctorLastResult(identity)?.hasFail === true)
     try {
       const remote = brainTarget === 'remote'
       const [status, coreStatus, state, conn] = await Promise.all([
