@@ -99,20 +99,78 @@ import { callTool, listTools, type ToolContext } from './tools/index.js'
  * recognised, and the second instance would try to bind and die on EADDRINUSE
  * instead of adopting the first. So: 503 still counts, `service` decides.
  */
-async function healthzOk(host: string, port: number): Promise<boolean> {
+/**
+ * Who is already on this port — not merely whether someone is.
+ *
+ * Asking only "is a Pomnia here?" is how a bare `brain-core` on a desktop
+ * machine ends up adopting the desktop's own embedded brain: the port answers,
+ * the service name matches, and the operator gets somebody else's vault while
+ * the log reports a clean start. `vaultOwner` is what separates an orphan of
+ * this install from a different install that happens to share a port.
+ */
+/** What to do about a port that is already taken. */
+export type PortCollisionVerdict =
+  | { action: 'adopt'; note: string }
+  | { action: 'refuse'; message: string }
+  | { action: 'rethrow' }
+
+/**
+ * Adopt an orphan of this install; refuse a stranger; stay out of the way when
+ * the port is not Pomnia at all.
+ *
+ * The permissive middle — adopting when the other side reports no owner — is
+ * deliberate. An instance still in start-up, or one older than this check, has
+ * no owner to give, and refusing there would break restarts that work today.
+ * The case worth catching is the one where both sides answer and disagree.
+ */
+export function decidePortCollision(opts: {
+  port: number
+  url: string
+  other: { pomnia: boolean; owner: string | null }
+  mine: string | null
+}): PortCollisionVerdict {
+  const { port, url, other, mine } = opts
+  if (!other.pomnia) return { action: 'rethrow' }
+  if (other.owner && mine && other.owner !== mine) {
+    return {
+      action: 'refuse',
+      message:
+        `port ${port} is already serving ${other.owner}, not ${mine} — ` +
+        `that is a different Pomnia, not an orphan of this one. ` +
+        `Start this instance on another port (--port / BRAIN_PORT), or stop the other first.`,
+    }
+  }
+  return {
+    action: 'adopt',
+    note:
+      `[pomnia-core] port ${port} in use; adopting existing brain-core at ${url}` +
+      (other.owner ? ` (vault owner ${other.owner})` : ' (owner unreported)'),
+  }
+}
+
+async function healthzIdentity(
+  host: string,
+  port: number,
+): Promise<{ pomnia: boolean; owner: string | null }> {
   const url = `http://${host}:${port}/healthz`
   try {
     const ac = new AbortController()
     const t = setTimeout(() => ac.abort(), 1_500)
     try {
       const res = await fetch(url, { signal: ac.signal })
-      const body = (await res.json().catch(() => null)) as { service?: string } | null
-      return isPomniaService(body?.service)
+      const body = (await res.json().catch(() => null)) as {
+        service?: string
+        vaultOwner?: unknown
+      } | null
+      return {
+        pomnia: isPomniaService(body?.service),
+        owner: typeof body?.vaultOwner === 'string' ? body.vaultOwner : null,
+      }
     } finally {
       clearTimeout(t)
     }
   } catch {
-    return false
+    return { pomnia: false, owner: null }
   }
 }
 
@@ -1416,16 +1474,22 @@ export async function createBrainServer(
         })
       } catch (err) {
         const code = err && typeof err === 'object' && 'code' in err ? String((err as NodeJS.ErrnoException).code) : ''
-        if (code === 'EADDRINUSE' && (await healthzOk(config.host, config.port))) {
-          // Orphan / previous instance already healthy — adopt instead of failing.
-          console.warn(
-            `[pomnia-core] port ${config.port} in use; adopting existing brain-core at ${url}`,
-          )
-          http?.removeAllListeners()
-          http?.close()
-          http = null
-          adopted = true
-          return
+        if (code === 'EADDRINUSE') {
+          const verdict = decidePortCollision({
+            port: config.port,
+            url,
+            other: await healthzIdentity(config.host, config.port),
+            mine: vaultOwnership?.owner ? describeOwner(vaultOwnership.owner) : null,
+          })
+          if (verdict.action === 'refuse') throw new Error(verdict.message)
+          if (verdict.action === 'adopt') {
+            console.warn(verdict.note)
+            http?.removeAllListeners()
+            http?.close()
+            http = null
+            adopted = true
+            return
+          }
         }
         // Bind failed and nothing healthy to adopt — tear down db before rethrow.
         if (ctx?.db) {
