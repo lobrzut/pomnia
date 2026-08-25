@@ -130,7 +130,7 @@ export class SyncIntakeTracker {
       }
       // warn, not debug — a keep-both that nobody sees is a silent overwrite.
       console.warn(
-        `[brain-core] sync conflict: kept ${opts.conflict.kept}, wrote ${opts.conflict.wrote} (peer=${peer})`,
+        `[pomnia-core] sync conflict: kept ${opts.conflict.kept}, wrote ${opts.conflict.wrote} (peer=${peer})`,
       )
     }
   }

@@ -520,7 +520,7 @@ export async function indexDir(
       })()
 
       console.error(
-        `[brain-core] chunker ${was} -> ${fingerprint.chunker}: dropped ${gone} ` +
+        `[pomnia-core] chunker ${was} -> ${fingerprint.chunker}: dropped ${gone} ` +
           `chunk(s), re-embedding the whole vault; the incremental pass cannot ` +
           `see a chunker change`,
       )

@@ -115,7 +115,7 @@ const j = (status: number, body: unknown): AdminResponse => ({ status, body })
  * fact, when the answer has to already exist.
  */
 function audit(actor: string, what: string): void {
-  console.error(`[brain-core] ADMIN ${actor}: ${what}`)
+  console.error(`[pomnia-core] ADMIN ${actor}: ${what}`)
 }
 
 export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<AdminResponse> {

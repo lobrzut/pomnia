@@ -422,7 +422,7 @@ export class BrainCoreManager {
         const line = typeof d === 'string' ? d : d.toString()
         stderrBuf += line
         if (stderrBuf.length > 8_000) stderrBuf = stderrBuf.slice(-4_000)
-        console.error('[brain-core]', line.trimEnd())
+        console.error('[pomnia-core]', line.trimEnd())
       })
       child.onceExit((code) => {
         if (this.child === child) {

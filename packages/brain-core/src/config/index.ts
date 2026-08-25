@@ -251,7 +251,7 @@ export async function loadConfig(
       // from one you never passed — and the daemon then starts on a default you
       // did not choose. Warn rather than throw: refusing to boot over a stray
       // argument would take the memory server down for a typo.
-      console.error(`[brain-core] ignoring unknown argument: ${arg}`)
+      console.error(`[pomnia-core] ignoring unknown argument: ${arg}`)
       continue
     }
     // `next !== undefined`, not `next`: an empty value is a mistake, and the
@@ -306,7 +306,7 @@ export async function loadConfig(
       cfg.ollamaUrlError = `${ollama.reason}: ${ollama.detail}`
       cfg.ollamaUrl = ''
       console.error(
-        `[brain-core] REFUSED Ollama URL (${cfg.ollamaUrlError}) — starting without embeddings; ` +
+        `[pomnia-core] REFUSED Ollama URL (${cfg.ollamaUrlError}) — starting without embeddings; ` +
           'semantic search will return nothing until this is fixed (or set BRAIN_EMBED_BACKEND=fastembed)',
       )
     }

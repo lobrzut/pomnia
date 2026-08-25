@@ -224,7 +224,7 @@ export async function callTool(
         { path: saved.path, text: readFileSync(saved.path, 'utf8') },
       ]).catch((err) => {
         console.error(
-          '[brain-core] session index after save_conversation failed:',
+          '[pomnia-core] session index after save_conversation failed:',
           err instanceof Error ? err.message : err,
         )
       })
@@ -240,7 +240,7 @@ export async function callTool(
           { path: ckpt.path, text: readFileSync(ckpt.path, 'utf8') },
         ]).catch((err) => {
           console.error(
-            '[brain-core] session index after checkpoint_session failed:',
+            '[pomnia-core] session index after checkpoint_session failed:',
             err instanceof Error ? err.message : err,
           )
         })

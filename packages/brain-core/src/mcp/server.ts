@@ -203,7 +203,13 @@ function createMcpServer(
   actor?: string,
 ): Server {
   const mcp = new Server(
-    { name: 'brain-core', version: BRAIN_CORE_VERSION },
+    // What a client shows in its server list. Nothing keys off it -- an MCP
+    // client addresses a server by the name the user gave it in their own
+    // config -- so this is the half of the rename that costs nothing. The
+    // machine-facing `service` field in /healthz is a different matter: five
+    // call sites recognise a Pomnia server by it, and it moves only once
+    // readers that accept both names are actually deployed.
+    { name: 'pomnia-core', version: BRAIN_CORE_VERSION },
     { capabilities: { tools: {} } },
   )
 
@@ -398,8 +404,8 @@ export async function createBrainServer(
       if (ownership.writable) {
         console.error(
           ownership.reason === 'claimed'
-            ? `[brain-core] vault claimed by ${describeOwner(me)} — this instance owns writes`
-            : `[brain-core] vault owner: ${describeOwner(me)} — writes enabled`,
+            ? `[pomnia-core] vault claimed by ${describeOwner(me)} — this instance owns writes`
+            : `[pomnia-core] vault owner: ${describeOwner(me)} — writes enabled`,
         )
       } else {
         // Prefer the marker; fall back to --vault-owner so a pinned replica
@@ -408,7 +414,7 @@ export async function createBrainServer(
           ? describeOwner(ownership.owner)
           : config.authoritativeVaultHint
         console.error(
-          `[brain-core] READ-ONLY — save_conversation and checkpoint_session will refuse (` +
+          `[pomnia-core] READ-ONLY — save_conversation and checkpoint_session will refuse (` +
             (ownership.reason === 'read-only-flag'
               ? `--read-only${heldBy ? `; vault held by ${heldBy}` : ''}`
               : `vault held by ${heldBy ?? 'unknown'}`) +
@@ -425,8 +431,8 @@ export async function createBrainServer(
         const n = await gate.tokenCount()
         console.error(
           n > 0
-            ? `[brain-core] bearer auth ON (${n} token(s) from ${config.auth.tokensFile})`
-            : `[brain-core] bearer auth ON but NO TOKENS in ${config.auth.tokensFile} — every request will be refused`,
+            ? `[pomnia-core] bearer auth ON (${n} token(s) from ${config.auth.tokensFile})`
+            : `[pomnia-core] bearer auth ON but NO TOKENS in ${config.auth.tokensFile} — every request will be refused`,
         )
       }
 
@@ -785,7 +791,7 @@ export async function createBrainServer(
           }
           await serveMcp(req, res, auth.name)
         })().catch((err: unknown) => {
-          console.error('[brain-core] request error:', err)
+          console.error('[pomnia-core] request error:', err)
           if (!res.headersSent) {
             res.statusCode = 500
             res.end('internal error')
@@ -806,12 +812,12 @@ export async function createBrainServer(
           try {
             const stats = await indexDir(ctx!.db, ctx!.embedder, ctx!.vaultRoot)
             console.error(
-              `[brain-core] reindex: ${stats.files} re-embedded, ${stats.chunks} chunk(s), ` +
+              `[pomnia-core] reindex: ${stats.files} re-embedded, ${stats.chunks} chunk(s), ` +
                 `${stats.skipped} unchanged, ${stats.prunedFiles} pruned in ` +
                 `${((Date.now() - t0) / 1000).toFixed(1)}s`,
             )
           } catch (e) {
-            console.error(`[brain-core] reindex failed: ${(e as Error).message}`)
+            console.error(`[pomnia-core] reindex failed: ${(e as Error).message}`)
           } finally {
             reindexing = false
           }
@@ -869,7 +875,7 @@ export async function createBrainServer(
           if (!r.ok || r.user.role !== 'admin') {
             win.push(t)
             loginFails.set(key, win)
-            console.error(`[brain-core] failed panel login from ${key}`)
+            console.error(`[pomnia-core] failed panel login from ${key}`)
             // One message for both cases: naming which half was wrong turns a
             // login form into an account enumerator.
             sendAdmin(res, {
@@ -882,7 +888,7 @@ export async function createBrainServer(
           loginFails.delete(key)
           const s = sessions.create(r.user.username, r.user.role)
           void touchLogin(config.dataDir, r.user.username).catch(() => {})
-          console.error(`[brain-core] panel login: ${r.user.username} from ${key}`)
+          console.error(`[pomnia-core] panel login: ${r.user.username} from ${key}`)
           res.setHeader('set-cookie', sessionCookie(s.id, isHttps))
           // The CSRF token goes in the body, never in a cookie: the whole point
           // is that a cross-site page cannot read it.
@@ -1173,12 +1179,12 @@ export async function createBrainServer(
               try {
                 const stats = await indexDir(ctx!.db, ctx!.embedder, ctx!.vaultRoot)
                 console.error(
-                  `[brain-core] post-sync reindex: ${stats.files} re-embedded, ` +
+                  `[pomnia-core] post-sync reindex: ${stats.files} re-embedded, ` +
                     `${stats.chunks} chunk(s), ${stats.skipped} unchanged, ` +
                     `${stats.prunedFiles} pruned in ${((Date.now() - t0) / 1000).toFixed(1)}s`,
                 )
               } catch (e) {
-                console.error(`[brain-core] post-sync reindex failed: ${(e as Error).message}`)
+                console.error(`[pomnia-core] post-sync reindex failed: ${(e as Error).message}`)
               } finally {
                 reindexing = false
               }
@@ -1379,7 +1385,7 @@ export async function createBrainServer(
         try {
           await transport.handleRequest(req, res)
         } catch (err) {
-          console.error('[brain-core] transport error:', err)
+          console.error('[pomnia-core] transport error:', err)
           if (!res.headersSent) {
             res.statusCode = 500
             res.end('internal error')
@@ -1401,7 +1407,7 @@ export async function createBrainServer(
             // — the log is the only place that difference is visible.
             const a = http?.address()
             const bound = a && typeof a === 'object' ? `${a.address}:${a.port}` : `${config.host}:${config.port}`
-            console.error(`[brain-core] listening on http://${bound} (MCP /mcp · panel / · status /status)`)
+            console.error(`[pomnia-core] listening on http://${bound} (MCP /mcp · panel / · status /status)`)
             resolve()
           }
           http?.once('error', onErr)
@@ -1413,7 +1419,7 @@ export async function createBrainServer(
         if (code === 'EADDRINUSE' && (await healthzOk(config.host, config.port))) {
           // Orphan / previous instance already healthy — adopt instead of failing.
           console.warn(
-            `[brain-core] port ${config.port} in use; adopting existing brain-core at ${url}`,
+            `[pomnia-core] port ${config.port} in use; adopting existing brain-core at ${url}`,
           )
           http?.removeAllListeners()
           http?.close()

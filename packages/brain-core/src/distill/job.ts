@@ -184,7 +184,7 @@ export function createDistillJob(getConfig: () => DistillJobLiveConfig): Distill
           await onWrittenHook?.(dep.written)
         } catch (e) {
           failed++
-          console.error(`[brain-core] distill failed ${conv.id}:`, (e as Error).message)
+          console.error(`[pomnia-core] distill failed ${conv.id}:`, (e as Error).message)
         }
       }
     } finally {

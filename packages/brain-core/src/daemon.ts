@@ -63,7 +63,7 @@ async function reindexInBackground(config: Awaited<ReturnType<typeof loadConfig>
   try {
     await embedder.preflight()
   } catch (err) {
-    console.error(`[brain-core] reindex refused: ${err instanceof Error ? err.message : String(err)}`)
+    console.error(`[pomnia-core] reindex refused: ${err instanceof Error ? err.message : String(err)}`)
     return
   }
   const db = openDb({ dbPath: `${config.dataDir}/vectordb/library.db` })
@@ -73,15 +73,15 @@ async function reindexInBackground(config: Awaited<ReturnType<typeof loadConfig>
     const stats = await indexDir(db, embedder, vaultRoot, (p) => {
       if (p.done - last < 250 && p.done !== p.total) return
       last = p.done
-      console.error(`[brain-core] indexing ${p.done}/${p.total}`)
+      console.error(`[pomnia-core] indexing ${p.done}/${p.total}`)
     })
     const secs = ((Date.now() - started) / 1000).toFixed(0)
     console.error(
-      `[brain-core] reindex done in ${secs}s — ${stats.files} file(s), ${stats.chunks} chunk(s), ` +
+      `[pomnia-core] reindex done in ${secs}s — ${stats.files} file(s), ${stats.chunks} chunk(s), ` +
         `${stats.skipped} unchanged, ${stats.prunedFiles} pruned`,
     )
   } catch (err) {
-    console.error(`[brain-core] reindex failed: ${err instanceof Error ? err.message : String(err)}`)
+    console.error(`[pomnia-core] reindex failed: ${err instanceof Error ? err.message : String(err)}`)
   } finally {
     db.close()
   }
@@ -100,9 +100,9 @@ async function claimAndExit(config: BrainConfig): Promise<never> {
   const { previous, owner } = await claimVault({ vaultRoot, me })
   console.error(
     previous && previous.id !== owner.id
-      ? `[brain-core] vault ownership taken from ${describeOwner(previous)} by ${describeOwner(owner)}\n` +
-          `[brain-core] ${describeOwner(previous)} will now refuse writes to this vault — sync it before it saves anything else`
-      : `[brain-core] vault owned by ${describeOwner(owner)}`,
+      ? `[pomnia-core] vault ownership taken from ${describeOwner(previous)} by ${describeOwner(owner)}\n` +
+          `[pomnia-core] ${describeOwner(previous)} will now refuse writes to this vault — sync it before it saves anything else`
+      : `[pomnia-core] vault owned by ${describeOwner(owner)}`,
   )
   process.exit(0)
 }
@@ -139,12 +139,12 @@ async function distillAndExit(config: BrainConfig, dryRun: boolean): Promise<nev
   if (!dryRun) {
     const r = distillRunnable(jobCfg)
     if (!r.ok) {
-      console.error(`[brain-core] distill refused: ${r.reason}`)
+      console.error(`[pomnia-core] distill refused: ${r.reason}`)
       process.exit(1)
     }
   } else if (!config.ollamaUrl || config.distillEnabled === false) {
     console.error(
-      `[brain-core] distill dry-run refused: ${
+      `[pomnia-core] distill dry-run refused: ${
         config.distillEnabled === false ? 'BRAIN_DISTILL=0' : 'no Ollama URL'
       }`,
     )
@@ -163,30 +163,30 @@ async function distillAndExit(config: BrainConfig, dryRun: boolean): Promise<nev
 
   const started = job.start({ dryRun, conversations })
   if (!started.started) {
-    console.error(`[brain-core] distill not started: ${started.reason}`)
+    console.error(`[pomnia-core] distill not started: ${started.reason}`)
     process.exit(1)
   }
-  console.error(`[brain-core] distill ${dryRun ? 'dry-run' : 'job'} started…`)
+  console.error(`[pomnia-core] distill ${dryRun ? 'dry-run' : 'job'} started…`)
 
   for (;;) {
     await new Promise((r) => setTimeout(r, 500))
     const s = job.status()
     if (s.phase === 'running' || s.phase === 'dry-run') {
       if (s.current) {
-        console.error(`[brain-core] distill: ${s.current.title} (${s.current.id.slice(0, 8)})`)
+        console.error(`[pomnia-core] distill: ${s.current.title} (${s.current.id.slice(0, 8)})`)
       }
       continue
     }
     if (s.last) {
       const L = s.last
       console.error(
-        `[brain-core] distill done — ok=${L.ok} stub=${L.stubs} garbage=${L.garbage} ` +
+        `[pomnia-core] distill done — ok=${L.ok} stub=${L.stubs} garbage=${L.garbage} ` +
           `skip=${L.skipped} fail=${L.failed} written=${L.written}` +
           (L.error ? ` (${L.error})` : ''),
       )
       process.exit(L.error && L.written === 0 && L.ok === 0 ? 1 : 0)
     }
-    console.error(`[brain-core] distill ${s.phase}: ${s.reason ?? ''}`)
+    console.error(`[pomnia-core] distill ${s.phase}: ${s.reason ?? ''}`)
     process.exit(1)
   }
 }
@@ -205,16 +205,16 @@ async function distillAndExit(config: BrainConfig, dryRun: boolean): Promise<nev
  */
 function installCrashReporting(): void {
   process.on('uncaughtException', (err) => {
-    console.error('[brain-core] FATAL uncaught exception:', err)
+    console.error('[pomnia-core] FATAL uncaught exception:', err)
     process.exit(1)
   })
   process.on('unhandledRejection', (reason) => {
-    console.error('[brain-core] FATAL unhandled rejection:', reason)
+    console.error('[pomnia-core] FATAL unhandled rejection:', reason)
     setTimeout(() => process.exit(1), 50).unref()
   })
   // Not fatal, but a symptom worth a line: someone forgot to remove a listener.
   process.on('warning', (w) => {
-    if (w.name === 'MaxListenersExceededWarning') console.error('[brain-core] warning:', w.message)
+    if (w.name === 'MaxListenersExceededWarning') console.error('[pomnia-core] warning:', w.message)
   })
 }
 
@@ -237,11 +237,11 @@ async function addTokenAndExit(config: BrainConfig, argv: string[]): Promise<nev
   }
   const r = await createToken(config.auth.tokensFile, { name, role })
   if (!r.ok) {
-    console.error(`[brain-core] ${r.detail}`)
+    console.error(`[pomnia-core] ${r.detail}`)
     process.exit(1)
   }
-  console.error(`[brain-core] ${role} token "${r.summary.name}" written to ${config.auth.tokensFile}`)
-  console.error('[brain-core] shown once — copy it now:\n')
+  console.error(`[pomnia-core] ${role} token "${r.summary.name}" written to ${config.auth.tokensFile}`)
+  console.error('[pomnia-core] shown once — copy it now:\n')
   // stdout, so `brain-core --add-token x | tee` works and the noise above does not.
   console.log(r.token)
   process.exit(0)
@@ -308,11 +308,11 @@ async function addUserAndExit(config: BrainConfig, argv: string[]): Promise<neve
 
   const r = await createUser(config.dataDir, { username, password, role })
   if (!r.ok) {
-    console.error(`[brain-core] ${r.detail}`)
+    console.error(`[pomnia-core] ${r.detail}`)
     process.exit(1)
   }
-  console.error(`[brain-core] konto „${r.summary.username}" (${r.summary.role}) utworzone`)
-  console.error(`[brain-core] zaloguj się w panelu: http://${config.host}:${config.port}/`)
+  console.error(`[pomnia-core] konto „${r.summary.username}" (${r.summary.role}) utworzone`)
+  console.error(`[pomnia-core] zaloguj się w panelu: http://${config.host}:${config.port}/`)
   process.exit(0)
 }
 
@@ -326,9 +326,9 @@ async function main(): Promise<void> {
   if (process.argv.includes('--distill-dry-run')) await distillAndExit(config, true)
   if (process.argv.includes('--distill')) await distillAndExit(config, false)
   if (process.argv.includes('--prefetch-embed')) {
-    console.error(`[brain-core] prefetching fastembed into ${config.embedCacheDir}…`)
+    console.error(`[pomnia-core] prefetching fastembed into ${config.embedCacheDir}…`)
     await prefetchFastembed(config.embedCacheDir)
-    console.error('[brain-core] embed cache ready')
+    console.error('[pomnia-core] embed cache ready')
     process.exit(0)
   }
 
@@ -336,7 +336,7 @@ async function main(): Promise<void> {
   await server.start()
 
   if (process.argv.includes('--reindex')) {
-    console.error('[brain-core] --reindex: building index in the background, serving meanwhile')
+    console.error('[pomnia-core] --reindex: building index in the background, serving meanwhile')
     void reindexInBackground(config)
   }
 
@@ -351,12 +351,12 @@ async function main(): Promise<void> {
         config.embedBackend === 'fastembed'
           ? `fastembed ${embedder.config.modelId}`
           : `${config.embedModel} via ${config.ollamaUrl}`
-      console.error(`[brain-core] embeddings ready (${where})`)
+      console.error(`[pomnia-core] embeddings ready (${where})`)
     } catch (e) {
       console.error(
-        `[brain-core] DEGRADED — semantic search will return nothing: ${(e as Error).message}`,
+        `[pomnia-core] DEGRADED — semantic search will return nothing: ${(e as Error).message}`,
       )
-      console.error('[brain-core] skills, profile and note reads still work; /healthz reports this')
+      console.error('[pomnia-core] skills, profile and note reads still work; /healthz reports this')
     }
   })()
 
@@ -366,18 +366,18 @@ async function main(): Promise<void> {
     // server; systemd sends SIGTERM again if the first is slow.
     if (shuttingDown) return
     shuttingDown = true
-    console.error(`[brain-core] received ${signal}, shutting down…`)
+    console.error(`[pomnia-core] received ${signal}, shutting down…`)
     // Never let a hung close hold the unit in `deactivating` until systemd's
     // 90-second default kills it — the operator reads that as a broken service.
     const hard = setTimeout(() => {
-      console.error('[brain-core] shutdown exceeded 10s — exiting anyway')
+      console.error('[pomnia-core] shutdown exceeded 10s — exiting anyway')
       process.exit(0)
     }, 10_000)
     hard.unref()
     try {
       await server.stop()
     } catch (e) {
-      console.error('[brain-core] stop failed:', (e as Error).message)
+      console.error('[pomnia-core] stop failed:', (e as Error).message)
     }
     process.exit(0)
   }
@@ -385,10 +385,10 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => void shutdown('SIGINT'))
   process.on('SIGTERM', () => void shutdown('SIGTERM'))
 
-  console.error(`[brain-core] listening on ${config.host}:${config.port}`)
+  console.error(`[pomnia-core] listening on ${config.host}:${config.port}`)
 }
 
 main().catch((err) => {
-  console.error('[brain-core] fatal:', err)
+  console.error('[pomnia-core] fatal:', err)
   process.exit(1)
 })
