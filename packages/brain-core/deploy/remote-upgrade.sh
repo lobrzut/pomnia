@@ -78,7 +78,12 @@ chown -R root:root dist package.json deploy 2>/dev/null || true
 # host on a different major fails to load it with ERR_DLOPEN_FAILED and a
 # NODE_MODULE_VERSION mismatch -- what happened feeding a Node 22 build to a
 # Node 20 box. Rebuild rather than restart into a crash loop.
-if ! node -e "require('./node_modules/better-sqlite3')" >/dev/null 2>&1; then
+# Opening a database, not just requiring the package: better-sqlite3 does not
+# dlopen its binding at import time, it does it in the Database constructor.
+# The first version of this guard called require() alone, passed happily, and
+# let the service restart straight into ERR_DLOPEN_FAILED -- testing the one
+# step that could not fail.
+if ! node -e "new (require('./node_modules/better-sqlite3'))(':memory:').close()" >/dev/null 2>&1; then
   echo "native binding will not load under $(node --version); rebuilding"
   npm rebuild better-sqlite3 >/dev/null 2>&1 || echo "! rebuild failed; restart will show why" >&2
 fi
