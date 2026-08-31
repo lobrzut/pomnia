@@ -252,6 +252,8 @@ export interface UiLabels {
   vaultReplicaUrl: string
   vaultReplicaAuto: string
   vaultReplicaAutoHint: string
+  vaultReplicaTokenOwn: string
+  vaultReplicaTokenBorrowed: string
   vaultReplicaLast: string
   vaultReplicaLastOk: (uploaded: number, unchanged: number) => string
   vaultReplicaNoUrl: string
@@ -1057,6 +1059,11 @@ const PL_LABELS: UiLabels = {
   vaultReplicaAuto: 'Wysyłaj automatycznie po destylacji',
   vaultReplicaAutoHint:
     'Nieudana próba nie zniknie po cichu — wynik jest zawsze zapisany i widoczny niżej.',
+  vaultReplicaTokenOwn: 'Wysyłka używa własnego tokena repliki.',
+  vaultReplicaTokenBorrowed:
+    'Brak własnego tokena repliki — wysyłka użyje tokena Connect, który jest tokenem agenta ' +
+    'i nie ma prawa zapisu. Serwer odrzuci ją z błędem o roli admina. Nie podnoś roli tokena ' +
+    'Connect: trafia do configów wszystkich klientów MCP. Wpisz osobny token admina tutaj.',
   vaultReplicaLast: 'Ostatnia replikacja:',
   vaultReplicaLastOk: (u, n) => `wysłano ${u}, bez zmian ${n}`,
   vaultReplicaNoUrl: 'Najpierw podaj adres repliki.',
@@ -1933,6 +1940,11 @@ const EN_LABELS: UiLabels = {
   vaultReplicaUrl: 'Replica address',
   vaultReplicaAuto: 'Push automatically after distillation',
   vaultReplicaAutoHint: 'A failed attempt is recorded and shown below — it never disappears quietly.',
+  vaultReplicaTokenOwn: 'Push uses its own replica token.',
+  vaultReplicaTokenBorrowed:
+    'No replica token set — push will fall back to the Connect token, which is an agent ' +
+    'token and cannot write. The server refuses it with an admin-role error. Do not raise the ' +
+    'Connect token: it is written into every MCP client config. Set a separate admin token here.',
   vaultReplicaLast: 'Last replication:',
   vaultReplicaLastOk: (u, n) => `${u} uploaded, ${n} unchanged`,
   vaultReplicaNoUrl: 'Set the replica address first.',

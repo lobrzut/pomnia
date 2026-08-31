@@ -412,11 +412,21 @@ async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
     // simply did not start, no toast, no log line, and the health check below
     // runs with silentOk so it says nothing either. The vault opened, MCP was
     // absent, and nothing on screen connected the two.
+    //
+    // Not starting is only a failure when something was counting on it. With
+    // Brain pointed at a server the embedded engine has no job: agents read the
+    // remote index, and a local one would fill a database nobody queries.
+    // Reporting that as an error puts a red cross on the app doing exactly what
+    // it was configured to do — and after enough of those, the red cross that
+    // means something gets dismissed along with the rest.
+    const remote = (getAppSettings().brainTarget ?? 'embedded') === 'remote'
     log.warn('embedded brain autostart failed:', ensured.error ?? 'unknown')
     sendAppToast({
-      kind: 'error',
-      title: m().brainStartFailedTitle,
-      detail: m().brainStartFailedDetail(ensured.error ?? '?'),
+      kind: remote ? 'info' : 'error',
+      title: remote ? m().brainNotNeededTitle : m().brainStartFailedTitle,
+      detail: remote
+        ? m().brainNotNeededDetail(getAppSettings().brainMcpUrl?.trim() ?? '')
+        : m().brainStartFailedDetail(ensured.error ?? '?'),
     })
   }
   if (!ensured.running || !vault || !vaultPath) {

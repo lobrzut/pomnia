@@ -30,6 +30,8 @@ export interface MainStrings {
 
   // ── embedded brain ───────────────────────────────────────────────────────
   brainStartFailedTitle: string
+  brainNotNeededTitle: string
+  brainNotNeededDetail: (server: string) => string
   brainStartFailedDetail: (why: string) => string
   brainNoEmbedTitle: string
   brainStartTooLong: string
@@ -130,6 +132,10 @@ const PL: MainStrings = {
   pendingDocs: 'oczekujące dokumenty…',
 
   brainStartFailedTitle: 'Lokalna wyszukiwarka nie wystartowała',
+  brainNotNeededTitle: 'Lokalna wyszukiwarka nie jest potrzebna',
+  brainNotNeededDetail: (server: string) =>
+    `Mózg jest na ${server} i to on trzyma indeks. Lokalne indeksowanie zapisywałoby ` +
+    `do bazy, której żaden agent nie czyta. To jest stan poprawny — nic nie musisz robić.`,
   brainStartFailedDetail: (why) => `${why} — dopóki nie ruszy, agenci nie widzą pamięci.`,
   brainNoEmbedTitle: 'Wyszukiwarka nie ma czym liczyć',
   brainStartTooLong: 'Uruchamianie wyszukiwarki trwa zbyt długo',
@@ -229,6 +235,10 @@ const EN: MainStrings = {
   pendingDocs: 'pending documents…',
 
   brainStartFailedTitle: 'The local search engine did not start',
+  brainNotNeededTitle: 'The local search engine is not needed',
+  brainNotNeededDetail: (server: string) =>
+    `Brain runs on ${server} and holds the index there. Indexing locally would fill ` +
+    `a database no agent reads. This is the correct state — nothing to do.`,
   brainStartFailedDetail: (why) => `${why} — until it runs, agents cannot see your memory.`,
   brainNoEmbedTitle: 'The search engine has nothing to compute with',
   brainStartTooLong: 'The search engine is taking too long to start',

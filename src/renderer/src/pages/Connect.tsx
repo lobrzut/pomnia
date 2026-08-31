@@ -875,6 +875,20 @@ export default function Connect() {
           </div>
           <p className="mb-3 text-xs text-ink-faint">{labels.vaultReplicaLead}</p>
 
+          {/* Which credential the push will actually use. It was invisible, and
+              the fallback is an agent token that cannot write — so the button
+              failed with a server error about admin roles while the panel looked
+              fully configured. */}
+          <p
+            className={
+              replica?.hasToken
+                ? 'mb-3 text-xs text-ink-faint'
+                : 'mb-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-200'
+            }
+          >
+            {replica?.hasToken ? labels.vaultReplicaTokenOwn : labels.vaultReplicaTokenBorrowed}
+          </p>
+
           <Field label={labels.vaultReplicaUrl}>
             <Input
               value={replica?.url ?? ''}
