@@ -30,6 +30,8 @@ export interface MainStrings {
 
   // ── embedded brain ───────────────────────────────────────────────────────
   brainStartFailedTitle: string
+  brainNotNeededTitle: string
+  brainNotNeededDetail: (server: string) => string
   brainStartFailedDetail: (why: string) => string
   brainNoEmbedTitle: string
   brainStartTooLong: string
@@ -40,6 +42,8 @@ export interface MainStrings {
   remoteUnreachableDetail: (url: string, why: string) => string
   remoteNotBrainCoreTitle: string
   remoteNotBrainCoreDetail: (root: string, engine: string) => string
+  vaultNotSyncedTitle: string
+  vaultNotSyncedDetail: (server: string) => string
 
   // ── index ────────────────────────────────────────────────────────────────
   fullReindexTitle: string
@@ -119,10 +123,19 @@ export interface MainStrings {
 
 const PL: MainStrings = {
   ledgerTravels: (known) => `${known} rozmów · od teraz podróżuje razem z danymi`,
+  vaultNotSyncedTitle: 'Notatki z tego komputera nie trafiają na serwer',
+  vaultNotSyncedDetail: (server: string) =>
+    `Brain wskazuje na ${server}, ale wysyłka repliki jest wyłączona. Nowe notatki ` +
+    `zostają tylko tutaj, a agenci czytają serwer — im dłużej tak stoi, tym bardziej ` +
+    `oba vaulty się rozjeżdżają. Włącz w Connect → Replikacja vaultu.`,
   ledgerRecovered: (recovered) => `${recovered} rozmów odzyskanych — nie trzeba ich mielić od nowa`,
   pendingDocs: 'oczekujące dokumenty…',
 
   brainStartFailedTitle: 'Lokalna wyszukiwarka nie wystartowała',
+  brainNotNeededTitle: 'Lokalna wyszukiwarka nie jest potrzebna',
+  brainNotNeededDetail: (server: string) =>
+    `Mózg jest na ${server} i to on trzyma indeks. Lokalne indeksowanie zapisywałoby ` +
+    `do bazy, której żaden agent nie czyta. To jest stan poprawny — nic nie musisz robić.`,
   brainStartFailedDetail: (why) => `${why} — dopóki nie ruszy, agenci nie widzą pamięci.`,
   brainNoEmbedTitle: 'Wyszukiwarka nie ma czym liczyć',
   brainStartTooLong: 'Uruchamianie wyszukiwarki trwa zbyt długo',
@@ -222,6 +235,10 @@ const EN: MainStrings = {
   pendingDocs: 'pending documents…',
 
   brainStartFailedTitle: 'The local search engine did not start',
+  brainNotNeededTitle: 'The local search engine is not needed',
+  brainNotNeededDetail: (server: string) =>
+    `Brain runs on ${server} and holds the index there. Indexing locally would fill ` +
+    `a database no agent reads. This is the correct state — nothing to do.`,
   brainStartFailedDetail: (why) => `${why} — until it runs, agents cannot see your memory.`,
   brainNoEmbedTitle: 'The search engine has nothing to compute with',
   brainStartTooLong: 'The search engine is taking too long to start',
@@ -233,6 +250,11 @@ const EN: MainStrings = {
   remoteNotBrainCoreTitle: 'That remote server is not brain-core',
   remoteNotBrainCoreDetail: (root, engine) =>
     `${root} — ${engine}. Agents would get a different memory from it than this app has. Fix the address in Connect, or go back to local mode.`,
+  vaultNotSyncedTitle: 'Notes from this computer are not reaching the server',
+  vaultNotSyncedDetail: (server: string) =>
+    `Brain points at ${server}, but replica push is off. New notes stay here while ` +
+    `agents read the server, so the two vaults drift further apart the longer it runs. ` +
+    `Turn it on in Connect → Vault replication.`,
 
   fullReindexTitle: 'Full index rebuild',
   fullReindexDetail:

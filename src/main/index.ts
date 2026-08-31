@@ -63,6 +63,7 @@ import {
   type SourceId,
   localizePipelineProgress,
 } from '@core/index'
+import { shouldWarnVaultNotSynced } from '../core/brain/vaultSyncWarning.js'
 import { m } from './mainStrings.js'
 import { formatBuildIdentity } from '../buildInfo.js'
 
@@ -411,11 +412,21 @@ async function maybeAutoStartEmbeddedBrain(ollamaUrl?: string): Promise<void> {
     // simply did not start, no toast, no log line, and the health check below
     // runs with silentOk so it says nothing either. The vault opened, MCP was
     // absent, and nothing on screen connected the two.
+    //
+    // Not starting is only a failure when something was counting on it. With
+    // Brain pointed at a server the embedded engine has no job: agents read the
+    // remote index, and a local one would fill a database nobody queries.
+    // Reporting that as an error puts a red cross on the app doing exactly what
+    // it was configured to do — and after enough of those, the red cross that
+    // means something gets dismissed along with the rest.
+    const remote = (getAppSettings().brainTarget ?? 'embedded') === 'remote'
     log.warn('embedded brain autostart failed:', ensured.error ?? 'unknown')
     sendAppToast({
-      kind: 'error',
-      title: m().brainStartFailedTitle,
-      detail: m().brainStartFailedDetail(ensured.error ?? '?'),
+      kind: remote ? 'info' : 'error',
+      title: remote ? m().brainNotNeededTitle : m().brainStartFailedTitle,
+      detail: remote
+        ? m().brainNotNeededDetail(getAppSettings().brainMcpUrl?.trim() ?? '')
+        : m().brainStartFailedDetail(ensured.error ?? '?'),
     })
   }
   if (!ensured.running || !vault || !vaultPath) {
@@ -506,9 +517,38 @@ function checkVaultHealthInBackground(opts?: { silentOk?: boolean }): void {
  * Reset by `resetRemoteBrainWarning` whenever the user edits the target or URL.
  */
 let warnedRemoteBrain = false
+let warnedVaultNotSynced = false
 
 function resetRemoteBrainWarning(): void {
   warnedRemoteBrain = false
+  warnedVaultNotSynced = false
+}
+
+/**
+ * Two live vaults, drifting, with nothing saying so.
+ *
+ * Pointing Brain at a server does not move this machine's vault: the desktop
+ * keeps distilling into its own, the agents keep reading the server's, and
+ * neither side is wrong on its own. Only the pair is. Left alone it is slow and
+ * silent — on one install the local vault sat 78 sessions behind 589 for weeks,
+ * discovered by counting files, not by anything the app said.
+ *
+ * The app already holds both halves of the answer (Brain is remote, replica
+ * push is off), so it can say this without asking anything of the network. Once
+ * per vault open, not per distillation: a warning that repeats is a warning
+ * people learn to dismiss.
+ */
+function warnIfVaultNotSynced(): void {
+  if (warnedVaultNotSynced) return
+  const s = getAppSettings()
+  if (!shouldWarnVaultNotSynced(s)) return
+  const server = s.brainMcpUrl?.trim() ?? ''
+  warnedVaultNotSynced = true
+  sendAppToast({
+    kind: 'warn',
+    title: m().vaultNotSyncedTitle,
+    detail: m().vaultNotSyncedDetail(server),
+  })
 }
 
 async function warnIfRemoteBrainUnusable(): Promise<void> {
@@ -863,6 +903,7 @@ function registerIpc(): void {
     brainCore.setVaultRoot(knowledgeRoot)
     void maybeAutoStartEmbeddedBrain()
     void warnIfRemoteBrainUnusable()
+    warnIfVaultNotSynced()
     void healLedgerForVault()
     // When autostart is off, still prompt for one-shot index hygiene.
     if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
@@ -891,6 +932,7 @@ function registerIpc(): void {
     const pendingLibraryIndex = vault.getPendingIndexDocuments().length
     void maybeAutoStartEmbeddedBrain()
     void warnIfRemoteBrainUnusable()
+    warnIfVaultNotSynced()
     void healLedgerForVault()
     if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
     return {
@@ -1355,13 +1397,24 @@ function registerIpc(): void {
     if (!vaultPath) throw new Error(m().vaultNotOpen)
     const url = (target ?? '').trim()
     if (!url) throw new Error(m().replicaNoTarget)
+    // Prefer the purpose-built replica token over whatever the renderer passed.
+    //
+    // The renderer only holds the Connect token, and that one is minted for MCP
+    // agents: it can read, so the pull half of the sync succeeds, and it cannot
+    // write, so the push half fails with `write_needs_admin` — a server error
+    // whose hint then advises reissuing the Connect token as admin. Following
+    // that advice would hand admin write access to every MCP client on the
+    // machine, when what is needed is one admin token for this one app.
+    // `replicaToken` is exactly that, and it never leaves main: the renderer is
+    // told only whether it is set, never its value.
+    const auth = getAppSettings().replicaToken?.trim() || token?.trim() || undefined
     const root = brainVaultRoot(vaultPath)
     activity.update({ kind: 'indexing', phase: 'reindex', detail: m().replicaComparing })
     try {
       const r = await syncVaultSurface({
         vaultRoot: root,
         target: url,
-        token: token?.trim() || undefined,
+        token: auth,
         onProgress: (done, total, path) =>
           activity.update({
             kind: 'indexing',
@@ -1963,6 +2016,30 @@ function registerIpc(): void {
         : saved.brainMcpUrl?.trim() || '')
     if (url && (resolvedTarget === 'embedded' || resolvedTarget === 'remote')) {
       try {
+        // Ask the endpoint whether it is there before writing it into every
+        // client's config.
+        //
+        // This one call rewrites the Pomnia block in up to six files at once,
+        // so an unverified URL is not one broken client — it is every agent on
+        // the machine, all failing the same way, with the failure only visible
+        // the next time each one starts. That is how `…/admin/mcp` (the panel
+        // URL, one paste away from the right one) reached six configs and cost
+        // an evening: the address was never asked whether it worked.
+        //
+        // probeMcpUrl POSTs the same `initialize` the agent will, so a pass
+        // means the agent connects. On failure we leave the configs alone —
+        // yesterday's working block beats today's unverified one — and the
+        // status the caller receives still reports the real problem.
+        const probeUrl = `${url.replace(/\/+$/, '').replace(/\/mcp$/, '')}/mcp`
+        const probe = await probeMcpUrl(probeUrl, resolvedTarget === 'remote' ? token : undefined)
+        if (!probe.speaksMcp) {
+          log.warn(
+            `not rewriting MCP configs: ${probe.url} ${
+              probe.reachable ? `answered ${probe.status} but not as an MCP server` : `unreachable (${probe.error})`
+            }`,
+          )
+          throw new Error('endpoint did not answer as an MCP server')
+        }
         const sync = await syncManagedMcpConfigs({
           brainUrl: url,
           target: resolvedTarget,

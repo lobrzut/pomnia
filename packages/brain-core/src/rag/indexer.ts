@@ -385,8 +385,14 @@ export const SKIP_DIRS = new Set([
  * When present as immediate children of the vault root, only these trees are
  * walked (plus any loose `.md`/`.txt` at the root, e.g. USER.md).
  * Skills live next to distilled/ but must never enter RAG.
+ *
+ * `sprawy/` holds hand-written case files — company filings, deadlines, the
+ * kind of note that opens with "this is the only source of the current state".
+ * It was excluded, so those files sat in the vault invisible to search: the
+ * one place the user would look for them was the one place that could not find
+ * them. Unlike skills/, they are knowledge and belong in RAG.
  */
-export const INDEX_SUBDIRS = new Set(['distilled', 'sessions', 'library'])
+export const INDEX_SUBDIRS = new Set(['distilled', 'sessions', 'library', 'sprawy'])
 
 /** Basenames never indexed even if they appear outside skills/ (belt-and-suspenders). */
 const SKIP_BASENAMES = new Set(['example_usage.md'])

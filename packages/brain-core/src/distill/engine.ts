@@ -2,12 +2,12 @@
 // Copyright (C) 2026 Pomnia
 /**
  * Server-side distillation engine — adapted from Desktop `src/core/brain/distill.ts`.
- * Profile default: qwen2.5:14b via Ollama /api/generate.
+ * Profile default: DEFAULT_DISTILL_MODEL via Ollama /api/generate.
  */
 
 import { assembleNote, coerceFields, transcript } from './note.js'
 import { DEFAULT_DISTILL_MODEL, ollamaGenerate } from './ollamaChat.js'
-import type { DistillConversation, DistilledNote } from './types.js'
+import type { DistillConversation, DistilledFields, DistilledNote } from './types.js'
 
 const SYSTEM = `You are a knowledge distiller for a personal RAG "brain".
 Given a raw AI-assistant conversation transcript, extract ONLY durable, reusable knowledge.
@@ -49,16 +49,49 @@ export async function distillConversation(
 ): Promise<DistilledNote> {
   const model = opts.model || DEFAULT_DISTILL_MODEL
   const { text } = transcript(conv, opts.maxChars ?? 12_000)
-  const raw = opts.generate
-    ? await opts.generate(text, SYSTEM, model)
-    : await ollamaGenerate({
-        baseUrl: opts.ollamaUrl,
-        model,
-        prompt: text,
-        system: SYSTEM,
-        json: true,
-        timeoutMs: opts.timeoutMs ?? DISTILL_TIMEOUT_MS,
-        signal: opts.signal,
-      })
-  return assembleNote(conv, coerceFields(raw), model)
+
+  const generate = (): Promise<string> =>
+    opts.generate
+      ? opts.generate(text, SYSTEM, model)
+      : ollamaGenerate({
+          baseUrl: opts.ollamaUrl,
+          model,
+          prompt: text,
+          system: SYSTEM,
+          json: true,
+          timeoutMs: opts.timeoutMs ?? DISTILL_TIMEOUT_MS,
+          signal: opts.signal,
+        })
+
+  let fields = coerceFields(await generate())
+
+  // One retry when the model returned nothing usable.
+  //
+  // `coerceFields` is forgiving, so empty output means the response was not a
+  // note at all. Measured across 30 conversations, this happens roughly once
+  // per 30 on an 8B model and never on a 14B: the small model opens valid JSON,
+  // falls into a repetition loop (in the observed case a run of tab characters
+  // inside `facts`) and never closes the object. It is a sampling accident, not
+  // a misunderstanding of the schema, so the same prompt usually succeeds on
+  // the next attempt.
+  //
+  // Cheap insurance either way: a conversation with genuinely nothing durable
+  // in it costs one extra generation, while a lost note costs a note. Retrying
+  // once, not until it works — a model that fails twice on the same input is
+  // saying something, and a distill loop that never gives up blocks the queue.
+  if (isEmptyFields(fields)) fields = coerceFields(await generate())
+
+  return assembleNote(conv, fields, model)
+}
+
+/** Nothing usable came back — every list empty and no summary. */
+function isEmptyFields(f: DistilledFields): boolean {
+  return (
+    f.decisions.length === 0 &&
+    f.solutions.length === 0 &&
+    f.facts.length === 0 &&
+    f.openQuestions.length === 0 &&
+    f.attemptsFailed.length === 0 &&
+    !f.summary.trim()
+  )
 }

@@ -28,6 +28,7 @@ import { loadConfig, type BrainConfig } from './config/index.js'
 import { createBrainServer } from './mcp/server.js'
 import {
   createDistillJob,
+  DEFAULT_DISTILL_MODEL,
   distillRunnable,
   parseConversation,
   parseConversationsJson,
@@ -128,7 +129,7 @@ async function distillAndExit(config: BrainConfig, dryRun: boolean): Promise<nev
   }
   const jobCfg = {
     enabled: config.distillEnabled !== false,
-    model: config.distillModel || 'qwen2.5:14b',
+    model: config.distillModel || DEFAULT_DISTILL_MODEL,
     ollamaUrl: config.ollamaUrl,
     vaultRoot,
     writable,

@@ -116,6 +116,54 @@ export function hasCheckpointSubstance(args: {
 export const CHECKPOINT_EMPTY_REFUSE =
   'refused: checkpoint empty — need at least one of decisions / files_touched / errors_seen / commands_run (no file written).'
 
+/**
+ * Words whose meaning expires. "dziś", "wczoraj", "3 dni temu" — each is read
+ * against the day it was written, and a checkpoint exists to be read months
+ * later.
+ *
+ * The author is systematically unreliable here: an agent has no felt sense of
+ * days passing, so one conversation spanning three dates gets written up
+ * throughout as "today". That happened in this vault — a note explaining that
+ * an encrypted store "could not have produced today's checkpoints" stopped
+ * meaning anything the moment tomorrow arrived. The file is stamped correctly
+ * from the server clock; only the prose rots.
+ *
+ * This reports rather than repairs: only the author knows which day was meant,
+ * so the checkpoint is still written and the warning rides along with it.
+ */
+// Word edges are lookarounds over Unicode letters, not `\b`: JS defines `\b`
+// against [A-Za-z0-9_], so `ś` counts as a boundary and `\bdziś\b` never
+// matches the very word this vault is full of. The lookarounds also keep
+// "podziśkowanie" and "todayish" from firing.
+const EDGE_L = '(?<![\\p{L}\\p{N}_])'
+const EDGE_R = '(?![\\p{L}\\p{N}_])'
+const RELATIVE_TIME = new RegExp(
+  EDGE_L +
+    '(dziś|dzis|dzisiaj|dzisiejsz\\p{L}*|wczoraj|wczorajsz\\p{L}*|jutro|przedwczoraj' +
+    '|today|yesterday|tomorrow' +
+    '|\\d+\\s+(?:dni|dnia|tygodni\\p{L}*|miesi[ęe]c\\p{L}*)\\s+temu' +
+    '|\\d+\\s+(?:days?|weeks?|months?)\\s+ago)' +
+    EDGE_R,
+  'giu',
+)
+
+/** Relative time expressions found in free text, deduplicated and lower-cased. */
+export function relativeTimePhrases(values: (string | undefined)[]): string[] {
+  const hits = new Set<string>()
+  for (const v of values) {
+    for (const m of (v ?? '').matchAll(RELATIVE_TIME)) hits.add(m[0].toLowerCase())
+  }
+  return [...hits]
+}
+
+export function relativeTimeWarning(phrases: string[], today: string): string {
+  return (
+    `note: relative dates in this checkpoint (${phrases.join(', ')}) — ` +
+    `they read against the day of writing, and this note will be read much later. ` +
+    `Prefer the absolute date (${today}).`
+  )
+}
+
 export const CHECKPOINT_DISABLED_REFUSE =
   'refused: autoCheckpointEnabled is OFF in Pomnia Settings — do not auto-checkpoint. User can still save_conversation with „zapisz do Pomnia” / „save to Pomnia”.'
 
@@ -200,11 +248,26 @@ export async function runCheckpointSession(
   writeFileSync(tmp, content, 'utf-8')
   renameSync(tmp, outPath)
 
+  // Written first, warned about second: a checkpoint with a soft date is still
+  // worth far more than no checkpoint, and the author can fix the wording on
+  // the next one.
+  const relative = relativeTimePhrases([
+    summary,
+    topic,
+    ...decisions,
+    ...root_causes,
+    ...solutions,
+    ...facts,
+    ...open_questions,
+    ...attempts_failed,
+  ])
+
   return {
     path: outPath,
     refused: false,
     text:
       `✓ Checkpoint saved to vault/sessions/checkpoints/${filename}\n` +
+      (relative.length ? relativeTimeWarning(relative, date) + '\n' : '') +
       `Indexing for search_library in the background.\n` +
       `Conscious full save still needs „zapisz do Pomnia” → save_conversation.`,
   }

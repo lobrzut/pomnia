@@ -56,7 +56,7 @@ export interface ClientSpec {
    * Legacy Python hub only: `{pomnia,pomnia-vault,pomnia-library}` SSE (or /mcp split).
    * Default remote brain-core uses `brainCoreRemoteServers` instead — do not call this for new remotes.
    */
-  buildServers: (brainUrl: string, token?: string) => Record<string, Record<string, unknown>>
+  buildServers: (brainUrl: string, token?: string, os?: OS) => Record<string, Record<string, unknown>>
   /** Human notes — what file, anything quirky, multi-location warnings. */
   notes: string
   /** How to make the client pick up the change. */
@@ -85,8 +85,25 @@ function dirnamePath(os: OS, filePath: string): string {
   return (os === 'win32' ? path.win32 : path.posix).dirname(filePath)
 }
 
+/**
+ * Reduce whatever was pasted into the Brain URL field back to the server root.
+ *
+ * The panel is served at `/admin`, so that is the URL a person copies out of
+ * their browser. Appending `/mcp` to it yields `/admin/mcp` — a route that
+ * exists, demands an admin role, and answers 403 with a hint telling the user
+ * to mint an admin token they do not need. `/mcp` and `/status` get pasted for
+ * the same reason. One wrong paste otherwise poisons every client at once,
+ * because every client's config comes out of this one generator.
+ */
 function trimBase(url: string): string {
-  return url.replace(/\/+$/, '')
+  let base = url.trim().replace(/\/+$/, '')
+  // Loop: `…/admin/mcp` is the panel URL plus a helpfully appended `/mcp`, and
+  // that is exactly the combination people arrive with.
+  for (;;) {
+    const stripped = base.replace(/\/(admin|mcp|status)$/i, '').replace(/\/+$/, '')
+    if (stripped === base) return base
+    base = stripped
+  }
 }
 
 /**
@@ -107,6 +124,45 @@ function withHeaders(token: string | undefined, server: Record<string, unknown>)
   return { ...server, headers: { Authorization: `Bearer ${token}` } }
 }
 
+/** Env var carrying the Bearer header value for `mcp-remote` on Windows. */
+const AUTH_HEADER_ENV = 'AUTH_HEADER'
+
+/**
+ * Claude Desktop entry that survives Windows.
+ *
+ * Claude Desktop launches every stdio server through `cmd.exe`, and the obvious
+ * spelling breaks twice there:
+ *
+ *  1. `command: 'npx'` is resolved via `where`, which returns
+ *     `C:\Program Files\nodejs\npx` and is handed to cmd.exe UNQUOTED —
+ *     cmd splits on the space and reports `'C:\Program' is not recognized`.
+ *  2. `--header "Authorization: Bearer <token>"` is split on its space too, so
+ *     the server receives an EMPTY Authorization header, answers 401, and
+ *     mcp-remote falls into OAuth dynamic client registration and dies with
+ *     `Invalid OAuth error response ... [object Response]` — an error that
+ *     names nothing about the real cause and sends people hunting through
+ *     OAuth docs.
+ *
+ * Naming `cmd` as the command dodges (1): `where cmd` resolves to
+ * `C:\Windows\System32\cmd.exe`, which has no spaces, and cmd then resolves and
+ * quotes `npx` itself. Moving the header value into an env var dodges (2) —
+ * note there is no space after the colon, which is what keeps cmd from
+ * splitting the argument at all. mcp-remote substitutes `${VAR}` itself.
+ *
+ * POSIX has neither problem, but uses the same env form so both platforms are
+ * one code path with one behaviour to reason about.
+ */
+function mcpRemoteEntry(os: OS, mcpUrl: string, token?: string): Record<string, unknown> {
+  const authArgs = token ? ['--header', `Authorization:\${${AUTH_HEADER_ENV}}`] : []
+  const remoteArgs = ['-y', 'mcp-remote', mcpUrl, '--allow-http', ...authArgs]
+  const entry: Record<string, unknown> =
+    os === 'win32'
+      ? { command: 'cmd', args: ['/c', 'npx', ...remoteArgs] }
+      : { command: 'npx', args: remoteArgs }
+  if (token) entry.env = { [AUTH_HEADER_ENV]: `Bearer ${token}` }
+  return entry
+}
+
 /**
  * brain-core (embedded or remote): ONE unified MCP at `/mcp` (all tools on one server).
  * Remote may include Bearer; embedded never does.
@@ -114,6 +170,7 @@ function withHeaders(token: string | undefined, server: Record<string, unknown>)
 function brainCoreServers(
   spec: ClientSpec,
   brainUrl: string,
+  os: OS,
   token?: string,
 ): Record<string, Record<string, unknown>> {
   const mcp = `${trimBase(brainUrl)}/mcp`
@@ -124,15 +181,8 @@ function brainCoreServers(
       return { [MCP_POMNIA_KEY]: withHeaders(token, { url: mcp }) }
     case 'antigravity':
       return { [MCP_POMNIA_KEY]: withHeaders(token, { type: 'streamable-http', serverUrl: mcp }) }
-    case 'claude-desktop': {
-      const authArgs = token ? ['--header', `Authorization: Bearer ${token}`] : []
-      return {
-        [MCP_POMNIA_KEY]: {
-          command: 'npx',
-          args: ['-y', 'mcp-remote', mcp, '--allow-http', ...authArgs],
-        },
-      }
-    }
+    case 'claude-desktop':
+      return { [MCP_POMNIA_KEY]: mcpRemoteEntry(os, mcp, token) }
     case 'vscode':
       return { [MCP_POMNIA_KEY]: withHeaders(token, { type: 'http', url: mcp }) }
     case 'windsurf':
@@ -145,17 +195,22 @@ function brainCoreServers(
 }
 
 /** Embedded = brain-core with no auth. */
-function embeddedServers(spec: ClientSpec, brainUrl: string): Record<string, Record<string, unknown>> {
-  return brainCoreServers(spec, brainUrl)
+function embeddedServers(
+  spec: ClientSpec,
+  brainUrl: string,
+  os: OS,
+): Record<string, Record<string, unknown>> {
+  return brainCoreServers(spec, brainUrl, os)
 }
 
 /** Default remote = brain-core `/mcp` + optional Bearer. */
 function brainCoreRemoteServers(
   spec: ClientSpec,
   brainUrl: string,
+  os: OS,
   token?: string,
 ): Record<string, Record<string, unknown>> {
-  return brainCoreServers(spec, brainUrl, token)
+  return brainCoreServers(spec, brainUrl, os, token)
 }
 
 /* ---------------------------------------------------------------------- */
@@ -463,22 +518,18 @@ export const CLIENTS: ClientSpec[] = [
           ? joinPath(os, home, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json')
           : joinPath(os, appDataRoot(os, home), 'Claude', 'claude_desktop_config.json'),
     mcpKey: 'mcpServers',
-    buildServers: (url, token) => {
-      // Claude Desktop wraps non-localhost http MCP through mcp-remote with --allow-http.
-      // Token (if present) is passed via --header. mcp-remote handles the SSE transport.
+    buildServers: (url, token, os = 'win32') => {
+      // Claude Desktop wraps non-localhost http MCP through mcp-remote with
+      // --allow-http. See mcpRemoteEntry for why the Windows spelling differs.
       const base = trimBase(url)
-      const authArgs = token ? ['--header', `Authorization: Bearer ${token}`] : []
-      const wrap = (target: string) => ({
-        command: 'npx',
-        args: ['-y', 'mcp-remote', target, '--allow-http', ...authArgs],
-      })
+      const wrap = (target: string) => mcpRemoteEntry(os, target, token)
       return {
         [MCP_POMNIA_KEY]:     wrap(PATHS.ragMcp(base)),
         [MCP_POMNIA_VAULT_KEY]:   wrap(PATHS.vaultMcp(base)),
         [MCP_POMNIA_LIBRARY_KEY]: wrap(PATHS.libraryMcp(base)),
       }
     },
-    notes: 'Claude Desktop cannot speak HTTP/SSE to non-localhost natively; we tunnel through `mcp-remote` (npm) with --allow-http. Requires Node.js installed locally.',
+    notes: 'Claude Desktop cannot speak HTTP/SSE to non-localhost natively; we tunnel through `mcp-remote` (npm) with --allow-http. Requires Node.js installed locally. On Windows the entry runs through `cmd /c npx` and passes the Bearer token via the AUTH_HEADER env var — both work around cmd.exe mangling the plain spelling.',
     restartHint: 'Quit Claude Desktop from the system tray (NOT just close the window), then relaunch.',
   },
 
@@ -652,10 +703,10 @@ export function buildSnippet(
   const base = trimBase(brainUrl)
   const servers =
     target === 'embedded'
-      ? embeddedServers(spec, brainUrl)
+      ? embeddedServers(spec, brainUrl, os)
       : remoteHub === 'legacy-hub'
-        ? spec.buildServers(base, token)
-        : brainCoreRemoteServers(spec, base, token)
+        ? spec.buildServers(base, token, os)
+        : brainCoreRemoteServers(spec, base, os, token)
   const filePath = spec.configPath(os, home)
 
   const fullFileObj = { [spec.mcpKey]: servers }
