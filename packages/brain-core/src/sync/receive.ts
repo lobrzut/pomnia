@@ -67,6 +67,33 @@ async function hashFile(abs: string): Promise<string | null> {
   }
 }
 
+/** Every CR removed. Only ever used to compare, never to write. */
+function withoutCr(buf: Buffer): Buffer {
+  return Buffer.from(buf.filter((b) => b !== 0x0d))
+}
+
+/**
+ * The same note, written by two machines that disagree about line endings.
+ *
+ * A Windows desktop writes CRLF and a Linux server writes LF, so byte hashes
+ * differ for text that is identical to read. Every file either side had
+ * rewritten therefore came back a conflict, and conflicts accumulate: the same
+ * note as `-2`, `-3`, `-4`, one more on every sync. One vault reached 36 copies,
+ * 24 of them byte-identical to the file they were "conflicting" with — and each
+ * copy also entered the index, so a search returned the same note several times.
+ *
+ * Used only to decide whether this is a conflict. What lands on disk is still
+ * exactly what the writer sent: neither side gets its file rewritten to settle
+ * an argument about invisible characters.
+ */
+async function sameIgnoringLineEndings(abs: string, incoming: Buffer): Promise<boolean> {
+  try {
+    return withoutCr(await fs.readFile(abs)).equals(withoutCr(incoming))
+  } catch {
+    return false
+  }
+}
+
 async function listExisting(vaultRoot: string, dirs: readonly string[]): Promise<string[]> {
   const out: string[] = []
   const walk = async (rel: string): Promise<void> => {
@@ -276,6 +303,10 @@ export async function applyFile(opts: {
   try {
     const existingHash = await hashFile(abs)
     if (existingHash === actual) {
+      return { ok: true, path: verdict.relative, bytes: opts.content.length, unchanged: true }
+    }
+    // Not a conflict when the only disagreement is CR. See sameIgnoringLineEndings.
+    if (existingHash !== null && (await sameIgnoringLineEndings(abs, opts.content))) {
       return { ok: true, path: verdict.relative, bytes: opts.content.length, unchanged: true }
     }
     if (existingHash !== null) {
