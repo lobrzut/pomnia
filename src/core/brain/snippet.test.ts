@@ -207,3 +207,67 @@ describe('brain/snippet — Antigravity remote mcp_config.json', () => {
     expect(s.instructions).toContain('GEMINI.md')
   })
 })
+
+describe('brain/snippet — pasted-URL normalisation (regression: /admin/mcp 403)', () => {
+  const paste = (url: string): string => {
+    const s = buildSnippet('cursor', url, 'darwin', '/Users/Alice', 'btk_t', 'remote')
+    const full = JSON.parse(s.fullFileJson) as { mcpServers: Record<string, { url: string }> }
+    return full.mcpServers[MCP_POMNIA_KEY].url
+  }
+  const want = 'http://host:7865/mcp'
+
+  it('accepts the panel URL people copy out of the browser', () => {
+    // Was: http://host:7865/admin/mcp → 403 with a hint about admin tokens.
+    expect(paste('http://host:7865/admin')).toBe(want)
+    expect(paste('http://host:7865/admin/')).toBe(want)
+  })
+
+  it('accepts a URL that already names an endpoint', () => {
+    expect(paste('http://host:7865/mcp')).toBe(want)
+    expect(paste('http://host:7865/admin/mcp')).toBe(want)
+    expect(paste('http://host:7865/status')).toBe(want)
+  })
+
+  it('leaves an ordinary base URL alone, whitespace and slashes included', () => {
+    expect(paste('http://host:7865')).toBe(want)
+    expect(paste('http://host:7865///')).toBe(want)
+    expect(paste('  http://host:7865  ')).toBe(want)
+  })
+})
+
+describe('brain/snippet — Claude Desktop survives cmd.exe on Windows', () => {
+  const desktop = (os: 'win32' | 'darwin'): { command: string; args: string[]; env?: Record<string, string> } => {
+    const home = os === 'win32' ? 'C:\Users\Alice' : '/Users/Alice'
+    const s = buildSnippet('claude-desktop', 'http://host:7865', os, home, 'btk_t', 'remote')
+    const full = JSON.parse(s.fullFileJson) as {
+      mcpServers: Record<string, { command: string; args: string[]; env?: Record<string, string> }>
+    }
+    return full.mcpServers[MCP_POMNIA_KEY]
+  }
+
+  it('never names npx directly on Windows', () => {
+    // `command: 'npx'` resolves to C:\Program Files\nodejs\npx, which Claude
+    // Desktop hands to cmd.exe unquoted → 'C:\Program' is not recognized.
+    const e = desktop('win32')
+    expect(e.command).toBe('cmd')
+    expect(e.args.slice(0, 3)).toEqual(['/c', 'npx', '-y'])
+  })
+
+  it('never puts a space inside the Authorization argument', () => {
+    // cmd.exe splits on it, the server sees an empty header, answers 401, and
+    // mcp-remote dies inside OAuth registration.
+    const e = desktop('win32')
+    const header = e.args[e.args.indexOf('--header') + 1]
+    expect(header).toBe('Authorization:${AUTH_HEADER}')
+    expect(header).not.toContain(' ')
+    expect(e.env?.AUTH_HEADER).toBe('Bearer btk_t')
+  })
+
+  it('keeps the token out of argv on POSIX too', () => {
+    const e = desktop('darwin')
+    expect(e.command).toBe('npx')
+    expect(e.args).toContain('--allow-http')
+    expect(e.args.join(' ')).not.toContain('btk_t')
+    expect(e.env?.AUTH_HEADER).toBe('Bearer btk_t')
+  })
+})

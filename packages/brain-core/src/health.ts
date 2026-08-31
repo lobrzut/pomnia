@@ -234,6 +234,59 @@ function countRow(db: Database.Database, sql: string): number {
 }
 
 /**
+ * Notes sitting in the vault that never reached the index.
+ *
+ * A partial index is the quiet failure this server had no way to report. On one
+ * appliance a CIFS mount without `iocharset=utf8` left 206 of 3573 files
+ * listable but not openable: `ls` showed them, opening them said ENOENT, the
+ * indexer skipped them, and `/healthz` reported `ok` for three weeks while a
+ * slice of the vault was unsearchable. The only symptom was searches quietly
+ * missing notes nobody thought to go looking for.
+ *
+ * Counting directory entries is what makes this work: an unreadable file still
+ * appears on disk, so it widens the gap precisely because nothing can read it.
+ *
+ * Cached, because a container probes /healthz every 30s and the vault usually
+ * lives on a network share — walking it that often would cost more than it says.
+ */
+const DISK_COUNT_TTL_MS = 5 * 60_000
+let diskCount: { at: number; files: number } | null = null
+
+async function countIndexableOnDisk(vaultRoot: string): Promise<number> {
+  const now = Date.now()
+  if (diskCount && now - diskCount.at < DISK_COUNT_TTL_MS) return diskCount.files
+  let files = 0
+  for (const rel of SYNC_DIRS) {
+    const stack = [join(vaultRoot, rel)]
+    while (stack.length > 0) {
+      const dir = stack.pop() as string
+      let entries
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true })
+      } catch {
+        continue
+      }
+      for (const e of entries) {
+        if (e.isDirectory()) stack.push(join(dir, e.name))
+        else if (e.name.endsWith('.md')) files += 1
+      }
+    }
+  }
+  diskCount = { at: now, files }
+  return files
+}
+
+/** Ignore a gap this small — pruning lag and in-flight writes are not faults. */
+const INDEX_GAP_ABS = 10
+/** …and this fraction of the vault, so ordinary churn cannot flag a big one. */
+const INDEX_GAP_RATIO = 0.02
+
+/** Test seam: the cache would otherwise carry one case into the next. */
+export function resetDiskCountCache(): void {
+  diskCount = null
+}
+
+/**
  * Does the vault hold anything worth indexing? Stops at the first note.
  *
  * Deliberately a first-hit scan, not a count: this runs on every /healthz,
@@ -327,6 +380,20 @@ export async function collectHealth(opts: {
         index = (await vaultHasNotes(opts.vaultRoot))
           ? { state: 'down', detail: 'index is empty — run brain-core --reindex' }
           : { state: 'degraded', detail: 'nothing indexed yet — the vault has no notes' }
+      } else {
+        // A non-empty index is not a complete one. See countIndexableOnDisk.
+        const onDisk = await countIndexableOnDisk(opts.vaultRoot)
+        const gap = onDisk - counts.files
+        if (gap > Math.max(INDEX_GAP_ABS, onDisk * INDEX_GAP_RATIO)) {
+          index = {
+            state: 'degraded',
+            detail:
+              `${gap} of ${onDisk} notes are on disk but not in the index — ` +
+              `run brain-core --reindex. If a reindex does not close the gap, the files ` +
+              `exist but cannot be read: check the vault mount (a CIFS share without ` +
+              `iocharset=utf8 makes non-ASCII filenames listable and unopenable).`,
+          }
+        }
       }
     } catch (e) {
       db = { state: 'down', detail: (e as Error).message }

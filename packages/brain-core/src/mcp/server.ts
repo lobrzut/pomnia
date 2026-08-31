@@ -790,10 +790,14 @@ export async function createBrainServer(
                 auth.reason === 'forbidden'
                   ? {
                       error: 'forbidden',
-                      // The credential is real and the scope is wrong; telling
-                      // them to try another token sends them hunting for a
-                      // problem that is not there.
-                      hint: 'this endpoint needs an admin token — `brain-core --add-token <name> --role admin`',
+                      // The credential is real and the scope is wrong. Lead
+                      // with the likeliest cause: `/admin` is the panel URL
+                      // people copy from the browser, so an agent config
+                      // pointed here is nearly always a mis-pasted base URL,
+                      // not a missing role. Mentioning the token first sent
+                      // users minting admin tokens they never needed.
+                      hint:
+                        'agents connect to /mcp — this is the admin surface. If your MCP client is configured with a URL ending in /admin/mcp, drop the /admin. A genuine admin tool needs `brain-core --add-token <name> --role admin`.',
                     }
                   : {
                       error: auth.reason === 'rate_limited' ? 'rate_limited' : 'unauthorized',

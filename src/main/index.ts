@@ -1355,13 +1355,24 @@ function registerIpc(): void {
     if (!vaultPath) throw new Error(m().vaultNotOpen)
     const url = (target ?? '').trim()
     if (!url) throw new Error(m().replicaNoTarget)
+    // Prefer the purpose-built replica token over whatever the renderer passed.
+    //
+    // The renderer only holds the Connect token, and that one is minted for MCP
+    // agents: it can read, so the pull half of the sync succeeds, and it cannot
+    // write, so the push half fails with `write_needs_admin` — a server error
+    // whose hint then advises reissuing the Connect token as admin. Following
+    // that advice would hand admin write access to every MCP client on the
+    // machine, when what is needed is one admin token for this one app.
+    // `replicaToken` is exactly that, and it never leaves main: the renderer is
+    // told only whether it is set, never its value.
+    const auth = getAppSettings().replicaToken?.trim() || token?.trim() || undefined
     const root = brainVaultRoot(vaultPath)
     activity.update({ kind: 'indexing', phase: 'reindex', detail: m().replicaComparing })
     try {
       const r = await syncVaultSurface({
         vaultRoot: root,
         target: url,
-        token: token?.trim() || undefined,
+        token: auth,
         onProgress: (done, total, path) =>
           activity.update({
             kind: 'indexing',
@@ -1963,6 +1974,30 @@ function registerIpc(): void {
         : saved.brainMcpUrl?.trim() || '')
     if (url && (resolvedTarget === 'embedded' || resolvedTarget === 'remote')) {
       try {
+        // Ask the endpoint whether it is there before writing it into every
+        // client's config.
+        //
+        // This one call rewrites the Pomnia block in up to six files at once,
+        // so an unverified URL is not one broken client — it is every agent on
+        // the machine, all failing the same way, with the failure only visible
+        // the next time each one starts. That is how `…/admin/mcp` (the panel
+        // URL, one paste away from the right one) reached six configs and cost
+        // an evening: the address was never asked whether it worked.
+        //
+        // probeMcpUrl POSTs the same `initialize` the agent will, so a pass
+        // means the agent connects. On failure we leave the configs alone —
+        // yesterday's working block beats today's unverified one — and the
+        // status the caller receives still reports the real problem.
+        const probeUrl = `${url.replace(/\/+$/, '').replace(/\/mcp$/, '')}/mcp`
+        const probe = await probeMcpUrl(probeUrl, resolvedTarget === 'remote' ? token : undefined)
+        if (!probe.speaksMcp) {
+          log.warn(
+            `not rewriting MCP configs: ${probe.url} ${
+              probe.reachable ? `answered ${probe.status} but not as an MCP server` : `unreachable (${probe.error})`
+            }`,
+          )
+          throw new Error('endpoint did not answer as an MCP server')
+        }
         const sync = await syncManagedMcpConfigs({
           brainUrl: url,
           target: resolvedTarget,

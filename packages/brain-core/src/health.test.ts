@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { collectHealth, redactHealth, worstOf } from './health.js'
+import { collectHealth, redactHealth, resetDiskCountCache, worstOf } from './health.js'
 import type { EmbedClient } from './rag/embed.js'
 
 let vaultRoot: string
@@ -227,5 +227,59 @@ describe('disk', () => {
     await collectHealth({ ...base, db: db({ files: 1, chunks: 1 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot })
     const { readdir } = await import('node:fs/promises')
     expect(await readdir(vaultRoot)).not.toContain('.write-probe')
+  })
+})
+
+describe('collectHealth — notes on disk but not in the index', () => {
+  // The on-disk count is cached for 5 minutes, so without clearing it each
+  // case would be graded against the previous case's vault.
+  beforeEach(() => resetDiskCountCache())
+
+  /** Write n notes under sessions/, the way a vault actually fills up. */
+  async function seedNotes(n: number): Promise<void> {
+    await mkdir(join(vaultRoot, 'sessions'), { recursive: true })
+    for (let i = 0; i < n; i++) {
+      await writeFile(join(vaultRoot, 'sessions', `note-${i}.md`), `# note ${i}`)
+    }
+  }
+
+  it('degrades when a large share of the vault never reached the index', async () => {
+    // The shape of the real incident: a CIFS mount without iocharset=utf8 left
+    // 206 of 3573 files listable and unopenable, so the indexer skipped them
+    // and /healthz stayed green while searches quietly missed them.
+    await seedNotes(100)
+    const h = await collectHealth({
+      ...base, db: db({ files: 40, chunks: 120 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+    })
+    expect(h.checks.index.state).toBe('degraded')
+    expect(h.checks.index.detail).toContain('60 of 100')
+    expect(h.status).toBe('degraded')
+  })
+
+  it('names the mount as a suspect, because a reindex alone will not fix that case', async () => {
+    await seedNotes(100)
+    const h = await collectHealth({
+      ...base, db: db({ files: 40, chunks: 120 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+    })
+    expect(h.checks.index.detail).toContain('iocharset=utf8')
+  })
+
+  it('stays ok when the gap is ordinary churn, not a fault', async () => {
+    // Pruning lag and in-flight writes must not page anybody.
+    await seedNotes(100)
+    const h = await collectHealth({
+      ...base, db: db({ files: 98, chunks: 300 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+    })
+    expect(h.checks.index.state).toBe('ok')
+  })
+
+  it('stays ok when the index is ahead of the walk', async () => {
+    // Deleted-but-not-pruned rows make files exceed what is on disk; that is a
+    // negative gap and nonsense to report as missing notes.
+    await seedNotes(10)
+    const h = await collectHealth({
+      ...base, db: db({ files: 40, chunks: 120 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+    })
+    expect(h.checks.index.state).toBe('ok')
   })
 })

@@ -11,9 +11,23 @@ export interface OllamaGenerateOpts {
   system?: string
   json?: boolean
   temperature?: number
+  /**
+   * Context window. Ollama defaults to 4096, which `num_ctx` must cover for the
+   * prompt AND the generated note together. A distill transcript is budgeted at
+   * 12 000 characters and Polish tokenizes at roughly 3 chars/token, so the
+   * prompt alone lands near 4 000 — add a 400-600 token note and the longest
+   * conversations overflow. Ollama then silently slides the window and drops
+   * the head of the transcript: no error, just a note distilled from a
+   * conversation missing its beginning. `transcript()`'s own head+tail budget
+   * assumes the model sees what it sent.
+   */
+  numCtx?: number
   timeoutMs?: number
   signal?: AbortSignal
 }
+
+/** Headroom over the 12 000-char transcript budget plus the generated note. */
+export const DEFAULT_NUM_CTX = 8192
 
 export async function ollamaGenerate(opts: OllamaGenerateOpts): Promise<string> {
   const base = opts.baseUrl.replace(/\/$/, '')
@@ -24,7 +38,7 @@ export async function ollamaGenerate(opts: OllamaGenerateOpts): Promise<string> 
     system: opts.system,
     stream: false,
     format: opts.json ? 'json' : undefined,
-    options: { temperature: opts.temperature ?? 0.2 },
+    options: { temperature: opts.temperature ?? 0.2, num_ctx: opts.numCtx ?? DEFAULT_NUM_CTX },
   }
   const timeoutMs = opts.timeoutMs ?? 300_000
   const signals: AbortSignal[] = [AbortSignal.timeout(timeoutMs)]
