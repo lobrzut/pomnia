@@ -65,3 +65,24 @@ The push now prefers it, the panel says which credential it will use, and when t
 ## "The local search engine did not start" is not always an error
 
 With Brain pointed at a server, the embedded engine has no job — agents read the remote index, and a local one would fill a database nobody queries. That was reported as an error. A red cross on correct behaviour is not a warning; it is training to ignore warnings.
+
+---
+
+## Verifying the download
+
+The build is unsigned, so SmartScreen will warn. That makes the checksum the only
+thing you can actually check it against — published here for the first time:
+
+```
+Pomnia-0.1.71-setup.exe
+SHA256  0c313cfd0a60e52621c91673a03c363fc778528d043db59219c11f9d977e761e
+size    167 204 025 bytes
+```
+
+```powershell
+Get-FileHash -Algorithm SHA256 .\Pomnia-0.1.71-setup.exe
+```
+
+`latest.yml` is attached alongside the installer. It carries the SHA-512 the
+updater checks, and until now it was generated locally and never uploaded — so
+the checksum reached nobody and in-app updates had nothing to read.
