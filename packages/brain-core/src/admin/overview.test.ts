@@ -159,7 +159,10 @@ describe('collectOverview', () => {
    * state a failed reindex leaves behind while every counter it wrote says
    * success, and you can only see it by measuring both sides.
    */
-  it('reports the gap between disk and index', async () => {
+  // Writes 710 files, so it is slow by nature and was sitting just under
+  // vitest's 5s default: any extra load elsewhere in the suite tipped it into
+  // a timeout that said nothing about the gap arithmetic it actually checks.
+  it('reports the gap between disk and index', { timeout: 30_000 }, async () => {
     for (let i = 0; i < 10; i++) await put(`sessions/n${i}.md`, 'x')
     // Not indexable, so it must not widen the gap.
     for (let i = 0; i < 700; i++) await put(`skills/s${i}.md`, 'x')

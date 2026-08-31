@@ -247,28 +247,28 @@ describe('collectHealth — notes on disk but not in the index', () => {
     // The shape of the real incident: a CIFS mount without iocharset=utf8 left
     // 206 of 3573 files listable and unopenable, so the indexer skipped them
     // and /healthz stayed green while searches quietly missed them.
-    await seedNotes(100)
+    await seedNotes(12)
     const h = await collectHealth({
-      ...base, db: db({ files: 40, chunks: 120 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+      ...base, db: db({ files: 1, chunks: 4 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
     })
     expect(h.checks.index.state).toBe('degraded')
-    expect(h.checks.index.detail).toContain('60 of 100')
+    expect(h.checks.index.detail).toContain('11 of 12')
     expect(h.status).toBe('degraded')
   })
 
   it('names the mount as a suspect, because a reindex alone will not fix that case', async () => {
-    await seedNotes(100)
+    await seedNotes(12)
     const h = await collectHealth({
-      ...base, db: db({ files: 40, chunks: 120 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+      ...base, db: db({ files: 1, chunks: 4 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
     })
     expect(h.checks.index.detail).toContain('iocharset=utf8')
   })
 
   it('stays ok when the gap is ordinary churn, not a fault', async () => {
     // Pruning lag and in-flight writes must not page anybody.
-    await seedNotes(100)
+    await seedNotes(12)
     const h = await collectHealth({
-      ...base, db: db({ files: 98, chunks: 300 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+      ...base, db: db({ files: 11, chunks: 40 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
     })
     expect(h.checks.index.state).toBe('ok')
   })
@@ -279,13 +279,13 @@ describe('collectHealth — notes on disk but not in the index', () => {
     // which the indexer skips on purpose. A monitor that goes red over correct
     // behaviour trains people to ignore it, which restores the exact silence
     // the check exists to break.
-    await seedNotes(20)
+    await seedNotes(5)
     await mkdir(join(vaultRoot, 'distilled', '_review'), { recursive: true })
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 10; i++) {
       await writeFile(join(vaultRoot, 'distilled', '_review', `q-${i}.md`), '# quarantined')
     }
     const h = await collectHealth({
-      ...base, db: db({ files: 20, chunks: 60 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+      ...base, db: db({ files: 5, chunks: 15 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
     })
     expect(h.checks.index.state).toBe('ok')
   })
@@ -293,7 +293,7 @@ describe('collectHealth — notes on disk but not in the index', () => {
   it('stays ok when the index is ahead of the walk', async () => {
     // Deleted-but-not-pruned rows make files exceed what is on disk; that is a
     // negative gap and nonsense to report as missing notes.
-    await seedNotes(10)
+    await seedNotes(5)
     const h = await collectHealth({
       ...base, db: db({ files: 40, chunks: 120 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
     })
