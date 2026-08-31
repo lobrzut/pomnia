@@ -36,7 +36,7 @@ import {
   type OllamaRuntimeSnapshot,
 } from './ollama/runtime.js'
 import { EMBED_DIMS } from './rag/embed.js'
-import { SKIP_DIRS } from './rag/indexer.js'
+import { INDEX_SUBDIRS, SKIP_DIRS } from './rag/indexer.js'
 import type { EmbedBackendName, EmbedClient } from './rag/embed.js'
 import { SYNC_DIRS } from './sync/paths.js'
 import type { SyncHealthSnapshot } from './sync/status.js'
@@ -257,7 +257,12 @@ async function countIndexableOnDisk(vaultRoot: string): Promise<number> {
   const now = Date.now()
   if (diskCount && now - diskCount.at < DISK_COUNT_TTL_MS) return diskCount.files
   let files = 0
-  for (const rel of SYNC_DIRS) {
+  // INDEX_SUBDIRS, not SYNC_DIRS. They are different lists on purpose:
+  // skills/ replicates between machines and is deliberately kept out of
+  // RAG, so counting it reported 774 notes 'missing from the index' that
+  // the indexer was never asked to take. Walking the same list the indexer
+  // walks is the only version of this check that cannot invent a gap.
+  for (const rel of INDEX_SUBDIRS) {
     const stack = [join(vaultRoot, rel)]
     while (stack.length > 0) {
       const dir = stack.pop() as string

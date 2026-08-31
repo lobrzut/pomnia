@@ -273,6 +273,22 @@ describe('collectHealth — notes on disk but not in the index', () => {
     expect(h.checks.index.state).toBe('ok')
   })
 
+  it('does not count skills as a gap — they replicate but never enter RAG', async () => {
+    // Shipped once and caught on the live server: the walk used SYNC_DIRS while
+    // the indexer uses INDEX_SUBDIRS, and skills/ is in the first and not the
+    // second. /healthz went degraded over 774 notes the indexer was never
+    // asked to take — the same false alarm as quarantine, one list further up.
+    await seedNotes(10)
+    await mkdir(join(vaultRoot, 'skills'), { recursive: true })
+    for (let i = 0; i < 40; i++) {
+      await writeFile(join(vaultRoot, 'skills', `s-${i}.md`), '# skill')
+    }
+    const h = await collectHealth({
+      ...base, db: db({ files: 10, chunks: 30 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+    })
+    expect(h.checks.index.state).toBe('ok')
+  })
+
   it('does not count quarantine as a gap — _review is policy, not a fault', async () => {
     // Found the hard way: this check reported 123 missing notes on a real
     // appliance, and all 123 were readable files sitting in distilled/_review,
