@@ -273,6 +273,23 @@ describe('collectHealth — notes on disk but not in the index', () => {
     expect(h.checks.index.state).toBe('ok')
   })
 
+  it('does not count quarantine as a gap — _review is policy, not a fault', async () => {
+    // Found the hard way: this check reported 123 missing notes on a real
+    // appliance, and all 123 were readable files sitting in distilled/_review,
+    // which the indexer skips on purpose. A monitor that goes red over correct
+    // behaviour trains people to ignore it, which restores the exact silence
+    // the check exists to break.
+    await seedNotes(20)
+    await mkdir(join(vaultRoot, 'distilled', '_review'), { recursive: true })
+    for (let i = 0; i < 60; i++) {
+      await writeFile(join(vaultRoot, 'distilled', '_review', `q-${i}.md`), '# quarantined')
+    }
+    const h = await collectHealth({
+      ...base, db: db({ files: 20, chunks: 60 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+    })
+    expect(h.checks.index.state).toBe('ok')
+  })
+
   it('stays ok when the index is ahead of the walk', async () => {
     // Deleted-but-not-pruned rows make files exceed what is on disk; that is a
     // negative gap and nonsense to report as missing notes.

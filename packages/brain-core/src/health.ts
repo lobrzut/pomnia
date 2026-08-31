@@ -36,6 +36,7 @@ import {
   type OllamaRuntimeSnapshot,
 } from './ollama/runtime.js'
 import { EMBED_DIMS } from './rag/embed.js'
+import { SKIP_DIRS } from './rag/indexer.js'
 import type { EmbedBackendName, EmbedClient } from './rag/embed.js'
 import { SYNC_DIRS } from './sync/paths.js'
 import type { SyncHealthSnapshot } from './sync/status.js'
@@ -267,8 +268,15 @@ async function countIndexableOnDisk(vaultRoot: string): Promise<number> {
         continue
       }
       for (const e of entries) {
-        if (e.isDirectory()) stack.push(join(dir, e.name))
-        else if (e.name.endsWith('.md')) files += 1
+        // Count what the indexer would index, nothing else. `_review/`
+        // is quarantine and deliberately stays out of RAG, so counting it
+        // reports a gap that is policy working — on one appliance that
+        // would have pinned /healthz to `degraded` over 123 files that are
+        // exactly where they belong. A check that cries wolf gets ignored,
+        // which is how the silence it exists to break comes back.
+        if (e.isDirectory()) {
+          if (!SKIP_DIRS.has(e.name) && !e.name.startsWith('.')) stack.push(join(dir, e.name))
+        } else if (e.name.endsWith('.md')) files += 1
       }
     }
   }
