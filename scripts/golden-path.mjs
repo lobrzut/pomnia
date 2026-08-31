@@ -171,11 +171,57 @@ function countIndexableNotes() {
   return n
 }
 
+/**
+ * Which brain do the agents on this machine actually search?
+ *
+ * This gate measured the local index and nothing else, which is the right
+ * answer only for an embedded install. Point Brain at a server — the setup the
+ * app recommends — and the local index stops being maintained on purpose: the
+ * embedded engine does not start, because indexing locally would fill a
+ * database nobody queries. The gate then read that deliberately stale copy and
+ * refused a release over a brain no agent talks to, while the one they do talk
+ * to was complete.
+ *
+ * For a remote brain the question is answered by the server: /healthz compares
+ * its own notes on disk against its own index and reports `checks.index`. Ask
+ * the thing that knows rather than guessing from the wrong side of the network.
+ */
+function remoteBrain() {
+  try {
+    const s = JSON.parse(readFileSync(join(APPDATA, 'pomnia', 'app-settings.json'), 'utf8'))
+    if ((s.brainTarget ?? 'embedded') !== 'remote') return null
+    const url = (s.brainMcpUrl || '').trim().replace(/\/+$/, '').replace(/\/mcp$/, '')
+    return url ? { url, token: (s.connectToken || '').trim() } : null
+  } catch {
+    return null
+  }
+}
+
+async function remoteIndexHealth(brain) {
+  const headers = brain.token ? { Authorization: `Bearer ${brain.token}` } : {}
+  const r = await fetch(`${brain.url}/healthz`, { headers, signal: AbortSignal.timeout(8000) })
+  const h = await r.json()
+  return { state: h?.checks?.index?.state, detail: h?.checks?.index?.detail, files: h?.index?.files ?? null }
+}
+
 const onDisk = countIndexableNotes()
 /** Drives the later search check — a skipped check must not look like a pass. */
 let indexHealthy = false
 
-if (files != null && onDisk > 0) {
+const brain = remoteBrain()
+if (brain) {
+  try {
+    const h = await remoteIndexHealth(brain)
+    if (h.state === 'ok') {
+      indexHealthy = true
+      pass(`Remote brain index OK at ${brain.url} (${h.files ?? '?'} files) — this is the brain agents search`)
+    } else {
+      boom(`Remote brain at ${brain.url} reports index ${h.state ?? 'unknown'}: ${h.detail ?? 'no detail'}`)
+    }
+  } catch (e) {
+    boom(`Brain is configured as remote (${brain.url}) but did not answer /healthz: ${e.message}`)
+  }
+} else if (files != null && onDisk > 0) {
   const coverage = files / onDisk
   if (coverage < MIN_COVERAGE) {
     boom(
