@@ -27,6 +27,10 @@ export const SYNC_DIRS = [
   'skills',
   'chats',
   'state',
+  // Indexed since 0.1.71, so it has to travel too: a directory that is
+  // searchable on one machine and unreplicable to the next is a note you
+  // can find exactly once, from exactly one desk.
+  'sprawy',
 ] as const
 
 /**
@@ -37,6 +41,31 @@ export const SYNC_DIRS = [
  * ledgerMerge.ts). Putting it in SYNC_ROOT_FILES would be the wrong path.
  */
 export const SYNC_ROOT_FILES = ['USER.md', 'AGENTS.md'] as const
+
+/**
+ * `USER-2.md` for a diverged `USER.md`.
+ *
+ * When both sides changed a file, receive.ts keeps the local copy and writes the
+ * incoming one beside it with a numeric suffix. That sibling then has to pass
+ * this same validator — and for the two files allowed at the vault root it did
+ * not, because `USER-2.md` is not itself in SYNC_ROOT_FILES. The result was that
+ * the root files were the only ones that could never be reconciled: every push
+ * after a divergence failed with `conflict path refused: not-synced-dir`, and
+ * kept failing, while the notes around them synced normally.
+ *
+ * `USER.md` is the profile every agent reads at the start of every session, so
+ * "the one file that cannot heal" was the worst possible choice.
+ */
+function isRootConflictCopy(name: string): boolean {
+  return (SYNC_ROOT_FILES as readonly string[]).some((allowed) => {
+    const dot = allowed.lastIndexOf('.')
+    const stem = dot > 0 ? allowed.slice(0, dot) : allowed
+    const ext = dot > 0 ? allowed.slice(dot) : ''
+    if (!name.startsWith(`${stem}-`) || !name.endsWith(ext)) return false
+    const middle = name.slice(stem.length + 1, name.length - ext.length)
+    return /^\d+$/.test(middle)
+  })
+}
 
 /**
  * Distillation ledger — lives under `state/` (already in SYNC_DIRS), not the
@@ -138,7 +167,8 @@ export function safeVaultPath(input: string): PathVerdict {
 
   const head = segments[0]
   const isRootFile =
-    segments.length === 1 && (SYNC_ROOT_FILES as readonly string[]).includes(head)
+    segments.length === 1 &&
+    ((SYNC_ROOT_FILES as readonly string[]).includes(head) || isRootConflictCopy(head))
   if (!isRootFile && !(SYNC_DIRS as readonly string[]).includes(head)) {
     return { ok: false, reason: 'not-synced-dir' }
   }
