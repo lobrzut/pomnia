@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Pomnia
 /**
  * Server-side distillation engine — adapted from Desktop `src/core/brain/distill.ts`.
- * Profile default: qwen2.5:14b via Ollama /api/generate.
+ * Profile default: DEFAULT_DISTILL_MODEL via Ollama /api/generate.
  */
 
 import { assembleNote, coerceFields, transcript } from './note.js'

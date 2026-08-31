@@ -2,7 +2,39 @@
 // Copyright (C) 2026 Pomnia
 /** Minimal Ollama /api/generate client for distill (separate from embed). */
 
-export const DEFAULT_DISTILL_MODEL = 'qwen2.5:14b'
+/**
+ * Distillation model.
+ *
+ * Was `qwen2.5:14b` on the assumption that the larger model writes the better
+ * note. Measured against `scoreFields` — the gate that decides whether a note
+ * reaches retrieval at all — the assumption does not hold:
+ *
+ *   30 conversations, 2 passes    qwen2.5:14b   llama3.1:8b
+ *   mean score                          5.838         6.853
+ *   passes the quality gate               73%           87%
+ *   attempts_failed per note             1.03          1.87
+ *   median seconds per conversation      18.5           9.2
+ *
+ * Better on 23 of 30, median delta +1.18, and the runs were deterministic
+ * (spread 0.000 per host). Replicated on a second machine with a different GPU,
+ * where the gap was wider still, and confirmed on a held-out set the numbers
+ * never steered: 7.514 mean, every note through the gate, read by hand.
+ *
+ * The `attempts_failed` row matters more than the mean. That section is the one
+ * an agent needs most and the corpus had least of — across 1809 notes there
+ * were none, because nothing asked for them. The smaller model records nearly
+ * twice as many.
+ *
+ * The one thing 14B did better was never returning unparseable JSON, where 8B
+ * failed roughly once in thirty. `distillConversation` retries once, which
+ * covers it.
+ *
+ * Measured on one corpus (Polish + English, homelab and development work), so
+ * this is a better default, not a proof about every vault. Anyone whose notes
+ * look different should measure their own — experiments/gepa-distill in
+ * lobrzut/pomnia-lab is the rig that produced these numbers.
+ */
+export const DEFAULT_DISTILL_MODEL = 'llama3.1:8b'
 
 export interface OllamaGenerateOpts {
   baseUrl: string

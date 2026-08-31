@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_DISTILL_MODEL } from '../distill/ollamaChat.js'
 
 import { loadConfig } from './index.js'
 
@@ -146,10 +147,13 @@ describe('sync peer vs archive target', () => {
 })
 
 describe('distill config', () => {
-  it('defaults distill on with qwen2.5:14b', async () => {
+  it('defaults distill on, with the model the engine ships', async () => {
+    // Asserted against the constant, not a copy of it: the literal here was
+    // the thing that made the default look changed while three other places
+    // still decided it at runtime.
     const cfg = await loadConfig([...base], {})
     expect(cfg.distillEnabled).toBe(true)
-    expect(cfg.distillModel).toBe('qwen2.5:14b')
+    expect(cfg.distillModel).toBe(DEFAULT_DISTILL_MODEL)
   })
 
   it('turns distill off with BRAIN_DISTILL=0', async () => {

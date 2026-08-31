@@ -12,6 +12,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { validateOllamaUrl } from '../admin/settings.js'
+import { DEFAULT_DISTILL_MODEL } from '../distill/ollamaChat.js'
 import {
   defaultEmbedCacheDir,
   parseEmbedBackend,
@@ -111,7 +112,7 @@ export interface BrainConfig {
    * KVM sets BRAIN_DISTILL=0. Linux SoT enables when writable vault + Ollama.
    */
   distillEnabled: boolean
-  /** Chat model for distill (default qwen2.5:14b). Env: BRAIN_DISTILL_MODEL. */
+  /** Chat model for distill. Default: DEFAULT_DISTILL_MODEL. Env: BRAIN_DISTILL_MODEL. */
   distillModel: string
 
   /**
@@ -147,7 +148,7 @@ export function defaultConfig(): BrainConfig {
     embedBackend: 'ollama',
     embedCacheDir: defaultEmbedCacheDir(dataDir),
     distillEnabled: true,
-    distillModel: 'qwen2.5:14b',
+    distillModel: DEFAULT_DISTILL_MODEL,
     auth: {
       tokensFile: join(dataDir, 'mcp-tokens.json'),
       maxFailsPerMinute: 20,
