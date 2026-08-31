@@ -63,6 +63,7 @@ import {
   type SourceId,
   localizePipelineProgress,
 } from '@core/index'
+import { shouldWarnVaultNotSynced } from '../core/brain/vaultSyncWarning.js'
 import { m } from './mainStrings.js'
 import { formatBuildIdentity } from '../buildInfo.js'
 
@@ -506,9 +507,38 @@ function checkVaultHealthInBackground(opts?: { silentOk?: boolean }): void {
  * Reset by `resetRemoteBrainWarning` whenever the user edits the target or URL.
  */
 let warnedRemoteBrain = false
+let warnedVaultNotSynced = false
 
 function resetRemoteBrainWarning(): void {
   warnedRemoteBrain = false
+  warnedVaultNotSynced = false
+}
+
+/**
+ * Two live vaults, drifting, with nothing saying so.
+ *
+ * Pointing Brain at a server does not move this machine's vault: the desktop
+ * keeps distilling into its own, the agents keep reading the server's, and
+ * neither side is wrong on its own. Only the pair is. Left alone it is slow and
+ * silent — on one install the local vault sat 78 sessions behind 589 for weeks,
+ * discovered by counting files, not by anything the app said.
+ *
+ * The app already holds both halves of the answer (Brain is remote, replica
+ * push is off), so it can say this without asking anything of the network. Once
+ * per vault open, not per distillation: a warning that repeats is a warning
+ * people learn to dismiss.
+ */
+function warnIfVaultNotSynced(): void {
+  if (warnedVaultNotSynced) return
+  const s = getAppSettings()
+  if (!shouldWarnVaultNotSynced(s)) return
+  const server = s.brainMcpUrl?.trim() ?? ''
+  warnedVaultNotSynced = true
+  sendAppToast({
+    kind: 'warn',
+    title: m().vaultNotSyncedTitle,
+    detail: m().vaultNotSyncedDetail(server),
+  })
 }
 
 async function warnIfRemoteBrainUnusable(): Promise<void> {
@@ -863,6 +893,7 @@ function registerIpc(): void {
     brainCore.setVaultRoot(knowledgeRoot)
     void maybeAutoStartEmbeddedBrain()
     void warnIfRemoteBrainUnusable()
+    warnIfVaultNotSynced()
     void healLedgerForVault()
     // When autostart is off, still prompt for one-shot index hygiene.
     if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
@@ -891,6 +922,7 @@ function registerIpc(): void {
     const pendingLibraryIndex = vault.getPendingIndexDocuments().length
     void maybeAutoStartEmbeddedBrain()
     void warnIfRemoteBrainUnusable()
+    warnIfVaultNotSynced()
     void healLedgerForVault()
     if (!getAppSettings().embeddedBrainAutoStart) void maybeHygieneReindexAfterVaultChange()
     return {
