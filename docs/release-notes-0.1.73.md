@@ -1,4 +1,4 @@
-> **No re-chunk, no reindex required.** This is a code swap. One thing is worth a reindex afterwards, and 0.1.72 will now tell you when: see *Recall could quote a note you deleted*.
+> **No re-chunk, no reindex required.** This is a code swap. One thing is worth a reindex afterwards, and 0.1.73 will now tell you when: see *Recall could quote a note you deleted*.
 
 ## Two controls that could never have worked
 
@@ -34,6 +34,16 @@ What it can do is state the fact in the one channel that reliably reaches an age
 
 It stays silent when you have turned auto-checkpoint off. That setting is an instruction, not a preference to argue with.
 
+## Sync conflicts stopped multiplying
+
+Recording a conflict does not resolve it. Both sides keep their own copy of the file, so the next sync saw the same disagreement and wrote another numbered copy — `-3`, then `-4`, one more on every run, for as long as nobody merged the two by hand.
+
+On a live vault two checkpoints reached `-9` in a day and a half. Five of those copies appeared overnight while nothing was being edited at all: the two sides simply disagreed, and every sync said so again in a new file. Each copy also enters the index, so one note answers a search several times. Deleting them achieved nothing, because the next sync put them back — which from the outside looks like a vault that will not stay tidy.
+
+A disagreement is now recorded once. Before writing a new copy, Pomnia looks for one that already holds exactly the incoming bytes; if it is there, nothing is written. Line endings are ignored in that comparison, for the same reason the conflict test itself ignores them.
+
+If your vault already carries `-2`…`-9` copies from the old behaviour, the first sync after upgrading will **not** add another one on top. Those existing copies are yours to delete — check them first, since some may hold content the base file does not.
+
 ## Cards no longer get sliced while they arrive
 
 The source cards on the dashboard animate in from 6px below, inside a scrolling column that had 4px of room underneath. The bottom row was clipped for the ~280ms of its own entrance, and its glow stayed clipped afterwards.
@@ -49,10 +59,11 @@ Pomnia is two programs that update independently. Installing the desktop app doe
 | File beats cache for the connect token | ✅ | — |
 | Cards not clipped on entry | ✅ | — |
 | Recall withholds deleted notes | — | ✅ |
+| Conflicts recorded once, not per sync | ✅ | ✅ |
 | `/healthz` reports orphaned index entries | — | ✅ |
 | Reminder when the vault has gone quiet | — | ✅ |
 
-If your agents connect to a brain-core on another machine, the three anti-drift fixes arrive when you update **that** server, not when you install this app.
+If your agents connect to a brain-core on another machine, the anti-drift fixes arrive when you update **that** server, not when you install this app. The conflict fix is the exception: both sides write conflict copies, so it has to be on both to end the multiplication.
 
 ## Verifying the download
 
@@ -63,7 +74,7 @@ Compare the SHA256 of the installer against this value before running it:
 ```
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Pomnia-0.1.72-setup.exe
+Get-FileHash -Algorithm SHA256 .\Pomnia-0.1.73-setup.exe
 ```
 
 The build is unsigned, so Windows SmartScreen will warn. "More info" → "Run anyway" is the expected path; the hash is what actually tells you the file is the one that was built.
