@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
+import { conversationTitle } from './conversationTitle.js'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import type { BackupOptions, Conversation, DetectedSource, Message, OS } from '../model.js'
@@ -85,7 +86,7 @@ export async function readAntigravityTranscripts(home: string): Promise<Conversa
       const text = textFromLine(obj)
       if (!role || !text) continue
       messages.push({ role, text, ts })
-      if (role === 'user' && !title) title = text.slice(0, 80)
+      if (role === 'user' && !title) title = conversationTitle(text)
     }
 
     if (messages.length) {

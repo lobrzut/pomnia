@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
+import { conversationTitle } from './conversationTitle.js'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { execFile } from 'node:child_process'
@@ -197,7 +198,7 @@ export async function readCursorAgentTranscripts(home = homeDir()): Promise<Conv
       const text = agentContentText(obj.message?.content)
       if (!role || !text) continue
       messages.push({ role, text })
-      if (role === 'user' && !title) title = text.replace(/\s+/g, ' ').trim().slice(0, 80)
+      if (role === 'user' && !title) title = conversationTitle(text)
     }
 
     if (!messages.length) continue
