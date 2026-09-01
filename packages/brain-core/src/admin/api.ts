@@ -266,7 +266,14 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
 
   // ── tokens ──────────────────────────────────────────────────────────────
   if (path === '/admin/tokens' && method === 'GET') {
-    return j(200, { tokens: (await readTokens(deps.tokensFile)).map(summarise) })
+    // An unreadable store must not render as an empty one: "you have no
+    // tokens" is a sentence that sends an operator to mint replacements for
+    // credentials that are still there.
+    try {
+      return j(200, { tokens: (await readTokens(deps.tokensFile)).map(summarise) })
+    } catch (e) {
+      return j(500, { error: 'tokens_unreadable', detail: (e as Error).message })
+    }
   }
 
   if (path === '/admin/tokens' && method === 'POST') {

@@ -12,6 +12,7 @@ import {
   summarise,
   touchToken,
   validateTokenName,
+  readTokensOrEmpty,
 } from './tokens.js'
 
 let file: string
@@ -144,10 +145,21 @@ describe('touchToken', () => {
 })
 
 describe('readTokens', () => {
-  it('treats a missing or corrupt file as empty, never as open', async () => {
+  it('treats a missing file as empty, because it is', async () => {
     expect(await readTokens(file)).toEqual([])
+  })
+
+  it('never lets a corrupt file open the gate', async () => {
+    // The security intent this test has always carried. It now lives in the
+    // read-only path, which fails closed; the writing path throws instead, so
+    // "could not read" can no longer be persisted as "there was nothing".
     await writeFile(file, '{ not json', 'utf8')
-    expect(await readTokens(file)).toEqual([])
+    expect(await readTokensOrEmpty(file)).toEqual([])
+  })
+
+  it('surfaces corruption to a caller that is about to write', async () => {
+    await writeFile(file, '{ not json', 'utf8')
+    await expect(readTokens(file)).rejects.toThrow()
   })
 
   /** Every token that exists today was issued for an agent. */

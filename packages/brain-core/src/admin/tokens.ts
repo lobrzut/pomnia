@@ -72,6 +72,17 @@ export function summarise(t: StoredToken): TokenSummary {
   }
 }
 
+/**
+ * Every token in the store, or a throw.
+ *
+ * This used to swallow every error and return `[]`, which made "the store
+ * could not be read" indistinguishable from "the store is empty". Three
+ * callers read and then write, so one transient failure during createToken
+ * would have persisted a store holding only the new token — every other
+ * credential erased, silently, by an operation that looked like it succeeded.
+ *
+ * Callers that only read should use readTokensOrEmpty and fail closed.
+ */
 export async function readTokens(file: string): Promise<StoredToken[]> {
   try {
     const parsed = JSON.parse((await fs.readFile(file, 'utf8')).replace(/^﻿/, '')) as unknown
@@ -85,6 +96,25 @@ export async function readTokens(file: string): Promise<StoredToken[]> {
         created: typeof e.created === 'string' ? e.created : new Date().toISOString(),
         ...(typeof e.lastUsed === 'string' ? { lastUsed: e.lastUsed } : {}),
       }))
+  } catch (e) {
+    // A store that is not there yet is empty. Anything else — an I/O error,
+    // a truncated file, a permission change — is an unknown, and the two must
+    // not look alike to a caller that is about to write.
+    if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') return []
+    throw e
+  }
+}
+
+/**
+ * Tokens for a decision that only reads.
+ *
+ * Fails closed: an unreadable store means no request can be authorised, which
+ * is the safe direction for an auth gate. Never use this before a write — see
+ * readTokens.
+ */
+export async function readTokensOrEmpty(file: string): Promise<StoredToken[]> {
+  try {
+    return await readTokens(file)
   } catch {
     return []
   }
