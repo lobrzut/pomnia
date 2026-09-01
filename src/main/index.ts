@@ -2223,6 +2223,24 @@ if (!gotSingleInstanceLock) {
   })
 }
 
+/**
+ * Mini keeps its own user data.
+ *
+ * Electron derives userData from the packaged package.json name, which is the
+ * same for both flavours — so a Mini build lands in %APPDATA%/pomnia beside an
+ * installed full Desktop and they share one app-settings.json, one vault
+ * pointer and one token. Two programs writing one file is the fault this
+ * project spent the week removing; shipping a test build that can do it to a
+ * working install would be worse than not shipping one.
+ *
+ * Set before whenReady: Electron resolves userData on first access, and a
+ * later rename leaves anything already read pointing at the old path.
+ */
+if (import.meta.env?.MAIN_VITE_POMNIA_FLAVOUR === 'mini') {
+  app.setName('pomnia-mini')
+  app.setPath('userData', join(app.getPath('appData'), 'pomnia-mini'))
+}
+
 app.whenReady().then(async () => {
   // app.quit() asks; it does not stop this callback from running first. Without
   // this line the losing process would still migrate AppData and open the vault
