@@ -78,11 +78,19 @@ export default function Connect() {
   const simpleMode = useStore((s) => s.simpleMode)
   const agentBrainMode = useStore((s) => s.agentBrainMode)
   const setAgentBrainMode = useStore((s) => s.setAgentBrainMode)
-  const connectLegacyHub = useStore((s) => s.connectLegacyHub)
-  const setConnectLegacyHub = useStore((s) => s.setConnectLegacyHub)
   const labels = uiLabels()
   const effectiveTarget: BrainTarget = simpleMode ? 'embedded' : brainTarget
-  const remoteHub = effectiveTarget === 'remote' && connectLegacyHub ? 'legacy-hub' : 'brain-core'
+  /**
+   * The legacy Python hub is gone; every remote brain is brain-core.
+   *
+   * The toggle that used to sit under this page generated configs for the
+   * retired three-SSE architecture — three servers where there is now one
+   * endpoint. Anyone who flipped it got MCP blocks pointing at ports that
+   * stopped answering, which looks exactly like "Pomnia does not connect".
+   * Pinned rather than read from the store so a setting saved back when the
+   * hub existed cannot keep writing dead configs.
+   */
+  const remoteHub = 'brain-core' as const
   const brainUrl = effectiveTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
   const [loading, setLoading] = useState(true)
   const [clients, setClients] = useState<ClientStatus[]>([])
@@ -98,15 +106,28 @@ export default function Connect() {
   const [minting, setMinting] = useState(false)
   const [writingBrief, setWritingBrief] = useState(false)
 
+  /**
+   * Mint a token without asking for a name in a dialog that does not exist.
+   *
+   * This used `window.prompt`, which Chromium disables inside Electron — so the
+   * button answered every click with "prompt() is not supported" and could never
+   * have worked, for anyone, on any platform this ships to.
+   *
+   * The name only has to be recognisable when revoking later, and the machine
+   * already knows enough to produce one. A name typed into a box that is not
+   * there is worth less than a token that appears.
+   */
   async function mintToken() {
     if (minting) return
     const dashboardUrl = dashboardUrlFromBrainUrl(brainUrl)
-    const suggested = `pomnia-${new Date().toISOString().slice(0, 10)}`
-    const name = window.prompt(
-      labels.tokenNamePrompt,
-      suggested,
-    )
-    if (!name) return
+    const host = (() => {
+      try {
+        return new URL(brainUrl.includes('://') ? brainUrl : `http://${brainUrl}`).hostname
+      } catch {
+        return 'pomnia'
+      }
+    })()
+    const name = `${host}-${new Date().toISOString().slice(0, 10)}`
     setMinting(true)
     try {
       const r = await api.connectMcpTokenCreate(dashboardUrl, name.trim(), connectToken || undefined)
@@ -251,7 +272,7 @@ export default function Connect() {
   useEffect(() => {
     if (picked) void pick(picked)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentBrainMode, connectLegacyHub])
+  }, [agentBrainMode])
 
   async function copy(text: string, key: string, label: string) {
     // A rejected clipboard write used to leave no trace at all — no tick, no
@@ -535,19 +556,6 @@ export default function Connect() {
                 : labels.urlChangeHint}
           </span>
         </div>
-        {!simpleMode && brainTarget === 'remote' && (
-          <div className="mt-4 flex items-start justify-between gap-4 border-t border-white/8 pt-4">
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-ink">{labels.connectLegacyHubToggle}</div>
-              <p className="mt-1 text-xs leading-relaxed text-ink-dim">{labels.connectLegacyHubHint}</p>
-            </div>
-            <Toggle
-              checked={connectLegacyHub}
-              onChange={setConnectLegacyHub}
-              aria-label={labels.connectLegacyHubToggle}
-            />
-          </div>
-        )}
       </GlassCard>
 
       <GlassCard className="mb-5 p-5">
@@ -827,11 +835,9 @@ export default function Connect() {
                 <p className="text-[11px] leading-relaxed text-ink-faint">
                   {brainTarget === 'embedded'
                     ? labels.snippetLocalModeHint
-                    : connectLegacyHub
-                      ? labels.snippetLegacyHubHint
-                      : connectToken
-                        ? labels.snippetRemoteBrainCoreHint
-                        : labels.connectTokenRequired}
+                    : connectToken
+                      ? labels.snippetRemoteBrainCoreHint
+                      : labels.connectTokenRequired}
                 </p>
               </div>
             </>
