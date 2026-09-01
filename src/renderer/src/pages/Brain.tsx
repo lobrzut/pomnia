@@ -842,7 +842,7 @@ export default function Brain() {
                   {p.recommended && <Badge color="#22d3ee">recommended</Badge>}
                   {active && <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-iris" />}
                 </div>
-                <p className="mt-1.5 min-h-[42px] text-[11px] leading-relaxed text-ink-faint">{p.blurb}</p>
+                <p className="mt-1.5 min-h-[42px] text-[11px] leading-relaxed text-ink-faint">{labels.profileBlurbs[p.id] ?? p.blurb}</p>
                 <div className="mt-2 flex items-center gap-2">
                   <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-cyan">{p.chatModel}</code>
                   <span className="text-[10px] text-ink-faint">{p.chatSize}</span>

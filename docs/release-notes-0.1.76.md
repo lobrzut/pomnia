@@ -197,7 +197,7 @@ bdc5ad038ca9c7a386f727109df2b2fef8e26ff287563f2aef3679d5f7808c2b
 ```
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Pomnia-0.1.75-setup.exe
+Get-FileHash -Algorithm SHA256 .\Pomnia-0.1.76-setup.exe
 ```
 
 The build is unsigned, so Windows SmartScreen will warn. "More info" → "Run anyway" is the expected path; the hash is what actually tells you the file is the one that was built.

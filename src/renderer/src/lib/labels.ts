@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Pomnia
 /** Polish + English UI chrome labels. Brain knowledge stays auto bilingual (no knowledgeLang). */
 
+import type { VramProfileId } from '@core/brain/profiles'
 import { formatPipelineProgressLabel } from '@core/pipelineLabels.js'
 import type { ActivityState } from './types'
 import { getUiLocale } from './uiLocale'
@@ -571,6 +572,15 @@ export interface UiLabels {
   exportNotes: string
   mcpClients: string
   mcpClientsLead: string
+  /**
+   * Profile descriptions, by profile id.
+   *
+   * They used to be read straight off VRAM_PROFILES, which is shared with the
+   * main process and therefore English-only. That put two English paragraphs
+   * in the middle of an otherwise Polish screen, on the one card the user has
+   * to read carefully before downloading several gigabytes.
+   */
+  profileBlurbs: Record<VramProfileId, string>
   strategyHybrid: string
   strategySnapshot: string
   strategySnapshotHint: string
@@ -1403,6 +1413,10 @@ const PL_LABELS: UiLabels = {
   mcpClients: 'Klienci MCP',
   mcpClientsLead:
     'Te aplikacje czytają pamięć z Pomni. To niezależne od tego, czy oddają swoje rozmowy — czytać potrafi każdy klient mówiący MCP. Wybierz, które widać w zakładce Connect: wykryte pokazują się domyślnie — przypnij brakujące albo ukryj nieużywane.',
+  profileBlurbs: {
+    lite: 'Na kartę, na której ósemka się nie zmieści. Wybrana przez to, co działa, nie przez jakość — niemierzona względem bramki.',
+    standard: 'Najlepszy zmierzony przerób: wyższe oceny niż 14B i mniej więcej dwukrotnie szybciej.',
+  },
   strategyHybrid: 'czaty + config',
   strategySnapshot: 'tylko config',
   strategySnapshotHint:
@@ -2250,6 +2264,10 @@ const EN_LABELS: UiLabels = {
   mcpClients: 'MCP clients',
   mcpClientsLead:
     'These apps read memory from Pomnia. That is independent of whether they give up their chats — any MCP-speaking client can read. Choose which appear on the Connect tab: detected ones show by default — pin missing ones or hide unused.',
+  profileBlurbs: {
+    lite: 'For a card the 8B will not fit on. Chosen by what runs, not by quality — not measured against the gate.',
+    standard: 'Best measured notes per second: higher scores than the 14B and roughly twice the speed.',
+  },
   strategyHybrid: 'chats + config',
   strategySnapshot: 'config only',
   strategySnapshotHint:

@@ -17,8 +17,11 @@
  * directly (deep import, not through the barrel) for the browser preview.
  */
 
+/** Stable ids, exported so the UI can key translations off them. */
+export type VramProfileId = 'lite' | 'standard'
+
 export interface VramProfile {
-  id: 'lite' | 'standard'
+  id: VramProfileId
   label: string
   /** Display range of GPU memory this profile is sized for. */
   vram: string
