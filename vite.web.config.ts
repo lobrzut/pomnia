@@ -15,6 +15,11 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   root: 'src/renderer',
+  // Vite resolves .env files against `root`, which is the renderer folder, not
+  // the repository. Without this, `.env.mini` at the top level is silently
+  // ignored and a --mode mini run quietly builds the full app — which is
+  // exactly what it did the first time.
+  envDir: resolve('.'),
   resolve: {
     alias: {
       '@': resolve('src/renderer/src'),

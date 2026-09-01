@@ -26,6 +26,7 @@ import {
   REMOTE_BRAIN_URL_PLACEHOLDER,
 } from '@core/brain/snippet'
 import { identifyEngine } from '@core/brain/engine'
+import { isMini } from '../lib/flavour'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { getUiLocale } from '../lib/uiLocale'
@@ -79,7 +80,12 @@ export default function Connect() {
   const agentBrainMode = useStore((s) => s.agentBrainMode)
   const setAgentBrainMode = useStore((s) => s.setAgentBrainMode)
   const labels = uiLabels()
-  const effectiveTarget: BrainTarget = simpleMode ? 'embedded' : brainTarget
+  // Mini has no brain of its own, so 'embedded' is not a state it can be in.
+  // Pinning it here rather than hiding the switch means a setting inherited
+  // from a full install cannot leave Mini pointing at a server that is not
+  // there — and every snippet it writes is a remote one, which is the only
+  // kind that makes sense for it.
+  const effectiveTarget: BrainTarget = isMini ? 'remote' : simpleMode ? 'embedded' : brainTarget
   /**
    * The legacy Python hub is gone; every remote brain is brain-core.
    *
@@ -501,7 +507,7 @@ export default function Connect() {
         </div>
         )}
 
-        {(brainTarget === 'embedded' || simpleMode) && embeddedRunning === false && (
+        {!isMini && (brainTarget === 'embedded' || simpleMode) && embeddedRunning === false && (
           <p className="mb-3 text-[11px] text-amber">
             {labels.embeddedBrainNotRunning}{' '}
             <button onClick={() => setRoute('brain')} className="no-drag font-medium text-iris hover:underline">

@@ -49,7 +49,9 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.json",
     "typecheck:brain-core": "npm run typecheck --prefix packages/brain-core",
-    "typecheck:doc-parser": "npm run typecheck --prefix packages/doc-parser"
+    "typecheck:doc-parser": "npm run typecheck --prefix packages/doc-parser",
+    "dev:mini": "npm run generate:build-info && electron-vite dev --mode mini",
+    "web:mini": "vite --config vite.web.config.ts --mode mini"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.80",

@@ -7,7 +7,7 @@ import Aurora from './components/Aurora'
 import { Sidebar, TitleBar } from './components/Shell'
 import { Toasts } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { useStore } from './store/useStore'
+import { useStore, type Route } from './store/useStore'
 import { api } from './lib/api'
 import { applyColorScheme, isColorScheme } from './lib/theme'
 import { invalidateUiLabelsCache, uiLabels } from './lib/labels'
@@ -24,8 +24,9 @@ import Onboarding from './pages/Onboarding'
 import HowItWorks from './pages/HowItWorks'
 import FloatingMonitor from './pages/FloatingMonitor'
 import ProfilePreview from './pages/ProfilePreview'
+import { isMini, MINI_ROUTES } from './lib/flavour'
 
-const PAGES = {
+const ALL_PAGES = {
   dashboard: Dashboard,
   browse: Browse,
   import: ImportPage,
@@ -35,6 +36,16 @@ const PAGES = {
   guide: HowItWorks,
   skills: Skills,
 } as const
+
+/**
+ * Mini ships two screens. Anything else is reachable only through a stale
+ * route left in storage, so it is removed from the registry rather than just
+ * hidden from the sidebar — a page that cannot be navigated to but still
+ * renders is a page that will be found by accident.
+ */
+const PAGES: Partial<Record<Route, (typeof ALL_PAGES)[keyof typeof ALL_PAGES]>> = isMini
+  ? Object.fromEntries(MINI_ROUTES.map((r) => [r, ALL_PAGES[r]]))
+  : ALL_PAGES
 
 function isFloatingMonitorRoute(): boolean {
   const hash = window.location.hash.replace(/^#/, '')
@@ -155,7 +166,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const Page = PAGES[route]
+  // A build that drops pages can inherit a route pointing at one of them.
+  const Page = PAGES[route] ?? PAGES[MINI_ROUTES[0]]!
 
   return (
     <div className="grain relative flex h-full flex-col overflow-hidden" key={uiLocale}>
@@ -183,7 +195,13 @@ export default function App() {
       </div>
       {/* First run: full setup wizard. After that: plain lock gate when the vault is closed. */}
       {/* No exit animation on full-screen gates — AnimatePresence left a z-40 overlay at opacity 0 that still captured clicks. */}
-      {!onboarded ? <Onboarding /> : !vault.open ? <VaultGate /> : null}
+      {/*
+        Mini has no onboarding. The wizard walks through sources, Ollama and a
+        VRAM profile — every one of which belongs to the half Mini does not
+        ship. Its first run is the vault gate and then Connect, which is the
+        whole of what it does.
+      */}
+      {!isMini && !onboarded ? <Onboarding /> : !vault.open ? <VaultGate /> : null}
       <Toasts />
     </div>
   )

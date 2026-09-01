@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
 import { motion } from 'framer-motion'
+import { isMini, MINI_ROUTES } from '../lib/flavour'
 import { BrainCircuit, Import as ImportIcon, LayoutDashboard, Lock, Map, MessagesSquare, Minus, Plug, Settings as Cog, Square, X } from 'lucide-react'
 import clsx from 'clsx'
 import { AppLogo } from './AppLogo'
@@ -22,7 +23,9 @@ const NAV_ICONS: Record<Route, typeof LayoutDashboard> = {
 
 function navItems(): { id: Route; label: string; icon: typeof LayoutDashboard }[] {
   const L = uiLabels()
-  return [
+  // Mini keeps the same registry and shows a subset, rather than carrying its
+  // own list that would drift from this one the first time an item is renamed.
+  const all: { id: Route; label: string; icon: typeof LayoutDashboard }[] = [
     { id: 'dashboard', label: L.navDashboard, icon: NAV_ICONS.dashboard },
     { id: 'guide', label: L.navGuide, icon: NAV_ICONS.guide },
     { id: 'browse', label: L.navBrowse, icon: NAV_ICONS.browse },
@@ -31,6 +34,7 @@ function navItems(): { id: Route; label: string; icon: typeof LayoutDashboard }[
     { id: 'connect', label: L.navConnect, icon: NAV_ICONS.connect },
     { id: 'settings', label: L.navSettings, icon: NAV_ICONS.settings }
   ]
+  return isMini ? all.filter((n) => (MINI_ROUTES as readonly Route[]).includes(n.id)) : all
 }
 
 export function TitleBar() {

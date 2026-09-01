@@ -1378,7 +1378,7 @@ const PL_LABELS: UiLabels = {
   connectOpenDashboard: 'Otwórz dashboard tokenów',
   connectPartialTitle: 'Niepełny mcp.json — brak vault/library',
   connectPartialDetail:
-    'brain-core: wystarczy `pomnia` → /mcp. Legacy hub: pomnia + pomnia-vault + pomnia-library. Skopiuj świeży snippet poniżej.',
+    'Jeden serwer `pomnia` → /mcp to komplet. Skopiuj świeży snippet poniżej.',
   connectPartialFix: 'Skopiuj pełny config poniżej i nadpisz / zmerguj mcp.json',
   connectMacNoAppHint:
     'Bez aplikacji Desktop: docs/CURSOR-MCP.md — ten sam pełny JSON MCP (przykład Cursor; kształt dla innych klientów w Connect).',
@@ -2578,7 +2578,7 @@ const EN_LABELS: UiLabels = {
   connectOpenDashboard: 'Open the token dashboard',
   connectPartialTitle: 'Incomplete mcp.json — vault/library missing',
   connectPartialDetail:
-    'brain-core: `pomnia` → /mcp is enough. Legacy hub: pomnia + pomnia-vault + pomnia-library. Copy a fresh snippet below.',
+    'One `pomnia` server → /mcp is the whole configuration. Copy a fresh snippet below.',
   connectPartialFix: 'Copy the full config below and overwrite or merge mcp.json',
   embeddedBrainNotRunning: 'The local search engine is not running. Open the tab',
   embeddedBrainNotRunningLink: 'Brain',
