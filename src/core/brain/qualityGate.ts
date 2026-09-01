@@ -15,7 +15,7 @@
  * Label alone is not enough for stub/garbage: thin-but-useful notes must stay
  * searchable under _weak/; only empty stubs go to quarantine.
  */
-import { basename, join } from 'node:path'
+import { join } from 'node:path'
 import type { DistilledNote } from './distill.js'
 import { scoreFields } from './distill.js'
 
@@ -108,16 +108,6 @@ export function destDir(distilledRoot: string, dest: QualityDestination): string
   if (dest === 'review') return join(distilledRoot, '_review')
   if (dest === 'weak') return join(distilledRoot, '_weak')
   return distilledRoot
-}
-
-/** True when path already sits under the right subfolder for `dest`. */
-export function pathMatchesDestination(filePath: string, dest: QualityDestination): boolean {
-  const norm = filePath.replace(/\\/g, '/').toLowerCase()
-  const inReview = norm.includes('/_review/')
-  const inWeak = norm.includes('/_weak/')
-  if (dest === 'review') return inReview
-  if (dest === 'weak') return inWeak && !inReview
-  return !inReview && !inWeak
 }
 
 /** Parse `quality:` from YAML frontmatter (first --- block). */
@@ -237,18 +227,4 @@ export function rateUnratedMarkdown(markdown: string): {
   const score = empty ? 0 : scoreFields(fields)
   const quality = qualityFromScoreAsymmetric(score, empty)
   return { score, quality, empty }
-}
-
-/**
- * Resolve where a markdown file should land under distilledRoot, based on
- * frontmatter quality (or keep if missing — caller rates unrated separately).
- */
-export function resolveDestPath(
-  distilledRoot: string,
-  filename: string,
-  quality: string | null | undefined,
-): { dest: QualityDestination; path: string } {
-  const dest = destinationForQuality(quality)
-  const name = basename(filename)
-  return { dest, path: join(destDir(distilledRoot, dest), name) }
 }

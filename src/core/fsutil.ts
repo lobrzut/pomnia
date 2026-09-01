@@ -74,15 +74,6 @@ export async function* walk(root: string, opts: WalkOptions = {}): AsyncGenerato
   if (await pathExists(root)) yield* recurse(root)
 }
 
-export async function readJsonSafe<T>(file: string): Promise<T | null> {
-  try {
-    const txt = await fs.readFile(file, 'utf8')
-    return JSON.parse(txt) as T
-  } catch {
-    return null
-  }
-}
-
 export async function countFilesMatching(root: string, pattern: RegExp, opts: WalkOptions = {}): Promise<number> {
   let n = 0
   for await (const f of walk(root, opts)) if (pattern.test(f.relPath)) n++

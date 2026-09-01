@@ -56,19 +56,9 @@ export function appDataRoot(targetOS: OS, home: string): string {
   }
 }
 
-/** Returns the path module matching a target OS (for building paths for *other* platforms). */
-export function pathFor(targetOS: OS): path.PlatformPath {
-  return targetOS === 'win32' ? path.win32 : path.posix
-}
-
 /** Normalize any path to forward-slash form for portable storage in the vault. */
 export function toPortable(p: string): string {
   return p.replace(/\\/g, '/')
-}
-
-/** Convert a portable (forward-slash) path back to the native separator. */
-export function fromPortable(p: string, targetOS: OS = currentOS()): string {
-  return targetOS === 'win32' ? p.replace(/\//g, '\\') : p
 }
 
 /**

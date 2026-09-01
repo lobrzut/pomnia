@@ -318,13 +318,3 @@ export async function readArchiveManifestJson(
   if (!loaded.manifest) throw new Error('manifest.cvb is not a JSON VaultManifest')
   return { manifest: loaded.manifest, from: loaded.fromPrev ? 'prev' : 'primary' }
 }
-
-/** Ensure a zeroed/corrupt primary still yields the spare for tests. */
-export async function primaryManifestExists(vaultRoot: string): Promise<boolean> {
-  try {
-    await fs.access(join(vaultRoot, MANIFEST_REL))
-    return true
-  } catch {
-    return false
-  }
-}

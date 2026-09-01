@@ -332,10 +332,6 @@ export async function pingBrain(url: string, token?: string): Promise<BrainPing>
   return { url: base, reachable: false, error: 'no probe succeeded' }
 }
 
-export function dashboardHint(brainUrl: string): string {
-  return dashboardUrlFromBrainUrl(brainUrl)
-}
-
 /** How long a polled MCP hit stays "recent" on the Brain side (ms). */
 export const MCP_ACTIVITY_RECENT_MS = 10_000
 function normalizeMcpActivity(data: unknown): McpActivityResponse | null {

@@ -110,11 +110,6 @@ export function remapTextPaths(
   return { text: out, changed }
 }
 
-/** Should this captured config likely be path-remapped? (helper for adapters) */
-export function looksLikeTextConfig(relPath: string): boolean {
-  return /\.(json|jsonl|md|yml|yaml|toml|ini|cfg|conf|txt|xml|env)$/i.test(relPath)
-}
-
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

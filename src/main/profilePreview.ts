@@ -122,12 +122,3 @@ export async function showProfilePreview(): Promise<void> {
     profileWin = null
   })
 }
-
-export async function toggleProfilePreview(): Promise<boolean> {
-  if (isProfilePreviewVisible()) {
-    destroyProfilePreview()
-    return false
-  }
-  await showProfilePreview()
-  return true
-}

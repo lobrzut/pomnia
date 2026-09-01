@@ -239,10 +239,6 @@ let lastMcpActivity: { tool: string; detail?: string; ts: number } | null = null
  */
 const activityRing: ActivityRing = createActivityRing(50)
 
-export function getActivityRing(): ActivityRing {
-  return activityRing
-}
-
 function recordMcpActivity(ev: McpQueryEvent, actor?: string): void {
   const ts = Date.now()
   lastMcpActivity = { tool: ev.tool, detail: ev.detail, ts }

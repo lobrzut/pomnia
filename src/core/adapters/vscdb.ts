@@ -67,24 +67,3 @@ export async function queryItemTable(dbPath: string, where = '1=1'): Promise<Arr
     }
   }
 }
-
-export async function queryDiskKV(
-  dbPath: string,
-  where = '1=1'
-): Promise<Array<{ key: string; value: string }>> {
-  const db = await openVscdb(dbPath)
-  if (!db) return []
-  try {
-    const res = db.exec(`SELECT key, value FROM cursorDiskKV WHERE ${where}`)
-    if (!res.length) return []
-    return res[0].values.map((row: any[]) => ({ key: String(row[0]), value: String(row[1]) }))
-  } catch {
-    return []
-  } finally {
-    try {
-      db.close()
-    } catch {
-      /* ignore */
-    }
-  }
-}

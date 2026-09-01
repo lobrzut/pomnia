@@ -305,8 +305,3 @@ export async function syncVaultSurface(opts: VaultSyncOptions): Promise<VaultSur
   const push = await syncVaultToReplica(opts)
   return { pull, push }
 }
-
-/** Relative path in POSIX form, for callers that have an absolute one. */
-export function toVaultRelative(vaultRoot: string, abs: string): string {
-  return relative(vaultRoot, abs).split(sep).join('/')
-}

@@ -48,13 +48,6 @@ export function synthesizeReplaySteps(primaryKind: Exclude<ActivityKind, 'idle'>
   }
 }
 
-export function normalizeReplaySteps(snapshot: LastActivityReplay): ActivityState[] {
-  const steps = snapshot.steps?.length
-    ? snapshot.steps
-    : synthesizeReplaySteps('distill')
-  return steps.map(toActivityState)
-}
-
 export function replayTimeline(snapshot: LastActivityReplay): Array<{ state: ActivityState; durationMs: number }> {
   const steps = snapshot.steps?.length
     ? snapshot.steps
@@ -67,9 +60,4 @@ export function replayTimeline(snapshot: LastActivityReplay): Array<{ state: Act
 
 export function replayTotalMs(snapshot: LastActivityReplay): number {
   return replayTimeline(snapshot).reduce((sum, step) => sum + step.durationMs, 0)
-}
-
-export function primaryReplayKind(snapshot: LastActivityReplay): Exclude<ActivityKind, 'idle'> {
-  const first = snapshot.steps.find((s) => s.kind !== 'finale')
-  return first?.kind ?? snapshot.steps[0]?.kind ?? 'distill'
 }

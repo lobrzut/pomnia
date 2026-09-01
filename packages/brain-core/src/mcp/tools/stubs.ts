@@ -19,33 +19,6 @@
  * (reads `<skillsRoot>/brain` + `cli`).
  */
 
-export const stubSchemas = {
-  list_skills: { type: 'object' as const, properties: {} },
-  list_cli_skills: { type: 'object' as const, properties: {} },
-  get_skill: {
-    type: 'object' as const,
-    properties: { name: { type: 'string' } },
-    required: ['name'],
-  },
-  run_skill: {
-    type: 'object' as const,
-    properties: {
-      name: { type: 'string' },
-      inputs: { type: 'object', default: {} },
-    },
-    required: ['name'],
-  },
-  search_code: {
-    type: 'object' as const,
-    properties: {
-      query: { type: 'string' },
-      top_k: { type: 'integer', default: 5 },
-    },
-    required: ['query'],
-  },
-  code_status: { type: 'object' as const, properties: {} },
-}
-
 /**
  * Refusal text for the unimplemented tools.
  *
