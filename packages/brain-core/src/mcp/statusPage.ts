@@ -32,7 +32,7 @@ import {
   brandChromeCss,
   brandSkyHtml,
   brandSkyScript,
-  brandWordmarkHtml,
+  brandWordmarkHtml,
 } from './brandChrome.js'
 
 export type PageState = 'ok' | 'degraded' | 'down'
