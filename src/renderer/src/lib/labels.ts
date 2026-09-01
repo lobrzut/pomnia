@@ -164,8 +164,6 @@ export interface UiLabels {
   quarantineTitle: string
   quarantineLead: string
   quarantineHeader: (count: number) => string
-  quarantineReview: string
-  quarantineWeak: string
   quarantineWeakToggle: (count: number) => string
   quarantineEmpty: string
   quarantineSearchPlaceholder: string
@@ -173,7 +171,6 @@ export interface UiLabels {
   quarantineSelectToRead: string
   quarantineMetaQuality: string
   quarantineMetaMsgCount: string
-  quarantineView: string
   quarantinePromote: string
   quarantinePromotedToast: (name: string) => string
   quarantinePromoteFailed: string
@@ -185,7 +182,6 @@ export interface UiLabels {
   quarantineDeleteAllConfirm: (count: number) => string
   quarantineDeletedAllToast: (count: number) => string
   quarantineDeleteAllFailed: string
-  quarantineClose: string
   quarantineVaultClosed: string
   onboardingFirstRun: string
   onboardingSidebarFooter: string
@@ -289,7 +285,6 @@ export interface UiLabels {
   clientConfigError: string
   clientNone: string
   // ── connect: token + snippet ─────────────────────────────────────────────
-  tokenNamePrompt: string
   tokenSavedDetail: string
   tokenCreateFailed: string
   tokenCreateFailedDetail: (msg: string) => string
@@ -334,14 +329,8 @@ export interface UiLabels {
   brainStoppedStartInTab: string
   skillsNoneOnServer: string
   snippetLocalModeHint: string
-  snippetTokenInHeaders: string
-  /** Remote brain-core default: one pomnia → /mcp + Bearer. */
   snippetRemoteBrainCoreHint: string
   /** Legacy Python hub 3×SSE snippet note. */
-  snippetLegacyHubHint: string
-  /** Connect Remote advanced toggle label. */
-  connectLegacyHubToggle: string
-  connectLegacyHubHint: string
   onboardingEngineLooking: string
   onboardingEngineLookingAt: (url: string) => string
   onboardingEngineRunning: string
@@ -472,7 +461,6 @@ export interface UiLabels {
   uiLocaleHint: string
   uiLocalePl: string
   uiLocaleEn: string
-  floatingMonitor: string
   floatingMonitorOnMinimize: string
   floatingMonitorOnMinimizeHint: string
   floatingMonitorIdleBadge: string
@@ -517,9 +505,7 @@ export interface UiLabels {
   profilePreviewSaveTooLong: (max: number) => string
   profilePreviewEditorHint: string
   profilePreviewCopy: string
-  profilePreviewCopySummary: string
   profilePreviewCopied: string
-  profilePreviewCopiedSummary: string
   profilePreviewCopyFailed: string
   profilePreviewLoading: string
   profilePreviewProgressVault: string
@@ -562,7 +548,6 @@ export interface UiLabels {
   settingsLead: string
   vault: string
   lockVault: string
-  noVaultOpen: string
   knowledgePathOpen: (path: string) => string
   knowledgePathLocked: string
   brainBridge: string
@@ -656,7 +641,6 @@ export interface UiLabels {
   importDocQueuedHint: string
   importDocIndexedToast: (chunks: number) => string
   importDocQueuedToast: string
-  importDocQueuedDetail: string
   importDocFailedToast: string
   importDocNotIndexedBadge: string
   importDocIndexedBadge: (chunks: number) => string
@@ -678,7 +662,6 @@ export interface UiLabels {
   importDocLibrarySortSize: string
   importDocLibraryPending: string
   importDocLibraryIndexed: string
-  importDocDelete: string
   importDocDeleteAria: (name: string) => string
   importDocDeleteConfirm: (name: string) => string
   importDocDeletedToast: (name: string) => string
@@ -730,7 +713,6 @@ export interface UiLabels {
   dashboardActivityLast: (relative: string) => string
   dashboardActivityNone: string
   guideFlowReplayHint: string
-  activityTrayBusy: string
   healthTitle: string
   healthLead: string
   healthRefresh: string
@@ -812,8 +794,6 @@ export interface UiLabels {
   guideDocsBody: string
   guideDocsWhere: string
   guideOpenTab: string
-  guideDiagramToggle: string
-  guideDiagramHide: string
   guideFlowReplay: string
   guideFlowReplayLast: string
   guideFlowReplayLastNone: string
@@ -824,11 +804,8 @@ export interface UiLabels {
   guideFlowAgentLegend: string
   guideFlowMiniExpand: string
   flowEdgeMemoryReturn: string
-  flowAgentConsumptionCaption: string
   flowAgentLayerSkills: string
-  flowAgentLayerSkillsOptional: string
   flowAgentLayerSearch: string
-  flowIllustrationCaption: string
   flowNodeAiLabel: string
   flowNodeAiHint: string
   flowNodeAiDisk: string
@@ -876,8 +853,6 @@ export interface UiLabels {
   /** Remote brain: strip must not look like a hard fail for missing local Ollama. */
   statusOllamaOptional: string
   statusBrainRemote: string
-  statusBrainRemoteOk: string
-  statusBrainRemoteFail: string
   statusChecking: string
   statusLastDistill: string
   statusNoDistill: string
@@ -911,7 +886,6 @@ export interface UiLabels {
   skillsEmptyImported: string
   skillsBack: string
   skillsSize: (bytes: number) => string
-  skillsModified: (isoOrRelative: string) => string
   dashboardSourcesHeading: string
   dashboardSelectAll: string
   dashboardDeselectAll: string
@@ -966,8 +940,6 @@ const PL_LABELS: UiLabels = {
   quarantineLead:
     'Po destylacji słabe notatki lądują w _weak/ (indeksowane) lub _review/ (kwarantanna). Tylko Ty możesz przywrócić do distilled/.',
   quarantineHeader: (count) => `Kwarantanna · ${count}`,
-  quarantineReview: '_review (kwarantanna)',
-  quarantineWeak: '_weak (słabe)',
   quarantineWeakToggle: (count) => `${count} słabych (już w indeksie)`,
   quarantineEmpty: 'Brak notatek w kwarantannie.',
   quarantineSearchPlaceholder: 'filtruj po nazwie…',
@@ -975,7 +947,6 @@ const PL_LABELS: UiLabels = {
   quarantineSelectToRead: 'Wybierz notatkę, żeby zobaczyć, dlaczego trafiła do kwarantanny',
   quarantineMetaQuality: 'quality',
   quarantineMetaMsgCount: 'msg_count',
-  quarantineView: 'Podgląd',
   quarantinePromote: 'Przywróć do distilled/',
   quarantinePromotedToast: (name) => `Przywrócono ${name} do distilled/`,
   quarantinePromoteFailed: 'Nie udało się przywrócić notatki',
@@ -990,7 +961,6 @@ const PL_LABELS: UiLabels = {
   quarantineDeletedAllToast: (count) =>
     `Usunięto ${count} ${count === 1 ? 'notatkę' : count < 5 ? 'notatki' : 'notatek'} z _review/`,
   quarantineDeleteAllFailed: 'Nie udało się usunąć notatek z kwarantanny',
-  quarantineClose: 'Zamknij',
   quarantineVaultClosed: 'Otwórz vault, żeby zobaczyć _review / _weak.',
   onboardingFirstRun: 'pierwszy start',
   onboardingSidebarFooter: 'Local-first. Zaszyfrowane. Nic nie wychodzi z dysku bez Twojej zgody.',
@@ -1109,7 +1079,6 @@ const PL_LABELS: UiLabels = {
   clientPartial: 'Niepełny',
   clientConfigError: 'Błąd config',
   clientNone: 'Brak',
-  tokenNamePrompt: 'Nazwa tokena (np. macbook, windows — ułatwia późniejsze odwołanie):',
   tokenSavedDetail: 'Zapisany w polu — snippet odświeży się automatycznie.',
   tokenCreateFailed: 'Nie udało się utworzyć tokena',
   tokenCreateFailedDetail: (msg) => `${msg} — otwórz dashboard :7860 i wklej token ręcznie.`,
@@ -1152,14 +1121,8 @@ const PL_LABELS: UiLabels = {
   brainStoppedStartInTab: 'lokalny brain zatrzymany — uruchom w zakładce Brain',
   skillsNoneOnServer: 'Serwer Brain nie ma jeszcze skilli.',
   snippetLocalModeHint: 'Tryb lokalny: jeden serwer pomnia na /mcp — bez Bearer tokena.',
-  snippetTokenInHeaders: 'Token jest w headers — trzymaj plik prywatny (chmod 600).',
   snippetRemoteBrainCoreHint:
     'Remote brain-core: jeden serwer `pomnia` → /mcp + Bearer — nie stare 3×SSE.',
-  snippetLegacyHubHint:
-    'Legacy Python hub: trzy serwery SSE (pomnia + vault + library). Token w headers — trzymaj plik prywatny.',
-  connectLegacyHubToggle: 'Legacy Python hub (3× SSE)',
-  connectLegacyHubHint:
-    'Zaawansowane: stary hub z pomnia + pomnia-vault + pomnia-library na /sse. Domyślnie Connect emituje brain-core (jeden /mcp).',
   onboardingEngineLooking: 'Szukam Ollama na tym komputerze…',
   onboardingEngineLookingAt: (url) => `Sprawdzam Ollama pod ${url}…`,
   onboardingEngineRunning: 'Ollama działa',
@@ -1307,7 +1270,6 @@ const PL_LABELS: UiLabels = {
     'Tylko chrome aplikacji (menu, Settings, toasty). Brain działa dwujęzycznie automatycznie — bez osobnego ustawienia języka wiedzy.',
   uiLocalePl: 'PL',
   uiLocaleEn: 'EN',
-  floatingMonitor: 'Pływający diagram',
   floatingMonitorOnMinimize: 'Pokaż przy minimalizacji',
   floatingMonitorOnMinimizeHint:
     'Gdy chowasz okno do traya lub minimalizujesz — mały diagram na pulpicie pokazuje na żywo destylację, indeksowanie i zapytania MCP (jak PiP na YouTube).',
@@ -1352,9 +1314,7 @@ const PL_LABELS: UiLabels = {
   profilePreviewSaveTooLong: (max) => `Za długi profil — maks. ${max} znaków`,
   profilePreviewEditorHint: '§ PROFIL = Ty · § TECH = tożsamość projektu (nie changelog) · § KOMUNIKACJA',
   profilePreviewCopy: 'Kopiuj',
-  profilePreviewCopySummary: 'Kopiuj streszczenie',
   profilePreviewCopied: 'Skopiowano USER.md',
-  profilePreviewCopiedSummary: 'Skopiowano streszczenie',
   profilePreviewCopyFailed: 'Nie udało się skopiować',
   profilePreviewLoading: 'Profiluję…',
   profilePreviewProgressVault: 'Czytam USER.md…',
@@ -1401,7 +1361,6 @@ const PL_LABELS: UiLabels = {
   settingsLead: 'Vault, integracje i bezpieczeństwo.',
   vault: 'Vault',
   lockVault: 'Zablokuj',
-  noVaultOpen: 'Brak otwartego vaultu.',
   knowledgePathOpen: (path) => `Wiedza (USER.md, distilled): ${path}`,
   knowledgePathLocked: 'otwórz vault',
   brainBridge: 'Most do Brain',
@@ -1510,7 +1469,6 @@ const PL_LABELS: UiLabels = {
   importDocQueuedHint: 'Zapisano w vault — indeks po uruchomieniu Brain.',
   importDocIndexedToast: (chunks) => `Zindeksowano ${chunks} chunków`,
   importDocQueuedToast: 'Zapisano — indeks po uruchomieniu Brain',
-  importDocQueuedDetail: 'Dokument jest w vault; indeks powstanie po starcie wyszukiwarki.',
   importDocFailedToast: 'Import dokumentu nie powiódł się',
   importDocNotIndexedBadge: 'bez indeksu',
   importDocIndexedBadge: (chunks) => `${chunks} chunków`,
@@ -1532,7 +1490,6 @@ const PL_LABELS: UiLabels = {
   importDocLibrarySortSize: 'Rozmiar',
   importDocLibraryPending: 'czeka na indeks',
   importDocLibraryIndexed: 'zindeksowany',
-  importDocDelete: 'Usuń',
   importDocDeleteAria: (name) => `Usuń „${name}”`,
   importDocDeleteConfirm: (name) =>
     `Usunąć „${name}”? Usuniemy tylko bloby tego dokumentu (nie czaty/snapshoty).`,
@@ -1579,7 +1536,6 @@ const PL_LABELS: UiLabels = {
   flowLiveBadge: formatFlowLiveBadge,
   flowFocusBanner: formatFlowFocusBanner,
   flowLastMcpBadge: formatFlowLastMcpBadge,
-  activityTrayBusy: 'Operacja w tle',
   healthTitle: 'Diagnostyka',
   healthLead: 'Szybki przegląd — co musi działać, żeby pamięć i MCP były gotowe.',
   healthRefresh: 'Odśwież',
@@ -1668,8 +1624,6 @@ const PL_LABELS: UiLabels = {
     'Import → vault (zaszyfrowane) → bezpośredni indeks embeddingów. BEZ destylacji LLM — tylko chunk + embed.',
   guideDocsWhere: 'Import → Dokumenty',
   guideOpenTab: 'Otwórz zakładkę',
-  guideDiagramToggle: 'Pokaż diagram',
-  guideDiagramHide: 'Ukryj diagram',
   guideFlowReplay: 'Odtwórz demo',
   guideFlowReplayLast: 'Odtwórz ostatnią aktywność',
   guideFlowReplayLastNone: 'Brak zapisanej aktywności — uruchom destylację, import lub zapytanie MCP.',
@@ -1679,7 +1633,6 @@ const PL_LABELS: UiLabels = {
   guideFlowDocsLegend: 'Ścieżka dokumentów',
   guideFlowOptionalLegend: 'Opcjonalnie',
   guideFlowAgentLegend: 'Zapytanie agenta',
-  flowAgentConsumptionCaption: 'Konsumpcja (nie zapis):',
   guideFlowMiniExpand: 'Pełna mapa →',
   flowEdgeMemoryReturn: 'odpowiedź z pamięci',
   flowNodeAiLabel: 'Narzędzia AI',
@@ -1705,7 +1658,6 @@ const PL_LABELS: UiLabels = {
   flowNodeMcpHint: 'Agent łączy się przez MCP — most do lokalnej wyszukiwarki Brain.',
   flowNodeMcpDisk: 'Connect · mcp.json',
   flowAgentLayerSkills: 'skills',
-  flowAgentLayerSkillsOptional: 'opcj.',
   flowAgentLayerSearch: 'search_library',
   flowFinaleCaption: 'Indeks gotowy — pamięć dostępna dla agenta',
   flowWaitingCaption: 'Gdy coś się dzieje, podświetli się tylko aktywna ścieżka',
@@ -1713,8 +1665,6 @@ const PL_LABELS: UiLabels = {
   dashboardActivityNow: (state) => formatFlowLiveBadge(state),
   dashboardActivityLast: (relative) => `Ostatnia aktywność: destylacja ${relative}`,
   dashboardActivityNone: 'Brak ostatniej destylacji — uruchom Brain, aby przygotować pamięć',
-  flowIllustrationCaption:
-    'Oczekiwanie — animacja ruszy przy destylacji, imporcie, indeksowaniu lub zapytaniu MCP',
   flowNodeImportLabel: 'Import',
   flowNodeImportHint: 'PDF, EPUB, ZIP — trafia do vaultu bez destylacji LLM.',
   flowNodeImportDisk: 'vault/library.cvb',
@@ -1738,8 +1688,6 @@ const PL_LABELS: UiLabels = {
   statusOllamaFail: 'brak połączenia',
   statusOllamaOptional: 'opcjonalne (zdalny Brain)',
   statusBrainRemote: 'zdalny',
-  statusBrainRemoteOk: 'serwer OK',
-  statusBrainRemoteFail: 'serwer nieosiągalny',
   statusChecking: 'sprawdzam…',
   statusLastDistill: 'Ostatnia destylacja',
   statusNoDistill: 'jeszcze nie było',
@@ -1779,7 +1727,6 @@ const PL_LABELS: UiLabels = {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   },
-  skillsModified: (s) => s,
   dashboardSourcesHeading: 'Źródła',
   dashboardSelectAll: 'Zaznacz wszystkie',
   dashboardDeselectAll: 'Odznacz wszystkie',
@@ -1853,8 +1800,6 @@ const EN_LABELS: UiLabels = {
   quarantineLead:
     'After distill, weak notes go to _weak/ (indexed) or _review/ (quarantine). Only you can move them back to distilled/.',
   quarantineHeader: (count) => `Quarantine · ${count}`,
-  quarantineReview: '_review (quarantine)',
-  quarantineWeak: '_weak (weak)',
   quarantineWeakToggle: (count) => `${count} weak (already indexed)`,
   quarantineEmpty: 'No notes in quarantine.',
   quarantineSearchPlaceholder: 'filter by name…',
@@ -1862,7 +1807,6 @@ const EN_LABELS: UiLabels = {
   quarantineSelectToRead: 'Select a note to see why it landed in quarantine',
   quarantineMetaQuality: 'quality',
   quarantineMetaMsgCount: 'msg_count',
-  quarantineView: 'View',
   quarantinePromote: 'Restore to distilled/',
   quarantinePromotedToast: (name) => `Restored ${name} to distilled/`,
   quarantinePromoteFailed: 'Could not restore note',
@@ -1877,7 +1821,6 @@ const EN_LABELS: UiLabels = {
   quarantineDeletedAllToast: (count) =>
     `Deleted ${count} note${count === 1 ? '' : 's'} from _review/`,
   quarantineDeleteAllFailed: 'Could not delete quarantine notes',
-  quarantineClose: 'Close',
   quarantineVaultClosed: 'Open a vault to see _review / _weak.',
   onboardingFirstRun: 'first run',
   onboardingSidebarFooter: 'Local-first. Encrypted. Nothing leaves your hardware unless you say so.',
@@ -1994,7 +1937,6 @@ const EN_LABELS: UiLabels = {
   clientPartial: 'Incomplete',
   clientConfigError: 'Config error',
   clientNone: 'None',
-  tokenNamePrompt: 'Token name (e.g. macbook, windows — makes it easier to revoke later):',
   tokenSavedDetail: 'Saved to the field — the snippet refreshes by itself.',
   tokenCreateFailed: 'Could not create the token',
   tokenCreateFailedDetail: (msg) => `${msg} — open the dashboard on :7860 and paste a token by hand.`,
@@ -2037,14 +1979,8 @@ const EN_LABELS: UiLabels = {
   brainStoppedStartInTab: 'local brain stopped — start it in the Brain tab',
   skillsNoneOnServer: 'The Brain server has no skills yet.',
   snippetLocalModeHint: 'Local mode: one pomnia server on /mcp — no bearer token.',
-  snippetTokenInHeaders: 'The token sits in headers — keep this file private (chmod 600).',
   snippetRemoteBrainCoreHint:
     'Remote brain-core: one `pomnia` server → /mcp + Bearer — not the old 3×SSE hub.',
-  snippetLegacyHubHint:
-    'Legacy Python hub: three SSE servers (pomnia + vault + library). Token in headers — keep the file private.',
-  connectLegacyHubToggle: 'Legacy Python hub (3× SSE)',
-  connectLegacyHubHint:
-    'Advanced: old hub with pomnia + pomnia-vault + pomnia-library on /sse. By default Connect emits brain-core (single /mcp).',
   onboardingEngineLooking: 'Looking for Ollama on this machine…',
   onboardingEngineLookingAt: (url) => `Checking Ollama at ${url}…`,
   onboardingEngineRunning: 'Ollama is running',
@@ -2191,7 +2127,6 @@ const EN_LABELS: UiLabels = {
     'App chrome only (menus, Settings, toasts). Brain stays automatically bilingual — no separate knowledge language setting.',
   uiLocalePl: 'PL',
   uiLocaleEn: 'EN',
-  floatingMonitor: 'Floating diagram',
   floatingMonitorOnMinimize: 'Show on minimize',
   floatingMonitorOnMinimizeHint:
     'When you hide to tray or minimize — a small desktop diagram shows live distill, indexing, and MCP queries (like YouTube PiP).',
@@ -2236,9 +2171,7 @@ const EN_LABELS: UiLabels = {
   profilePreviewSaveTooLong: (max) => `Profile too long — max ${max} characters`,
   profilePreviewEditorHint: '§ PROFIL = you · § TECH = project identity (not changelog) · § KOMUNIKACJA',
   profilePreviewCopy: 'Copy',
-  profilePreviewCopySummary: 'Copy summary',
   profilePreviewCopied: 'USER.md copied',
-  profilePreviewCopiedSummary: 'Summary copied',
   profilePreviewCopyFailed: 'Could not copy',
   profilePreviewLoading: 'Profiling…',
   profilePreviewProgressVault: 'Reading USER.md…',
@@ -2253,7 +2186,6 @@ const EN_LABELS: UiLabels = {
   settingsLead: 'Vault, tray, theme, and MCP client visibility.',
   vault: 'Vault',
   lockVault: 'Lock vault',
-  noVaultOpen: 'No vault open',
   knowledgePathOpen: (path) => `Knowledge (USER.md, distilled): ${path}`,
   knowledgePathLocked: 'Unlock the vault to see the knowledge path.',
   brainBridge: 'Brain bridge',
@@ -2311,7 +2243,6 @@ const EN_LABELS: UiLabels = {
   flowLastMcpBadge: formatFlowLastMcpBadgeEn,
   flowFinaleCaption: 'Index ready — memory available to the agent',
   flowWaitingCaption: 'When something runs, only the active path lights up',
-  activityTrayBusy: 'Background task',
   healthTitle: 'Diagnostics',
   healthLead: 'Quick check — what must work for memory and MCP.',
   healthRefresh: 'Refresh',
@@ -2380,8 +2311,6 @@ const EN_LABELS: UiLabels = {
   statusOllamaFail: 'unreachable',
   statusOllamaOptional: 'optional (remote Brain)',
   statusBrainRemote: 'remote',
-  statusBrainRemoteOk: 'server OK',
-  statusBrainRemoteFail: 'server unreachable',
   statusChecking: 'checking…',
   statusLastDistill: 'Last distill',
   statusNoDistill: 'none yet',
@@ -2421,7 +2350,6 @@ const EN_LABELS: UiLabels = {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   },
-  skillsModified: (s) => s,
   dashboardSourcesHeading: 'Sources',
   dashboardSelectAll: 'Select all',
   dashboardDeselectAll: 'Deselect all',
@@ -2530,7 +2458,6 @@ const EN_LABELS: UiLabels = {
   importDocLibrarySortSize: 'Size',
   importDocLibraryPending: 'pending index',
   importDocLibraryIndexed: 'indexed',
-  importDocDelete: 'Delete',
   importDocDeleteAria: (name) => `Delete “${name}”`,
   importDocDeleteConfirm: (name) =>
     `Delete “${name}”? Only this document’s blobs are removed (not chats/snapshots).`,
@@ -2600,7 +2527,6 @@ const EN_LABELS: UiLabels = {
   importDocDone: 'Document imported',
   importDocBrainOff: 'Start the local search engine (Brain) to index the chunks.',
   importDocQueuedHint: 'Saved to the vault — it will be indexed once Brain starts.',
-  importDocQueuedDetail: 'The document is in the vault; the index is built when the engine starts.',
   importDocFailedToast: 'Document import failed',
   importDocIndexedBadge: (chunks) => `${chunks} chunks`,
   importDocPagesBadge: (n) => `${n} pp.`,
@@ -2642,8 +2568,6 @@ const EN_LABELS: UiLabels = {
     'Import → vault (encrypted) → straight to the embedding index. NO LLM distillation — chunk and embed only.',
   guideDocsWhere: 'Import → Documents',
   guideOpenTab: 'Open the tab',
-  guideDiagramToggle: 'Show the diagram',
-  guideDiagramHide: 'Hide the diagram',
   guideFlowReplayLastNone: 'Nothing recorded yet — run a distillation, an import or an MCP query.',
   guideFlowReplayLastBusy: 'Hold on — something is running right now.',
   guideFlowReplayHint:
@@ -2652,7 +2576,6 @@ const EN_LABELS: UiLabels = {
   guideFlowDocsLegend: 'Document path',
   guideFlowOptionalLegend: 'Optional',
   guideFlowAgentLegend: 'Agent query',
-  flowAgentConsumptionCaption: 'Reading (not writing):',
   guideFlowMiniExpand: 'Full map →',
   flowEdgeMemoryReturn: 'answer from memory',
 
@@ -2681,14 +2604,11 @@ const EN_LABELS: UiLabels = {
   flowNodeMcpHint: 'The agent connects over MCP — the bridge to the local Brain search engine.',
   flowNodeMcpDisk: 'Connect · mcp.json',
   flowAgentLayerSkills: 'skills',
-  flowAgentLayerSkillsOptional: 'opt.',
   flowAgentLayerSearch: 'search_library',
   flowMiniStatus: (state) => (state.kind === 'idle' ? 'Idle' : formatFlowFocusBannerEn(state)),
   dashboardActivityNow: (state) => formatFlowLiveBadgeEn(state),
   dashboardActivityLast: (relative) => `Last activity: distillation ${relative}`,
   dashboardActivityNone: 'No distillation yet — start Brain to prepare your memory',
-  flowIllustrationCaption:
-    'Waiting — the animation starts on a distillation, import, indexing run or MCP query',
   flowNodeImportLabel: 'Import',
   flowNodeImportHint: 'PDF, EPUB, ZIP — lands in the vault without LLM distillation.',
   flowNodeImportDisk: 'vault/library.cvb',
