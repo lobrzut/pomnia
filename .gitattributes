@@ -45,8 +45,8 @@ Dockerfile  text eol=lf
 # Source and docs: LF in the repository, whatever the checkout does locally.
 #
 # Three files had reached the repo with CRLF and, in two cases, with doubled
-# carriage returns (
-) — a file written back through a converting layer
+# carriage returns - CR CR LF - a file written back through a converting
+# layer more than once. Every other tracked source file is LF.
 # more than once. Nothing failed because of it, but every edit to those files
 # produced a diff of the whole file, which hides the actual change and is how a
 # one-line fix arrives for review as four hundred.
