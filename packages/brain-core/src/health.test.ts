@@ -6,6 +6,7 @@ import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { collectHealth, redactHealth, resetDiskCountCache, worstOf } from './health.js'
+import { indexAfterWrite, resetIndexFailures } from './mcp/indexAfterWrite.js'
 import type { EmbedClient } from './rag/embed.js'
 
 let vaultRoot: string
@@ -340,5 +341,44 @@ describe('collectHealth — notes on disk but not in the index', () => {
       ...base, db: db({ files: 40, chunks: 120 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
     })
     expect(h.checks.index.detail).not.toContain('iocharset')
+  })
+})
+
+describe('collectHealth - a note that failed to index at write time', () => {
+  beforeEach(() => {
+    resetDiskCountCache()
+    resetIndexFailures()
+  })
+  afterEach(() => resetIndexFailures())
+
+  it('degrades even though the counts look healthy', async () => {
+    // The quietest gap there is: somebody deliberately recorded a decision,
+    // the tool reported success, and recall will never return it. One or two
+    // notes cannot move the disk-vs-index ratio, so arithmetic will not find
+    // this - it has to be reported on its own.
+    await mkdir(join(vaultRoot, 'sessions'), { recursive: true })
+    for (let i = 0; i < 10; i++) {
+      await writeFile(join(vaultRoot, 'sessions', `n${i}.md`), '# n')
+    }
+    await indexAfterWrite('sessions/lost.md', async () => { throw new Error('embedder down') }, 200)
+    const h = await collectHealth({
+      ...base, db: db({ files: 10, chunks: 30 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+    })
+    expect(h.checks.index.state).toBe('degraded')
+    expect(h.checks.index.detail).toContain('written but failed to index')
+    expect(h.checks.index.detail).toContain('sessions/lost.md')
+    expect(h.checks.index.detail).toContain('--reindex')
+  })
+
+  it('stays ok when every write reached the index', async () => {
+    await mkdir(join(vaultRoot, 'sessions'), { recursive: true })
+    for (let i = 0; i < 10; i++) {
+      await writeFile(join(vaultRoot, 'sessions', `n${i}.md`), '# n')
+    }
+    await indexAfterWrite('sessions/ok.md', async () => undefined, 200)
+    const h = await collectHealth({
+      ...base, db: db({ files: 10, chunks: 30 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+    })
+    expect(h.checks.index.state).toBe('ok')
   })
 })

@@ -13,6 +13,7 @@
 import type Database from 'better-sqlite3'
 import { readFileSync } from 'node:fs'
 import { afterCall, freshState, type UnsavedState } from '../unsavedWork.js'
+import { indexAfterWrite, indexOutcomeNote } from '../indexAfterWrite.js'
 import type { EmbedClient } from '../../rag/embed.js'
 import { indexFiles } from '../../rag/indexer.js'
 
@@ -252,16 +253,15 @@ async function dispatchTool(
       return runSearchLibrary(args, { db: ctx.db, embedder: ctx.embedder })
     case 'save_conversation': {
       const saved = await runSaveConversation(args, { vaultRoot: ctx.vaultRoot })
-      // Fire-and-forget: index the new session file without blocking the MCP reply.
-      void indexFiles(ctx.db, ctx.embedder, [
-        { path: saved.path, text: readFileSync(saved.path, 'utf8') },
-      ]).catch((err) => {
-        console.error(
-          '[pomnia-core] session index after save_conversation failed:',
-          err instanceof Error ? err.message : err,
-        )
-      })
-      return saved.text
+      // The write is atomic; the index was not part of that promise. See
+      // indexAfterWrite: a note on disk that never reached the index is not
+      // saved in the sense that matters, and this used to answer 'saved'.
+      const outcome = await indexAfterWrite(saved.path, () =>
+        indexFiles(ctx.db, ctx.embedder, [
+          { path: saved.path, text: readFileSync(saved.path, 'utf8') },
+        ]),
+      )
+      return `${saved.text}\n\n${indexOutcomeNote(outcome)}`
     }
     case 'checkpoint_session': {
       const ckpt = await runCheckpointSession(args, {
@@ -269,14 +269,14 @@ async function dispatchTool(
         autoCheckpointEnabled: ctx.autoCheckpointEnabled !== false,
       })
       if (ckpt.path) {
-        void indexFiles(ctx.db, ctx.embedder, [
-          { path: ckpt.path, text: readFileSync(ckpt.path, 'utf8') },
-        ]).catch((err) => {
-          console.error(
-            '[pomnia-core] session index after checkpoint_session failed:',
-            err instanceof Error ? err.message : err,
-          )
-        })
+        // Captured: the closure below loses the narrowing from this `if`.
+        const written = ckpt.path
+        const outcome = await indexAfterWrite(written, () =>
+          indexFiles(ctx.db, ctx.embedder, [
+            { path: written, text: readFileSync(written, 'utf8') },
+          ]),
+        )
+        return `${ckpt.text}\n\n${indexOutcomeNote(outcome)}`
       }
       return ckpt.text
     }

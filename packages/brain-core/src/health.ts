@@ -37,6 +37,7 @@ import {
 } from './ollama/runtime.js'
 import { EMBED_DIMS } from './rag/embed.js'
 import { INDEX_SUBDIRS, SKIP_DIRS } from './rag/indexer.js'
+import { indexFailureSnapshot } from './mcp/indexAfterWrite.js'
 import type { EmbedBackendName, EmbedClient } from './rag/embed.js'
 import { SYNC_DIRS } from './sync/paths.js'
 import type { SyncHealthSnapshot } from './sync/status.js'
@@ -394,11 +395,25 @@ export async function collectHealth(opts: {
           ? { state: 'down', detail: 'index is empty — run brain-core --reindex' }
           : { state: 'degraded', detail: 'nothing indexed yet — the vault has no notes' }
       } else {
+        // A note that failed to index at write time is the quietest gap of all:
+        // it is a decision somebody deliberately recorded, the tool reported it,
+        // and recall will never return it. Too few to move the ratio below, so
+        // it is reported on its own rather than left to arithmetic.
+        const writeFailures = indexFailureSnapshot()
         // A non-empty index is not a complete one. See countIndexableOnDisk.
         const onDisk = await countIndexableOnDisk(opts.vaultRoot)
         const gap = onDisk - counts.files
         const tolerance = Math.max(INDEX_GAP_ABS, onDisk * INDEX_GAP_RATIO)
-        if (gap > tolerance) {
+        if (writeFailures.count > 0) {
+          index = {
+            state: 'degraded',
+            detail:
+              `${writeFailures.count} note(s) were written but failed to index since ` +
+              `this process started — they are on disk and recall will not return them. ` +
+              `Last: ${writeFailures.last?.path ?? '(unknown)'} — ` +
+              `${writeFailures.last?.detail ?? ''}. Run brain-core --reindex.`,
+          }
+        } else if (gap > tolerance) {
           index = {
             state: 'degraded',
             detail:
