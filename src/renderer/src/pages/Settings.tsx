@@ -736,6 +736,8 @@ export default function Settings() {
       </GlassCard>
       )}
 
+      {/* Mini: eksport ze snapshotu to destylacja. */}
+      {!isMini && (
       <GlassCard className="mb-4 p-5">
         <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
           <Brain className="h-4 w-4 text-mint" /> {labels.brainBridge}
@@ -769,6 +771,7 @@ export default function Settings() {
           </Button>
         </div>
       </GlassCard>
+      )}
 
       <GlassCard className="mb-4 p-5">
         <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
@@ -830,6 +833,8 @@ export default function Settings() {
         </div>
       </GlassCard>
 
+      {/* Mini: snapshoty sa w vaulcie. */}
+      {!isMini && (
       <GlassCard className="mb-4 p-5">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
@@ -882,6 +887,7 @@ export default function Settings() {
           </ul>
         )}
       </GlassCard>
+      )}
 
       {isWindows || isMock ? (
         <GlassCard className="mb-4 p-5">
@@ -923,6 +929,8 @@ export default function Settings() {
         </GlassCard>
       ) : null}
 
+      {/* Mini: opisuje szyfrowanie vaulta, ktorego Mini nie ma. */}
+      {!isMini && (
       <GlassCard className="p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
           <ShieldCheck className="h-4 w-4 text-mint" /> {labels.securityAbout}
@@ -942,6 +950,7 @@ export default function Settings() {
           </p>
         )}
       </GlassCard>
+      )}
     </div>
   )
 }

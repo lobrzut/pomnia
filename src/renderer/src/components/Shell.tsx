@@ -44,7 +44,8 @@ export function TitleBar() {
   // Onboarding / VaultGate paint their own brand at z-40. TitleBar stays at z-50
   // so window chrome remains usable — but showing logo + "POMNIA vault" here
   // stacks on top of the gate brand (double mark + overlapping labels).
-  const gateOpen = !onboarded || !vault.open
+  // Mini has no vault and no onboarding, so neither gate ever covers the bar.
+  const gateOpen = !isMini && (!onboarded || !vault.open)
   return (
     // z-50: must stay above VaultGate's lock overlay (z-40) — on a frameless
     // window these minimize/maximize/close buttons are the only way to control
@@ -61,8 +62,12 @@ export function TitleBar() {
             <AppLogo size="xs" />
             <div className="flex items-baseline gap-2 leading-none">
               <span className="text-[15px] font-bold tracking-tight text-grad">POMNIA</span>
-              <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">vault</span>
+              {/* Which build this is, said where nobody has to go looking. */}
+              <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-ink-faint">
+                {isMini ? 'mini' : 'vault'}
+              </span>
             </div>
+            {!isMini && (
             <div className="ml-2 flex items-center gap-2">
               <span
                 className={clsx('h-1.5 w-1.5 rounded-full', vault.open ? 'bg-mint' : 'bg-ink-faint')}
@@ -70,6 +75,7 @@ export function TitleBar() {
               />
               <span className="truncate text-xs text-ink-dim">{vault.open ? vault.name : labels.vaultLocked}</span>
             </div>
+            )}
           </>
         )}
       </div>

@@ -669,11 +669,15 @@ function resolveWindowIcon(): string | undefined {
 }
 
 function createWindow(): void {
+  // Mini is two screens wide, not eight. The full app needs room for a
+  // dashboard, a flow diagram and a document importer; Mini shows Connect and
+  // Settings, and at 1180x800 both sit in a column of whitespace.
+  const mini = import.meta.env?.MAIN_VITE_POMNIA_FLAVOUR === 'mini'
   win = new BrowserWindow({
-    width: 1180,
-    height: 800,
-    minWidth: 940,
-    minHeight: 640,
+    width: mini ? 860 : 1180,
+    height: mini ? 700 : 800,
+    minWidth: mini ? 720 : 940,
+    minHeight: mini ? 560 : 640,
     show: false,
     frame: process.platform !== 'darwin',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',

@@ -192,7 +192,7 @@ export default function Connect() {
       // so the badge went green while search returned a months-old corpus.
       const engine = identifyEngine(d).label
       setBrainDetail(
-        brainTarget === 'embedded' && core && !core.running
+        effectiveTarget === 'embedded' && core && !core.running
           ? labels.brainStoppedStartInTab
           : r.brain.reachable
             ? [
@@ -486,12 +486,14 @@ export default function Connect() {
           </Button>
         </div>
 
-        {!simpleMode && (
+        {/* Mini is remote by construction; offering the switch would offer a
+            mode it cannot enter. */}
+        {!simpleMode && !isMini && (
         <div className="mb-3 inline-flex rounded-xl border border-white/10 bg-black/30 p-1">
           <button
             onClick={() => switchTarget('embedded')}
             className={`no-drag rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-              brainTarget === 'embedded' ? 'bg-iris/20 text-ink' : 'text-ink-faint hover:text-ink-dim'
+              effectiveTarget === 'embedded' ? 'bg-iris/20 text-ink' : 'text-ink-faint hover:text-ink-dim'
             }`}
           >
             {labels.embedded}
@@ -507,7 +509,7 @@ export default function Connect() {
         </div>
         )}
 
-        {!isMini && (brainTarget === 'embedded' || simpleMode) && embeddedRunning === false && (
+        {!isMini && effectiveTarget === 'embedded' && embeddedRunning === false && (
           <p className="mb-3 text-[11px] text-amber">
             {labels.embeddedBrainNotRunning}{' '}
             <button onClick={() => setRoute('brain')} className="no-drag font-medium text-iris hover:underline">
@@ -525,9 +527,9 @@ export default function Connect() {
               if (brainTarget === 'remote') setRemoteBrainUrl(e.target.value)
             }}
             onBlur={() => void refreshSnippetIfPicked()}
-            placeholder={brainTarget === 'embedded' ? EMBEDDED_URL : REMOTE_URL_PLACEHOLDER}
+            placeholder={effectiveTarget === 'embedded' ? EMBEDDED_URL : REMOTE_URL_PLACEHOLDER}
             className="w-64"
-            readOnly={brainTarget === 'embedded'}
+            readOnly={effectiveTarget === 'embedded'}
           />
           )}
           {!simpleMode && brainTarget === 'remote' && (
@@ -555,7 +557,7 @@ export default function Connect() {
             </>
           )}
           <span className="text-[11px] text-ink-faint">
-            {simpleMode || brainTarget === 'embedded'
+            {effectiveTarget === 'embedded'
               ? labels.embeddedSnippetHint
               : !connectToken.trim()
                 ? labels.connectTokenRequired
@@ -839,7 +841,7 @@ export default function Connect() {
               <div className="mt-2 flex items-start gap-2 px-1">
                 <KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-faint" />
                 <p className="text-[11px] leading-relaxed text-ink-faint">
-                  {brainTarget === 'embedded'
+                  {effectiveTarget === 'embedded'
                     ? labels.snippetLocalModeHint
                     : connectToken
                       ? labels.snippetRemoteBrainCoreHint
