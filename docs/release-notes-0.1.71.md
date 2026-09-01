@@ -66,6 +66,46 @@ The push now prefers it, the panel says which credential it will use, and when t
 
 With Brain pointed at a server, the embedded engine has no job — agents read the remote index, and a local one would fill a database nobody queries. That was reported as an error. A red cross on correct behaviour is not a warning; it is training to ignore warnings.
 
+## Replication stopped fighting itself
+
+Three faults, all found by pushing a real vault between a Windows desktop and a
+Linux server rather than by reading the code.
+
+**A conflict on `USER.md` could never heal.** When both sides change a file the
+receiver keeps its copy and writes the incoming one beside it as `USER-2.md` —
+which then has to pass the same path validator, and `USER-2.md` is not itself on
+the list of files allowed at the vault root. So it was refused, and refused again
+on every later push, while the notes around it replicated normally. `USER.md` is
+the profile every agent reads at the start of every session, which made it the
+worst possible file to be the one that cannot reconcile.
+
+**CRLF counted as a change.** A Windows desktop writes CRLF and a Linux server
+writes LF; the text is identical and the byte hashes are not. Every file either
+side had rewritten therefore came back a conflict — and conflicts accumulate:
+the same note as `-2`, `-3`, `-4`, one more on every sync. One vault reached 36
+copies, 24 of them byte-identical to the file they were "conflicting" with, and
+each copy also entered the index, so a search returned the same note several
+times. The comparison now ignores CR, and only to decide whether this is a
+conflict: what lands on disk is still exactly what the sender wrote.
+
+**`sprawy/` could not travel.** It became indexable in this release and was not
+replicable — a directory searchable on one machine and unreachable from the next.
+
+## Which half of this you are upgrading
+
+Pomnia is two programs that update separately, and it is easy — this project got
+it wrong twice while preparing this release — to fix one and test the other.
+
+| Fix | Lives in | Arrives with |
+|---|---|---|
+| MCP config generation, Connect probe, replica token, notification severity | Desktop | the installer |
+| Path validation, conflict copies, CRLF comparison, `/healthz`, `num_ctx`, distill model | brain-core | rebuilding the server image |
+
+A `/sync/file → 400` is the **server** answering. `local refused` is your own
+machine. Replication is the one place where two installations must agree about
+the rules, and today nothing tells you when they do not — so upgrade both, or
+expect errors that name a problem you have already fixed on the other side.
+
 ---
 
 ## Verifying the download
@@ -75,8 +115,8 @@ thing you can actually check it against — published here for the first time:
 
 ```
 Pomnia-0.1.71-setup.exe
-SHA256  0c313cfd0a60e52621c91673a03c363fc778528d043db59219c11f9d977e761e
-size    167 204 025 bytes
+SHA256  1400053e604b4f2cc98810acc1d459accd9f0f6c4a29feb609789ea86c6ae402
+size    167 207 354 bytes
 ```
 
 ```powershell
