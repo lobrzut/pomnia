@@ -18,7 +18,7 @@
  */
 
 export interface VramProfile {
-  id: 'lite' | 'standard' | 'max'
+  id: 'lite' | 'standard'
   label: string
   /** Display range of GPU memory this profile is sized for. */
   vram: string
@@ -44,18 +44,34 @@ export const PROFILE_EMBED_SIZE = '274 MB'
  * Replicated on a second machine with a different GPU and confirmed on a
  * held-out set read by hand. So Standard is now the 8B.
  *
- * Lite and Max are unchanged and unmeasured. The blurbs no longer claim a
- * quality ordering by size, because the one comparison that was measured here
- * came out the other way round. Numbers come from one corpus (Polish and
- * English, homelab and development work) — the rig that produced them is in
- * lobrzut/pomnia-lab if yours looks different.
+ * There is no longer a Max tier. It offered qwen2.5:32b at 20 GB on the
+ * assumption that a bigger model writes a better note — the same assumption
+ * the measurement above had just refuted, one size class down. Nothing here
+ * ever tested it, and it could not be: on the hardware available a 32B has to
+ * be split across two cards, which makes the throughput number a measurement
+ * of PCIe rather than of the model. Its other claim, the longest context, was
+ * answering a problem nobody has — prompts measure around 4062 tokens against
+ * a window of 8192.
+ *
+ * A tier that promises quality, cannot be measured, and sits behind small
+ * print saying so is the same failure this project spent a week removing
+ * everywhere else: a confident label with nothing behind it. Someone with a
+ * 24 GB card is better served running Standard and having the card free.
+ *
+ * Lite stays, described as what it is. It is not the bottom of a quality
+ * ladder; it is the only thing that runs on a 4–6 GB card, where the 8B does
+ * not fit alongside anything else.
+ *
+ * Numbers come from one corpus (Polish and English, homelab and development
+ * work) — the rig that produced them is in lobrzut/pomnia-lab if yours looks
+ * different.
  */
 export const VRAM_PROFILES: VramProfile[] = [
   {
     id: 'lite',
     label: 'Lite',
     vram: '4–6 GB',
-    blurb: 'Laptop or older GPU. Fastest, shortest context. Not measured against the quality gate.',
+    blurb: 'For a card the 8B will not fit on. Chosen by what runs, not by quality — not measured against the gate.',
     chatModel: 'qwen2.5:3b',
     chatSize: '1.9 GB'
   },
@@ -67,13 +83,5 @@ export const VRAM_PROFILES: VramProfile[] = [
     chatModel: 'llama3.1:8b',
     chatSize: '4.7 GB',
     recommended: true
-  },
-  {
-    id: 'max',
-    label: 'Max',
-    vram: '24 GB+',
-    blurb: 'Workstation class, longest context, slowest per note. Not measured against the quality gate.',
-    chatModel: 'qwen2.5:32b',
-    chatSize: '20 GB'
   }
 ]
