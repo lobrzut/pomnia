@@ -1,4 +1,4 @@
-> **No re-chunk, no reindex required.** This is a code swap. One thing is worth a reindex afterwards, and 0.1.74 will now tell you when: see *Recall could quote a note you deleted*.
+> **No re-chunk, no reindex required.** This is a code swap. One thing is worth a reindex afterwards, and 0.1.75 will now tell you when: see *Recall could quote a note you deleted*.
 
 ## Two controls that could never have worked
 
@@ -96,7 +96,7 @@ Compare the SHA256 of the installer against this value before running it:
 ```
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Pomnia-0.1.74-setup.exe
+Get-FileHash -Algorithm SHA256 .\Pomnia-0.1.75-setup.exe
 ```
 
 The build is unsigned, so Windows SmartScreen will warn. "More info" → "Run anyway" is the expected path; the hash is what actually tells you the file is the one that was built.
