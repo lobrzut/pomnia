@@ -306,13 +306,39 @@ describe('collectHealth — notes on disk but not in the index', () => {
     expect(h.checks.index.state).toBe('ok')
   })
 
-  it('stays ok when the index is ahead of the walk', async () => {
-    // Deleted-but-not-pruned rows make files exceed what is on disk; that is a
-    // negative gap and nonsense to report as missing notes.
+  it('tolerates the index running slightly ahead of the walk', async () => {
+    // A handful of not-yet-pruned rows is pruning lag, not a fault, and gets
+    // the same tolerance as the missing-notes direction.
+    await seedNotes(200)
+    const h = await collectHealth({
+      ...base, db: db({ files: 203, chunks: 600 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+    })
+    expect(h.checks.index.state).toBe('ok')
+  })
+
+  it('degrades when the index holds many entries with no note behind them', async () => {
+    // Seen on the live server during an audit: 2688 indexed against 2666 on
+    // disk. Orphans are quieter than missing notes — recall still answers, so
+    // nothing looks wrong, and what comes back is a passage from a note that
+    // was deleted. Earlier this direction was graded ok on the grounds that a
+    // negative gap is not missing notes. True, and beside the point: it is a
+    // different fault, and it was going unreported.
     await seedNotes(5)
     const h = await collectHealth({
       ...base, db: db({ files: 40, chunks: 120 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
     })
-    expect(h.checks.index.state).toBe('ok')
+    expect(h.checks.index.state).toBe('degraded')
+    expect(h.checks.index.detail).toContain('35 entries more')
+    expect(h.checks.index.detail).toContain('--reindex')
+  })
+
+  it('does not blame the mount for orphans — a reindex is the whole fix', async () => {
+    // The missing-notes text names iocharset=utf8 as a suspect. Repeating that
+    // here would send someone to check a mount that is working.
+    await seedNotes(5)
+    const h = await collectHealth({
+      ...base, db: db({ files: 40, chunks: 120 }), embedder: okEmbedder, vaultRoot, dataDir: vaultRoot,
+    })
+    expect(h.checks.index.detail).not.toContain('iocharset')
   })
 })

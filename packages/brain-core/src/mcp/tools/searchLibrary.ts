@@ -14,6 +14,7 @@ import type Database from 'better-sqlite3'
 import type { EmbedClient } from '../../rag/embed.js'
 import { search, type SearchSource } from '../../rag/search.js'
 import { classifyGrounding, keywordHits, noteDate, semanticScore, SEM_MEANINGFUL } from '../../rag/grounding.js'
+import { keepLiveSources } from '../../rag/liveSources.js'
 
 export const searchLibrarySchema = {
   type: 'object' as const,
@@ -51,16 +52,31 @@ export async function runSearchLibrary(
 ): Promise<string> {
   const { query, top_k, source } = argsSchema.parse(args)
 
-  const hits = await search(deps.db, deps.embedder, {
+  const raw = await search(deps.db, deps.embedder, {
     query,
     topK: top_k,
     source: source as SearchSource,
   })
 
+  // Before anything is judged: a chunk whose file was deleted is not a weak
+  // result, it is a passage with nothing behind it. See keepLiveSources.
+  const { live: hits, missing } = await keepLiveSources(raw)
   const verdict = classifyGrounding(hits)
 
   if (hits.length === 0) {
-    return JSON.stringify({ hits: [], ...verdict, message: 'no results' })
+    return JSON.stringify({
+      hits: [],
+      ...verdict,
+      message: 'no results',
+      ...(missing.length
+        ? {
+            stale_dropped: missing.length,
+            stale_note:
+              `${missing.length} indexed passage(s) matched but their notes no longer ` +
+              `exist on disk, so they were withheld. Run brain-core --reindex to prune them.`,
+          }
+        : {}),
+    })
   }
 
   // Two things the caller could not previously see. `matched` says whether a row
@@ -84,5 +100,16 @@ export async function runSearchLibrary(
     }
   })
 
-  return JSON.stringify({ hits: annotated, ...verdict })
+  return JSON.stringify({
+    hits: annotated,
+    ...verdict,
+    ...(missing.length
+      ? {
+          stale_dropped: missing.length,
+          stale_note:
+            `${missing.length} further passage(s) were withheld: their notes are in the ` +
+            `index but no longer on disk. Run brain-core --reindex to prune them.`,
+        }
+      : {}),
+  })
 }

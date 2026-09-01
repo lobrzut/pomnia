@@ -397,7 +397,8 @@ export async function collectHealth(opts: {
         // A non-empty index is not a complete one. See countIndexableOnDisk.
         const onDisk = await countIndexableOnDisk(opts.vaultRoot)
         const gap = onDisk - counts.files
-        if (gap > Math.max(INDEX_GAP_ABS, onDisk * INDEX_GAP_RATIO)) {
+        const tolerance = Math.max(INDEX_GAP_ABS, onDisk * INDEX_GAP_RATIO)
+        if (gap > tolerance) {
           index = {
             state: 'degraded',
             detail:
@@ -405,6 +406,19 @@ export async function collectHealth(opts: {
               `run brain-core --reindex. If a reindex does not close the gap, the files ` +
               `exist but cannot be read: check the vault mount (a CIFS share without ` +
               `iocharset=utf8 makes non-ASCII filenames listable and unopenable).`,
+          }
+        } else if (-gap > tolerance) {
+          // The index can also be too big, and that failure is quieter than a
+          // missing note. Entries for files that were deleted, renamed or
+          // conflict-resolved stay searchable: recall returns a passage, the
+          // agent cites it, and the note it came from is not there any more.
+          // Nothing else in the system notices — every counter goes up.
+          index = {
+            state: 'degraded',
+            detail:
+              `the index holds ${-gap} entries more than the ${onDisk} notes on disk — ` +
+              `deleted or renamed notes are still searchable and will be quoted back ` +
+              `as if they existed. Run brain-core --reindex to prune them.`,
           }
         }
       }
