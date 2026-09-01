@@ -26,7 +26,7 @@ Every assistant keeps conversations somewhere else. Switch machines and you lose
 
 ## Simple flow (Desktop)
 
-1. **Start Brain** — Brain tab → start embedded Brain (needs [Ollama](https://ollama.com): `nomic-embed-text` + a distill model, e.g. `qwen2.5:14b`).
+1. **Start Brain** — Brain tab → start embedded Brain (needs [Ollama](https://ollama.com): `nomic-embed-text` + a distill model; `llama3.1:8b` is the measured default — it scored higher than `qwen2.5:14b` and ran about twice as fast).
 2. **Backup and into Brain** — Dashboard: backup sources → distill into local Brain.
 3. **Connect MCP** — Connect tab → snippet for `http://127.0.0.1:7862` → paste into Cursor (`Settings → MCP`) → Reload.
 

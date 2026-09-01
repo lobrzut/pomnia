@@ -23,10 +23,29 @@ import { dirname, join } from 'node:path'
 
 export const SETTINGS_SCHEMA = 1
 
+/** The three looks the pages ship with. Ids are the contract with the CSS. */
+export const COLOR_SCHEMES = ['mint', 'iris', 'glass'] as const
+export type ColorScheme = (typeof COLOR_SCHEMES)[number]
+export const DEFAULT_COLOR_SCHEME: ColorScheme = 'mint'
+
+export function isColorScheme(v: unknown): v is ColorScheme {
+  return typeof v === 'string' && (COLOR_SCHEMES as readonly string[]).includes(v)
+}
+
 export interface ServerSettings {
   schemaVersion: number
   ollamaUrl?: string
   embedModel?: string
+  /**
+   * Look of the served pages, set in the admin panel.
+   *
+   * It used to live only in the visitor's localStorage, chosen through a
+   * switcher on the public status page. That made it a per-browser preference
+   * on a page whose whole job is to report what this server is — so it did not
+   * survive a different browser, and could not be set at all by the person who
+   * runs the appliance. It is a setting; it belongs in settings.
+   */
+  colorScheme?: ColorScheme
   /** ISO of the last change, and which token made it. */
   updatedAt?: string
   updatedBy?: string

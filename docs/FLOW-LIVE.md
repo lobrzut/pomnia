@@ -14,10 +14,10 @@ flowchart LR
   end
 
   subgraph brain [Brain homelab — one place]
-    MCP[pomnia / mcp_rag.py]
-    ACT[last_mcp_activity.json]
-    API["GET /mcp/activity (:7862)\nGET /api/mcp/last-activity (:7860)"]
-    MCP -->|record_mcp_tool| ACT
+    MCP[pomnia / brain-core]
+    ACT[in-memory activity ring]
+    API["GET /mcp/activity"]
+    MCP -->|records each tool call| ACT
     ACT --> API
   end
 
@@ -36,50 +36,40 @@ flowchart LR
 ## What happens on a query
 
 1. The agent calls an MCP tool (`search_library`, `get_skill`, `run_skill`, …).
-2. `dashboard/mcp_rag.py` → `record_mcp_tool()` writes `{ tool, ts, query_preview }` to `data/last_mcp_activity.json`.
+2. brain-core records `{ tool, ts, query_preview }` and serves the most recent call from `GET /mcp/activity`.
 3. Pomnia:
    - **Embedded** (`brainTarget=embedded`): the `brain-core` child process emits `mcp-query` over fork IPC — no polling at all.
    - **Remote** (`brainTarget=remote`): the main process polls every **2 s** while the window has focus and either Dashboard or HowItWorks is visible (`mcpActivity:watch` ref-count).
 4. `activity.update({ kind: 'mcp-query' })` → FlowDiagram lights the agent → library branch.
 
-## Endpoints (Brain)
+## Endpoint
 
-| URL | Port | Shape |
-|-----|------|--------|
-| `GET /mcp/activity` | 7862 (auth proxy) | `{ last: { tool, detail, ts }, recent }` |
-| `GET /api/mcp/last-activity` | 7860 (dashboard) | `{ tool, ts, query_preview }` |
-| `GET /api/mcp/last-activity` | 7862 (alias) | as above |
+| URL | Shape |
+|-----|--------|
+| `GET /mcp/activity` | `{ last: { tool, detail, ts }, recent }` |
 
-`recent=true` when the last call was less than 4 s ago. Metadata only — no vault content leaves the server.
+Served by brain-core on its own port — `7862` for the brain embedded in Pomnia Desktop, whatever the appliance is configured with otherwise (`7865` on the reference deployment). `recent=true` when the last call was less than 4 s ago. Metadata only — no vault content leaves the server.
 
-## Deploying Brain (homelab / 192.168.x.x)
+> Older revisions of this page described a Python hub: `dashboard/mcp_rag.py` writing `data/last_mcp_activity.json`, a FastAPI dashboard on `:7860`, and `supergateway` plus an auth proxy in front. All of it is gone. brain-core is one Node process that answers MCP, admin and health on a single port, and none of those services or endpoints exist to restart.
 
-On the Brain server (repo `brain`, branch `main` → remote `hub`):
+## Deploying Brain (homelab)
 
-```powershell
-cd C:\Users\Alice\Projects\brain   # or SSH to the host
+brain-core runs as one container. On the appliance:
 
-# 1. Pull, and make sure pipeline/mcp_activity.py is present
-git pull hub main
-
-# 2. Restart the MCP services (supergateway + auth proxy + mcp_rag)
-# Docker:
-docker compose restart brain-mcp-gateway brain-mcp-auth-proxy
-
-# Or systemd (Linux):
-sudo systemctl restart brain-mcp-gateway brain-mcp-auth-proxy
-
-# 3. Restart the FastAPI dashboard (:7860) — it serves the new
-#    /api/mcp/last-activity endpoint
-sudo systemctl restart brain-dashboard
-# or: docker compose restart brain-dashboard
+```bash
+# compose.yaml pins the image tag; bump it and bring the service up
+sed -i s@brain-core:OLD@brain-core:NEW@ compose.yaml
+docker compose up -d
+sleep 15
+curl -s http://127.0.0.1:7865/healthz
 ```
+
+`/healthz` must report the version you just deployed and `"status":"ok"`. Keep the previous `compose.yaml` so a bad start can be rolled back without reconstructing it by hand.
 
 **Smoke test:**
 
-```powershell
-curl -s http://brain.example.local:7862/mcp/activity
-curl -s http://brain.example.local:7860/api/mcp/last-activity
+```bash
+curl -s http://brain.example.local:7865/mcp/activity
 ```
 
 In Cursor: `pomnia.search_library "test"` — within 2 s the FlowDiagram in Pomnia should blink its MCP branch.
@@ -87,7 +77,7 @@ In Cursor: `pomnia.search_library "test"` — within 2 s the FlowDiagram in Pomn
 ## Pomnia configuration
 
 1. Settings → Brain target: **Remote**
-2. MCP URL: `http://brain.example.local:7862` (auth proxy)
+2. MCP URL: `http://brain.example.local:7865` — the host and port only. Pomnia strips a trailing `/admin`, `/mcp` or `/status` if you paste the address bar from the admin panel, and probes the endpoint before writing any client config.
 3. MCP token (the same one as in `~/.cursor/mcp.json`)
 4. Open **Dashboard** or **How it works** — polling starts on its own
 

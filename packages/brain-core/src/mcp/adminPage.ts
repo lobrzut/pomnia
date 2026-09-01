@@ -35,6 +35,7 @@
  * deliberately left out while there is one person.
  */
 
+import { DEFAULT_COLOR_SCHEME, type ColorScheme } from '../admin/settings.js'
 import {
   BRAND_HEAD_LINKS,
   brandChromeCss,
@@ -47,14 +48,17 @@ import {
 
 export function renderAdminPage(
   origin: string,
-  opts?: { distillFeature?: boolean },
+  opts?: { distillFeature?: boolean; colorScheme?: ColorScheme },
 ): string {
   const distillFeature = opts?.distillFeature !== false
+  // Opens in the saved look rather than flashing mint first. The switcher on
+  // this page is the place the setting is made; see themeScript.
+  const scheme = opts?.colorScheme ?? DEFAULT_COLOR_SCHEME
   const esc = (s: string): string =>
     s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
 
   return `<!doctype html>
-<html lang="pl" data-theme="mint">
+<html lang="pl" data-theme="${scheme}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">

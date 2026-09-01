@@ -1,70 +1,97 @@
-# Cursor ↔ Brain MCP (first-time)
+# Connecting an agent to Pomnia over MCP
 
-Connecting Cursor to Brain on a **new machine** — especially a Mac without the Pomnia DMG.
+One server, one endpoint. If you are working from an older copy of this page
+that told you to configure three servers against `/sse` and
+`/servers/brain-vault/sse`, that was the Python hub, which is gone. Those paths
+no longer answer, and a config built from them fails at the next client restart
+with an error that names none of this.
 
-## What has to be in `~/.cursor/mcp.json`
+## The endpoint
 
-**Always three servers** against a remote Brain (`:7862` + Bearer):
+| | |
+|---|---|
+| Embedded brain (inside Pomnia Desktop) | `http://127.0.0.1:7862/mcp`, no token |
+| Remote brain-core | `http://<host>:7865/mcp` + `Authorization: Bearer btk_…` |
 
-| MCP key (client) | HTTP path on the server |
-|--------------------|--------------------------|
-| `pomnia` | `/sse` |
-| `pomnia-vault` | `/servers/brain-vault/sse` |
-| `pomnia-library` | `/servers/brain-library/sse` |
+The MCP client key is **`pomnia`**.
 
-`pomnia` on its own is an **incomplete** configuration — no vault, no library. Status in the app still accepts the legacy keys `brain-rag` / `brain-vault` / `brain-library`.
+### The one mistake worth naming
 
-The URL paths `/servers/brain-vault|library` are **paths on the Brain proxy** — do not change them. Only the key name in `mcp.json` changes.
+The admin panel is served from the **same port** at `/admin`, so that is the URL
+in your browser's address bar when you go looking for a token — and pasting it
+into the URL field produces `…/admin/mcp`, which is a real route, gated on an
+admin role, answering `403`. Pomnia strips `/admin`, `/mcp` and `/status` from
+whatever you paste, and probes the endpoint before writing any config. If you
+are writing the file by hand, strip it yourself.
 
-## Mac / no Pomnia app (for now)
+## Let the app write it
 
-1. Open the generator in a browser:
-   - marketing site (outside this repo, Cloudflare / pomnia.ai): `https://pomnia.ai/cursor-mcp.html` (if deployed)
-2. Paste the Brain URL (`http://…:7862`) and the Bearer token.
-3. **Copy mcp.json for Cursor** → save it as `~/.cursor/mcp.json`.
-4. Cursor → `Cmd+Shift+P` → **Developer: Reload Window**.
+**Connect** tab → mode **On your server** → URL and token → pick your client →
+**Copy**. It writes the block into up to six client configs at once, and checks
+the endpoint answers first. When the probe fails, yesterday's working config is
+left alone rather than replaced with a broken one.
 
-Token: the Brain dashboard on **`:7860`** (same host as MCP, different port) → Settings / API tokens.
+## Writing it by hand
 
-## Windows (when you have the Pomnia installer)
-
-The **Connect** tab in the app:
-
-1. Mode **On your server** → URL `:7862`
-2. Token (paste one, or **New token** from the dashboard)
-3. Pick **Cursor** → **Copy mcp.json for Cursor**
-4. Reload Window in Cursor
-
-Connect also detects a **Partial** config (rag only) and tells you vault/library are missing.
-
-## Example (template — put in your own URL and token)
+Cursor reads `~/.cursor/mcp.json`. The whole file is this object:
 
 ```json
 {
   "mcpServers": {
     "pomnia": {
-      "url": "http://YOUR-HOST:7862/sse",
-      "headers": { "Authorization": "Bearer btk_…" }
-    },
-    "pomnia-vault": {
-      "url": "http://YOUR-HOST:7862/servers/brain-vault/sse",
-      "headers": { "Authorization": "Bearer btk_…" }
-    },
-    "pomnia-library": {
-      "url": "http://YOUR-HOST:7862/servers/brain-library/sse",
+      "url": "http://YOUR-HOST:7865/mcp",
       "headers": { "Authorization": "Bearer btk_…" }
     }
   }
 }
 ```
 
-Do not commit a real token. On macOS: `chmod 600 ~/.cursor/mcp.json`.
+VS Code (`%APPDATA%\Code\User\mcp.json`, or `~/.config/Code/User/mcp.json`) uses
+`servers` instead of `mcpServers`, and each entry needs `"type": "http"`.
+
+### Claude Desktop on Windows
+
+Claude Desktop speaks stdio, so it reaches an HTTP endpoint through
+`mcp-remote`. Two details are not optional on Windows, and both fail with an
+error that names something else entirely:
+
+```json
+{
+  "mcpServers": {
+    "pomnia": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "mcp-remote", "http://YOUR-HOST:7865/mcp",
+               "--allow-http", "--header", "Authorization:${AUTH_HEADER}"],
+      "env": { "AUTH_HEADER": "Bearer btk_…" }
+    }
+  }
+}
+```
+
+- `command: "npx"` resolves through `where` to `C:\Program Files\nodejs\npx`,
+  which `cmd.exe` then splits on the space: `'C:\Program' is not recognized`.
+  Going through `cmd /c` avoids handing it an unquoted path.
+- `--header "Authorization: Bearer <token>"` is split by `cmd.exe` on **its**
+  space, so the server receives an empty Authorization header, answers `401`,
+  and `mcp-remote` falls into OAuth registration and dies with
+  `Invalid OAuth error response … [object Response]`. The `${AUTH_HEADER}` form
+  has no space in it.
+- `--allow-http` is required for a plain-HTTP endpoint on your own network.
+
+## Tokens
+
+Mint one in the admin panel (`http://<host>:7865/admin` → Tokens) or from the
+**Connect** tab. Agents need the `agent` role; an admin token is for
+administration and is not what a client should carry.
+
+Do not commit a real token. On macOS and Linux: `chmod 600 ~/.cursor/mcp.json`.
 
 ## Verifying
 
-- Cursor → Settings → MCP: three servers Connected
-- The agent calls `get_user_profile` / `search_library`
+- The client lists **one** `pomnia` server, connected.
+- The agent can call `get_user_profile` and `search_library`.
+- `curl -s http://<host>:7865/healthz` reports `"status":"ok"`.
 
-## Embedded (with the Pomnia app only)
-
-The local brain inside Pomnia is **one** `pomnia` server at `http://127.0.0.1:7862/mcp`, no token. That does not apply to a Mac without the DMG — use remote plus the three servers above.
+A `403` from `/mcp` means the URL still has `/admin` in it. A `401` means the
+token is missing, empty or revoked — on Windows an empty Authorization header is
+the usual cause; see above.

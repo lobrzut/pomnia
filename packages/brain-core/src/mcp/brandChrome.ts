@@ -227,15 +227,39 @@ export function brandSkyScript(): string {
 `
 }
 
+/**
+ * Wiring for the admin panel's colour switcher.
+ *
+ * It writes through to server settings, so the choice belongs to the server
+ * rather than to whichever browser happened to make it. The public status page
+ * no longer carries a switcher at all — it renders the stored scheme and
+ * nothing else, because a status page's job is to report this server's state,
+ * not to offer the visitor a preference that only they can see.
+ *
+ * localStorage is still written, as an immediate local echo so the panel does
+ * not flicker back before the PUT lands. The server's copy is what any other
+ * browser will see.
+ */
 export function themeScript(): string {
   return `
 (function(){
   var KEY='pomnia-color-scheme';
   var allowed={mint:1,iris:1,glass:1};
-  function apply(scheme){
+  function persist(scheme){
+    try{
+      fetch('/admin/settings', {
+        method:'PUT',
+        credentials:'same-origin',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({colorScheme:scheme})
+      }).catch(function(){});
+    }catch(e){}
+  }
+  function apply(scheme, save){
     if(!allowed[scheme]) scheme='mint';
     document.documentElement.setAttribute('data-theme', scheme);
     try{ localStorage.setItem(KEY, scheme); }catch(e){}
+    if(save) persist(scheme);
     var bar=document.getElementById('theme-bar');
     if(!bar) return;
     var buttons=bar.querySelectorAll('[data-theme-opt]');
@@ -244,16 +268,20 @@ export function themeScript(): string {
       b.setAttribute('aria-checked', String(b.getAttribute('data-theme-opt')===scheme));
     }
   }
-  var initial='mint';
-  try{ initial=localStorage.getItem(KEY)||'mint'; }catch(e){}
-  apply(initial);
+  // The server-rendered data-theme is the stored setting; trust it over the
+  // local echo, which may be a stale choice from before someone changed it.
+  var initial=document.documentElement.getAttribute('data-theme');
+  if(!initial||!allowed[initial]){
+    try{ initial=localStorage.getItem(KEY)||'mint'; }catch(e){ initial='mint'; }
+  }
+  apply(initial, false);
   var bar=document.getElementById('theme-bar');
   if(bar){
     bar.addEventListener('click', function(ev){
       var t=ev.target;
       if(!t||!t.getAttribute) return;
       var opt=t.getAttribute('data-theme-opt');
-      if(opt) apply(opt);
+      if(opt) apply(opt, true);
     });
   }
   window.__pomniaApplyTheme=apply;

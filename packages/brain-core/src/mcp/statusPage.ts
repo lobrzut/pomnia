@@ -26,14 +26,13 @@
  * CDN breaks loudly instead of quietly phoning out.
  */
 
+import { DEFAULT_COLOR_SCHEME, type ColorScheme } from '../admin/settings.js'
 import {
   BRAND_HEAD_LINKS,
   brandChromeCss,
   brandSkyHtml,
   brandSkyScript,
-  brandWordmarkHtml,
-  themeScript,
-  themeSwitcherHtml,
+  brandWordmarkHtml,
 } from './brandChrome.js'
 
 export type PageState = 'ok' | 'degraded' | 'down'
@@ -52,6 +51,17 @@ export interface StatusPageInfo {
   checks?: Array<{ name: string; state: PageState; detail?: string }>
   /** Absent or null when redacted — never fake `{files:0,chunks:0}`. */
   index?: { files: number; chunks: number } | null
+  /**
+   * Look of this page, from server settings. Set in the admin panel.
+   *
+   * This page used to carry its own Mint/Iris/Glass switcher, which wrote to
+   * the visitor's localStorage. That made the appearance of a server's status
+   * page a per-browser preference of whoever happened to open it: it did not
+   * survive another browser, said nothing about the server, and the person who
+   * actually runs the appliance had no way to set it. It is a setting, so it
+   * comes from settings and this page only applies it.
+   */
+  colorScheme?: ColorScheme
 }
 
 const esc = (s: string): string =>
@@ -90,7 +100,7 @@ export function renderStatusPage(info: StatusPageInfo): string {
   const detailed = !!info.checks?.length
 
   return `<!doctype html>
-<html lang="en" data-theme="mint">
+<html lang="en" data-theme="${esc(info.colorScheme ?? DEFAULT_COLOR_SCHEME)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -186,7 +196,6 @@ ${BRAND_HEAD_LINKS}
           ? 'Pomnia — operator view. Everything below is status; nothing here reads the vault.'
           : 'Pomnia is running. This is everything it will tell you without a token.'
       }</p>
-      <div class="theme-wrap">${themeSwitcherHtml()}</div>
     </header>
 
     <dl>
@@ -224,7 +233,7 @@ ${BRAND_HEAD_LINKS}
     </footer>
   </main>
   </div>
-<script>${themeScript()}${brandSkyScript()}</script>
+<script>${brandSkyScript()}</script>
 </body>
 </html>
 `

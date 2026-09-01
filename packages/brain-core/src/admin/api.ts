@@ -20,7 +20,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-import { readSettings, validateEmbedModel, validateOllamaUrl, writeSettings } from './settings.js'
+import { COLOR_SCHEMES, isColorScheme, readSettings, validateEmbedModel, validateOllamaUrl, writeSettings } from './settings.js'
 import { createToken, readTokens, revokeToken, summarise } from './tokens.js'
 import {
   changePassword,
@@ -137,7 +137,7 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
   }
 
   if (path === '/admin/settings' && method === 'PUT') {
-    const b = (req.body ?? {}) as { ollamaUrl?: unknown; embedModel?: unknown }
+    const b = (req.body ?? {}) as { ollamaUrl?: unknown; embedModel?: unknown; colorScheme?: unknown }
     const next = await readSettings(deps.dataDir)
     // Read before applying. Comparing after would compare the new value with
     // itself, and the warning below would never fire.
@@ -153,11 +153,21 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
       if (!v.ok) return j(400, { error: 'invalid_embed_model', detail: v.detail })
       next.embedModel = v.model
     }
+    if (b.colorScheme !== undefined) {
+      if (!isColorScheme(b.colorScheme)) {
+        return j(400, { error: 'invalid_color_scheme', detail: COLOR_SCHEMES.join(' | ') })
+      }
+      next.colorScheme = b.colorScheme
+    }
     next.updatedAt = new Date().toISOString()
     next.updatedBy = req.actor
     await writeSettings(deps.dataDir, next)
     deps.applyOllama({ ollamaUrl: next.ollamaUrl, embedModel: next.embedModel })
-    audit(req.actor, `settings → ollama=${next.ollamaUrl ?? '(unit)'} model=${next.embedModel ?? '(unit)'}`)
+    audit(
+      req.actor,
+      `settings → ollama=${next.ollamaUrl ?? '(unit)'} model=${next.embedModel ?? '(unit)'} ` +
+        `colors=${next.colorScheme ?? '(unit)'}`,
+    )
 
     // Changing the model invalidates every vector in the index, and an
     // incremental reindex will not notice: file contents did not change, so it

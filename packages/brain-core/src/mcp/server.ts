@@ -655,11 +655,19 @@ export async function createBrainServer(
           res.setHeader('referrer-policy', 'no-referrer')
           res.setHeader('x-content-type-options', 'nosniff')
           res.setHeader('cache-control', 'no-store')
-          res.end(
-            renderAdminPage(`${proto === 'https' ? 'https' : 'http'}://${host}`, {
-              distillFeature: config.distillEnabled !== false,
-            }),
-          )
+          // This handler is not async, and making the whole request path async
+          // for one cosmetic field would be a poor trade. A failed read simply
+          // falls back to the default look.
+          void readSettings(config.dataDir)
+            .catch(() => ({}) as Awaited<ReturnType<typeof readSettings>>)
+            .then((saved) => {
+              res.end(
+                renderAdminPage(`${proto === 'https' ? 'https' : 'http'}://${host}`, {
+                  distillFeature: config.distillEnabled !== false,
+                  colorScheme: saved.colorScheme,
+                }),
+              )
+            })
           return
         }
         // Public status page — moved off `/` so the homepage is login.
@@ -712,6 +720,7 @@ export async function createBrainServer(
                 writable: health.writable,
                 vaultOwner: health.vaultOwner,
                 uptimeSec: health.uptimeSec,
+                colorScheme: (await readSettings(config.dataDir)).colorScheme,
                 ...(authed
                   ? {
                       ...(health.index ? { index: health.index } : {}),

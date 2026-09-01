@@ -303,15 +303,25 @@ Document encryption is paid **at import time only**, never in the search loop:
 | `Import.tsx` | chat exports only |
 | `brainCore.ts` | utilityProcess/fork embedded, reindex of the distilled dir |
 
-### 6.5 Homelab Brain (`reliqua-brain-hub`)
+### 6.5 Homelab Brain (`@pomnia/brain-core`)
+
+The same package the Desktop embeds, run as a container against a vault on the
+network. One Node process serves MCP, admin and health on a single port.
 
 | Element | Role |
 |---------|------|
-| `pipeline/rag.py` | PDF/EPUB/DOCX extraction + chunk + embed |
-| `dashboard/app.py` | `/api/library/upload`, `/api/library/reindex` |
-| `dashboard/mcp_rag.py` | MCP tools for agents |
-| `data/library/` | Book and PDF originals (42 documents today) |
-| `data/vault/distilled/` | Distilled notes |
+| `rag/indexer.ts` | Chunk + embed; `INDEX_SUBDIRS` decides what is indexed at all |
+| `rag/search.ts` | Hybrid semantic + keyword search over `library.db` |
+| `rag/grounding.ts` | Labels a result set `strong` / `lexical` / `none` |
+| `mcp/tools/` | The tools agents call — `search_library`, `get_user_profile`, … |
+| `admin/api.ts` | `/admin/*`: tokens, settings, reindex |
+| `<vault>/library/` | Book and PDF originals |
+| `<vault>/distilled/` | Distilled notes |
+
+> This section used to describe `reliqua-brain-hub`: `pipeline/rag.py`,
+> `dashboard/app.py` and `dashboard/mcp_rag.py`, a Python stack fronted by
+> supergateway and an auth proxy. It has been replaced by brain-core and none of
+> those files exist any more.
 
 ---
 
