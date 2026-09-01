@@ -193,7 +193,7 @@ If your agents connect to a brain-core on another machine, the server-side fixes
 Compare the SHA256 of the installer against this value before running it:
 
 ```
-bdc5ad038ca9c7a386f727109df2b2fef8e26ff287563f2aef3679d5f7808c2b
+07c977b1f3d94dc03e3d0bb423fa16d929eddf91b1c996c5652115702ecba6ba
 ```
 
 ```powershell
