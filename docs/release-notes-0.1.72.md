@@ -56,10 +56,14 @@ If your agents connect to a brain-core on another machine, the three anti-drift 
 
 ## Verifying the download
 
-Compare the SHA256 of the installer against the value published with this release before running it.
+Compare the SHA256 of the installer against this value before running it:
+
+```
+326b0393e82a50748d74ae83a6f222e0cb5ea2fa6c5f3b968c0702200f5509c4
+```
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Pomnia-Setup-0.1.72.exe
+Get-FileHash -Algorithm SHA256 .\Pomnia-0.1.72-setup.exe
 ```
 
 The build is unsigned, so Windows SmartScreen will warn. "More info" → "Run anyway" is the expected path; the hash is what actually tells you the file is the one that was built.
