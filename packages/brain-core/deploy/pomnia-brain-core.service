@@ -27,6 +27,17 @@ Group=pomnia
 WorkingDirectory=/opt/pomnia-brain-core
 
 ; KVM product default: ONNX nomic embed (~0.5 GB), no chat model, no Ollama.
+# Distillation is off unless this host actually has a chat model to run it.
+#
+# The installer defaults to fastembed and never pulls a chat model, which is
+# the whole point of the appliance: search on a NAS, no GPU, no Ollama. But
+# distill defaults to on and its only precondition was a non-empty Ollama URL,
+# and the config default is http://127.0.0.1:11434 whether or not anything
+# listens there. So a plain install reported distill enabled, runnable and
+# idle on a machine with no Ollama installed, and failed on every attempt.
+#
+# install.sh rewrites this to 1 when run with --with-ollama.
+Environment=BRAIN_DISTILL=0
 Environment=BRAIN_EMBED_BACKEND=fastembed
 Environment=BRAIN_EMBED_CACHE=/var/lib/pomnia/embed-cache
 

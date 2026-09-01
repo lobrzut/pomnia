@@ -20,6 +20,9 @@ VAULT_ROOT=""
 USER_NAME=pomnia
 PORT=7865
 EMBED_BACKEND=fastembed
+# Off by default: this installer never pulls a chat model, so there is
+# nothing for distill to run. --with-ollama turns it on.
+DISTILL=0
 UNIT=/etc/systemd/system/pomnia-brain-core.service
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -32,7 +35,10 @@ while [[ $# -gt 0 ]]; do
     --embed-backend) EMBED_BACKEND="$2"; shift 2 ;;
     # Consent up front, for a run with no terminal attached. There is no
     # --no-ollama: doing nothing is already the default when nobody says yes.
-    --with-ollama) WITH_OLLAMA=1; EMBED_BACKEND=ollama; shift ;;
+    # Distill follows the same rule: off unless this host has a model to
+    # run it. A server claiming a capability nobody installed is worse
+    # than one that says plainly it cannot do it.
+    --with-ollama) WITH_OLLAMA=1; EMBED_BACKEND=ollama; DISTILL=1; shift ;;
     -h|--help) sed -n '3,16p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
@@ -140,6 +146,7 @@ sed -e "s|--port 7865|--port $PORT|" \
     -e "s|/var/lib/pomnia/vault|$VAULT_ROOT|g" \
     -e "s|/var/lib/pomnia|$DATA|g" \
     -e "s|BRAIN_EMBED_BACKEND=fastembed|BRAIN_EMBED_BACKEND=$EMBED_BACKEND|" \
+    -e "s|BRAIN_DISTILL=0|BRAIN_DISTILL=$DISTILL|" \
     "$SRC/deploy/pomnia-brain-core.service" > "$UNIT"
 
 # ProtectSystem=strict only allows writes under ReadWritePaths. A vault on its
