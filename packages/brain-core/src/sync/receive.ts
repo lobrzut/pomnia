@@ -206,6 +206,47 @@ export async function conflictSuffixPath(vaultRoot: string, relative: string): P
   throw new Error(`no free conflict suffix for ${relative}`)
 }
 
+/**
+ * A conflict copy already holding exactly these incoming bytes, if there is one.
+ *
+ * Recording a conflict does not resolve it. Both sides keep their own `X.md`,
+ * so the next sync sees the same disagreement and writes `X-3.md`, then
+ * `X-4.md` — one more on every run, for as long as nobody merges by hand. Two
+ * checkpoints on a live vault reached `-9` in a day and a half, five of those
+ * copies produced overnight while nothing was being edited at all. Each copy
+ * also enters the index, so one note answers a search several times.
+ *
+ * The disagreement is worth recording once. Recording it again says nothing new
+ * and costs a file, an index entry and a duplicate search result every time.
+ * So: if some `X-N.md` already carries exactly what is arriving, this conflict
+ * is on record — point at it and write nothing.
+ *
+ * Compared ignoring CR, for the same reason the conflict test itself is: two
+ * machines that disagree about line endings have not disagreed about content.
+ */
+async function recordedConflictPath(
+  vaultRoot: string,
+  relative: string,
+  incoming: Buffer,
+): Promise<string | null> {
+  const dir = dirname(relative)
+  const base = basename(relative)
+  const ext = extname(base)
+  const stem = ext ? base.slice(0, -ext.length) : base
+  const wanted = withoutCr(incoming)
+  for (let n = 2; n < 1000; n++) {
+    const candidate = dir === '.' ? `${stem}-${n}${ext}` : `${dir}/${stem}-${n}${ext}`
+    let existing: Buffer
+    try {
+      existing = await fs.readFile(join(vaultRoot, candidate))
+    } catch {
+      return null // first gap: nothing further along can exist either
+    }
+    if (withoutCr(existing).equals(wanted)) return candidate
+  }
+  return null
+}
+
 async function writeAtomic(abs: string, content: Buffer): Promise<void> {
   await fs.mkdir(dirname(abs), { recursive: true })
   const tmp = `${abs}.sync-tmp`
@@ -310,6 +351,17 @@ export async function applyFile(opts: {
       return { ok: true, path: verdict.relative, bytes: opts.content.length, unchanged: true }
     }
     if (existingHash !== null) {
+      // Already on record? Then this is the same disagreement, not a new one.
+      const recorded = await recordedConflictPath(opts.vaultRoot, verdict.relative, opts.content)
+      if (recorded !== null) {
+        return {
+          ok: true,
+          path: recorded,
+          bytes: opts.content.length,
+          unchanged: true,
+          conflict: { kept: verdict.relative, wrote: recorded },
+        }
+      }
       const alt = await conflictSuffixPath(opts.vaultRoot, verdict.relative)
       const altVerdict = safeVaultPath(alt)
       if (!altVerdict.ok) {
