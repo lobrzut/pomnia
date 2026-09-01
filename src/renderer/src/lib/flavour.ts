@@ -6,9 +6,15 @@
  * `full` is the app as it has always been: it reads the assistants' own stores,
  * distils on a local GPU, imports documents, and can run a brain inside itself.
  *
- * `mini` is the other half of a self-hosted pair. It holds the encrypted vault,
- * wires MCP into the agents, and replicates to a brain-core running elsewhere.
- * It has no brain of its own, no Ollama, no distiller and no importer.
+ * `mini` is the other half of a self-hosted pair. It wires MCP into the agents
+ * and nothing else: no brain, no Ollama, no distiller, no importer -- and no
+ * vault. The memory lives on the server the agents query, so a second
+ * encrypted store here would be a second thing to disagree with it, and the
+ * only guard against two Pomnias opening one vault is Electron's
+ * single-instance lock -- which is keyed on userData and does not see two
+ * builds with different identities.
+ *
+ * Connect, the whole reason Mini exists, touches `vault` once: in a comment.
  *
  * The split is not a guess about what people need. Measured on a live vault:
  * before MCP existed, 1626 notes were distilled because there was no other way

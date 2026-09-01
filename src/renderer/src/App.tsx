@@ -196,12 +196,20 @@ export default function App() {
       {/* First run: full setup wizard. After that: plain lock gate when the vault is closed. */}
       {/* No exit animation on full-screen gates — AnimatePresence left a z-40 overlay at opacity 0 that still captured clicks. */}
       {/*
-        Mini has no onboarding. The wizard walks through sources, Ollama and a
-        VRAM profile — every one of which belongs to the half Mini does not
-        ship. Its first run is the vault gate and then Connect, which is the
-        whole of what it does.
+        Mini has neither onboarding nor a vault.
+
+        The wizard walks through sources, Ollama and a VRAM profile, all of
+        which belong to the half Mini does not ship. The vault is the sharper
+        point: the memory lives on the server the agents query, so a second
+        encrypted store on this machine would be a second thing to disagree
+        with it — and the only guard against two Pomnias opening one vault is
+        Electron's single-instance lock, which is keyed on userData and
+        therefore does not see two builds with different identities.
+
+        Connect needs none of it: the whole page touches `vault` once, in a
+        comment. So Mini opens straight onto the one thing it does.
       */}
-      {!isMini && !onboarded ? <Onboarding /> : !vault.open ? <VaultGate /> : null}
+      {isMini ? null : !onboarded ? <Onboarding /> : !vault.open ? <VaultGate /> : null}
       <Toasts />
     </div>
   )

@@ -15,6 +15,7 @@ import { UI_LOCALES, type UiLocale } from '../lib/uiLocale'
 import { useStore, ollamaUrlFromBrainUrl, ollamaUrlLooksLocal } from '../store/useStore'
 import { isMcpClientActive } from '../lib/mcpClientVisibility'
 import { hasOllamaModel as hasModel } from '@core/brain/modelMatch'
+import { isMini } from '../lib/flavour'
 import type { ClientId } from '../lib/types'
 
 const ALL_CLIENTS: ClientId[] = ['claude-code', 'cursor', 'antigravity', 'claude-desktop', 'vscode', 'windsurf', 'hermes']
@@ -44,12 +45,15 @@ function HealthCheck() {
     setChecking(true)
     const next: HealthRow[] = []
     try {
-      next.push({
-        id: 'vault',
-        label: labels.healthVault,
-        ok: vault.open,
-        detail: vault.open ? vault.path ?? vault.name ?? labels.healthOk : labels.healthVaultAction
-      })
+      // A vault Mini does not have is not a vault in a bad state.
+      if (!isMini) {
+        next.push({
+          id: 'vault',
+          label: labels.healthVault,
+          ok: vault.open,
+          detail: vault.open ? vault.path ?? vault.name ?? labels.healthOk : labels.healthVaultAction
+        })
+      }
 
       let status = null
       try {
@@ -707,6 +711,8 @@ export default function Settings() {
 
       <HealthCheck />
 
+      {/* Mini has no vault: the memory lives on the server the agents query. */}
+      {!isMini && (
       <GlassCard className="mb-4 p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
           <Vault className="h-4 w-4 text-mint" /> {labels.vault}
@@ -728,6 +734,7 @@ export default function Settings() {
           <p className="text-sm text-ink-faint">{labels.knowledgePathLocked}</p>
         )}
       </GlassCard>
+      )}
 
       <GlassCard className="mb-4 p-5">
         <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
