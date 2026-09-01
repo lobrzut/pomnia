@@ -36,3 +36,50 @@ describe('appliance install defaults', () => {
     expect(deploy('install.sh')).toContain('BRAIN_DISTILL=$DISTILL')
   })
 })
+
+/**
+ * Distillation on a machine with no GPU is not impossible, it is
+ * non-interactive. Measured on the reference appliance (i5-6600T, four cores):
+ * 654 s per note against 9.2 s on a desktop GPU. The vault behind that number
+ * records a median of 3 notes a day and 13 at the 90th percentile across 359
+ * days, and an eight-hour night fits 44 — so a timer keeps up with fifteen
+ * times the median day while nobody is using the box.
+ */
+describe('nightly distillation', () => {
+  it('runs the one-shot distiller rather than a server', () => {
+    expect(deploy('pomnia-distill.service')).toContain('daemon.js --distill')
+    expect(deploy('pomnia-distill.service')).toContain('Type=oneshot')
+  })
+
+  it('never gets killed halfway', () => {
+    // A note half-written has to be redone from the top, so a run that is cut
+    // short leaves the queue exactly where it was, every night.
+    expect(deploy('pomnia-distill.service')).toContain('TimeoutStartSec=0')
+  })
+
+  it('yields to anyone actually using the machine', () => {
+    // The point of running at night is to be invisible; a search arriving at
+    // 3am must still be answered.
+    const unit = deploy('pomnia-distill.service')
+    expect(unit).toContain('Nice=19')
+    expect(unit).toContain('IOSchedulingClass=idle')
+    expect(unit).toContain('CPUSchedulingPolicy=idle')
+  })
+
+  it('survives a box that was switched off overnight', () => {
+    // Without Persistent the queue just grows and nothing says why.
+    expect(deploy('pomnia-distill.timer')).toContain('Persistent=true')
+  })
+
+  it('is installed only when a model was installed with it', () => {
+    const sh = deploy('install.sh')
+    expect(sh).toContain('if [[ "$DISTILL" == "1" ]]; then')
+    expect(sh).toContain('systemctl enable --now pomnia-distill.timer')
+  })
+
+  it('removes the timer when distillation is turned back off', () => {
+    // A nightly run against a host with no model would fail every night,
+    // forever, and nothing would be watching.
+    expect(deploy('install.sh')).toContain('systemctl disable --now pomnia-distill.timer')
+  })
+})

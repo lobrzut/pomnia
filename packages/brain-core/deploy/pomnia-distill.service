@@ -1,0 +1,62 @@
+; SPDX-License-Identifier: AGPL-3.0-only
+; One distillation pass over the inbox. Driven by pomnia-distill.timer.
+;
+; Why this exists as a timer rather than something the server does when work
+; arrives: measured on the reference appliance (Intel i5-6600T, four cores, no
+; GPU), llama3.1:8b takes 654 s per note against 9.2 s on a desktop GPU. Three
+; quarters of that is reading the transcript, not writing the note, so a shorter
+; prompt or a terser model buys far less than it looks.
+;
+; That rules out distilling on request, and does not rule out distilling at all.
+; The vault this was measured against records a median of 3 notes a day, 6 at
+; the 75th percentile and 13 at the 90th, across 359 days. An eight-hour night
+; fits 44. So the appliance keeps up with fifteen times its median day while
+; nobody is using it, and the honest limit is a catch-up: the one 206-note day
+; in that history would take five nights.
+;
+; Requires a chat model on this host, so install.sh only installs this unit with
+; --with-ollama. Without it the appliance searches and does not distil.
+
+[Unit]
+Description=Pomnia — distil queued conversations into notes
+Documentation=https://pomnia.ai
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=pomnia
+Group=pomnia
+ExecStart=/usr/bin/node /opt/pomnia-brain-core/dist/daemon.js --distill --data-dir /var/lib/pomnia --vault-root /var/lib/pomnia/vault
+
+; A run is long by design and must not be killed halfway: a note half-written is
+; a note that has to be redone from the top, and the queue would never drain.
+TimeoutStartSec=0
+
+; The whole point of running at night is to be invisible. Nice + idle I/O means
+; a search arriving at 3am is still answered promptly, because the distiller
+; yields rather than competing for the same four cores.
+Nice=19
+IOSchedulingClass=idle
+CPUSchedulingPolicy=idle
+
+Environment=BRAIN_EMBED_BACKEND=fastembed
+Environment=BRAIN_EMBED_CACHE=/var/lib/pomnia/embed-cache
+
+; Same sandbox as the server. ProtectSystem=strict makes everything read-only
+; except the paths below, which install.sh appends when the vault lives on its
+; own mount.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+ReadWritePaths=/var/lib/pomnia

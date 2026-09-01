@@ -1,0 +1,26 @@
+; SPDX-License-Identifier: AGPL-3.0-only
+; Nightly distillation on a machine without a GPU.
+
+[Unit]
+Description=Pomnia — nightly distillation
+Documentation=https://pomnia.ai
+
+[Timer]
+; 03:00, because the run needs the machine to itself. On the reference hardware
+; a note costs 654 s of four cores; the median day's three notes are done in
+; half an hour, and a 90th-percentile day of thirteen in under two and a half.
+OnCalendar=*-*-* 03:00:00
+
+; A homelab box is often off overnight. Without this the queue simply grows and
+; nothing ever says why -- the exact silence this project keeps removing.
+Persistent=true
+
+; Half an hour of jitter so a rack of these does not all wake on the same
+; second, and so the run does not start on the same tick as every other daily
+; timer on the host.
+RandomizedDelaySec=30m
+
+Unit=pomnia-distill.service
+
+[Install]
+WantedBy=timers.target

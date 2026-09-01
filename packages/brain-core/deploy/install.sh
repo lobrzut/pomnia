@@ -165,10 +165,39 @@ case "$VAULT_REAL" in
     ;;
 esac
 
+# Nightly distillation, only where there is a model to run it.
+#
+# Measured on the reference appliance (i5-6600T, four cores, no GPU):
+# 654 s per note against 9.2 s on a desktop GPU, three quarters of it spent
+# reading the transcript rather than writing the note. That rules out
+# distilling on request. It does not rule out distilling: the vault behind
+# those numbers records a median of 3 notes a day and 13 at the 90th
+# percentile, and an eight-hour night fits 44. The box keeps up while nobody
+# is using it.
+if [[ "$DISTILL" == "1" ]]; then
+  sed -e "s|/opt/pomnia-brain-core|$PREFIX|g" -e "s|/var/lib/pomnia/vault|$VAULT_ROOT|g" -e "s|/var/lib/pomnia|$DATA|g" -e "s|^User=pomnia$|User=$USER_NAME|" -e "s|^Group=pomnia$|Group=$USER_NAME|" "$SRC/deploy/pomnia-distill.service" > /etc/systemd/system/pomnia-distill.service
+  cp "$SRC/deploy/pomnia-distill.timer" /etc/systemd/system/pomnia-distill.timer
+  # A vault on its own mount needs listing here too, for the same reason the
+  # server unit does: ProtectSystem=strict blocks every other write.
+  case "$VAULT_REAL" in
+    "$DATA_REAL"/*) ;;
+    *) printf "ReadWritePaths=%s\n" "$VAULT_REAL" >> /etc/systemd/system/pomnia-distill.service ;;
+  esac
+else
+  # Leave nothing behind from an earlier --with-ollama run: a timer firing
+  # nightly against a host with no model would fail every night, forever.
+  systemctl disable --now pomnia-distill.timer >/dev/null 2>&1 || true
+  rm -f /etc/systemd/system/pomnia-distill.service /etc/systemd/system/pomnia-distill.timer
+fi
+
 systemctl daemon-reload
 ok "unit written to $UNIT"
 
 systemctl enable pomnia-brain-core >/dev/null
+if [[ "$DISTILL" == "1" ]]; then
+  systemctl enable --now pomnia-distill.timer >/dev/null
+  ok "nightly distillation enabled (03:00) - systemctl list-timers pomnia-distill"
+fi
 systemctl restart pomnia-brain-core
 
 # Verify rather than announce. An installer that prints "done" over a service
