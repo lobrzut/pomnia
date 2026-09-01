@@ -1,4 +1,4 @@
-> **No re-chunk, no reindex required.** This is a code swap. One thing is worth a reindex afterwards, and 0.1.73 will now tell you when: see *Recall could quote a note you deleted*.
+> **No re-chunk, no reindex required.** This is a code swap. One thing is worth a reindex afterwards, and 0.1.74 will now tell you when: see *Recall could quote a note you deleted*.
 
 ## Two controls that could never have worked
 
@@ -44,6 +44,26 @@ A disagreement is now recorded once. Before writing a new copy, Pomnia looks for
 
 If your vault already carries `-2`…`-9` copies from the old behaviour, the first sync after upgrading will **not** add another one on top. Those existing copies are yours to delete — check them first, since some may hold content the base file does not.
 
+## Conversations were being titled with the clock
+
+A conversation's title is its first user message, and clients wrap that message in metadata before the person's actual words — `<timestamp>Sunday, Aug 30, 2026, 9:52 PM (UTC+2)</timestamp>`. Taking the first 80 characters therefore titled the conversation with the time it happened, and that title becomes the note's filename.
+
+On a live vault this had reached **417 of 2192 distilled notes — 19%**, named after when they happened rather than what they were about. Search embeddings come from the note body, so those notes stayed findable by meaning; but the filename is what keyword scoring matches against, at the highest keyword weight there is. They carried a strong signal for the word "timestamp" and none at all for their subject. It showed in the UI too, as a raw tag in the distillation progress line.
+
+Leading metadata blocks are now stripped before the title is taken, and only for the title — a question with markup in the middle is still distilled intact. When nothing usable remains, the conversation id is used instead: an id is merely opaque, while a date dressed up as a subject looks like it means something.
+
+This fixes new imports. Notes already named this way keep their filenames; their real subject is in the body, and a rename is a decision about your own vault rather than something an upgrade should do to it.
+
+## The Max profile is gone
+
+It offered a 32B model at 20 GB on the assumption that a bigger model writes a better note — the same assumption the measurement one size class down had already refuted: `llama3.1:8b` scored 6.853 against the 14B's 5.838 and ran about twice as fast.
+
+Nothing had ever tested the 32B, and on the hardware here it cannot be: a 32B has to be split across two 12 GB cards, which makes the throughput figure a measurement of PCIe rather than of the model. Its other claim — the longest context — answers a problem nobody has, with prompts measuring around 4062 tokens against a window of 8192.
+
+A tier that promises quality, cannot be measured, and carries small print admitting so is the same failure the rest of this work has been removing: a confident label with nothing behind it. With a 24 GB card, run Standard and keep the card free.
+
+**Lite stays**, described as what it is — not the bottom of a quality ladder, but the only model that runs on a 4–6 GB card.
+
 ## Cards no longer get sliced while they arrive
 
 The source cards on the dashboard animate in from 6px below, inside a scrolling column that had 4px of room underneath. The bottom row was clipped for the ~280ms of its own entrance, and its glow stayed clipped afterwards.
@@ -60,6 +80,8 @@ Pomnia is two programs that update independently. Installing the desktop app doe
 | Cards not clipped on entry | ✅ | — |
 | Recall withholds deleted notes | — | ✅ |
 | Conflicts recorded once, not per sync | ✅ | ✅ |
+| Titles no longer taken from the timestamp | ✅ | — |
+| Max profile removed | ✅ | — |
 | `/healthz` reports orphaned index entries | — | ✅ |
 | Reminder when the vault has gone quiet | — | ✅ |
 
@@ -74,7 +96,7 @@ Compare the SHA256 of the installer against this value before running it:
 ```
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Pomnia-0.1.73-setup.exe
+Get-FileHash -Algorithm SHA256 .\Pomnia-0.1.74-setup.exe
 ```
 
 The build is unsigned, so Windows SmartScreen will warn. "More info" → "Run anyway" is the expected path; the hash is what actually tells you the file is the one that was built.
