@@ -108,6 +108,27 @@ export type PathRejection =
  */
 const MACHINE_STATE_FILES = new Set(['vault-writer.json'])
 
+/**
+ * Generated catalogues, keyed by exact relative path.
+ *
+ * skills/index.json lists every skill with a `localPath` — an absolute path on
+ * the machine that wrote it, `C:\Vault\skills\…` on one side and
+ * `/var/lib/pomnia/vault/skills/…` on the other. It therefore cannot ever agree
+ * across two machines: the file's whole job is to record where it was made.
+ *
+ * Replicating it produced a conflict on literally every sync. On the live vault
+ * it had reached index-19.json, and those nineteen copies held five distinct
+ * contents between them — the rest were re-recordings of a disagreement that
+ * had already been recorded, which is what conflict dedup now prevents. But
+ * dedup only slows this file down; it can never settle, because each side is
+ * right about its own paths.
+ *
+ * Every machine regenerates this from its own skills directory, so nothing is
+ * lost by never sending it. Same principle as the ownership marker above: this
+ * describes the machine, not the memory.
+ */
+const GENERATED_FILES = new Set(['skills/index.json'])
+
 export type PathVerdict = { ok: true; relative: string } | { ok: false; reason: PathRejection }
 
 /** Deeper than this is not a vault layout we produce. */
@@ -179,6 +200,7 @@ export function safeVaultPath(input: string): PathVerdict {
   if (head === 'state' && MACHINE_STATE_FILES.has(segments[segments.length - 1])) {
     return { ok: false, reason: 'machine-state' }
   }
+  if (GENERATED_FILES.has(raw)) return { ok: false, reason: 'machine-state' }
 
   // Belt and braces: after all of the above, normalising must be a no-op.
   const normalized = normalize(raw).split(sep).join('/')

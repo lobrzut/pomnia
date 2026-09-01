@@ -164,8 +164,13 @@ describe('collectOverview', () => {
   // a timeout that said nothing about the gap arithmetic it actually checks.
   it('reports the gap between disk and index', async () => {
     for (let i = 0; i < 10; i++) await put(`sessions/n${i}.md`, 'x')
-    // Not indexable, so it must not widen the gap.
-    for (let i = 0; i < 700; i++) await put(`skills/s${i}.md`, 'x')
+    // Not indexable, so these must not widen the gap. Sixty is already far
+    // past the tolerance — max(10, 2% of what is on disk) — so counting them
+    // would fail this loudly. It used to write 700, mirroring the size of a
+    // real skills folder, and that cost 710 sequential file creations: two
+    // seconds alone and past the 30s timeout when the suite runs in parallel
+    // on Windows. The assertion is about a category, not a volume.
+    for (let i = 0; i < 60; i++) await put(`skills/s${i}.md`, 'x')
     const o = await collectOverview({
       db: db(4, 12),
       vaultRoot: root,
