@@ -12,6 +12,7 @@
 
 import type Database from 'better-sqlite3'
 import { readFileSync } from 'node:fs'
+import { afterCall, freshState, type UnsavedState } from '../unsavedWork.js'
 import type { EmbedClient } from '../../rag/embed.js'
 import { indexFiles } from '../../rag/indexer.js'
 
@@ -202,7 +203,39 @@ export function listTools(
  * Dispatch a `tools/call` — returns the tool's text response (string).
  * Unknown tools throw so the MCP server can convert to a proper error.
  */
+/**
+ * Serve one tool call, then say whether the vault has gone quiet.
+ *
+ * The reminder rides on the result of whatever the agent called anyway,
+ * because there is no other channel: an agent whose context ends does not get
+ * to say goodbye, and this server never learns the session existed. See
+ * unsavedWork.
+ */
 export async function callTool(
+  name: string,
+  args: unknown,
+  ctx: ToolContext,
+): Promise<string> {
+  const out = await dispatchTool(name, args, ctx)
+  const decision = afterCall({
+    tool: name,
+    state: unsavedState,
+    now: Date.now(),
+    autoCheckpointEnabled: ctx.autoCheckpointEnabled !== false,
+  })
+  unsavedState = decision.next
+  return decision.reminder ? out + decision.reminder : out
+}
+
+/** Process-wide; the reminder is a fact about the vault, not about a session. */
+let unsavedState: UnsavedState = freshState(Date.now())
+
+/** Test seam — otherwise one case's counters carry into the next. */
+export function resetUnsavedState(now: number = Date.now()): void {
+  unsavedState = freshState(now)
+}
+
+async function dispatchTool(
   name: string,
   args: unknown,
   ctx: ToolContext,
