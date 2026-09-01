@@ -260,7 +260,14 @@ export default function Dashboard() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="grid grid-cols-2 gap-2 pb-1">
+        {/*
+          pb-2, not pb-1: GlassCard enters from y:6 and this grid is inside an
+          overflow-y-auto column, so 4px of bottom padding is 2px short of the
+          entrance offset. The bottom row got sliced for the ~280ms of its own
+          animation, and the glow below it stayed clipped after. Keep this at
+          least the entrance distance if that value ever changes.
+        */}
+        <div className="grid grid-cols-2 gap-2 px-0.5 pb-2">
           {scanning && installed.length === 0 ? (
             Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="skeleton h-[72px] rounded-[var(--radius-xl)]" />
