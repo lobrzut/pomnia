@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
 import { create } from 'zustand'
+import { resolveConnectToken } from '@core/brain/tokenPrecedence'
 import { VRAM_PROFILES } from '@core/brain/profiles'
 import { DISTILLABLE_SOURCES } from '@core/brain/distillSources'
 import { EMBEDDED_BRAIN_DEFAULT_URL } from '@core/brain/snippet'
@@ -694,9 +695,13 @@ export const useStore = create<State>((set, get) => ({
       if (!hasLocalStorageKey(BRAIN_DEPLOY_URL_KEY) && s.brainDeployUrl) {
         saveStr(BRAIN_DEPLOY_URL_KEY, s.brainDeployUrl)
       }
-      if (!hasLocalStorageKey(CONNECT_TOKEN_KEY) && s.connectToken) {
-        saveStr(CONNECT_TOKEN_KEY, s.connectToken)
-      }
+      // The token is the one setting where the file outranks localStorage.
+      // Rule and reasoning live in resolveConnectToken.
+      const tokenVerdict = resolveConnectToken({
+        fileToken: s.connectToken,
+        cachedToken: loadStr(CONNECT_TOKEN_KEY),
+      })
+      if (tokenVerdict.refreshCache) saveStr(CONNECT_TOKEN_KEY, tokenVerdict.token)
       if (!hasLocalStorageKey(OLLAMA_URL_KEY) && s.ollamaUrl) {
         saveOllamaUrl(s.ollamaUrl)
       }
@@ -706,7 +711,7 @@ export const useStore = create<State>((set, get) => ({
         ? state.brainTarget
         : (s.brainTarget ?? state.brainTarget)
       const brainDeployUrl = state.brainDeployUrl || s.brainDeployUrl || loadBrainDeployUrl()
-      const connectToken = state.connectToken || s.connectToken || loadStr(CONNECT_TOKEN_KEY)
+      const connectToken = tokenVerdict.token || state.connectToken
       const ollamaUrl = state.ollamaUrl || s.ollamaUrl || ''
       const colorScheme = isColorScheme(s.colorScheme) ? s.colorScheme : 'mint'
       applyColorScheme(colorScheme)
