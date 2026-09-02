@@ -37,7 +37,12 @@ export interface OcrOptions {
 
 export interface OcrResult {
   method: OcrMethod
+  /** Pages that survived the quality floor. */
   pages: { page: number; text: string }[]
+  /** How many pages were OCR'd before filtering. */
+  attempted?: number
+  /** How many of those were dropped as picture-noise. */
+  dropped?: number
   /** Pages that were sent to OCR. */
   ocrPageNumbers: number[]
 }
@@ -230,12 +235,49 @@ export async function runOcr(pdfPath: string, opts?: OcrOptions): Promise<OcrRes
     opts?.onProgress?.({ done: i + 1, total: pageNums.length, page })
   }
 
+  // Keep only pages that read like text. Reporting the drop count matters:
+  // '20 pages OCR'd' and '11 pages kept' are different facts, and the second
+  // is the one that says what the memory actually gained.
+  const kept = pages.filter(
+    (p) => p.text.trim().length >= OCR_MIN_CHARS && pageTextQuality(p.text) >= OCR_QUALITY_FLOOR,
+  )
+
   return {
-    method: pages.some((p) => p.text.length > 0) ? 'tesseract' : 'none',
-    pages,
+    method: kept.length > 0 ? 'tesseract' : 'none',
+    pages: kept,
     ocrPageNumbers: pageNums,
+    attempted: pages.length,
+    dropped: pages.length - kept.length,
   }
 }
+
+/**
+ * How much of a page reads like words rather than like a picture.
+ *
+ * OCR run over a diagram returns confident nonsense: a page of a chess book
+ * came back as `Se ake ase 0 oo / Tir are EZ eda eC / aie. |`. Nothing was
+ * filtering that, so it reached the vault, got indexed, and became something
+ * search could return as knowledge — the exact failure this project keeps
+ * removing elsewhere.
+ *
+ * Measured on that book, 20 pages OCR'd: real prose scored 0.57 to 0.85,
+ * including a table of contents full of dot leaders. The two picture pages
+ * scored 0.05 and 0.22. The gap is wide enough to cut in the middle and not
+ * lose anything that was worth keeping.
+ */
+export function pageTextQuality(text: string): number {
+  const tokens = text.split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return 0
+  const wordish = tokens.filter(
+    (t) => t.length >= 3 && [...t].filter((c) => /\p{L}/u.test(c)).length / t.length >= 0.7,
+  ).length
+  return wordish / tokens.length
+}
+
+/** Below this a page is a picture the OCR guessed at, not text. */
+export const OCR_QUALITY_FLOOR = 0.45
+/** Shorter than this there is nothing to judge, and nothing worth keeping. */
+export const OCR_MIN_CHARS = 40
 
 /** True when Tier 1 extraction looks like a scan (sparse text layer). */
 export function suggestOcr(parsed: Pick<ParsedDocument, 'meta' | 'format'>): boolean {

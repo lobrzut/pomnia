@@ -210,22 +210,33 @@ export async function ingestFiles(
         // nothing.
         let doc = parsed
         let ocrNote = ''
+        // Pages that actually carry text. Dividing the character count by
+        // every page in the file reported 137 chars/page for a book where
+        // 127 of 147 pages were blank — a number that described nothing.
+        let textPages = 0
         if (opts.ocr && doc.meta.sparse && doc.format === 'pdf') {
           try {
             const pages = Math.max(1, opts.ocrPages ?? 3)
             const ocr = await runOcr(p, { prefer: 'tesseract', maxPages: pages })
             if (ocr.method !== 'none' && ocr.pages.length > 0) {
               doc = applyOcrToDocument(doc, ocr)
-              // Say how many pages were actually read. 'OCR' on its own
-              // implies the whole document, and it is not.
-              ocrNote = ` — OCR: ${ocr.pages.length}/${parsed.meta.pageCount} str.`
+              textPages = ocr.pages.length
+              // Say what was read and what was thrown away. OCR over a
+              // diagram returns confident nonsense, and '20 pages read' with
+              // 9 of them discarded is a different fact from '20 pages of
+              // book'.
+              const dropped = ocr.dropped ?? 0
+              ocrNote =
+                ` — OCR: ${ocr.pages.length}/${parsed.meta.pageCount} str.` +
+                (dropped ? `, odrzucone jako obrazki: ${dropped}` : '')
             }
           } catch (e) {
             log.warn('ocr failed for', name, e)
           }
         }
 
-        const perPage = doc.meta.charCount / Math.max(1, doc.meta.pageCount)
+        const countedPages = textPages || doc.meta.pageCount
+        const perPage = doc.meta.charCount / Math.max(1, countedPages)
         if (doc.meta.charCount === 0) {
           files.push({
             file: name,
@@ -263,7 +274,7 @@ export async function ingestFiles(
           // staged — partial text beats none — but it says so.
           detail:
             `${extractionPathLabel(doc)}, ${doc.meta.pageCount} str., ` +
-            `${Math.round(perPage)} zn./str.` +
+            `${Math.round(perPage)} zn./str. z ${countedPages}` +
             (doc.meta.sparse ? ' — rzadki tekst, prawdopodobnie skan' : '') +
             ocrNote,
         })
