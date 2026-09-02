@@ -72,6 +72,9 @@ import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused 
 import { checkForUpdate, describeUpdate } from './updateCheck.js'
 import { buildDataLocationsSnapshot, detectInstallForm } from '@core/dataLocations.js'
 import { pushRemoteBehaviour } from '@core/brain/remoteBehaviour.js'
+
+/** Mini has no brain of its own, so every target it can have is remote. */
+const IS_MINI = import.meta.env?.MAIN_VITE_POMNIA_FLAVOUR === 'mini'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { runDocumentOcr } from './docOcr.js'
 import { removeLibraryDocumentWithIndex } from './libraryDocRemove.js'
@@ -1757,7 +1760,11 @@ function registerIpc(): void {
         Object.prototype.hasOwnProperty.call(patch, 'handshakePhrase') ||
         Object.prototype.hasOwnProperty.call(patch, 'handshakeEnabled') ||
         Object.prototype.hasOwnProperty.call(patch, 'autoCheckpointEnabled')
-      if (touchedBehaviour && next.brainTarget === 'remote') {
+      // Mini is always remote whatever the stored target says. Reading the
+      // stored value here is the same defect that froze the address field:
+      // Mini inherits 'embedded', so every Brain-mode toggle it offered was
+      // saved locally and never reached the server that acts on it.
+      if (touchedBehaviour && (IS_MINI || next.brainTarget === 'remote')) {
         void pushRemoteBehaviour({
           brainUrl: next.brainMcpUrl,
           adminToken: next.replicaToken,
@@ -2212,7 +2219,12 @@ function registerIpc(): void {
   ipcMain.handle(
     'connect:mcpTokenCreate',
     (_e, brainUrl: string, name: string, adminToken?: string) =>
-      createMcpToken(brainUrl, name, { token: adminToken }),
+      // Fall back to the stored admin token, which never leaves main. The
+      // renderer used to hand over whatever was in the Bearer field next to
+      // the button — an agent token, which cannot create tokens.
+      createMcpToken(brainUrl, name, {
+        token: adminToken?.trim() || getAppSettings().replicaToken?.trim(),
+      }),
   )
 
   ipcMain.on('win:minimize', () => {

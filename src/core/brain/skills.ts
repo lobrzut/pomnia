@@ -59,12 +59,18 @@ async function getJSON<T>(url: string, opts: AuthOpts): Promise<T> {
 export async function listAllSkills(baseUrl: string, opts: AuthOpts = {}): Promise<SkillListEntry[]> {
   const base = baseUrl.replace(/\/$/, '')
   const out: SkillListEntry[] = []
+  // Both catalogs failing is not the same fact as both being empty, and
+  // the caller printed the second for the first: against brain-core, which
+  // serves no /api/skills at all, 'the server has no skills yet' appeared
+  // for a request that reached nothing.
+  let reached = false
 
   try {
     const r = await getJSON<{ skills?: Array<{ name?: string; file?: string; description?: string; model?: string }> }>(
       `${base}/api/skills/list`,
       opts
     )
+    reached = true
     for (const s of r.skills ?? []) {
       const name = s.name ?? (s.file ?? '').replace(/\.md$/, '')
       if (name) out.push({ kind: 'brain', name, description: s.description, model: s.model })
@@ -78,6 +84,7 @@ export async function listAllSkills(baseUrl: string, opts: AuthOpts = {}): Promi
       `${base}/api/cli-skills/list`,
       opts
     )
+    reached = true
     for (const s of r.skills ?? []) {
       const name = s.id ?? s.name
       if (name) out.push({ kind: 'cli', name, description: s.description })
@@ -86,6 +93,11 @@ export async function listAllSkills(baseUrl: string, opts: AuthOpts = {}): Promi
     log.warn('cli skills list failed', e)
   }
 
+  if (!reached) {
+    throw new Error(
+      `no skill catalog at ${base} — neither /api/skills/list nor /api/cli-skills/list answered`,
+    )
+  }
   return out
 }
 

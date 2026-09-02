@@ -20,6 +20,8 @@
  * configs and are meant only to read and write memory.
  */
 
+import { brainBaseUrl } from './brainTarget.js'
+
 export interface RemoteBehaviour {
   handshakePhrase?: string
   handshakeEnabled?: boolean
@@ -31,14 +33,7 @@ export type BehaviourPushResult =
   | { ok: false; reason: 'no-url' | 'no-token' | 'rejected' | 'unreachable'; detail: string }
 
 /** `http://host:7865/admin` or `…/mcp` → `http://host:7865`. */
-export function behaviourBaseUrl(brainUrl: string): string {
-  let base = brainUrl.trim().replace(/\/+$/, '')
-  for (;;) {
-    const stripped = base.replace(/\/(admin|mcp|status)$/i, '').replace(/\/+$/, '')
-    if (stripped === base) return base
-    base = stripped
-  }
-}
+export const behaviourBaseUrl = brainBaseUrl
 
 /**
  * Only the fields that were actually asked for.

@@ -1,20 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
 /**
- * Manage MCP Bearer tokens on Brain from Pomnia.
+ * Mint an agent Bearer token on brain-core from Pomnia.
  *
- * Brain exposes POST /api/mcp/tokens to create new named tokens. The endpoint
- * itself is gated by the same session/Bearer auth as the rest of /api, so this
- * requires a bootstrap token — one you already generated in the dashboard
- * (or via cookie session there). Pomnia uses that as the admin token and can
- * mint per-client tokens without the user having to open the dashboard again.
+ * This used to POST /api/mcp/tokens on the retired Python hub's dashboard, on
+ * its own port. brain-core has neither: one port, and the route is
+ * POST /admin/tokens. Against a real server the old call returned 404 — or,
+ * because the caller also rewrote the port to 7860, never reached anything at
+ * all and surfaced as `TypeError: fetch failed`.
  *
- * A minted token is returned verbatim once, on creation, in the response body —
- * the server never exposes it again after that, only its name and creation ts.
+ * Two roles exist and the distinction matters. This mints `agent`: the token
+ * that goes into MCP client configs and may read and write memory. Creating it
+ * requires an `admin` token, which must never be pasted into those configs —
+ * it would put the right to change server behaviour and mint further tokens
+ * into six files on disk.
+ *
+ * The secret is returned exactly once, on creation. There is no read-back
+ * route, so save it before rotating anything.
  */
 
 interface AuthOpts {
-  /** Bearer token used to authorize the /api/mcp/tokens/* call. */
+  /** An **admin** token. An agent token cannot create tokens. */
   token?: string
 }
 
@@ -29,9 +35,8 @@ export interface McpTokenEntry {
   token?: string
 }
 
-/** POST /api/mcp/tokens with { name } — returns { name, token, created }.
- *  Throws with the HTTP status if the admin token is invalid or the name is
- *  taken. The full new token is returned only here; save it before rotating. */
+/** POST /admin/tokens with { name, role: 'agent' }. Throws with the HTTP
+ *  status if the admin token is missing or wrong, or the name is taken. */
 export async function createMcpToken(
   baseUrl: string,
   name: string,
@@ -40,14 +45,14 @@ export async function createMcpToken(
   const base = baseUrl.replace(/\/$/, '')
   const clean = name.trim()
   if (!clean) throw new Error('token name is empty')
-  const r = await fetch(`${base}/api/mcp/tokens`, {
+  const r = await fetch(`${base}/admin/tokens`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       accept: 'application/json',
       ...authHeaders(opts),
     },
-    body: JSON.stringify({ name: clean }),
+    body: JSON.stringify({ name: clean, role: 'agent' }),
   })
   if (!r.ok) {
     let detail = ''
@@ -57,9 +62,15 @@ export async function createMcpToken(
     } catch {
       /* keep empty */
     }
-    throw new Error(`POST /api/mcp/tokens → ${r.status}${detail ? ` (${detail})` : ''}`)
+    // 401 here means the token supplied was not an admin one — the single
+    // most likely mistake, since the field next to this button holds an agent
+    // token. Say that, rather than a bare status.
+    const hint = r.status === 401 || r.status === 403 ? ' — needs an admin token, not an agent one' : ''
+    throw new Error(`POST /admin/tokens → ${r.status}${detail ? ` (${detail})` : ''}${hint}`)
   }
-  const j = (await r.json()) as McpTokenEntry
+  // brain-core answers { token, summary: { name, created } }; the old hub
+  // answered a flat entry. Accept either, so a mixed fleet keeps working.
+  const j = (await r.json()) as McpTokenEntry & { summary?: { name: string; created: string } }
   if (!j.token) throw new Error('brain returned no token in the response')
-  return j
+  return { name: j.summary?.name ?? j.name, created: j.summary?.created ?? j.created, token: j.token }
 }

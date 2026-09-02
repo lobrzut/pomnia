@@ -26,7 +26,7 @@ import {
   REMOTE_BRAIN_URL_PLACEHOLDER,
 } from '@core/brain/snippet'
 import { identifyEngine } from '@core/brain/engine'
-import { canEditBrainUrl, resolveBrainTarget } from '@core/brain/brainTarget'
+import { brainBaseUrl, canEditBrainUrl, resolveBrainTarget } from '@core/brain/brainTarget'
 import { isMini } from '../lib/flavour'
 import { buildAgentSetupPrompt } from '@core/brain/genericSnippet'
 import { api } from '../lib/api'
@@ -137,7 +137,7 @@ export default function Connect() {
    */
   async function mintToken() {
     if (minting) return
-    const dashboardUrl = dashboardUrlFromBrainUrl(brainUrl)
+    const dashboardUrl = brainBaseUrl(brainUrl)
     const host = (() => {
       try {
         return new URL(brainUrl.includes('://') ? brainUrl : `http://${brainUrl}`).hostname
@@ -148,7 +148,10 @@ export default function Connect() {
     const name = `${host}-${new Date().toISOString().slice(0, 10)}`
     setMinting(true)
     try {
-      const r = await api.connectMcpTokenCreate(dashboardUrl, name.trim(), connectToken || undefined)
+      // No token argument: main uses the stored admin token. What sat here
+      // was `connectToken`, the agent token from the field beside the button,
+      // which the server correctly refuses for creating tokens.
+      const r = await api.connectMcpTokenCreate(dashboardUrl, name.trim())
       setConnectToken(r.token)
       toast({
         kind: 'success',
@@ -187,6 +190,26 @@ export default function Connect() {
     autoSync: boolean
     last: { at: string; ok: boolean; uploaded: number; unchanged: number; failed: number; error?: string } | null
   } | null>(null)
+
+  // The admin token is write-only from here: it is stored in main, which is
+  // the only process that ever holds its value. `replica.hasToken` is all the
+  // renderer learns back, so a saved token cannot be read out of the window.
+  const [adminDraft, setAdminDraft] = useState('')
+
+  async function saveAdminToken() {
+    const t = adminDraft.trim()
+    if (!t) return
+    try {
+      const r = await api.vaultReplicaConfig({ token: t })
+      // The config call answers without the last-sync block; merging keeps
+      // whatever the card already knew instead of blanking it.
+      setReplica((prev) => ({ last: prev?.last ?? null, ...r }))
+      setAdminDraft('')
+      toast({ kind: 'success', title: labels.adminTokenSaved, detail: labels.adminTokenSavedDetail })
+    } catch (e) {
+      toast({ kind: 'error', title: labels.adminTokenFailed, detail: (e as Error).message })
+    }
+  }
 
   async function refresh() {
     setLoading(true)
@@ -433,7 +456,7 @@ export default function Connect() {
   const visibleClients = CLIENT_ORDER.filter(isVisible)
   const hiddenCount = CLIENT_ORDER.length - visibleClients.length
   const connectedCount = visibleClients.filter((id) => clients.find((c) => c.id === id)?.state === 'wired').length
-  const dashboardUrl = effectiveTarget === 'remote' && brainUrl ? dashboardUrlFromBrainUrl(brainUrl) : ''
+  const dashboardUrl = effectiveTarget === 'remote' && brainUrl ? brainBaseUrl(brainUrl) : ''
   const partialClients = clients.filter((c) => c.state === 'partial' && isVisible(c.id))
   const agentPrompt = buildAgentSetupPrompt(
     effectiveTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl,
@@ -660,6 +683,40 @@ export default function Connect() {
               )}
             </>
           )}
+        </div>
+
+        {/*
+          The admin token, kept visibly apart from the agent one above.
+          They are not interchangeable: the field above is the token that
+          goes into every MCP client config and may read and write memory;
+          this one may mint those tokens and change how the server tells
+          agents to behave, so it must never be pasted into a client.
+
+          In Mini only. The full app has this field on the replication card,
+          and two fields writing one setting on one screen is how a value
+          gets set twice and trusted once.
+        */}
+        {isMini && effectiveTarget === 'remote' && (
+          <div className="mt-3">
+            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+              {labels.adminTokenLabel}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Input
+                value={adminDraft}
+                onChange={(e) => setAdminDraft(e.target.value)}
+                onBlur={() => void saveAdminToken()}
+                placeholder={
+                  replica?.hasToken ? labels.adminTokenStored : labels.adminTokenPlaceholder
+                }
+                type="password"
+                className="w-72"
+              />
+              <span className="text-[11px] text-ink-faint">{labels.adminTokenHint}</span>
+            </div>
+          </div>
+        )}
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           <span className="text-[11px] text-ink-faint">
             {effectiveTarget === 'embedded'
               ? labels.embeddedSnippetHint
@@ -1021,8 +1078,10 @@ export default function Connect() {
         </GlassCard>
       )}
 
-      {/* Skills sync — remote Brain dashboard (:7860) only */}
-      {effectiveTarget === 'remote' && (
+      {/* Skills sync — the retired hub's dashboard API. brain-core serves
+          skills through vault replication instead, and Mini has no vault to
+          receive them, so in Mini this button could only ever fail. */}
+      {effectiveTarget === 'remote' && !isMini && (
       <GlassCard className="p-5">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">

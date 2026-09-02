@@ -528,13 +528,13 @@ export default function Settings() {
         )}
       </GlassCard>
 
-      /*
+      {/*
         Hidden in Mini. Simple mode means "hide the remote server and stay on
         the brain inside this app" — Mini has no brain inside it and is pinned
         to remote, so the toggle cannot do the thing it names. Its own
         description sells vault, backup and search, three things Mini does not
         ship. Left visible it was a switch that promised the wrong product.
-      */
+      */}
       {!isMini && (
       <GlassCard className="mb-4 p-5">
         <div className="mb-1 flex items-center justify-between gap-3">
@@ -793,14 +793,14 @@ export default function Settings() {
       </GlassCard>
       )}
 
-      /*
+      {/*
         Hidden in Mini: this card pins and hides entries in the Connect
         client grid, and Mini does not have that grid — it shows the agents
         that actually connected instead. It also announces a local memory
         engine at 127.0.0.1, which in Mini is simply untrue: Mini ships no
         brain-core. A control for a screen that is gone, above a false
         statement of fact.
-      */
+      */}
       {!isMini && (
       <GlassCard className="mb-4 p-5">
         <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">

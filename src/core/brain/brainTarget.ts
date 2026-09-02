@@ -50,3 +50,22 @@ export function resolveBrainTarget({ mini, simpleMode, stored }: TargetInputs): 
 export function canEditBrainUrl(effective: BrainTarget): boolean {
   return effective === 'remote'
 }
+
+/**
+ * The server's own base URL: `http://host:7865/mcp` → `http://host:7865`.
+ *
+ * brain-core serves everything on one port — MCP, the admin API, the token
+ * dashboard at the root. The desktop still carried a helper that rewrote the
+ * port to 7860, which was the separate dashboard of the retired Python hub.
+ * Against brain-core that address answers nothing, so 'New token' failed with
+ * `TypeError: fetch failed` and 'Open token dashboard' opened a dead page —
+ * while the error text helpfully advised opening :7860 by hand.
+ */
+export function brainBaseUrl(brainUrl: string): string {
+  let base = brainUrl.trim().replace(/\/+$/, '')
+  for (;;) {
+    const stripped = base.replace(/\/(admin|mcp|status)$/i, '').replace(/\/+$/, '')
+    if (stripped === base) return base
+    base = stripped
+  }
+}

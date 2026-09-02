@@ -475,6 +475,13 @@ export interface UiLabels {
   floatingMonitorPin: string
   floatingMonitorUnpin: string
   floatingMonitorOpenHint: string
+  adminTokenLabel: string
+  adminTokenPlaceholder: string
+  adminTokenStored: string
+  adminTokenHint: string
+  adminTokenSaved: string
+  adminTokenSavedDetail: string
+  adminTokenFailed: string
   seenClientsTitle: string
   seenClientsLead: string
   seenClientsEmpty: string
@@ -1301,6 +1308,13 @@ const PL_LABELS: UiLabels = {
   floatingMonitorPin: 'Przypnij — zawsze na wierzchu',
   floatingMonitorUnpin: 'Odepnij — nie trzymaj na wierzchu',
   floatingMonitorOpenHint: 'Kliknij, aby otworzyć Pomnię na „Jak to działa”. Podwójne kliknięcie — zamknij.',
+  adminTokenLabel: 'Token admina (osobny od Bearer powyżej)',
+  adminTokenPlaceholder: 'btk_… — rola admin',
+  adminTokenStored: '•••••••• zapisany — wpisz nowy, aby podmienić',
+  adminTokenHint: 'Potrzebny do „Nowy token” i do zachowania agenta. Nie wklejaj go do klientów MCP.',
+  adminTokenSaved: 'Token admina zapisany',
+  adminTokenSavedDetail: 'Trzymany poza oknem — aplikacja nie odda go z powrotem.',
+  adminTokenFailed: 'Nie udało się zapisać tokena admina',
   seenClientsTitle: 'Agenci, którzy korzystali z pamięci',
   seenClientsLead:
     'Prosto z serwera — kto naprawdę się połączył, tak jak się przedstawił. Nie lista wpisana z góry, więc agent, o którym nikt nie słyszał, pojawi się tu sam.',
@@ -2188,6 +2202,13 @@ const EN_LABELS: UiLabels = {
   floatingMonitorPin: 'Pin — always on top',
   floatingMonitorUnpin: 'Unpin — do not stay on top',
   floatingMonitorOpenHint: 'Click to open Pomnia on “How it works”. Double-click — close.',
+  adminTokenLabel: 'Admin token (separate from the Bearer above)',
+  adminTokenPlaceholder: 'btk_… — admin role',
+  adminTokenStored: '•••••••• saved — type a new one to replace it',
+  adminTokenHint: 'Needed for “New token” and for agent behaviour. Never paste it into an MCP client.',
+  adminTokenSaved: 'Admin token saved',
+  adminTokenSavedDetail: 'Kept outside the window — the app will not hand it back.',
+  adminTokenFailed: 'Could not save the admin token',
   seenClientsTitle: 'Agents that used the memory',
   seenClientsLead:
     'Straight from the server — who actually connected, as they introduced themselves. Not a list written in advance, so an agent nobody has heard of turns up here on its own.',
