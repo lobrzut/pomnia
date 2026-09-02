@@ -477,27 +477,48 @@ export default function Settings() {
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
           <HardDrive className="h-4 w-4 text-mint" /> {labels.dataLocationsTitle}
         </div>
-        <p className="mb-3 text-xs text-ink-dim">{labels.dataLocationsLead}</p>
+        <p className="mb-3 text-xs text-ink-dim">
+          {isMini ? labels.dataLocationsLeadMini : labels.dataLocationsLead}
+        </p>
         {dataLoc ? (
           <div className="space-y-2.5 text-xs">
             <div>
               <div className="text-ink-faint">{labels.dataLocationsUserData}</div>
               <div className="mt-0.5 break-all font-mono text-[11px] text-ink">{dataLoc.userDataDir}</div>
             </div>
-            <div>
-              <div className="text-ink-faint">{labels.dataLocationsIndex}</div>
-              <div className="mt-0.5 break-all font-mono text-[11px] text-ink">{dataLoc.libraryDbPath}</div>
-            </div>
-            <div>
-              <div className="text-ink-faint">{labels.dataLocationsVault}</div>
-              <div className="mt-0.5 break-all font-mono text-[11px] text-ink">
-                {dataLoc.vaultPath ?? labels.dataLocationsVaultLocked}
-              </div>
-            </div>
+            {/*
+              Mini has neither. It printed an index path under its own userData
+              that it never creates — the file is simply not there — and told
+              the reader to unlock a vault it does not have, which is the same
+              dead instruction the tray used to give. The index the agents
+              actually read lives on the server they query.
+            */}
+            {!isMini && (
+              <>
+                <div>
+                  <div className="text-ink-faint">{labels.dataLocationsIndex}</div>
+                  <div className="mt-0.5 break-all font-mono text-[11px] text-ink">
+                    {dataLoc.libraryDbPath}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-ink-faint">{labels.dataLocationsVault}</div>
+                  <div className="mt-0.5 break-all font-mono text-[11px] text-ink">
+                    {dataLoc.vaultPath ?? labels.dataLocationsVaultLocked}
+                  </div>
+                </div>
+              </>
+            )}
             <p className="text-[11px] text-ink-faint">{labels.dataLocationsInstallForm(dataLoc.installForm)}</p>
-            <p className="text-[11px] leading-relaxed text-ink-dim">{labels.dataLocationsPlaintext}</p>
-            <p className="text-[11px] leading-relaxed text-ink-dim">{labels.dataLocationsOwnership}</p>
-            <p className="text-[11px] leading-relaxed text-ink-faint">{labels.dataLocationsWipe}</p>
+            {!isMini && (
+              <>
+                <p className="text-[11px] leading-relaxed text-ink-dim">{labels.dataLocationsPlaintext}</p>
+                <p className="text-[11px] leading-relaxed text-ink-dim">{labels.dataLocationsOwnership}</p>
+              </>
+            )}
+            <p className="text-[11px] leading-relaxed text-ink-faint">
+              {isMini ? labels.dataLocationsWipeMini : labels.dataLocationsWipe}
+            </p>
             {!isMock && (
               <div className="flex flex-wrap gap-2 pt-1">
                 <Button

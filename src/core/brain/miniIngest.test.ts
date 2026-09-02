@@ -5,7 +5,7 @@ import { pushStagedNotes, stagedNoteName } from './miniIngest.js'
 const okSync = vi.fn(async () => ({
   uploaded: 2,
   unchanged: 0,
-  failed: 0,
+  failed: [],
   errors: [],
   extraOnReplica: [],
 })) as never
@@ -15,7 +15,7 @@ describe('pushStagedNotes', () => {
     const sync = vi.fn(async () => ({
       uploaded: 2,
       unchanged: 1,
-      failed: 0,
+      failed: [],
       errors: [],
       extraOnReplica: [],
     }))

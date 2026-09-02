@@ -25,11 +25,14 @@ import HowItWorks from './pages/HowItWorks'
 import FloatingMonitor from './pages/FloatingMonitor'
 import ProfilePreview from './pages/ProfilePreview'
 import { isMini, MINI_ROUTES } from './lib/flavour'
+import MiniIngest from './pages/MiniIngest'
 
 const ALL_PAGES = {
   dashboard: Dashboard,
   browse: Browse,
-  import: ImportPage,
+  // Mini gets its own: the full Import talks about a vault, a local index and
+  // a distiller running here, and none of those exist in Mini.
+  import: isMini ? MiniIngest : ImportPage,
   brain: Brain,
   connect: Connect,
   settings: Settings,

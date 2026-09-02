@@ -130,6 +130,11 @@ const bridge = {
     >,
   connectSkillsSync: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsSync', brainUrl, token),
   mcpSeenClients: (brainUrl: string, token?: string) => ipcRenderer.invoke('mcp:seenClients', brainUrl, token),
+  miniIngestState: () => ipcRenderer.invoke('mini:ingestState'),
+  miniIngestPick: () => ipcRenderer.invoke('mini:ingestPick'),
+  miniIngestFiles: (paths: string[]) => ipcRenderer.invoke('mini:ingestFiles', paths),
+  miniIngestPush: () => ipcRenderer.invoke('mini:ingestPush'),
+  miniIngestClear: () => ipcRenderer.invoke('mini:ingestClear'),
   connectTokenAdopt: (brainUrl: string, token: string) =>
     ipcRenderer.invoke('connect:tokenAdopt', brainUrl, token),
   connectMcpTokenCreate: (brainUrl: string, name: string, adminToken?: string) =>

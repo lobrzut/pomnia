@@ -41,8 +41,8 @@ export const isMini = FLAVOUR === 'mini'
 /**
  * Routes Mini ships.
  *
- * `connect` is the reason it exists. `settings` carries the server address, the
- * token and the vault controls. Everything else belongs to collecting or
- * distilling, which Mini does not do.
+ * `connect` is the reason it exists. `settings` carries the server address and
+ * the token. `import` is the way material gets into a memory Mini does not
+ * hold: it parses here and sends to the server, which is the only sink it has.
  */
-export const MINI_ROUTES = ['connect', 'settings'] as const
+export const MINI_ROUTES = ['connect', 'import', 'settings'] as const

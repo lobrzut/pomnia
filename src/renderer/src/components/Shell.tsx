@@ -29,7 +29,9 @@ function navItems(): { id: Route; label: string; icon: typeof LayoutDashboard }[
     { id: 'dashboard', label: L.navDashboard, icon: NAV_ICONS.dashboard },
     { id: 'guide', label: L.navGuide, icon: NAV_ICONS.guide },
     { id: 'browse', label: L.navBrowse, icon: NAV_ICONS.browse },
-    { id: 'import', label: L.navImport, icon: NAV_ICONS.import },
+    // Mini's import is a different thing doing a different job, so it carries
+    // its own name rather than inheriting one written for a vault.
+    { id: 'import', label: isMini ? L.navImportMini : L.navImport, icon: NAV_ICONS.import },
     { id: 'brain', label: L.navBrain, icon: NAV_ICONS.brain },
     { id: 'connect', label: L.navConnect, icon: NAV_ICONS.connect },
     { id: 'settings', label: L.navSettings, icon: NAV_ICONS.settings }

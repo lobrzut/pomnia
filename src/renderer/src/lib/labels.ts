@@ -6,6 +6,7 @@ import type { VramProfileId } from '@core/brain/profiles'
 import { formatPipelineProgressLabel } from '@core/pipelineLabels.js'
 import type { ActivityState } from './types'
 import { getUiLocale } from './uiLocale'
+import { plCount } from './plPlural'
 
 const ACTIVITY_KIND_PL: Record<Exclude<ActivityState['kind'], 'idle'>, string> = {
   distill: 'destylacja',
@@ -266,6 +267,8 @@ export interface UiLabels {
   updateLinuxHint: string
   // ── data locations (Settings) ────────────────────────────────────────────
   dataLocationsTitle: string
+  dataLocationsLeadMini: string
+  dataLocationsWipeMini: string
   dataLocationsLead: string
   dataLocationsUserData: string
   dataLocationsIndex: string
@@ -485,6 +488,22 @@ export interface UiLabels {
   tokenAdoptFailed: string
   tokenHaveAdmin: string
   tokenNoAdmin: string
+  navImportMini: string
+  ingestTitle: string
+  ingestLead: string
+  ingestPick: string
+  ingestFormats: string
+  ingestNoteCount: (n: number) => string
+  ingestStaged: (n: number) => string
+  ingestNothingStaged: string
+  ingestSend: string
+  ingestClear: string
+  ingestSendHint: string
+  ingestParseFailed: string
+  ingestParsedWithErrors: (ok: number, bad: number) => string
+  ingestSentTitle: (n: number) => string
+  ingestSentDetail: string
+  ingestPushReason: (reason: string) => string
   seenClientsTitle: string
   seenClientsLead: string
   seenClientsEmpty: string
@@ -1093,6 +1112,10 @@ const PL_LABELS: UiLabels = {
   updateLinuxHint:
     'Linux: brak auto-instalatora. Pobierz nowe .AppImage lub .deb z Releases, nadpisz stary plik (AppImage) albo zainstaluj deb ponownie. Vault i ~/.config/Pomnia zostają.',
   dataLocationsTitle: 'Gdzie leżą dane',
+  dataLocationsLeadMini:
+    'Mini trzyma tu tylko ustawienia, logi i pliki czekające na wysyłkę. Vault i indeks wyszukiwania są na serwerze, do którego pytają agenci.',
+  dataLocationsWipeMini:
+    'Skasowanie tego katalogu usuwa ustawienia i token. Pamięci nie rusza — ta leży na serwerze.',
   dataLocationsLead:
     'Vault to folder, który wybierasz. Indeks wyszukiwania i ustawienia to osobny katalog aplikacji (jak AppData na Windows).',
   dataLocationsUserData: 'Dane aplikacji',
@@ -1327,20 +1350,36 @@ const PL_LABELS: UiLabels = {
   tokenAdoptFailed: 'Nie udało się rozpoznać tokena',
   tokenHaveAdmin: 'Token admina zapisany.',
   tokenNoAdmin: 'Bez tokena admina Tryb Brain zapisze się tylko lokalnie.',
+  navImportMini: 'Do Pomnia',
+  ingestTitle: 'Do Pomnia',
+  ingestLead: 'Wrzuć pliki — Pomnia rozpozna, co to jest, i wyśle na serwer.',
+  ingestPick: 'Wybierz pliki',
+  ingestFormats: 'PDF, DOCX, EPUB, MD, TXT oraz eksporty rozmów: ZIP, JSON, JSONL.',
+  ingestNoteCount: (n) => plCount(n, 'notatka', 'notatki', 'notatek'),
+  ingestStaged: (n) => `Gotowe do wysyłki: ${plCount(n, 'notatka', 'notatki', 'notatek')}.`,
+  ingestNothingStaged: 'Nic nie czeka na wysyłkę.',
+  ingestSend: 'Wyślij na serwer',
+  ingestClear: 'Wyrzuć',
+  ingestSendHint:
+    'Nieudana wysyłka nie kasuje tego, co przetworzone — ponowna próba nie znaczy parsowania PDF-a od nowa. Zapis wymaga tokena admina.',
+  ingestParseFailed: 'Nie udało się przetworzyć plików',
+  ingestParsedWithErrors: (ok, bad) => `Przetworzone: ${ok}, pominięte: ${bad}`,
+  ingestSentTitle: (n) => `Wysłane: ${plCount(n, 'notatka', 'notatki', 'notatek')}`,
+  ingestSentDetail: 'Serwer zaindeksuje je u siebie. Nic nie zostało skasowane.',
+  ingestPushReason: (reason) =>
+    reason === 'no-target'
+      ? 'Brak adresu serwera — uzupełnij w zakładce Connect'
+      : reason === 'no-token'
+        ? 'Potrzebny token admina — token agenta nie ma prawa zapisu'
+        : reason === 'nothing-staged'
+          ? 'Nie ma czego wysłać'
+          : 'Wysyłka nie powiodła się',
   seenClientsTitle: 'Agenci, którzy korzystali z pamięci',
   seenClientsLead: 'Prosto z serwera — kto się faktycznie połączył.',
   seenClientsEmpty: 'Jeszcze nikt się nie zgłosił.',
   seenClientsUnsupported:
     'Ten serwer tego nie raportuje — potrzebuje brain-core 0.1.78 lub nowszego.',
-  // Polish counts in three forms: 1 połączenie, 2-4 połączenia, 5+ połączeń —
-  // and the teens (12-14) take the last one despite ending in 2-4.
-  seenClientsConnects: (n: number) => {
-    const last = n % 10
-    const teen = n % 100
-    if (n === 1) return '1 połączenie'
-    if (last >= 2 && last <= 4 && !(teen >= 12 && teen <= 14)) return `${n} połączenia`
-    return `${n} połączeń`
-  },
+  seenClientsConnects: (n) => plCount(n, 'połączenie', 'połączenia', 'połączeń'),
   agentBehaviourTitle: 'Zachowanie agenta',
   agentBehaviourLead:
     'Stosuje je serwer, który odpowiada agentom — nie ta aplikacja. Przy zdalnym mózgu zmiana jest wysyłana na serwer.',
@@ -1997,6 +2036,10 @@ const EN_LABELS: UiLabels = {
   updateLinuxHint:
     'Linux: no auto-installer. Download the new .AppImage or .deb from Releases, replace the old AppImage or reinstall the deb. Your vault folder and ~/.config/Pomnia stay put.',
   dataLocationsTitle: 'Where data lives',
+  dataLocationsLeadMini:
+    'Mini keeps only settings, logs and files waiting to be sent. The vault and the search index are on the server the agents query.',
+  dataLocationsWipeMini:
+    'Deleting this directory removes settings and the token. It does not touch the memory, which lives on the server.',
   dataLocationsLead:
     'The vault is the folder you pick. The search index and settings live in a separate app data directory (AppData on Windows, ~/.config/Pomnia on Linux).',
   dataLocationsUserData: 'App data',
@@ -2230,6 +2273,30 @@ const EN_LABELS: UiLabels = {
   tokenAdoptFailed: 'Could not identify the token',
   tokenHaveAdmin: 'Admin token stored.',
   tokenNoAdmin: 'Without an admin token, Brain mode saves locally only.',
+  navImportMini: 'To Pomnia',
+  ingestTitle: 'To Pomnia',
+  ingestLead: 'Drop files in — Pomnia works out what they are and sends them to the server.',
+  ingestPick: 'Choose files',
+  ingestFormats: 'PDF, DOCX, EPUB, MD, TXT and chat exports: ZIP, JSON, JSONL.',
+  ingestNoteCount: (n) => `${n} ${n === 1 ? 'note' : 'notes'}`,
+  ingestStaged: (n) => `Ready to send: ${n} ${n === 1 ? 'note' : 'notes'}.`,
+  ingestNothingStaged: 'Nothing is waiting to be sent.',
+  ingestSend: 'Send to the server',
+  ingestClear: 'Discard',
+  ingestSendHint:
+    'A failed send keeps what was parsed — retrying does not mean parsing the PDF again. Writing needs an admin token.',
+  ingestParseFailed: 'Could not process the files',
+  ingestParsedWithErrors: (ok, bad) => `Processed: ${ok}, skipped: ${bad}`,
+  ingestSentTitle: (n) => `Sent ${n} ${n === 1 ? 'note' : 'notes'}`,
+  ingestSentDetail: 'The server will index them. Nothing was deleted.',
+  ingestPushReason: (reason) =>
+    reason === 'no-target'
+      ? 'No server address — fill it in under Connect'
+      : reason === 'no-token'
+        ? 'Needs an admin token — an agent token cannot write'
+        : reason === 'nothing-staged'
+          ? 'There is nothing to send'
+          : 'The send failed',
   seenClientsTitle: 'Agents that used the memory',
   seenClientsLead:
     'Straight from the server — who actually connected, as they introduced themselves. Not a list written in advance, so an agent nobody has heard of turns up here on its own.',

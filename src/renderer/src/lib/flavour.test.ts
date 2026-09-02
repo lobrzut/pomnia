@@ -15,10 +15,11 @@ describe('build flavour', () => {
     expect(isMini).toBe(false)
   })
 
-  it('ships exactly the two screens Mini is for', () => {
-    // Connect is the reason it exists; Settings carries the server, the token
-    // and the vault. Anything else belongs to collecting or distilling.
-    expect([...MINI_ROUTES]).toEqual(['connect', 'settings'])
+  it('ships exactly the three screens Mini is for', () => {
+    // Connect is the reason it exists; Settings carries the server and the
+    // token; Import is how material reaches a memory Mini does not hold — it
+    // parses here and sends to the server, the only sink it has.
+    expect([...MINI_ROUTES]).toEqual(['connect', 'import', 'settings'])
   })
 
   it('lands on Connect, not on a page it does not have', () => {

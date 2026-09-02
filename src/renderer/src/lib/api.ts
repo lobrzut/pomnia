@@ -243,6 +243,18 @@ export interface PomniaBridge {
    * kept in main and never comes back; the agent token minted from it does,
    * because the page needs it for the snippet.
    */
+  /** Notes parsed and waiting to be sent to the server. */
+  miniIngestState(): Promise<{ staged: number }>
+  miniIngestPick(): Promise<string[]>
+  miniIngestFiles(paths: string[]): Promise<{
+    files: { file: string; kind: 'document' | 'export'; notes: number; detail: string; error?: string }[]
+    staged: number
+  }>
+  miniIngestPush(): Promise<
+    | { ok: true; result: { uploaded: number; unchanged: number; failed: unknown[] } }
+    | { ok: false; reason: string; detail: string }
+  >
+  miniIngestClear(): Promise<{ staged: number }>
   connectTokenAdopt(
     brainUrl: string,
     token: string,
@@ -911,6 +923,31 @@ function mockBridge(): PomniaBridge {
     async connectSkillsSync() {
       await new Promise((r) => setTimeout(r, 700))
       return { fetched: 12, written: 12, errors: [] } as SkillSyncResult
+    },
+    async miniIngestState() {
+      return { staged: 0 }
+    },
+    async miniIngestPick() {
+      return ['C:/przyklad/Thinking Fast and Slow.pdf', 'C:/przyklad/chatgpt-export.zip']
+    },
+    async miniIngestFiles(paths) {
+      await new Promise((r) => setTimeout(r, 600))
+      return {
+        files: paths.map((p, i) => ({
+          file: p.split(/[\/]/).pop() ?? p,
+          kind: i === 0 ? ('document' as const) : ('export' as const),
+          notes: i === 0 ? 1 : 34,
+          detail: i === 0 ? 'unpdf, 412 str.' : 'chatgpt',
+        })),
+        staged: 35,
+      }
+    },
+    async miniIngestPush() {
+      await new Promise((r) => setTimeout(r, 800))
+      return { ok: true as const, result: { uploaded: 35, unchanged: 0, failed: [] } }
+    },
+    async miniIngestClear() {
+      return { staged: 0 }
     },
     async connectTokenAdopt(_brainUrl, token) {
       await new Promise((r) => setTimeout(r, 400))

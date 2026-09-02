@@ -72,6 +72,8 @@ import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused 
 import { checkForUpdate, describeUpdate } from './updateCheck.js'
 import { buildDataLocationsSnapshot, detectInstallForm } from '@core/dataLocations.js'
 import { pushRemoteBehaviour } from '@core/brain/remoteBehaviour.js'
+import { pushStagedNotes } from '@core/brain/miniIngest.js'
+import { clearStaging, ingestFiles, stagedCount, stagingRoot } from './miniIngest.js'
 
 /** Mini has no brain of its own, so every target it can have is remote. */
 const IS_MINI = import.meta.env?.MAIN_VITE_POMNIA_FLAVOUR === 'mini'
@@ -2199,6 +2201,51 @@ function registerIpc(): void {
    * connected' and 'this server cannot tell you' are different answers and
    * showing the first for the second is how a UI lies.
    */
+  /*
+   * 'Do Pomnia' — Mini's way of getting material into a memory it does not
+   * hold. Parsing happens here because doc-parser and the export readers are
+   * main-process code; the renderer only ever sees counts and names.
+   */
+  ipcMain.handle('mini:ingestState', async () => ({
+    staged: await stagedCount(app.getPath('userData')),
+  }))
+
+  ipcMain.handle('mini:ingestPick', async () => {
+    const r = await dialog.showOpenDialog(win!, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        // One entry, deliberately: asking someone to classify their own file
+        // before opening it is the question this module exists to avoid.
+        { name: 'Pomnia', extensions: ['pdf', 'docx', 'epub', 'md', 'txt', 'zip', 'json', 'jsonl'] },
+      ],
+    })
+    return r.canceled ? [] : r.filePaths
+  })
+
+  ipcMain.handle('mini:ingestFiles', async (_e, paths: string[]) =>
+    ingestFiles(app.getPath('userData'), Array.isArray(paths) ? paths : []),
+  )
+
+  ipcMain.handle('mini:ingestPush', async () => {
+    const s = getAppSettings()
+    const userData = app.getPath('userData')
+    const r = await pushStagedNotes({
+      stagingRoot: stagingRoot(userData),
+      target: brainBaseUrl(s.brainMcpUrl ?? ''),
+      adminToken: s.replicaToken,
+      staged: await stagedCount(userData),
+    })
+    // Only clear what the server confirmed it took. Clearing on any answer
+    // would throw away a 400-page parse because one file in the batch failed.
+    if (r.ok && r.result.failed.length === 0) await clearStaging(userData)
+    return r
+  })
+
+  ipcMain.handle('mini:ingestClear', async () => {
+    await clearStaging(app.getPath('userData'))
+    return { staged: 0 }
+  })
+
   ipcMain.handle('mcp:seenClients', async (_e, brainUrl: string, token?: string) => {
     const base = (brainUrl || '').trim().replace(/\/+$/, '').replace(/\/(admin|mcp|status)$/i, '')
     if (!base) return { supported: false, clients: [] }
