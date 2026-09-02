@@ -128,11 +128,15 @@ function pickUrl(srv: any): { url?: string; transport?: string; hasToken?: boole
   if (typeof srv.type === 'string') out.transport = srv.type
   if (typeof srv.url === 'string') out.url = srv.url
   else if (typeof srv.serverUrl === 'string') out.url = srv.serverUrl
-  else if (
-    typeof srv.command === 'string' &&
-    /^npx(\.cmd)?$/i.test(srv.command.split(/[\\/]/).pop() || '') &&
-    Array.isArray(srv.args)
-  ) {
+  // Any stdio entry whose arguments carry an http URL.
+  //
+  // This used to require `command: npx`, which is the shape from before this
+  // app began writing `cmd /c npx` on Windows -- its own fix for the space in
+  // `C:\Program Files`. So the reader could not read what the writer produced:
+  // the URL came back undefined, repairReason said 'no-url', and the repair
+  // rewrote the identical block on every sync. 107 writes to one
+  // claude_desktop_config.json in a day, each logged as `X -> X`.
+  else if (typeof srv.command === 'string' && Array.isArray(srv.args)) {
     const arg = srv.args.find((a: unknown) => typeof a === 'string' && /^https?:\/\//.test(a))
     if (arg) {
       out.url = arg as string

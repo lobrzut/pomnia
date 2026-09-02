@@ -507,6 +507,7 @@ export interface UiLabels {
   ingestEta: (seconds: number) => string
   ingestEtaUnknown: string
   ingestModelCustom: string
+  ingestPushResult: (uploaded: number, unchanged: number, failed: number) => string
   ingestTitle: string
   ingestLead: string
   ingestPick: string
@@ -1388,6 +1389,11 @@ const PL_LABELS: UiLabels = {
   ingestEta: (seconds) => `ok. ${formatDuration(seconds)}`,
   ingestEtaUnknown: 'czas nieznany — pierwsza wysyłka go zmierzy',
   ingestModelCustom: 'własny',
+  ingestPushResult: (uploaded, unchanged, failed) =>
+    `Wysłano ${plCount(uploaded, 'notatkę', 'notatki', 'notatek')}` +
+    (unchanged ? `, ${unchanged} bez zmian` : '') +
+    (failed ? `, ${plCount(failed, 'nieudana', 'nieudane', 'nieudanych')}` : '') +
+    '. Serwer nic nie skasował.',
   ingestTitle: 'Do Pomnia',
   ingestLead: 'Wrzuć pliki — Pomnia rozpozna, co to jest, i wyśle na serwer.',
   ingestPick: 'Wybierz pliki',
@@ -2330,6 +2336,11 @@ const EN_LABELS: UiLabels = {
   ingestEta: (seconds) => `about ${formatDuration(seconds)}`,
   ingestEtaUnknown: 'time unknown — the first upload will measure it',
   ingestModelCustom: 'custom',
+  ingestPushResult: (uploaded, unchanged, failed) =>
+    `Sent ${uploaded} ${uploaded === 1 ? 'note' : 'notes'}` +
+    (unchanged ? `, ${unchanged} unchanged` : '') +
+    (failed ? `, ${failed} failed` : '') +
+    '. The server deleted nothing.',
   ingestTitle: 'To Pomnia',
   ingestLead: 'Drop files in — Pomnia works out what they are and sends them to the server.',
   ingestPick: 'Choose files',

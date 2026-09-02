@@ -35,6 +35,12 @@ export default function MiniIngest() {
   const [bytes, setBytes] = useState(0)
   const [eta, setEta] = useState<number | null>(null)
   const [dragging, setDragging] = useState(false)
+  // The outcome of the last send, kept on the page. A toast answers 'what
+  // happened' for four seconds and then stops answering it, which is no use
+  // to someone who looked away while a hundred notes went up.
+  const [lastPush, setLastPush] = useState<
+    { ok: true; uploaded: number; unchanged: number; failed: number } | { ok: false; text: string } | null
+  >(null)
   const [ollama, setOllama] = useState<{ reachable: boolean; models: string[]; chatModel: string } | null>(null)
   const [model, setModel] = useState('')
   const [pulling, setPulling] = useState(false)
@@ -116,6 +122,12 @@ export default function MiniIngest() {
     try {
       const r = await api.miniIngestPush()
       if (r.ok) {
+        setLastPush({
+          ok: true,
+          uploaded: r.result.uploaded,
+          unchanged: r.result.unchanged,
+          failed: r.result.failed.length,
+        })
         toast({
           kind: 'success',
           title: labels.ingestSentTitle(r.result.uploaded),
@@ -124,6 +136,7 @@ export default function MiniIngest() {
         setFiles([])
       } else {
         // Each refusal is a different thing to do next, so each says which.
+        setLastPush({ ok: false, text: `${labels.ingestPushReason(r.reason)} — ${r.detail}` })
         toast({ kind: 'error', title: labels.ingestPushReason(r.reason), detail: r.detail })
       }
       await refresh()
@@ -309,6 +322,19 @@ export default function MiniIngest() {
             </Button>
           )}
         </div>
+        {lastPush && (
+          <div
+            className={`mt-3 rounded-xl border px-3 py-2 text-xs ${
+              lastPush.ok
+                ? 'border-mint/25 bg-mint/5 text-ink-dim'
+                : 'border-amber-500/30 bg-amber-500/5 text-amber-200'
+            }`}
+          >
+            {lastPush.ok
+              ? labels.ingestPushResult(lastPush.uploaded, lastPush.unchanged, lastPush.failed)
+              : lastPush.text}
+          </div>
+        )}
         {/* Staging survives a failed send on purpose: retrying should not mean
             parsing a 400-page PDF a second time. */}
         <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">{labels.ingestSendHint}</p>

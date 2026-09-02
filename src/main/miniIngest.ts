@@ -243,7 +243,19 @@ export async function ingestFiles(
             : `${r.detected} — transkrypty`,
         })
       } else {
-        files.push({ file: name, kind: 'document', notes: 0, detail: ext, error: 'unsupported' })
+        // Name the way out, not just the refusal. MOBI and AZW are the ones
+        // people actually have, and 'unsupported' leaves them guessing whether
+        // the file is broken or the format simply is not read here.
+        const convertible = ['.mobi', '.azw', '.azw3', '.prc'].includes(ext)
+        files.push({
+          file: name,
+          kind: 'document',
+          notes: 0,
+          detail: ext,
+          error: convertible
+            ? `${ext} — przekonwertuj na EPUB (np. Calibre)`
+            : `${ext} — obsługiwane: PDF, DOCX, EPUB, MD, TXT oraz ZIP/JSON/JSONL`,
+        })
       }
     } catch (e) {
       log.warn('mini ingest failed for', name, e)
