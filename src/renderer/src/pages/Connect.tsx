@@ -29,7 +29,7 @@ import { identifyEngine } from '@core/brain/engine'
 import { brainBaseUrl, canEditBrainUrl, resolveBrainTarget } from '@core/brain/brainTarget'
 import { isMini } from '../lib/flavour'
 import { formatClientVersion } from '../lib/clientVersion'
-import { buildAgentSetupPrompt } from '@core/brain/genericSnippet'
+import { buildAgentSetupPrompt, buildGenericSnippet } from '@core/brain/genericSnippet'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { getUiLocale } from '../lib/uiLocale'
@@ -202,6 +202,7 @@ export default function Connect() {
   // learns only `replica.hasToken` back, so a stored one cannot be read out
   // of the window.
   const [adopting, setAdopting] = useState(false)
+  const [showManual, setShowManual] = useState(false)
 
   /**
    * One field, one paste, and the server settles what the token is.
@@ -490,6 +491,15 @@ export default function Connect() {
   const connectedCount = visibleClients.filter((id) => clients.find((c) => c.id === id)?.state === 'wired').length
   const dashboardUrl = effectiveTarget === 'remote' && brainUrl ? brainBaseUrl(brainUrl) : ''
   const partialClients = clients.filter((c) => c.state === 'partial' && isVisible(c.id))
+  // The same three shapes the prompt tells an agent to choose between,
+  // for the person who would rather open the file themselves. Mini removed
+  // the per-client snippets, and with them every manual route — leaving one
+  // path that only works if you have an agent open and it cooperates.
+  const generic = buildGenericSnippet(
+    effectiveTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl,
+    effectiveTarget === 'remote' ? connectToken || undefined : undefined,
+    api.platform === 'darwin' ? 'darwin' : api.platform === 'linux' ? 'linux' : 'win32',
+  )
   const agentPrompt = buildAgentSetupPrompt(
     effectiveTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl,
     effectiveTarget === 'remote' ? connectToken || undefined : undefined,
@@ -562,6 +572,49 @@ export default function Connect() {
               {showPrompt ? labels.agentPromptHide : labels.agentPromptShow}
             </button>
             <span className="text-[11px] text-amber">{labels.agentPromptSecret}</span>
+          </div>
+
+          {/*
+            The manual route, deliberately quieter than the button above: it
+            is the fallback, not a peer. But it has to exist — an agent that
+            refuses, a client with no chat window, or simply someone who
+            would rather edit the file, all end up here.
+          */}
+          <div className="mt-4 border-t border-white/8 pt-3">
+            <button
+              onClick={() => setShowManual((v) => !v)}
+              className="no-drag text-[11px] font-medium text-ink-dim hover:text-ink"
+            >
+              {showManual ? labels.manualHide : labels.manualShow}
+            </button>
+            {showManual && (
+              <div className="mt-3 space-y-3">
+                <p className="text-[11px] leading-relaxed text-ink-faint">
+                  {labels.manualLead(generic.outerKey)}
+                </p>
+                {generic.variants.map((v) => (
+                  <div key={v.id}>
+                    <div className="mb-1 flex items-center justify-between gap-3">
+                      <span className="text-[11px] text-ink-dim">{labels.manualWhen(v.id)}</span>
+                      <button
+                        onClick={() => {
+                          void navigator.clipboard.writeText(v.json)
+                          setCopied(`manual-${v.id}`)
+                          window.setTimeout(() => setCopied(null), 1600)
+                        }}
+                        className="no-drag shrink-0 text-[11px] font-medium text-iris hover:underline"
+                      >
+                        {copied === `manual-${v.id}` ? labels.manualCopied : labels.manualCopy}
+                      </button>
+                    </div>
+                    <pre className="overflow-x-auto rounded-lg border border-white/8 bg-black/30 p-2.5 text-[11px] leading-relaxed text-ink-dim">
+                      {v.json}
+                    </pre>
+                  </div>
+                ))}
+                <p className="text-[11px] leading-relaxed text-ink-faint">{labels.manualOuterKeyNote}</p>
+              </div>
+            )}
           </div>
         </GlassCard>
       )}

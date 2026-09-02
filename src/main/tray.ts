@@ -84,6 +84,9 @@ function brainStatusLabel(): string {
   return m().trayBrainStopped
 }
 
+/** Mini ships no vault and no brain-core, so two of these lead nowhere. */
+const IS_MINI = import.meta.env?.MAIN_VITE_POMNIA_FLAVOUR === 'mini'
+
 function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
   const embedded = brainCore.status()
   const busyLine = activity.menuLine(isEnLocale())
@@ -103,12 +106,20 @@ function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
         void toggleFloatingMonitor().then(() => tray?.setContextMenu(buildMenu(win, onQuit)))
       },
     },
-    {
-      label: m().trayProfile,
-      click: () => {
-        void showProfilePreview().then(() => tray?.setContextMenu(buildMenu(win, onQuit)))
-      },
-    },
+    // The profile is read out of the vault. In Mini it opened a window
+    // saying 'unlock the vault to see the profile' — for a vault that does
+    // not exist and cannot be unlocked. A menu entry whose only outcome is
+    // an instruction you cannot follow.
+    ...(IS_MINI
+      ? []
+      : [
+          {
+            label: m().trayProfile,
+            click: () => {
+              void showProfilePreview().then(() => tray?.setContextMenu(buildMenu(win, onQuit)))
+            },
+          } as const,
+        ]),
     { type: 'separator' },
     ...(busyLine
       ? [
@@ -118,10 +129,17 @@ function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
           } as const,
         ]
       : []),
-    {
-      label: brainStatusLabel(),
-      enabled: false,
-    },
+    // The embedded brain's state. Mini never starts one, so this line was
+    // permanently 'local search: stopped' — a red-looking fact about a
+    // component Mini does not have.
+    ...(IS_MINI
+      ? []
+      : [
+          {
+            label: brainStatusLabel(),
+            enabled: false,
+          } as const,
+        ]),
     ...(embedded.running
       ? [
           {

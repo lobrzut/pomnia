@@ -589,6 +589,13 @@ export interface UiLabels {
   profileBlurbs: Record<VramProfileId, string>
   /** Generic MCP setup: one prompt the user pastes into any agent. */
   agentPromptTitle: string
+  manualShow: string
+  manualHide: string
+  manualLead: (outerKey: string) => string
+  manualWhen: (id: 'http' | 'server-url' | 'stdio') => string
+  manualOuterKeyNote: string
+  manualCopy: string
+  manualCopied: string
   agentPromptLead: string
   agentPromptCopy: string
   agentPromptCopied: string
@@ -1439,6 +1446,19 @@ const PL_LABELS: UiLabels = {
     standard: 'Najlepszy zmierzony przerób: wyższe oceny niż 14B i mniej więcej dwukrotnie szybciej.',
   },
   agentPromptTitle: 'Podłącz dowolnego agenta',
+  manualShow: 'Wolę wkleić sam do pliku konfiguracyjnego →',
+  manualHide: 'Ukryj konfigurację ręczną',
+  manualLead: (outerKey) =>
+    `Wklej jeden z trzech kształtów pod klucz \`${outerKey}\` w pliku MCP swojego klienta. Który — zależy od klienta, opis nad każdym.`,
+  manualWhen: (id) =>
+    id === 'http'
+      ? 'Klient przyjmuje URL — większość tak działa, zacznij od tego.'
+      : id === 'server-url'
+        ? 'Klient nazywa to pole `serverUrl` (Antigravity, Windsurf).'
+        : 'Klient umie tylko uruchomić polecenie (Claude Desktop). Wymaga Node.',
+  manualOuterKeyNote: 'VS Code nazywa ten klucz `servers`, nie `mcpServers`. Środek jest identyczny.',
+  manualCopy: 'Kopiuj',
+  manualCopied: 'Skopiowane',
   agentPromptLead:
     'Wklej to w okno swojego agenta. Sam znajdzie swój plik konfiguracyjny, dopisze Pomnię i sprawdzi, czy naprawdę odpowiada. Działa z każdym klientem mówiącym MCP — także takim, o którym jeszcze nie słyszeliśmy.',
   agentPromptCopy: 'Kopiuj polecenie',
@@ -2290,6 +2310,19 @@ const EN_LABELS: UiLabels = {
     standard: 'Best measured notes per second: higher scores than the 14B and roughly twice the speed.',
   },
   agentPromptTitle: 'Connect any agent',
+  manualShow: 'I would rather paste it into the config myself →',
+  manualHide: 'Hide manual setup',
+  manualLead: (outerKey) =>
+    `Paste one of the three shapes under the \`${outerKey}\` key in your client's MCP file. Which one depends on the client — see the note above each.`,
+  manualWhen: (id) =>
+    id === 'http'
+      ? 'Your client takes a URL — most do, start here.'
+      : id === 'server-url'
+        ? 'Your client names the field `serverUrl` (Antigravity, Windsurf).'
+        : 'Your client only launches a command (Claude Desktop). Needs Node.',
+  manualOuterKeyNote: 'VS Code calls this key `servers`, not `mcpServers`. Everything inside is the same.',
+  manualCopy: 'Copy',
+  manualCopied: 'Copied',
   agentPromptLead:
     'Paste this into your agent. It will find its own config file, add Pomnia and check that it actually answers. Works with any MCP client — including ones nobody has written a spec for.',
   agentPromptCopy: 'Copy the instruction',
