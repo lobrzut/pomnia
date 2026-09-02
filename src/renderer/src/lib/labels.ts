@@ -475,6 +475,11 @@ export interface UiLabels {
   floatingMonitorPin: string
   floatingMonitorUnpin: string
   floatingMonitorOpenHint: string
+  seenClientsTitle: string
+  seenClientsLead: string
+  seenClientsEmpty: string
+  seenClientsUnsupported: string
+  seenClientsConnects: (n: number) => string
   agentBehaviourTitle: string
   agentBehaviourLead: string
   handshake: string
@@ -1296,6 +1301,21 @@ const PL_LABELS: UiLabels = {
   floatingMonitorPin: 'Przypnij — zawsze na wierzchu',
   floatingMonitorUnpin: 'Odepnij — nie trzymaj na wierzchu',
   floatingMonitorOpenHint: 'Kliknij, aby otworzyć Pomnię na „Jak to działa”. Podwójne kliknięcie — zamknij.',
+  seenClientsTitle: 'Agenci, którzy korzystali z pamięci',
+  seenClientsLead:
+    'Prosto z serwera — kto naprawdę się połączył, tak jak się przedstawił. Nie lista wpisana z góry, więc agent, o którym nikt nie słyszał, pojawi się tu sam.',
+  seenClientsEmpty: 'Jeszcze nikt się nie zgłosił. Wklej polecenie w oknie agenta.',
+  seenClientsUnsupported:
+    'Ten serwer tego nie raportuje — potrzebuje brain-core 0.1.78 lub nowszego.',
+  // Polish counts in three forms: 1 połączenie, 2-4 połączenia, 5+ połączeń —
+  // and the teens (12-14) take the last one despite ending in 2-4.
+  seenClientsConnects: (n: number) => {
+    const last = n % 10
+    const teen = n % 100
+    if (n === 1) return '1 połączenie'
+    if (last >= 2 && last <= 4 && !(teen >= 12 && teen <= 14)) return `${n} połączenia`
+    return `${n} połączeń`
+  },
   agentBehaviourTitle: 'Zachowanie agenta',
   agentBehaviourLead:
     'Stosuje je serwer, który odpowiada agentom — nie ta aplikacja. Przy zdalnym mózgu zmiana jest wysyłana na serwer.',
@@ -2168,6 +2188,12 @@ const EN_LABELS: UiLabels = {
   floatingMonitorPin: 'Pin — always on top',
   floatingMonitorUnpin: 'Unpin — do not stay on top',
   floatingMonitorOpenHint: 'Click to open Pomnia on “How it works”. Double-click — close.',
+  seenClientsTitle: 'Agents that used the memory',
+  seenClientsLead:
+    'Straight from the server — who actually connected, as they introduced themselves. Not a list written in advance, so an agent nobody has heard of turns up here on its own.',
+  seenClientsEmpty: 'Nobody has introduced themselves yet. Paste the instruction into your agent.',
+  seenClientsUnsupported: 'This server does not report that — it needs brain-core 0.1.78 or newer.',
+  seenClientsConnects: (n: number) => (n === 1 ? '1 connection' : `${n} connections`),
   agentBehaviourTitle: 'Agent behaviour',
   agentBehaviourLead:
     'Applied by the server that answers your agents, not by this app. With a remote brain the change is sent to the server.',

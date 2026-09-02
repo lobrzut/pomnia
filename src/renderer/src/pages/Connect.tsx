@@ -112,6 +112,10 @@ export default function Connect() {
   const [copied, setCopied] = useState<string | null>(null)
   const [minting, setMinting] = useState(false)
   const [showPrompt, setShowPrompt] = useState(false)
+  const [seen, setSeen] = useState<{
+    supported: boolean
+    clients: { name: string; version?: string; lastSeen: number; connects: number }[]
+  } | null>(null)
   const [writingBrief, setWritingBrief] = useState(false)
 
   /**
@@ -247,6 +251,32 @@ export default function Connect() {
 
   // Replication state is independent of which brain is selected — the machine
   // that owns the vault has something to mirror either way.
+  // Who has actually connected, from the server rather than from a list of
+  // clients somebody wrote code for. Mini only: the full app still shows its
+  // own scan, and two answers to one question on one screen would be worse
+  // than either.
+  useEffect(() => {
+    if (!isMini) return
+    let alive = true
+    const load = (): void => {
+      void api
+        .mcpSeenClients(brainUrl, effectiveTarget === 'remote' ? connectToken || undefined : undefined)
+        .then((r) => {
+          if (alive) setSeen(r)
+        })
+        .catch(() => {
+          if (alive) setSeen({ supported: false, clients: [] })
+        })
+    }
+    load()
+    const t = window.setInterval(load, 20_000)
+    return () => {
+      alive = false
+      window.clearInterval(t)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brainUrl, connectToken, effectiveTarget])
+
   useEffect(() => {
     void api.vaultReplicaState().then(setReplica).catch(() => setReplica(null))
   }, [])
@@ -653,7 +683,54 @@ export default function Connect() {
         </div>
       </GlassCard>
 
-      {/* Clients status grid */}
+      {/*
+        Mini shows who actually connected, from the server. The grid below is
+        a scan of seven config files somebody wrote code for, and it reports
+        that a file parsed -- which has now meant nothing twice here: six
+        clients green while answering 403, one green with a token the server
+        rejects. This card is the other kind of evidence, and the only one that
+        covers an agent released tomorrow.
+      */}
+      {isMini && (
+        <GlassCard className="mb-5 p-5">
+          <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
+            <ListChecks className="h-4 w-4 text-mint" /> {labels.seenClientsTitle}
+          </div>
+          <p className="mb-3 text-xs leading-relaxed text-ink-dim">{labels.seenClientsLead}</p>
+          {seen === null ? (
+            <div className="flex items-center gap-2 text-xs text-ink-faint">
+              <Spinner className="h-3.5 w-3.5" />
+            </div>
+          ) : !seen.supported ? (
+            <p className="text-xs text-amber">{labels.seenClientsUnsupported}</p>
+          ) : seen.clients.length === 0 ? (
+            <p className="text-xs text-ink-faint">{labels.seenClientsEmpty}</p>
+          ) : (
+            <div className="space-y-2">
+              {seen.clients.map((c) => (
+                <div
+                  key={c.name}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-ink">{c.name}</div>
+                    <div className="text-[11px] text-ink-faint">
+                      {c.version ? `v${c.version} · ` : ''}
+                      {labels.seenClientsConnects(c.connects)}
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-[11px] text-ink-faint">
+                    {new Date(c.lastSeen).toLocaleTimeString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      )}
+
+      {/* Clients status grid — the config scan. Hidden in Mini: see above. */}
+      {!isMini && (
       <GlassCard className="mb-5 p-5">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-ink">
@@ -724,6 +801,7 @@ export default function Connect() {
           </button>
         )}
       </GlassCard>
+      )}
 
       {/*
         Mini does not build per-client snippets.

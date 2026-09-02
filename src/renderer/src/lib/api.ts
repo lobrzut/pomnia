@@ -179,6 +179,14 @@ export interface PomniaBridge {
     | { ok: true; path: string; bytes: number; handshakePath?: string; agentsPath?: string }
     | { ok: false; error: string; detail?: string; path?: string }
   >
+  /** Agents the server has actually seen connect. Empty list = none yet. */
+  mcpSeenClients(
+    brainUrl: string,
+    token?: string,
+  ): Promise<{
+    supported: boolean
+    clients: { name: string; version?: string; firstSeen: number; lastSeen: number; connects: number }[]
+  }>
   connectSkillsSync(brainUrl: string, token?: string): Promise<SkillSyncResult>
   appUpdateCheck(): Promise<{
     current: string
@@ -877,6 +885,18 @@ function mockBridge(): PomniaBridge {
         skipped: [],
         extraOnReplica: [],
         bytesUploaded: 0,
+      }
+    },
+    async mcpSeenClients() {
+      // Illustrative: two that introduced themselves, one of them unknown to
+      // this app — which is the point of reading the server instead of a list.
+      const now = Date.now()
+      return {
+        supported: true,
+        clients: [
+          { name: 'claude-code', version: '2.1.0', firstSeen: now - 86_400_000, lastSeen: now - 60_000, connects: 14 },
+          { name: 'some-agent-2027', firstSeen: now - 3_600_000, lastSeen: now - 900_000, connects: 2 },
+        ],
       }
     },
     async connectSkillsSync() {

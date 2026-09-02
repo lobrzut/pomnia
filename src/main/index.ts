@@ -2181,6 +2181,30 @@ function registerIpc(): void {
   })
 
 
+  /**
+   * Agents the server has actually seen, as they introduced themselves.
+   *
+   * A brain-core older than 0.1.78 does not serve this. `supported: false`
+   * says so rather than returning an empty list, because 'nobody has
+   * connected' and 'this server cannot tell you' are different answers and
+   * showing the first for the second is how a UI lies.
+   */
+  ipcMain.handle('mcp:seenClients', async (_e, brainUrl: string, token?: string) => {
+    const base = (brainUrl || '').trim().replace(/\/+$/, '').replace(/\/(admin|mcp|status)$/i, '')
+    if (!base) return { supported: false, clients: [] }
+    try {
+      const r = await fetch(`${base}/mcp/clients`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal: AbortSignal.timeout(6000),
+      })
+      if (!r.ok) return { supported: false, clients: [] }
+      const body = (await r.json()) as { clients?: unknown }
+      return { supported: true, clients: Array.isArray(body.clients) ? body.clients : [] }
+    } catch {
+      return { supported: false, clients: [] }
+    }
+  })
+
   ipcMain.handle('connect:skillsSync', (_e, brainUrl: string, token?: string) =>
     syncSkills(brainUrl, brainSkillsDir(vaultPath), { token })
   )
