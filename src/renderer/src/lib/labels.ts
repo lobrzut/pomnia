@@ -566,6 +566,12 @@ export interface UiLabels {
    * to read carefully before downloading several gigabytes.
    */
   profileBlurbs: Record<VramProfileId, string>
+  /** Generic MCP setup: one prompt the user pastes into any agent. */
+  agentPromptTitle: string
+  agentPromptLead: string
+  agentPromptCopy: string
+  agentPromptCopied: string
+  agentPromptSecret: string
   strategyHybrid: string
   strategySnapshot: string
   strategySnapshotHint: string
@@ -1376,6 +1382,12 @@ const PL_LABELS: UiLabels = {
     lite: 'Na kartę, na której ósemka się nie zmieści. Wybrana przez to, co działa, nie przez jakość — niemierzona względem bramki.',
     standard: 'Najlepszy zmierzony przerób: wyższe oceny niż 14B i mniej więcej dwukrotnie szybciej.',
   },
+  agentPromptTitle: 'Podłącz dowolnego agenta',
+  agentPromptLead:
+    'Wklej to w okno swojego agenta. Sam znajdzie swój plik konfiguracyjny, dopisze Pomnię i sprawdzi, czy naprawdę odpowiada. Działa z każdym klientem mówiącym MCP — także takim, o którym jeszcze nie słyszeliśmy.',
+  agentPromptCopy: 'Kopiuj polecenie',
+  agentPromptCopied: 'Skopiowane',
+  agentPromptSecret: 'Zawiera Twój token — to sekret. Nie wklejaj go tam, gdzie pokazujesz komuś ekran.',
   strategyHybrid: 'czaty + config',
   strategySnapshot: 'tylko config',
   strategySnapshotHint:
@@ -2200,6 +2212,12 @@ const EN_LABELS: UiLabels = {
     lite: 'For a card the 8B will not fit on. Chosen by what runs, not by quality — not measured against the gate.',
     standard: 'Best measured notes per second: higher scores than the 14B and roughly twice the speed.',
   },
+  agentPromptTitle: 'Connect any agent',
+  agentPromptLead:
+    'Paste this into your agent. It will find its own config file, add Pomnia and check that it actually answers. Works with any MCP client — including ones nobody has written a spec for.',
+  agentPromptCopy: 'Copy the instruction',
+  agentPromptCopied: 'Copied',
+  agentPromptSecret: 'Contains your token — treat it as a secret. Not for a window you are screen-sharing.',
   strategyHybrid: 'chats + config',
   strategySnapshot: 'config only',
   strategySnapshotHint:

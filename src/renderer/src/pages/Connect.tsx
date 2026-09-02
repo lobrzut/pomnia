@@ -27,6 +27,7 @@ import {
 } from '@core/brain/snippet'
 import { identifyEngine } from '@core/brain/engine'
 import { isMini } from '../lib/flavour'
+import { buildAgentSetupPrompt } from '@core/brain/genericSnippet'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { getUiLocale } from '../lib/uiLocale'
@@ -397,6 +398,12 @@ export default function Connect() {
   const connectedCount = visibleClients.filter((id) => clients.find((c) => c.id === id)?.state === 'wired').length
   const dashboardUrl = effectiveTarget === 'remote' && brainUrl ? dashboardUrlFromBrainUrl(brainUrl) : ''
   const partialClients = clients.filter((c) => c.state === 'partial' && isVisible(c.id))
+  const agentPrompt = buildAgentSetupPrompt(
+    effectiveTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl,
+    effectiveTarget === 'remote' ? connectToken || undefined : undefined,
+    api.platform === 'darwin' ? 'darwin' : api.platform === 'linux' ? 'linux' : 'win32',
+  )
+
   const checklistDone = {
     url: effectiveTarget === 'embedded' || !!remoteBrainUrl.trim(),
     token: effectiveTarget === 'embedded' || !!connectToken.trim(),
@@ -416,6 +423,38 @@ export default function Connect() {
           <p className="mt-1 text-[11px] text-ink-faint">{labels.connectMacNoAppHint}</p>
         </div>
       </div>
+
+      {/*
+        The general way in: one instruction the user pastes into whatever agent
+        they are already talking to, which then edits its own config and proves
+        the connection by calling a tool. Every per-client spec in this app
+        exists to save that paste; none of them is what makes MCP work. An
+        agent released tomorrow is covered by this and by nothing else.
+      */}
+      {isMini && (
+        <GlassCard className="mb-5 p-5">
+          <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
+            <Plug className="h-4 w-4 text-mint" /> {labels.agentPromptTitle}
+          </div>
+          <p className="mb-3 text-xs leading-relaxed text-ink-dim">{labels.agentPromptLead}</p>
+          <pre className="mb-3 max-h-64 overflow-auto rounded-xl border border-white/8 bg-black/30 p-3 text-[11px] leading-relaxed text-ink-dim">
+            {agentPrompt}
+          </pre>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={() => {
+                void navigator.clipboard.writeText(agentPrompt)
+                setCopied('agent-prompt')
+                window.setTimeout(() => setCopied(null), 1600)
+              }}
+            >
+              <Copy className="h-4 w-4" />
+              {copied === 'agent-prompt' ? labels.agentPromptCopied : labels.agentPromptCopy}
+            </Button>
+            <span className="text-[11px] text-amber">{labels.agentPromptSecret}</span>
+          </div>
+        </GlassCard>
+      )}
 
       {/* First-time checklist (remote) */}
       {!simpleMode && effectiveTarget === 'remote' && (
