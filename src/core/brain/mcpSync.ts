@@ -7,7 +7,6 @@
  */
 import { promises as fs } from 'node:fs'
 import { CLIENTS, buildSnippet, type BrainTarget, type ClientId } from './snippet.js'
-import { urlsPointAtSameBrain } from './mcpUrl.js'
 import type { OS } from '../model.js'
 
 export const MCP_MANAGED_KEYS = [
@@ -51,6 +50,37 @@ export function mergeManagedServers(
 export interface SyncMcpResult {
   updated: Array<{ id: ClientId; path: string; from?: string; to: string }>
   skipped: Array<{ id: ClientId; reason: string }>
+}
+
+/** Deterministic shape for comparison: key order must not decide equality. */
+function stable(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(stable)
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>
+    return Object.keys(o)
+      .sort()
+      .reduce<Record<string, unknown>>((acc, k) => {
+        acc[k] = stable(o[k])
+        return acc
+      }, {})
+  }
+  return v
+}
+
+/**
+ * Does the managed part of this config already say exactly what we would write?
+ *
+ * Only the keys we manage are compared. Someone else's servers in the same
+ * file are theirs, and a difference there is not a reason to rewrite ours.
+ */
+function sameManagedBlock(
+  current: Record<string, unknown>,
+  next: Record<string, unknown>,
+): boolean {
+  for (const key of Object.keys(next)) {
+    if (JSON.stringify(stable(current[key])) !== JSON.stringify(stable(next[key]))) return false
+  }
+  return true
 }
 
 export async function syncManagedMcpConfigs(opts: {
@@ -98,10 +128,6 @@ export async function syncManagedMcpConfigs(opts: {
       skipped.push({ id: spec.id, reason: 'no Pomnia-managed server block' })
       continue
     }
-    if (urlsPointAtSameBrain(current, brainUrl)) {
-      skipped.push({ id: spec.id, reason: 'already points at this brain' })
-      continue
-    }
     const snippet = buildSnippet(
       spec.id,
       brainUrl,
@@ -111,6 +137,27 @@ export async function syncManagedMcpConfigs(opts: {
       opts.target,
     )
     const nextManaged = JSON.parse(snippet.mergeJson) as Record<string, unknown>
+
+    // Compare the whole block, not just the address.
+    //
+    // This used to skip whenever the URL already matched, which sounds right
+    // and quietly made upgrades unable to repair anything else. A Claude
+    // Desktop entry written by an older build kept `command: "npx"` and a
+    // `--header "Authorization: Bearer …"` with a space in it -- the two
+    // Windows faults fixed in 0.1.71, which between them produce
+    // `'C:\Program' is not recognized` and an empty Authorization header. The
+    // address in that entry was perfectly correct, so every later version
+    // looked at it, agreed, and left the break in place. The user upgrades,
+    // nothing changes, and MCP is broken again for reasons the app has already
+    // been taught to fix.
+    //
+    // Stable key order both sides, so a rewrite means a real difference rather
+    // than JSON.stringify visiting properties in another order.
+    if (sameManagedBlock(mcp, nextManaged)) {
+      skipped.push({ id: spec.id, reason: 'already correct' })
+      continue
+    }
+
     const merged = mergeManagedServers(mcp, nextManaged)
     const nextRoot = { ...root, [spec.mcpKey]: merged }
     await fs.writeFile(filePath, `${JSON.stringify(nextRoot, null, 2)}\n`, 'utf8')
