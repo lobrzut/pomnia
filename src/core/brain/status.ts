@@ -123,9 +123,9 @@ export interface McpActivityResponse {
 }
 
 /** Detect a single server's URL across the various shapes clients use. */
-function pickUrl(srv: any): { url?: string; transport?: string; hasToken?: boolean } {
+function pickUrl(srv: any): { url?: string; transport?: string; hasToken?: boolean; token?: string } {
   if (!srv || typeof srv !== 'object') return {}
-  const out: { url?: string; transport?: string; hasToken?: boolean } = {}
+  const out: { url?: string; transport?: string; hasToken?: boolean; token?: string } = {}
   if (typeof srv.type === 'string') out.transport = srv.type
   if (typeof srv.url === 'string') out.url = srv.url
   else if (typeof srv.serverUrl === 'string') out.url = srv.serverUrl
@@ -140,24 +140,52 @@ function pickUrl(srv: any): { url?: string; transport?: string; hasToken?: boole
       out.transport = 'mcp-remote (stdio→http)'
     }
   }
+  // The token this client would actually send.
+  //
+  // Read rather than merely detected, because the status probe used to test
+  // each client's URL with *this app's* token. A client carrying a revoked one
+  // therefore probed green: Pomnia substituted a working token and reported
+  // that the config was fine. That is how a Claude Desktop entry answering 401
+  // sat here looking connected.
+  //
+  // Three shapes, and the third is ours. 0.1.71 moved Windows entries to
+  // `--header Authorization:${AUTH_HEADER}` with the value in `env`, because
+  // cmd.exe splits `Authorization: Bearer …` on its space and sends an empty
+  // header. Neither pattern below matched that, so the shape this app writes
+  // itself was reported as having no token at all.
+  const bearer = (v: unknown): string | undefined =>
+    typeof v === 'string' && /^Bearer\s+\S/.test(v) ? v.replace(/^Bearer\s+/, '') : undefined
+
   if (srv.headers && typeof srv.headers === 'object') {
-    const auth = (srv.headers as Record<string, unknown>)['Authorization']
-    if (typeof auth === 'string' && /^Bearer\s+/.test(auth)) out.hasToken = true
+    out.token = bearer((srv.headers as Record<string, unknown>)['Authorization'])
   }
-  if (Array.isArray(srv.args)) {
+  if (!out.token && Array.isArray(srv.args)) {
     const i = srv.args.indexOf('--header')
-    if (i >= 0 && typeof srv.args[i + 1] === 'string' && /Bearer\s+/.test(srv.args[i + 1])) {
-      out.hasToken = true
+    const arg = i >= 0 ? srv.args[i + 1] : undefined
+    if (typeof arg === 'string') {
+      out.token = bearer(arg.replace(/^Authorization:\s*/, ''))
+      if (!out.token) {
+        // `Authorization:${AUTH_HEADER}` -- the value lives in env.
+        const m = /^Authorization:\s*\$\{(\w+)\}$/.exec(arg)
+        const envVal = m && srv.env && typeof srv.env === 'object'
+          ? (srv.env as Record<string, unknown>)[m[1]]
+          : undefined
+        out.token = bearer(envVal)
+      }
     }
   }
+  if (out.token) out.hasToken = true
   return out
 }
+
+/** Test seam: the token-reading rules above are the whole point of the check. */
+export const __testPickUrl = pickUrl
 
 function pickServer(
   mcp: Record<string, unknown>,
   canonical: string,
   legacy: string,
-): { present: boolean; url?: string; transport?: string; hasToken?: boolean } {
+): { present: boolean; url?: string; transport?: string; hasToken?: boolean; token?: string } {
   const srv = mcp[canonical] ?? mcp[legacy]
   if (!srv) return { present: false }
   return { present: true, ...pickUrl(srv) }
@@ -279,7 +307,26 @@ export async function checkClient(spec: ClientSpec, opts?: CheckClientOptions): 
   // changes, and that gap is invisible to every check above.
   let probe: McpProbe | undefined
   if (opts?.probe && rag?.present && rag.url) {
-    probe = await probeMcpUrl(rag.url, opts.token, opts.probeTimeoutMs)
+    // This client's own token, not ours.
+    //
+    // Probing every config with the app's working token answers a question
+    // nobody asked: whether the server is up. What matters is whether *this
+    // client* can reach it, and a config carrying a revoked token would report
+    // connected right up until the agent tried to use it. Falling back to the
+    // app's token only when the config has none keeps an unauthenticated local
+    // brain probing as before.
+    probe = await probeMcpUrl(rag.url, rag.token ?? opts.token, opts.probeTimeoutMs)
+    // Not `!reachable`: a 401 means something answered, so the probe counts it
+    // as reachable on purpose. Rejected credentials are a different failure
+    // from a dead host and have to be named separately, or a client with a
+    // revoked token reads as connected.
+    if (rag.token && probe.status === 401) {
+      state = 'unreachable'
+      issues.unshift(
+        `${spec.label}: the token in this config is not accepted by ${rag.url} — ` +
+          `re-copy the snippet from Connect`,
+      )
+    }
     if (!probe.reachable && state === 'wired') {
       state = 'unreachable'
       issues.unshift(`${rag.url} is not answering (${probe.error ?? 'no response'})`)
