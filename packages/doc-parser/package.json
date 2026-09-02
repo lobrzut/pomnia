@@ -19,7 +19,7 @@
     "@napi-rs/canvas": "^0.1.80",
     "fflate": "^0.8.3",
     "mammoth": "^1.12.0",
-    "pdfjs-dist": "^4.10.38",
+    "pdfjs-dist": "5.6.205",
     "tesseract.js": "^6.0.0",
     "unpdf": "^1.6.2"
   },

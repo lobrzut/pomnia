@@ -46,6 +46,19 @@ const DEFAULT_SPARSE = 50
 const DEFAULT_MAX_PAGES = 3
 const DEFAULT_LANGS = 'eng+pol'
 
+/**
+ * Rendering needs a pdfjs that can actually make a canvas.
+ *
+ * unpdf's own bundled pdfjs cannot: its NodeCanvasFactory was stripped by the
+ * bundler down to a proxy that throws '@napi-rs/canvas is not available in this
+ * environment' for every call. So a real pdfjs-dist has to be injected — that
+ * is what this is for.
+ *
+ * The version has to match unpdf's, though. pdfjs-dist sat at 4.10.38 against
+ * unpdf's 5.6.205, and every render died with 'The API version does not match
+ * the Worker version'. runOcr reported that as no pages, so OCR looked like it
+ * had read a scan and found nothing in it, when it had never rendered a page.
+ */
 let pdfjsReady: Promise<void> | null = null
 
 async function ensurePdfjsForRender(): Promise<void> {

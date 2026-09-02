@@ -46,6 +46,9 @@ export default function MiniIngest() {
   const [pulling, setPulling] = useState(false)
   const [showOllama, setShowOllama] = useState(false)
   const [ocr, setOcr] = useState(false)
+  // Three pages of a 147-page book is not a sample, it is a title page.
+  // Ten is still a sample and says so; the number is here to be raised.
+  const [ocrPages, setOcrPages] = useState(10)
   const [files, setFiles] = useState<Parsed>([])
   const [parsing, setParsing] = useState(false)
   const [sending, setSending] = useState(false)
@@ -94,6 +97,7 @@ export default function MiniIngest() {
         ollamaUrl: ollamaUrl || undefined,
         model,
         ocr,
+        ocrPages,
       })
       // Append rather than replace: picking a second batch is adding to what is
       // staged, and wiping the first list would hide what is about to be sent.
@@ -268,7 +272,22 @@ export default function MiniIngest() {
             <div className="text-[13px] text-ink">{labels.ingestOcr}</div>
             <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">{labels.ingestOcrHint}</p>
           </div>
-          <Toggle checked={ocr} onChange={setOcr} aria-label={labels.ingestOcr} />
+          <div className="flex shrink-0 items-center gap-3">
+            {ocr && (
+              <label className="flex items-center gap-2 text-[11px] text-ink-faint">
+                {labels.ingestOcrPages}
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={ocrPages}
+                  onChange={(e) => setOcrPages(Math.max(1, Math.min(500, Number(e.target.value) || 1)))}
+                  className="no-drag w-16 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-ink"
+                />
+              </label>
+            )}
+            <Toggle checked={ocr} onChange={setOcr} aria-label={labels.ingestOcr} />
+          </div>
         </div>
         </>
         )}

@@ -508,6 +508,7 @@ export interface UiLabels {
   ingestEtaUnknown: string
   ingestModelCustom: string
   ingestPushResult: (uploaded: number, unchanged: number, failed: number) => string
+  ingestOcrPages: string
   ingestOcr: string
   ingestOcrHint: string
   ingestTitle: string
@@ -1396,6 +1397,7 @@ const PL_LABELS: UiLabels = {
     (unchanged ? `, ${unchanged} bez zmian` : '') +
     (failed ? `, ${plCount(failed, 'nieudana', 'nieudane', 'nieudanych')}` : '') +
     '. Serwer nic nie skasował.',
+  ingestOcrPages: 'stron:',
   ingestOcr: 'OCR dla skanów',
   ingestOcrHint:
     'Skan bez warstwy tekstowej inaczej nie da nic. Czyta próbkę stron, nie całość — powie ile.',
@@ -2346,6 +2348,7 @@ const EN_LABELS: UiLabels = {
     (unchanged ? `, ${unchanged} unchanged` : '') +
     (failed ? `, ${failed} failed` : '') +
     '. The server deleted nothing.',
+  ingestOcrPages: 'pages:',
   ingestOcr: 'OCR for scans',
   ingestOcrHint:
     'A scan with no text layer yields nothing otherwise. Reads a sample of pages, not the whole file — it says how many.',
