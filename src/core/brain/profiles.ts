@@ -69,6 +69,20 @@ export const PROFILE_EMBED_SIZE = '274 MB'
  * work) — the rig that produced them is in lobrzut/pomnia-lab if yours looks
  * different.
  */
+/**
+ * The model to reach for when nobody has chosen one.
+ *
+ * Derived from the recommended profile rather than written out again: the
+ * measurement that picked it lives above, and a second copy of the string is a
+ * second thing to forget. `defaultOllamaConfig()` carried `qwen2.5:14b` for two
+ * releases after this was decided — the release notes said the default had
+ * moved and one of the two defaults had not.
+ */
+export function defaultChatModel(): string {
+  const rec = VRAM_PROFILES.find((p) => p.recommended) ?? VRAM_PROFILES[0]
+  return rec.chatModel
+}
+
 export const VRAM_PROFILES: VramProfile[] = [
   {
     id: 'lite',

@@ -7,6 +7,7 @@
  * localhost:11434 (the GPU box) or a LAN Ollama.
  */
 import { log } from '../log.js'
+import { defaultChatModel } from './profiles.js'
 
 export interface OllamaModel {
   name: string
@@ -30,7 +31,11 @@ export interface OllamaConfig {
 export function defaultOllamaConfig(): OllamaConfig {
   return {
     baseUrl: process.env.POMNIA_OLLAMA || process.env.RELIQUA_OLLAMA || 'http://127.0.0.1:11434',
-    chatModel: process.env.POMNIA_OLLAMA_MODEL || process.env.RELIQUA_OLLAMA_MODEL || 'qwen2.5:14b',
+    // Measured, not assumed: llama3.1:8b scored 6.853 against the 14B's 5.838
+    // over 30 conversations, passed the quality gate 87% to 73%, and ran about
+    // twice as fast. brain-core moved to it in 0.1.76; this default did not,
+    // so the desktop kept handing out a model the project had already dropped.
+    chatModel: process.env.POMNIA_OLLAMA_MODEL || process.env.RELIQUA_OLLAMA_MODEL || defaultChatModel(),
     embedModel: process.env.POMNIA_EMBED_MODEL || process.env.RELIQUA_EMBED_MODEL || 'nomic-embed-text'
   }
 }

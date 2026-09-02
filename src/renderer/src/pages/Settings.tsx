@@ -18,6 +18,7 @@ import { hasOllamaModel as hasModel } from '@core/brain/modelMatch'
 import { isMini } from '../lib/flavour'
 import { resolveBrainTarget } from '@core/brain/brainTarget'
 import type { ClientId } from '../lib/types'
+import { defaultChatModel } from '@core/brain/profiles'
 
 const ALL_CLIENTS: ClientId[] = ['claude-code', 'cursor', 'antigravity', 'claude-desktop', 'vscode', 'windsurf', 'hermes']
 
@@ -120,15 +121,15 @@ function HealthCheck() {
               : labels.healthSkip,
         })
 
-        const chatOk = hasModel(models, status?.chatModel ?? 'qwen2.5:14b')
+        const chatOk = hasModel(models, status?.chatModel ?? defaultChatModel())
         next.push({
           id: 'chat',
           label: labels.healthChatModel,
           ok: status?.reachable ? chatOk : null,
           detail: chatOk
-            ? status?.chatModel ?? 'qwen2.5:14b'
+            ? status?.chatModel ?? defaultChatModel()
             : status?.reachable
-              ? labels.healthModelMissing(`ollama pull ${status?.chatModel ?? 'qwen2.5:14b'}`)
+              ? labels.healthModelMissing(`ollama pull ${status?.chatModel ?? defaultChatModel()}`)
               : labels.healthSkip,
         })
       }

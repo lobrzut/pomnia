@@ -30,6 +30,7 @@ import { uiLabels } from '../lib/labels'
 import { useStore, ollamaUrlFromBrainUrl, ollamaUrlLooksLocal } from '../store/useStore'
 import { identifyEngine } from '@core/brain/engine'
 import { hasOllamaModel } from '@core/brain/modelMatch'
+import { defaultChatModel } from '@core/brain/profiles'
 import { EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from '@core/brain/snippet'
 import type {
   BrainStatus,
@@ -565,7 +566,7 @@ function EngineStep({
   const found = !!status?.reachable
   const models = status?.models ?? []
   const embedModel = status?.embedModel ?? 'nomic-embed-text'
-  const distillModel = status?.chatModel ?? 'qwen2.5:14b'
+  const distillModel = status?.chatModel ?? defaultChatModel()
   const hasEmbed = hasOllamaModel(models, embedModel)
   const hasDistill = hasOllamaModel(models, distillModel)
   const remoteUrlTrimmed = remoteUrl.trim()

@@ -21,6 +21,8 @@ import { Button, GlassCard, Input, Spinner } from '../components/ui'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
+import { defaultChatModel, VRAM_PROFILES } from '@core/brain/profiles'
+import { hasOllamaModel } from '@core/brain/modelMatch'
 
 type Parsed = Awaited<ReturnType<typeof api.miniIngestFiles>>['files']
 
@@ -51,7 +53,7 @@ export default function MiniIngest() {
   const checkOllama = useCallback(async () => {
     const st = await api.brainStatus(ollamaUrl || undefined)
     setOllama({ reachable: st.reachable, models: st.models, chatModel: st.chatModel })
-    setModel((m) => m || st.chatModel)
+    setModel((m) => m || st.chatModel || defaultChatModel())
   }, [ollamaUrl])
 
   useEffect(() => {
@@ -173,7 +175,7 @@ export default function MiniIngest() {
                 ? labels.ingestOllamaChecking
                 : !ollama.reachable
                   ? labels.ingestOllamaUnreachable
-                  : ollama.models.includes(model)
+                  : hasOllamaModel(ollama.models, model)
                     ? labels.ingestOllamaReady(model)
                     : labels.ingestOllamaModelMissing(model)}
             </span>
@@ -195,13 +197,29 @@ export default function MiniIngest() {
             placeholder="http://127.0.0.1:11434"
             className="w-64"
           />
-          <Input
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder={ollama?.chatModel || 'qwen2.5:14b'}
-            className="w-48"
-          />
-          {ollama?.reachable && model && !ollama.models.includes(model) && (
+          {/*
+            The two tiers, not a free-text box. Standard is llama3.1:8b
+            because it was measured against the gate that decides whether a
+            note reaches retrieval at all: 6.853 to the 14B's 5.838, through
+            the gate 87% against 73%, and about twice as fast. Lite is not
+            the bottom of a quality ladder — it is what runs on a 4-6 GB card,
+            and it says so rather than implying it was measured too.
+          */}
+          <select
+            value={VRAM_PROFILES.some((p) => p.chatModel === model) ? model : 'custom'}
+            onChange={(e) => e.target.value !== 'custom' && setModel(e.target.value)}
+            className="no-drag rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-ink"
+          >
+            {VRAM_PROFILES.map((p) => (
+              <option key={p.id} value={p.chatModel}>
+                {p.label} — {p.chatModel} ({p.chatSize}, {p.vram})
+              </option>
+            ))}
+            {!VRAM_PROFILES.some((p) => p.chatModel === model) && (
+              <option value="custom">{model || labels.ingestModelCustom}</option>
+            )}
+          </select>
+          {ollama?.reachable && model && !hasOllamaModel(ollama.models, model) && (
             <Button
               variant="soft"
               disabled={pulling}

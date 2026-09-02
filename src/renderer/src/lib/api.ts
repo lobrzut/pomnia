@@ -670,9 +670,9 @@ function mockBridge(): PomniaBridge {
       return {
         reachable: true,
         baseUrl: 'http://localhost:11434',
-        chatModel: 'qwen2.5:14b',
+        chatModel: 'llama3.1:8b',
         embedModel: 'nomic-embed-text',
-        models: ['qwen2.5:14b', 'nomic-embed-text', 'deepseek-r1:32b', 'llama3.1:8b']
+        models: ['llama3.1:8b', 'nomic-embed-text', 'qwen2.5:14b']
       }
     },
     async brainRun() {
