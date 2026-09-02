@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ChevronDown, ChevronRight, Cpu, Download, FileUp, Send, Trash2, UploadCloud } from 'lucide-react'
 
-import { Button, GlassCard, Input, Spinner } from '../components/ui'
+import { Button, GlassCard, Input, Spinner, Toggle } from '../components/ui'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
@@ -45,6 +45,7 @@ export default function MiniIngest() {
   const [model, setModel] = useState('')
   const [pulling, setPulling] = useState(false)
   const [showOllama, setShowOllama] = useState(false)
+  const [ocr, setOcr] = useState(false)
   const [files, setFiles] = useState<Parsed>([])
   const [parsing, setParsing] = useState(false)
   const [sending, setSending] = useState(false)
@@ -89,7 +90,11 @@ export default function MiniIngest() {
     if (paths.length === 0) return
     setParsing(true)
     try {
-      const r = await api.miniIngestFiles(paths, { ollamaUrl: ollamaUrl || undefined, model })
+      const r = await api.miniIngestFiles(paths, {
+        ollamaUrl: ollamaUrl || undefined,
+        model,
+        ocr,
+      })
       // Append rather than replace: picking a second batch is adding to what is
       // staged, and wiping the first list would hide what is about to be sent.
       setFiles((prev) => [...prev, ...r.files])
@@ -252,6 +257,19 @@ export default function MiniIngest() {
           )}
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">{labels.ingestOllamaHint}</p>
+
+        {/* OCR sits here because it is the same question — what turns a file
+            into text — and it is off by default because it samples pages
+            rather than reading the document. A switch that quietly turned
+            147 scanned pages into three pages of text would be the same lie
+            as staging the empty note was. */}
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+          <div>
+            <div className="text-[13px] text-ink">{labels.ingestOcr}</div>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">{labels.ingestOcrHint}</p>
+          </div>
+          <Toggle checked={ocr} onChange={setOcr} aria-label={labels.ingestOcr} />
+        </div>
         </>
         )}
       </GlassCard>

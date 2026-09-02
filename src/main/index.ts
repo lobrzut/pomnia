@@ -2241,12 +2241,18 @@ function registerIpc(): void {
 
   ipcMain.handle(
     'mini:ingestFiles',
-    async (_e, paths: string[], opts?: { ollamaUrl?: string; model?: string }) =>
+    async (
+      _e,
+      paths: string[],
+      opts?: { ollamaUrl?: string; model?: string; ocr?: boolean; ocrPages?: number },
+    ) =>
       ingestFiles(app.getPath('userData'), Array.isArray(paths) ? paths : [], {
         // Fall back to the saved Ollama, so the address is configured once
         // rather than being re-typed on every import.
         ollamaUrl: opts?.ollamaUrl?.trim() || getAppSettings().ollamaUrl,
         model: opts?.model,
+        ocr: opts?.ocr === true,
+        ocrPages: opts?.ocrPages,
       }),
   )
 

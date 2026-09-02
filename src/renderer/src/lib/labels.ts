@@ -508,6 +508,8 @@ export interface UiLabels {
   ingestEtaUnknown: string
   ingestModelCustom: string
   ingestPushResult: (uploaded: number, unchanged: number, failed: number) => string
+  ingestOcr: string
+  ingestOcrHint: string
   ingestTitle: string
   ingestLead: string
   ingestPick: string
@@ -1394,6 +1396,9 @@ const PL_LABELS: UiLabels = {
     (unchanged ? `, ${unchanged} bez zmian` : '') +
     (failed ? `, ${plCount(failed, 'nieudana', 'nieudane', 'nieudanych')}` : '') +
     '. Serwer nic nie skasował.',
+  ingestOcr: 'OCR dla skanów',
+  ingestOcrHint:
+    'Skan bez warstwy tekstowej inaczej nie da nic. Czyta próbkę stron, nie całość — powie ile.',
   ingestTitle: 'Do Pomnia',
   ingestLead: 'Wrzuć pliki — Pomnia rozpozna, co to jest, i wyśle na serwer.',
   ingestPick: 'Wybierz pliki',
@@ -2341,6 +2346,9 @@ const EN_LABELS: UiLabels = {
     (unchanged ? `, ${unchanged} unchanged` : '') +
     (failed ? `, ${failed} failed` : '') +
     '. The server deleted nothing.',
+  ingestOcr: 'OCR for scans',
+  ingestOcrHint:
+    'A scan with no text layer yields nothing otherwise. Reads a sample of pages, not the whole file — it says how many.',
   ingestTitle: 'To Pomnia',
   ingestLead: 'Drop files in — Pomnia works out what they are and sends them to the server.',
   ingestPick: 'Choose files',

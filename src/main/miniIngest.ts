@@ -36,7 +36,13 @@ import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { extname, basename, join } from 'node:path'
 
-import { buildExtractedMarkdown, extractionPathLabel, parseDocument } from '@pomnia/doc-parser'
+import {
+  applyOcrToDocument,
+  buildExtractedMarkdown,
+  extractionPathLabel,
+  parseDocument,
+  runOcr,
+} from '@pomnia/doc-parser'
 
 import { STAGING_NOTES_DIR, stagedNoteName } from '@core/brain/miniIngest.js'
 import { distillConversation } from '@core/brain/distill.js'
@@ -68,6 +74,14 @@ export interface IngestOptions {
   /** Where a chat model lives. Absent means: stage transcripts, say so. */
   ollamaUrl?: string
   model?: string
+  /**
+   * Read scanned pages with OCR. Off by default and asked for explicitly,
+   * because it is slow and it samples: `ocrPages` pages, not the book. A
+   * setting that quietly turned 147 scanned pages into 3 pages of text
+   * would be the same lie as staging the empty note was.
+   */
+  ocr?: boolean
+  ocrPages?: number
   onProgress?: (done: number, total: number, file: string) => void
 }
 
@@ -186,15 +200,54 @@ export async function ingestFiles(
     try {
       if (DOC_EXTS.has(ext)) {
         const parsed = await parseDocument(p)
+
+        // A scan with no text layer is not a note. Staging it produced a
+        // file of pure YAML frontmatter — 3.6 kB from a 147-page book —
+        // which the page then counted as '1 note' and the server indexed as
+        // knowledge. The frontmatter had recorded the extraction path all
+        // along; nothing read it. Refusing is the only honest answer,
+        // because the alternative is a memory that confidently contains
+        // nothing.
+        let doc = parsed
+        let ocrNote = ''
+        if (opts.ocr && doc.meta.sparse && doc.format === 'pdf') {
+          try {
+            const pages = Math.max(1, opts.ocrPages ?? 3)
+            const ocr = await runOcr(p, { prefer: 'tesseract', maxPages: pages })
+            if (ocr.method !== 'none' && ocr.pages.length > 0) {
+              doc = applyOcrToDocument(doc, ocr)
+              // Say how many pages were actually read. 'OCR' on its own
+              // implies the whole document, and it is not.
+              ocrNote = ` — OCR: ${ocr.pages.length}/${parsed.meta.pageCount} str.`
+            }
+          } catch (e) {
+            log.warn('ocr failed for', name, e)
+          }
+        }
+
+        const perPage = doc.meta.charCount / Math.max(1, doc.meta.pageCount)
+        if (doc.meta.charCount === 0) {
+          files.push({
+            file: name,
+            kind: 'document',
+            notes: 0,
+            detail: `${parsed.meta.pageCount} str.`,
+            error: opts.ocr
+              ? 'skan bez warstwy tekstowej — OCR też nic nie odczytał'
+              : 'skan bez warstwy tekstowej — włącz OCR w sekcji Destylacja',
+          })
+          continue
+        }
+
         const bytes = await fs.readFile(p)
-        const md = buildExtractedMarkdown(parsed.markdown, {
+        const md = buildExtractedMarkdown(doc.markdown, {
           source_file: name,
           source_sha256: createHash('sha256').update(bytes).digest('hex'),
-          format: parsed.format,
-          extraction_tier: parsed.meta.tier,
-          extraction_sparse: parsed.meta.sparse,
-          extraction_path: extractionPathLabel(parsed),
-          pages: parsed.meta.pageCount,
+          format: doc.format,
+          extraction_tier: doc.meta.tier,
+          extraction_sparse: doc.meta.sparse,
+          extraction_path: extractionPathLabel(doc),
+          pages: doc.meta.pageCount,
           imported_at: new Date().toISOString(),
           imported_via: 'pomnia-mini',
         })
@@ -205,7 +258,14 @@ export async function ingestFiles(
           notes: 1,
           // Say which path produced the text: an OCR fallback is a different
           // quality of material than a real text layer, and it matters later.
-          detail: `${extractionPathLabel(parsed)}, ${parsed.meta.pageCount} str.`,
+          // Characters per page, because that is the number that says
+          // whether the text is really there. A sparse result is still
+          // staged — partial text beats none — but it says so.
+          detail:
+            `${extractionPathLabel(doc)}, ${doc.meta.pageCount} str., ` +
+            `${Math.round(perPage)} zn./str.` +
+            (doc.meta.sparse ? ' — rzadki tekst, prawdopodobnie skan' : '') +
+            ocrNote,
         })
       } else if (EXPORT_EXTS.has(ext)) {
         const r = await parseExportFile(p)

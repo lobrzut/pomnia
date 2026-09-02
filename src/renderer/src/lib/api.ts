@@ -256,7 +256,7 @@ export interface PomniaBridge {
   miniIngestPick(): Promise<string[]>
   miniIngestFiles(
     paths: string[],
-    opts?: { ollamaUrl?: string; model?: string },
+    opts?: { ollamaUrl?: string; model?: string; ocr?: boolean; ocrPages?: number },
   ): Promise<{
     files: { file: string; kind: 'document' | 'export'; notes: number; detail: string; error?: string }[]
     staged: number
