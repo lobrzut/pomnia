@@ -33,7 +33,8 @@ import { isDistillableSource } from '@core/brain/distillSources'
 import type { BrainHit, BrainStatus, EmbeddedBrainStatus, OllamaPullEvent, QuarantineBucket, QuarantineNoteMeta } from '../lib/types'
 import { uiLabels } from '../lib/labels'
 import { saveDoctorLastResult } from '../lib/doctorLastResult'
-import { useStore, ollamaUrlFromBrainUrl, dashboardUrlFromBrainUrl, ollamaUrlLooksLocal } from '../store/useStore'
+import { useStore, ollamaUrlFromBrainUrl, ollamaUrlLooksLocal } from '../store/useStore'
+import { brainBaseUrl } from '@core/brain/brainTarget'
 import { ActivityBanner } from '../components/ActivityBanner'
 
 type DoctorCheckRow = {
@@ -1178,7 +1179,10 @@ export default function Brain() {
           <Input
             value={brainDeployUrl}
             onChange={(e) => setBrainDeployUrl(e.target.value)}
-            placeholder={dashboardUrlFromBrainUrl(remoteBrainUrl)}
+            // The placeholder used to offer the brain's host on port 7860 —
+            // the retired hub's dashboard, which answers nothing. Suggesting
+            // an address that cannot work is worse than suggesting none.
+            placeholder={brainBaseUrl(remoteBrainUrl)}
             className="w-64"
           />
         </div>

@@ -21,7 +21,6 @@ import {
   type ClientId,
   type ClientSpec,
 } from './snippet.js'
-import { dashboardUrlFromBrainUrl } from './deploy.js'
 import { urlsPointAtSameBrain } from './mcpUrl.js'
 
 /**
@@ -400,11 +399,11 @@ export async function fetchMcpActivity(baseUrl: string, token?: string): Promise
   const base = baseUrl.replace(/\/+$/, '').replace(/\/mcp$/, '')
   const headers: Record<string, string> = { accept: 'application/json' }
   if (token) headers.Authorization = `Bearer ${token}`
-  const probes = [
-    `${base}/mcp/activity`,
-    `${base}/api/mcp/last-activity`,
-    `${dashboardUrlFromBrainUrl(base)}/api/mcp/last-activity`,
-  ]
+  // One endpoint. The two that used to follow it were the Python hub's, on
+  // its own port, and that hub is retired — so on every failed poll they cost
+  // two more 3s timeouts before the caller learned anything, turning a 3s
+  // failure into a 9s one on a 1.5s timer.
+  const probes = [`${base}/mcp/activity`]
   for (const url of probes) {
     try {
       const r = await fetch(url, { headers, signal: AbortSignal.timeout(3_000) })

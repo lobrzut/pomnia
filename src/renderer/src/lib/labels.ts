@@ -596,7 +596,6 @@ export interface UiLabels {
   manualOuterKeyNote: string
   manualCopy: string
   manualCopied: string
-  agentPromptLead: string
   agentPromptCopy: string
   agentPromptCopied: string
   agentPromptSecret: string
@@ -1117,7 +1116,7 @@ const PL_LABELS: UiLabels = {
   clientNone: 'Brak',
   tokenSavedDetail: 'Zapisany w polu — snippet odświeży się automatycznie.',
   tokenCreateFailed: 'Nie udało się utworzyć tokena',
-  tokenCreateFailedDetail: (msg) => `${msg} — otwórz dashboard :7860 i wklej token ręcznie.`,
+  tokenCreateFailedDetail: (msg) => `${msg} — otwórz dashboard Brain pod adresem serwera i wklej token ręcznie.`,
   snippetBuildFailed: 'Nie udało się zbudować snippeta',
   copyFailed: 'Nie udało się skopiować',
   copied: 'Skopiowano',
@@ -1302,8 +1301,7 @@ const PL_LABELS: UiLabels = {
   colorSchemeIris: 'Iris',
   colorSchemeGlass: 'Szkło',
   uiLocale: 'Język interfejsu',
-  uiLocaleHint:
-    'Tylko chrome aplikacji (menu, Settings, toasty). Brain działa dwujęzycznie automatycznie — bez osobnego ustawienia języka wiedzy.',
+  uiLocaleHint: 'Nie dotyczy języka wiedzy — Brain jest dwujęzyczny.',
   uiLocalePl: 'PL',
   uiLocaleEn: 'EN',
   floatingMonitorOnMinimize: 'Pokaż przy minimalizacji',
@@ -1327,12 +1325,11 @@ const PL_LABELS: UiLabels = {
   tokenAdoptAgentDetail: 'Trafi do konfiguracji klientów MCP. Do sterowania zachowaniem agenta potrzeba tokena admina.',
   tokenAdoptUnreachable: 'Nie mogę zapytać serwera, czym jest ten token',
   tokenAdoptFailed: 'Nie udało się rozpoznać tokena',
-  tokenHaveAdmin: 'Masz zapisany token admina — Tryb Brain poniżej dociera do serwera.',
-  tokenNoAdmin: 'Brak tokena admina — Tryb Brain poniżej zapisze się tylko lokalnie. Wklej token admina powyżej.',
+  tokenHaveAdmin: 'Token admina zapisany.',
+  tokenNoAdmin: 'Bez tokena admina Tryb Brain zapisze się tylko lokalnie.',
   seenClientsTitle: 'Agenci, którzy korzystali z pamięci',
-  seenClientsLead:
-    'Prosto z serwera — kto naprawdę się połączył, tak jak się przedstawił. Nie lista wpisana z góry, więc agent, o którym nikt nie słyszał, pojawi się tu sam.',
-  seenClientsEmpty: 'Jeszcze nikt się nie zgłosił. Wklej polecenie w oknie agenta.',
+  seenClientsLead: 'Prosto z serwera — kto się faktycznie połączył.',
+  seenClientsEmpty: 'Jeszcze nikt się nie zgłosił.',
   seenClientsUnsupported:
     'Ten serwer tego nie raportuje — potrzebuje brain-core 0.1.78 lub nowszego.',
   // Polish counts in three forms: 1 połączenie, 2-4 połączenia, 5+ połączeń —
@@ -1389,8 +1386,7 @@ const PL_LABELS: UiLabels = {
   profilePreviewEmptyVault: 'Sejf zablokowany — odblokuj vault, żeby zobaczyć profil.',
   profilePreviewEmptyBrain: 'Lokalna wyszukiwarka nie działa — uruchom Brain na stronie Brain.',
   profilePreviewEmptyKnowledge: 'Uzupełnij § PROFIL (kim jesteś) i Zapisz — TECH to projekt, nie Ty.',
-  connectPageLeadMini:
-    'Jedno polecenie, które agent wykonuje sam. Nie musisz wiedzieć, gdzie trzyma swój plik konfiguracyjny ani którego z trzech kształtów potrzebuje.',
+  connectPageLeadMini: 'Jedno polecenie — agent podłącza się sam.',
   connectPageLead:
     'Skopiuj konfigurację MCP i wklej u klienta (Cursor, Claude, Antigravity…) — Pomnia przepisuje blok `pomnia` na Brain tej aplikacji, inne serwery zostawia.',
   connectChecklistTitle: 'Pierwsze podłączenie (4 kroki)',
@@ -1400,7 +1396,7 @@ const PL_LABELS: UiLabels = {
   connectStepReload: 'Przeładuj klienta MCP (np. Reload Window)',
   connectCopyForClient: (name) => `Kopiuj mcp.json dla ${name}`,
   connectTokenPlaceholder: 'Bearer token (wymagany dla remote)',
-  connectTokenRequiredMini: 'Bez tokena MCP nie zadziała. Weź token z dashboardu i wklej go w pole powyżej.',
+  connectTokenRequiredMini: 'Bez tokena MCP nie zadziała.',
   connectTokenRequired: 'Bez tokena remote MCP zwykle nie zadziała — wklej lub utwórz poniżej.',
   connectOpenDashboard: 'Otwórz dashboard tokenów',
   connectPartialTitle: 'Niepełny mcp.json — brak vault/library',
@@ -1410,10 +1406,8 @@ const PL_LABELS: UiLabels = {
   connectMacNoAppHint:
     'Bez aplikacji Desktop: docs/CURSOR-MCP.md — ten sam pełny JSON MCP (przykład Cursor; kształt dla innych klientów w Connect).',
   agentBrainMode: 'Tryb Brain dla agenta',
-  agentBrainModeHint:
-    'Dopisuje agentowi regułę: sam czyta pamięć na starcie i zapisuje kamienie milowe, zamiast czekać na polecenie.',
-  agentBrainModeHintMore:
-    'Reguła trafia tam, gdzie dany klient jej szuka (Cursor rules, CLAUDE.md, GEMINI.md). „Połączony” znaczy tylko, że plik MCP istnieje — nie że agent już z pamięci skorzystał.',
+  agentBrainModeHint: 'Reguła dla agenta: czyta pamięć na starcie, zapisuje kamienie milowe.',
+  agentBrainModeHintMore: 'Trafia tam, gdzie klient jej szuka: Cursor rules, CLAUDE.md, GEMINI.md.',
   agentBrainModeBriefTitle: 'Reguła agenta (Tryb Brain / Pomnia)',
   agentBrainModeBriefCopy: 'Kopiuj regułę do pliku',
   agentBrainModeBriefWrite: 'Zapisz regułę na dysk',
@@ -1448,22 +1442,19 @@ const PL_LABELS: UiLabels = {
   agentPromptTitle: 'Podłącz dowolnego agenta',
   manualShow: 'Wolę wkleić sam do pliku konfiguracyjnego →',
   manualHide: 'Ukryj konfigurację ręczną',
-  manualLead: (outerKey) =>
-    `Wklej jeden z trzech kształtów pod klucz \`${outerKey}\` w pliku MCP swojego klienta. Który — zależy od klienta, opis nad każdym.`,
+  manualLead: (outerKey) => `Wklej jeden kształt pod klucz \`${outerKey}\` w pliku MCP klienta.`,
   manualWhen: (id) =>
     id === 'http'
       ? 'Klient przyjmuje URL — większość tak działa, zacznij od tego.'
       : id === 'server-url'
         ? 'Klient nazywa to pole `serverUrl` (Antigravity, Windsurf).'
         : 'Klient umie tylko uruchomić polecenie (Claude Desktop). Wymaga Node.',
-  manualOuterKeyNote: 'VS Code nazywa ten klucz `servers`, nie `mcpServers`. Środek jest identyczny.',
+  manualOuterKeyNote: 'VS Code nazywa ten klucz `servers`.',
   manualCopy: 'Kopiuj',
   manualCopied: 'Skopiowane',
-  agentPromptLead:
-    'Wklej to w okno swojego agenta. Sam znajdzie swój plik konfiguracyjny, dopisze Pomnię i sprawdzi, czy naprawdę odpowiada. Działa z każdym klientem mówiącym MCP — także takim, o którym jeszcze nie słyszeliśmy.',
   agentPromptCopy: 'Kopiuj polecenie',
   agentPromptCopied: 'Skopiowane',
-  agentPromptSecret: 'Zawiera Twój token — to sekret. Nie wklejaj go tam, gdzie pokazujesz komuś ekran.',
+  agentPromptSecret: 'Zawiera Twój token.',
   agentPromptShow: 'Pokaż treść',
   agentPromptHide: 'Ukryj',
   strategyHybrid: 'czaty + config',
@@ -1762,7 +1753,7 @@ const PL_LABELS: UiLabels = {
   flowNodeDocsIndexHint: 'Chunk + embed — bez destylacji.',
   flowNodeDocsIndexDisk: 'library.db (docs)',
   flowNodeDeployLabel: 'Deploy',
-  flowNodeDeployHint: 'Opcjonalna kopia notatek na zdalny serwer Brain (np. LAN :7860).',
+  flowNodeDeployHint: 'Opcjonalna kopia notatek na zdalny serwer Brain.',
   flowNodeDeployDisk: 'serwer Brain (opc.)',
   helpDontKnowStart: 'Nie wiem od czego zacząć →',
   statusStripTitle: 'Gdzie jesteś teraz',
@@ -2029,7 +2020,7 @@ const EN_LABELS: UiLabels = {
   clientNone: 'None',
   tokenSavedDetail: 'Saved to the field — the snippet refreshes by itself.',
   tokenCreateFailed: 'Could not create the token',
-  tokenCreateFailedDetail: (msg) => `${msg} — open the dashboard on :7860 and paste a token by hand.`,
+  tokenCreateFailedDetail: (msg) => `${msg} — open the Brain dashboard at the server's own address and paste a token by hand.`,
   snippetBuildFailed: 'Could not build the snippet',
   copyFailed: 'Could not copy',
   copied: 'Copied',
@@ -2213,8 +2204,7 @@ const EN_LABELS: UiLabels = {
   colorSchemeIris: 'Iris',
   colorSchemeGlass: 'Glass',
   uiLocale: 'Interface language',
-  uiLocaleHint:
-    'App chrome only (menus, Settings, toasts). Brain stays automatically bilingual — no separate knowledge language setting.',
+  uiLocaleHint: 'Not the knowledge language — Brain is bilingual.',
   uiLocalePl: 'PL',
   uiLocaleEn: 'EN',
   floatingMonitorOnMinimize: 'Show on minimize',
@@ -2238,12 +2228,12 @@ const EN_LABELS: UiLabels = {
   tokenAdoptAgentDetail: 'This goes into MCP client configs. Changing agent behaviour needs an admin token.',
   tokenAdoptUnreachable: 'Cannot ask the server what this token is',
   tokenAdoptFailed: 'Could not identify the token',
-  tokenHaveAdmin: 'An admin token is stored — Brain mode below reaches the server.',
-  tokenNoAdmin: 'No admin token — Brain mode below saves locally only. Paste an admin token above.',
+  tokenHaveAdmin: 'Admin token stored.',
+  tokenNoAdmin: 'Without an admin token, Brain mode saves locally only.',
   seenClientsTitle: 'Agents that used the memory',
   seenClientsLead:
     'Straight from the server — who actually connected, as they introduced themselves. Not a list written in advance, so an agent nobody has heard of turns up here on its own.',
-  seenClientsEmpty: 'Nobody has introduced themselves yet. Paste the instruction into your agent.',
+  seenClientsEmpty: 'Nobody has introduced themselves yet.',
   seenClientsUnsupported: 'This server does not report that — it needs brain-core 0.1.78 or newer.',
   seenClientsConnects: (n: number) => (n === 1 ? '1 connection' : `${n} connections`),
   agentBehaviourTitle: 'Agent behaviour',
@@ -2312,22 +2302,19 @@ const EN_LABELS: UiLabels = {
   agentPromptTitle: 'Connect any agent',
   manualShow: 'I would rather paste it into the config myself →',
   manualHide: 'Hide manual setup',
-  manualLead: (outerKey) =>
-    `Paste one of the three shapes under the \`${outerKey}\` key in your client's MCP file. Which one depends on the client — see the note above each.`,
+  manualLead: (outerKey) => `Paste one shape under the \`${outerKey}\` key in your client's MCP file.`,
   manualWhen: (id) =>
     id === 'http'
       ? 'Your client takes a URL — most do, start here.'
       : id === 'server-url'
         ? 'Your client names the field `serverUrl` (Antigravity, Windsurf).'
         : 'Your client only launches a command (Claude Desktop). Needs Node.',
-  manualOuterKeyNote: 'VS Code calls this key `servers`, not `mcpServers`. Everything inside is the same.',
+  manualOuterKeyNote: 'VS Code calls this key `servers`.',
   manualCopy: 'Copy',
   manualCopied: 'Copied',
-  agentPromptLead:
-    'Paste this into your agent. It will find its own config file, add Pomnia and check that it actually answers. Works with any MCP client — including ones nobody has written a spec for.',
   agentPromptCopy: 'Copy the instruction',
   agentPromptCopied: 'Copied',
-  agentPromptSecret: 'Contains your token — treat it as a secret. Not for a window you are screen-sharing.',
+  agentPromptSecret: 'Contains your token.',
   agentPromptShow: 'Show it',
   agentPromptHide: 'Hide',
   strategyHybrid: 'chats + config',
@@ -2635,7 +2622,7 @@ const EN_LABELS: UiLabels = {
   connectStepCopy: 'Copy mcp.json (one pomnia → /mcp)',
   connectCopyForClient: (name) => `Copy mcp.json for ${name}`,
   connectTokenPlaceholder: 'Bearer token (required for remote)',
-  connectTokenRequiredMini: 'MCP will not work without a token. Take one from the dashboard and paste it above.',
+  connectTokenRequiredMini: 'MCP will not work without a token.',
   connectTokenRequired: 'Remote MCP usually will not work without a token — paste or create one below.',
   connectOpenDashboard: 'Open the token dashboard',
   connectPartialTitle: 'Incomplete mcp.json — vault/library missing',
@@ -2751,7 +2738,7 @@ const EN_LABELS: UiLabels = {
   flowNodeDocsIndexHint: 'Chunk and embed — no distillation.',
   flowNodeDocsIndexDisk: 'library.db (docs)',
   flowNodeDeployLabel: 'Deploy',
-  flowNodeDeployHint: 'An optional copy of the notes on a remote Brain server (e.g. LAN :7860).',
+  flowNodeDeployHint: 'An optional copy of the notes on a remote Brain server.',
   flowNodeDeployDisk: 'Brain server (opt.)',
 }
 

@@ -9,6 +9,7 @@ import { api } from '../lib/api'
 import { formatFlowLiveBadge, uiLabels } from '../lib/labels'
 import type { EmbeddedBrainStatus } from '../lib/types'
 import { useStore } from '../store/useStore'
+import { isMini } from '../lib/flavour'
 
 function brainIdleBadge(
   labels: ReturnType<typeof uiLabels>,
@@ -41,6 +42,10 @@ export default function FloatingMonitor() {
   }, [])
 
   useEffect(() => {
+    // Mini runs no brain of its own, so there is no local status to poll
+    // and reporting one would only ever say 'stopped' about a component
+    // that was never meant to exist here.
+    if (isMini) return
     let cancelled = false
     const refresh = () => {
       void api.brainCoreStatus().then((s) => {
@@ -58,10 +63,15 @@ export default function FloatingMonitor() {
   }, [])
 
   useEffect(() => {
-    if (!onboarded) void api.floatingMonitorHide()
+    // Mini has no onboarding to complete, so `onboarded` is false forever
+    // and this hid the window the instant the tray opened it — a checkbox
+    // that ticks and does nothing.
+    if (!isMini && !onboarded) void api.floatingMonitorHide()
   }, [onboarded])
 
   const isIdle = globalActivity.kind === 'idle'
+  // In Mini the idle badge speaks only for the memory, not for a local
+  // engine: `core` stays null there, which is the neutral 'waiting' text.
   const badge = isIdle ? brainIdleBadge(labels, core) : formatFlowLiveBadge(globalActivity)
   const pinLabel = pinned ? labels.floatingMonitorUnpin : labels.floatingMonitorPin
   const brainLive = !!(core?.running || core?.starting)

@@ -84,7 +84,11 @@ function brainStatusLabel(): string {
   return m().trayBrainStopped
 }
 
-/** Mini ships no vault and no brain-core, so two of these lead nowhere. */
+/**
+ * Mini ships no vault and no brain-core, so two of these lead nowhere.
+ * The floating monitor stays: it reports MCP traffic polled from the remote
+ * server, which is the one thing Mini exists to make visible.
+ */
 const IS_MINI = import.meta.env?.MAIN_VITE_POMNIA_FLAVOUR === 'mini'
 
 function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {

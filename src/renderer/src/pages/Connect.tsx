@@ -541,9 +541,9 @@ export default function Connect() {
       */}
       {isMini && (
         <GlassCard className="mb-5 p-5">
-          {/* No card title: the page header two lines above says the same thing,
-              and one screen with one action does not need it said twice. */}
-          <p className="mb-3 text-xs leading-relaxed text-ink-dim">{labels.agentPromptLead}</p>
+          {/* No card title and no lead: the page header two lines above already
+              says what this does, and saying it twice in different words is how
+              a one-action screen starts reading like a manual. */}
           {/*
             Collapsed by default. The instruction is sixty lines of monospace
             written for a machine to act on, and it is meant to be copied, not
