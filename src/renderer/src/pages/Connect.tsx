@@ -28,6 +28,7 @@ import {
 import { identifyEngine } from '@core/brain/engine'
 import { brainBaseUrl, canEditBrainUrl, resolveBrainTarget } from '@core/brain/brainTarget'
 import { isMini } from '../lib/flavour'
+import { formatClientVersion } from '../lib/clientVersion'
 import { buildAgentSetupPrompt } from '@core/brain/genericSnippet'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
@@ -191,23 +192,54 @@ export default function Connect() {
     last: { at: string; ok: boolean; uploaded: number; unchanged: number; failed: number; error?: string } | null
   } | null>(null)
 
-  // The admin token is write-only from here: it is stored in main, which is
-  // the only process that ever holds its value. `replica.hasToken` is all the
-  // renderer learns back, so a saved token cannot be read out of the window.
-  const [adminDraft, setAdminDraft] = useState('')
+  // Pomnia's own liveness probe is not an agent and has read nothing, so it
+  // does not belong in a list of agents that used the memory. Filtered on the
+  // server too, from 0.1.79 — this keeps it out of sight on the servers
+  // already running, which is every one of them today.
+  const visibleSeen = (seen?.clients ?? []).filter((c) => c.name.toLowerCase() !== 'pomnia-status-probe')
 
-  async function saveAdminToken() {
-    const t = adminDraft.trim()
-    if (!t) return
+  // Whatever the admin token turns out to be, it lives in main. The renderer
+  // learns only `replica.hasToken` back, so a stored one cannot be read out
+  // of the window.
+  const [adopting, setAdopting] = useState(false)
+
+  /**
+   * One field, one paste, and the server settles what the token is.
+   *
+   * Mini asked for two tokens in two identical password boxes and left the
+   * person to know which was which — a distinction the app itself got wrong in
+   * code. An admin token is stored in main and never comes back here; an agent
+   * token is minted from it in the same step, because building the snippet is
+   * the only reason this page needs one.
+   */
+  async function adoptToken(raw: string) {
+    const t = raw.trim()
+    if (!t || adopting) return
+    setAdopting(true)
     try {
-      const r = await api.vaultReplicaConfig({ token: t })
-      // The config call answers without the last-sync block; merging keeps
-      // whatever the card already knew instead of blanking it.
-      setReplica((prev) => ({ last: prev?.last ?? null, ...r }))
-      setAdminDraft('')
-      toast({ kind: 'success', title: labels.adminTokenSaved, detail: labels.adminTokenSavedDetail })
+      const r = await api.connectTokenAdopt(brainUrl, t)
+      if (r.role === 'unreachable') {
+        toast({ kind: 'error', title: labels.tokenAdoptUnreachable, detail: r.detail })
+        return
+      }
+      if (r.role === 'admin') {
+        setReplica(await api.vaultReplicaState())
+        if (r.agentToken) {
+          setConnectToken(r.agentToken)
+          toast({ kind: 'success', title: labels.tokenAdoptAdmin, detail: labels.tokenAdoptAdminDetail })
+        } else {
+          // The admin token is stored and valid; only minting failed.
+          toast({ kind: 'warn', title: labels.tokenAdoptAdminNoMint, detail: r.detail })
+        }
+      } else {
+        setConnectToken(r.agentToken)
+        toast({ kind: 'info', title: labels.tokenAdoptAgent, detail: labels.tokenAdoptAgentDetail })
+      }
+      await refreshSnippetIfPicked()
     } catch (e) {
-      toast({ kind: 'error', title: labels.adminTokenFailed, detail: (e as Error).message })
+      toast({ kind: 'error', title: labels.tokenAdoptFailed, detail: (e as Error).message })
+    } finally {
+      setAdopting(false)
     }
   }
 
@@ -664,15 +696,19 @@ export default function Connect() {
               <Input
                 value={connectToken}
                 onChange={(e) => setConnectToken(e.target.value)}
-                onBlur={() => void refreshSnippetIfPicked()}
-                placeholder={labels.connectTokenPlaceholder}
+                onBlur={(e) => void (isMini ? adoptToken(e.target.value) : refreshSnippetIfPicked())}
+                placeholder={isMini ? labels.tokenAnyPlaceholder : labels.connectTokenPlaceholder}
                 type="password"
-                className="w-56"
+                className={isMini ? 'w-72' : 'w-56'}
               />
-              <Button variant="soft" onClick={() => void mintToken()} disabled={minting || !brainUrl.trim()}>
-                {minting ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
-                {labels.mintTokenBtn}
-              </Button>
+              {isMini ? (
+                adopting && <Spinner className="h-3.5 w-3.5" />
+              ) : (
+                <Button variant="soft" onClick={() => void mintToken()} disabled={minting || !brainUrl.trim()}>
+                  {minting ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {labels.mintTokenBtn}
+                </Button>
+              )}
               {dashboardUrl && (
                 <Button
                   variant="soft"
@@ -685,43 +721,24 @@ export default function Connect() {
           )}
         </div>
 
-        {/*
-          The admin token, kept visibly apart from the agent one above.
-          They are not interchangeable: the field above is the token that
-          goes into every MCP client config and may read and write memory;
-          this one may mint those tokens and change how the server tells
-          agents to behave, so it must never be pasted into a client.
-
-          In Mini only. The full app has this field on the replication card,
-          and two fields writing one setting on one screen is how a value
-          gets set twice and trusted once.
-        */}
+        {/* One field above does both jobs now; what is left to say is which
+            kind of token is currently in hand, because that decides whether
+            the Brain-mode toggles below can reach the server at all. */}
         {isMini && effectiveTarget === 'remote' && (
-          <div className="mt-3">
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
-              {labels.adminTokenLabel}
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Input
-                value={adminDraft}
-                onChange={(e) => setAdminDraft(e.target.value)}
-                onBlur={() => void saveAdminToken()}
-                placeholder={
-                  replica?.hasToken ? labels.adminTokenStored : labels.adminTokenPlaceholder
-                }
-                type="password"
-                className="w-72"
-              />
-              <span className="text-[11px] text-ink-faint">{labels.adminTokenHint}</span>
-            </div>
-          </div>
+          <p className="mt-2 text-[11px] text-ink-faint">
+            {replica?.hasToken ? labels.tokenHaveAdmin : labels.tokenNoAdmin}
+          </p>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <span className="text-[11px] text-ink-faint">
             {effectiveTarget === 'embedded'
               ? labels.embeddedSnippetHint
               : !connectToken.trim()
-                ? labels.connectTokenRequired
+                ? // Mini has no 'create' button any more — pasting an admin
+                  // token mints one — so the old wording pointed at nothing.
+                  isMini
+                  ? labels.connectTokenRequiredMini
+                  : labels.connectTokenRequired
                 : labels.urlChangeHint}
           </span>
         </div>
@@ -766,11 +783,11 @@ export default function Connect() {
             </div>
           ) : !seen.supported ? (
             <p className="text-xs text-amber">{labels.seenClientsUnsupported}</p>
-          ) : seen.clients.length === 0 ? (
+          ) : visibleSeen.length === 0 ? (
             <p className="text-xs text-ink-faint">{labels.seenClientsEmpty}</p>
           ) : (
             <div className="space-y-2">
-              {seen.clients.map((c) => (
+              {visibleSeen.map((c) => (
                 <div
                   key={c.name}
                   className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 px-3 py-2"
@@ -778,7 +795,7 @@ export default function Connect() {
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-ink">{c.name}</div>
                     <div className="text-[11px] text-ink-faint">
-                      {c.version ? `v${c.version} · ` : ''}
+                      {c.version ? `${formatClientVersion(c.version)} · ` : ''}
                       {labels.seenClientsConnects(c.connects)}
                     </div>
                   </div>

@@ -238,6 +238,15 @@ export interface PomniaBridge {
     extraOnReplica: string[]
     bytesUploaded: number
   }>
+  /**
+   * Hand the server one token and let it say what it is. An admin token is
+   * kept in main and never comes back; the agent token minted from it does,
+   * because the page needs it for the snippet.
+   */
+  connectTokenAdopt(
+    brainUrl: string,
+    token: string,
+  ): Promise<{ role: 'admin' | 'not-admin' | 'unreachable'; detail: string; agentToken: string }>
   connectMcpTokenCreate(
     brainUrl: string,
     name: string,
@@ -902,6 +911,12 @@ function mockBridge(): PomniaBridge {
     async connectSkillsSync() {
       await new Promise((r) => setTimeout(r, 700))
       return { fetched: 12, written: 12, errors: [] } as SkillSyncResult
+    },
+    async connectTokenAdopt(_brainUrl, token) {
+      await new Promise((r) => setTimeout(r, 400))
+      return token.startsWith('btk_admin')
+        ? { role: 'admin' as const, detail: 'mock', agentToken: 'btk_MOCK_agent_from_admin' }
+        : { role: 'not-admin' as const, detail: 'mock', agentToken: token }
     },
     async connectMcpTokenCreate(_brainUrl, name) {
       await new Promise((r) => setTimeout(r, 500))

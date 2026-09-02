@@ -13,6 +13,8 @@ import {
 import { api } from '../lib/api'
 import { loadBool, loadStr, migrateLegacyStorage, saveBool, saveStr } from '../lib/persist'
 import { applyColorScheme, isColorScheme, type ColorScheme } from '../lib/theme'
+import { isMini } from '../lib/flavour'
+import { resolveBrainTarget } from '@core/brain/brainTarget'
 import type {
   ClientId,
   ClientStatus,
@@ -536,12 +538,13 @@ export const useStore = create<State>((set, get) => ({
   mcpClients: [],
   loadMcpClients: async () => {
     const s = get()
-    const url = (s.simpleMode ? 'embedded' : s.brainTarget) === 'embedded' ? EMBEDDED_URL : s.remoteBrainUrl
+    const target = resolveBrainTarget({ mini: isMini, simpleMode: s.simpleMode, stored: s.brainTarget })
+    const url = target === 'embedded' ? EMBEDDED_URL : s.remoteBrainUrl
     try {
       const r = await api.connectStatus(
         url,
-        !s.simpleMode && s.brainTarget === 'remote' ? s.connectToken || undefined : undefined,
-        s.simpleMode ? 'embedded' : s.brainTarget,
+        target === 'remote' ? s.connectToken || undefined : undefined,
+        target,
       )
       set({ mcpClients: r.clients })
     } catch {

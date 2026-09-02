@@ -67,6 +67,20 @@ describe('clientRegistry — who has actually connected', () => {
     expect(seenClients()).toEqual([])
   })
 
+  it('does not list Pomnia talking to itself', () => {
+    // The desktop's liveness probe opens a session every few seconds. It reads
+    // nothing, and left in it dominates the list it is supposed to describe.
+    noteMcpBody(init('pomnia-status-probe', '1'), 1000)
+    noteMcpBody(init('PomNia-Status-Probe', '1'), 1000)
+    expect(seenClients()).toEqual([])
+  })
+
+  it('still lists a real client alongside the probe', () => {
+    noteMcpBody(init('pomnia-status-probe', '1'), 1000)
+    noteMcpBody(init('claude-code', '2.1.247'), 2000)
+    expect(seenClients().map((c) => c.name)).toEqual(['claude-code'])
+  })
+
   it('strips control characters out of a name', () => {
     // It lands in a UI and in logs; a name is a label, not a payload.
     noteMcpBody(init('ev\u0007il\u001bclient'), 1000)

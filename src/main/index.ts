@@ -75,6 +75,9 @@ import { pushRemoteBehaviour } from '@core/brain/remoteBehaviour.js'
 
 /** Mini has no brain of its own, so every target it can have is remote. */
 const IS_MINI = import.meta.env?.MAIN_VITE_POMNIA_FLAVOUR === 'mini'
+
+import { brainBaseUrl } from '@core/brain/brainTarget.js'
+import { probeTokenRole } from '@core/brain/tokenRole.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { runDocumentOcr } from './docOcr.js'
 import { removeLibraryDocumentWithIndex } from './libraryDocRemove.js'
@@ -2214,6 +2217,54 @@ function registerIpc(): void {
 
   ipcMain.handle('connect:skillsSync', (_e, brainUrl: string, token?: string) =>
     syncSkills(brainUrl, brainSkillsDir(vaultPath), { token })
+  )
+
+  /**
+   * Take one pasted token and work out what to do with it.
+   *
+   * Mini asked for two — an agent Bearer and an admin token — in two identical
+   * password fields, and expected the person to know which was which. The
+   * server can answer that in one request, so it does.
+   *
+   * An admin token is kept here and never returned: main is the only process
+   * that holds its value. An agent token is minted from it in the same step,
+   * because that is the only reason Mini needs one, and handed back for the
+   * snippet the page builds.
+   */
+  ipcMain.handle(
+    'connect:tokenAdopt',
+    async (_e, brainUrl: string, token: string) => {
+      const base = brainBaseUrl(brainUrl)
+      const clean = token.trim()
+      if (!clean) return { role: 'not-admin' as const, detail: 'empty', agentToken: '' }
+
+      const probe = await probeTokenRole({ baseUrl: base, token: clean })
+      if (probe.role !== 'admin') {
+        // Not admin: treat it as the agent token it probably is, and let the
+        // connection status say whether it actually works.
+        return { role: probe.role, detail: probe.detail, agentToken: clean }
+      }
+
+      await setAppSettings({ replicaToken: clean })
+      const host = (() => {
+        try {
+          return new URL(base).hostname
+        } catch {
+          return 'pomnia'
+        }
+      })()
+      try {
+        const minted = await createMcpToken(base, `${host}-${new Date().toISOString().slice(0, 10)}`, {
+          token: clean,
+        })
+        return { role: 'admin' as const, detail: probe.detail, agentToken: minted.token ?? '' }
+      } catch (e) {
+        // The admin token is stored either way — it is valid, that is what the
+        // probe just established. Only the minting failed, most often because
+        // a token of that name exists already.
+        return { role: 'admin' as const, detail: (e as Error).message, agentToken: '' }
+      }
+    },
   )
 
   ipcMain.handle(

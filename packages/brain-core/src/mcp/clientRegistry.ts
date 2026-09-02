@@ -34,6 +34,15 @@ export interface SeenClient {
 
 /** Bound so a misbehaving client cannot grow this without limit. */
 const MAX_CLIENTS = 64
+
+/**
+ * Pomnia's own liveness probe, which opens an MCP session on a timer purely to
+ * ask whether the server answers. It is not an agent and it has never read a
+ * note, so listing it under 'agents that used your memory' is false — and,
+ * because it runs every few seconds, it outnumbers the real clients: 217
+ * connections against 21 from a person's actual editor. Excluded by name.
+ */
+const PROBE_CLIENTS = new Set(['pomnia-status-probe'])
 const MAX_NAME = 64
 
 const clients = new Map<string, SeenClient>()
@@ -65,7 +74,7 @@ export function noteMcpBody(body: unknown, now: number = Date.now()): void {
     if (msg.method !== 'initialize') continue
     const info = msg.params?.clientInfo as { name?: unknown; version?: unknown } | undefined
     const name = clean(info?.name, MAX_NAME)
-    if (!name) continue
+    if (!name || PROBE_CLIENTS.has(name.toLowerCase())) continue
 
     const existing = clients.get(name)
     if (existing) {

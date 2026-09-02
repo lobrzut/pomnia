@@ -475,13 +475,16 @@ export interface UiLabels {
   floatingMonitorPin: string
   floatingMonitorUnpin: string
   floatingMonitorOpenHint: string
-  adminTokenLabel: string
-  adminTokenPlaceholder: string
-  adminTokenStored: string
-  adminTokenHint: string
-  adminTokenSaved: string
-  adminTokenSavedDetail: string
-  adminTokenFailed: string
+  tokenAnyPlaceholder: string
+  tokenAdoptAdmin: string
+  tokenAdoptAdminDetail: string
+  tokenAdoptAdminNoMint: string
+  tokenAdoptAgent: string
+  tokenAdoptAgentDetail: string
+  tokenAdoptUnreachable: string
+  tokenAdoptFailed: string
+  tokenHaveAdmin: string
+  tokenNoAdmin: string
   seenClientsTitle: string
   seenClientsLead: string
   seenClientsEmpty: string
@@ -541,6 +544,7 @@ export interface UiLabels {
   /** Copy-button label; `name` = selected MCP client (Cursor, Antigravity, …). */
   connectCopyForClient: (name: string) => string
   connectTokenPlaceholder: string
+  connectTokenRequiredMini: string
   connectTokenRequired: string
   connectOpenDashboard: string
   connectPartialTitle: string
@@ -1308,13 +1312,16 @@ const PL_LABELS: UiLabels = {
   floatingMonitorPin: 'Przypnij — zawsze na wierzchu',
   floatingMonitorUnpin: 'Odepnij — nie trzymaj na wierzchu',
   floatingMonitorOpenHint: 'Kliknij, aby otworzyć Pomnię na „Jak to działa”. Podwójne kliknięcie — zamknij.',
-  adminTokenLabel: 'Token admina (osobny od Bearer powyżej)',
-  adminTokenPlaceholder: 'btk_… — rola admin',
-  adminTokenStored: '•••••••• zapisany — wpisz nowy, aby podmienić',
-  adminTokenHint: 'Potrzebny do „Nowy token” i do zachowania agenta. Nie wklejaj go do klientów MCP.',
-  adminTokenSaved: 'Token admina zapisany',
-  adminTokenSavedDetail: 'Trzymany poza oknem — aplikacja nie odda go z powrotem.',
-  adminTokenFailed: 'Nie udało się zapisać tokena admina',
+  tokenAnyPlaceholder: 'Wklej token — agenta albo admina, rozpoznam',
+  tokenAdoptAdmin: 'Token admina rozpoznany',
+  tokenAdoptAdminDetail: 'Zapisany poza oknem. Token agenta utworzyłem sam i wstawiłem powyżej.',
+  tokenAdoptAdminNoMint: 'Token admina zapisany, ale nie udało się utworzyć tokena agenta',
+  tokenAdoptAgent: 'Token agenta',
+  tokenAdoptAgentDetail: 'Trafi do konfiguracji klientów MCP. Do sterowania zachowaniem agenta potrzeba tokena admina.',
+  tokenAdoptUnreachable: 'Nie mogę zapytać serwera, czym jest ten token',
+  tokenAdoptFailed: 'Nie udało się rozpoznać tokena',
+  tokenHaveAdmin: 'Masz zapisany token admina — Tryb Brain poniżej dociera do serwera.',
+  tokenNoAdmin: 'Brak tokena admina — Tryb Brain poniżej zapisze się tylko lokalnie. Wklej token admina powyżej.',
   seenClientsTitle: 'Agenci, którzy korzystali z pamięci',
   seenClientsLead:
     'Prosto z serwera — kto naprawdę się połączył, tak jak się przedstawił. Nie lista wpisana z góry, więc agent, o którym nikt nie słyszał, pojawi się tu sam.',
@@ -1386,6 +1393,7 @@ const PL_LABELS: UiLabels = {
   connectStepReload: 'Przeładuj klienta MCP (np. Reload Window)',
   connectCopyForClient: (name) => `Kopiuj mcp.json dla ${name}`,
   connectTokenPlaceholder: 'Bearer token (wymagany dla remote)',
+  connectTokenRequiredMini: 'Bez tokena MCP nie zadziała. Weź token z dashboardu i wklej go w pole powyżej.',
   connectTokenRequired: 'Bez tokena remote MCP zwykle nie zadziała — wklej lub utwórz poniżej.',
   connectOpenDashboard: 'Otwórz dashboard tokenów',
   connectPartialTitle: 'Niepełny mcp.json — brak vault/library',
@@ -2202,13 +2210,16 @@ const EN_LABELS: UiLabels = {
   floatingMonitorPin: 'Pin — always on top',
   floatingMonitorUnpin: 'Unpin — do not stay on top',
   floatingMonitorOpenHint: 'Click to open Pomnia on “How it works”. Double-click — close.',
-  adminTokenLabel: 'Admin token (separate from the Bearer above)',
-  adminTokenPlaceholder: 'btk_… — admin role',
-  adminTokenStored: '•••••••• saved — type a new one to replace it',
-  adminTokenHint: 'Needed for “New token” and for agent behaviour. Never paste it into an MCP client.',
-  adminTokenSaved: 'Admin token saved',
-  adminTokenSavedDetail: 'Kept outside the window — the app will not hand it back.',
-  adminTokenFailed: 'Could not save the admin token',
+  tokenAnyPlaceholder: 'Paste a token — agent or admin, I will tell which',
+  tokenAdoptAdmin: 'Admin token recognised',
+  tokenAdoptAdminDetail: 'Stored outside this window. An agent token was minted and filled in above.',
+  tokenAdoptAdminNoMint: 'Admin token stored, but minting an agent token failed',
+  tokenAdoptAgent: 'Agent token',
+  tokenAdoptAgentDetail: 'This goes into MCP client configs. Changing agent behaviour needs an admin token.',
+  tokenAdoptUnreachable: 'Cannot ask the server what this token is',
+  tokenAdoptFailed: 'Could not identify the token',
+  tokenHaveAdmin: 'An admin token is stored — Brain mode below reaches the server.',
+  tokenNoAdmin: 'No admin token — Brain mode below saves locally only. Paste an admin token above.',
   seenClientsTitle: 'Agents that used the memory',
   seenClientsLead:
     'Straight from the server — who actually connected, as they introduced themselves. Not a list written in advance, so an agent nobody has heard of turns up here on its own.',
@@ -2591,6 +2602,7 @@ const EN_LABELS: UiLabels = {
   connectStepCopy: 'Copy mcp.json (one pomnia → /mcp)',
   connectCopyForClient: (name) => `Copy mcp.json for ${name}`,
   connectTokenPlaceholder: 'Bearer token (required for remote)',
+  connectTokenRequiredMini: 'MCP will not work without a token. Take one from the dashboard and paste it above.',
   connectTokenRequired: 'Remote MCP usually will not work without a token — paste or create one below.',
   connectOpenDashboard: 'Open the token dashboard',
   connectPartialTitle: 'Incomplete mcp.json — vault/library missing',

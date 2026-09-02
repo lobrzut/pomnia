@@ -16,6 +16,7 @@ import { useStore, ollamaUrlFromBrainUrl, ollamaUrlLooksLocal } from '../store/u
 import { isMcpClientActive } from '../lib/mcpClientVisibility'
 import { hasOllamaModel as hasModel } from '@core/brain/modelMatch'
 import { isMini } from '../lib/flavour'
+import { resolveBrainTarget } from '@core/brain/brainTarget'
 import type { ClientId } from '../lib/types'
 
 const ALL_CLIENTS: ClientId[] = ['claude-code', 'cursor', 'antigravity', 'claude-desktop', 'vscode', 'windsurf', 'hermes']
@@ -36,7 +37,10 @@ function HealthCheck() {
   const [rows, setRows] = useState<HealthRow[]>([])
   const [checking, setChecking] = useState(false)
 
-  const effectiveTarget = simpleMode ? 'embedded' : brainTarget
+  // Deriving this by hand is what made Diagnostics report
+  // `TypeError: fetch failed`: in Mini the stored target is 'embedded', so
+  // the health check probed 127.0.0.1:7862 — a brain-core Mini never runs.
+  const effectiveTarget = resolveBrainTarget({ mini: isMini, simpleMode, stored: brainTarget })
   const brainUrl = effectiveTarget === 'embedded' ? EMBEDDED_URL : remoteBrainUrl
   /** Ollama gates follow stored Master target — simpleMode must not re-require local install. */
   const remoteBrain = brainTarget === 'remote'
