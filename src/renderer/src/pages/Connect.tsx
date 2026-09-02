@@ -26,6 +26,7 @@ import {
   REMOTE_BRAIN_URL_PLACEHOLDER,
 } from '@core/brain/snippet'
 import { identifyEngine } from '@core/brain/engine'
+import { canEditBrainUrl, resolveBrainTarget } from '@core/brain/brainTarget'
 import { isMini } from '../lib/flavour'
 import { buildAgentSetupPrompt } from '@core/brain/genericSnippet'
 import { api } from '../lib/api'
@@ -86,7 +87,12 @@ export default function Connect() {
   // from a full install cannot leave Mini pointing at a server that is not
   // there — and every snippet it writes is a remote one, which is the only
   // kind that makes sense for it.
-  const effectiveTarget: BrainTarget = isMini ? 'remote' : simpleMode ? 'embedded' : brainTarget
+  const effectiveTarget: BrainTarget = resolveBrainTarget({
+    mini: isMini,
+    simpleMode,
+    stored: brainTarget,
+  })
+  const urlEditable = canEditBrainUrl(effectiveTarget)
   /**
    * The legacy Python hub is gone; every remote brain is brain-core.
    *
@@ -593,7 +599,7 @@ export default function Connect() {
           <button
             onClick={() => switchTarget('remote')}
             className={`no-drag rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-              brainTarget === 'remote' ? 'bg-iris/20 text-ink' : 'text-ink-faint hover:text-ink-dim'
+              effectiveTarget === 'remote' ? 'bg-iris/20 text-ink' : 'text-ink-faint hover:text-ink-dim'
             }`}
           >
             {labels.remote}
@@ -622,12 +628,12 @@ export default function Connect() {
           <Input
             value={brainUrl}
             onChange={(e) => {
-              if (brainTarget === 'remote') setRemoteBrainUrl(e.target.value)
+              if (urlEditable) setRemoteBrainUrl(e.target.value)
             }}
             onBlur={() => void refreshSnippetIfPicked()}
             placeholder={effectiveTarget === 'embedded' ? EMBEDDED_URL : REMOTE_URL_PLACEHOLDER}
             className="w-64"
-            readOnly={effectiveTarget === 'embedded'}
+            readOnly={!urlEditable}
           />
           )}
           {(!simpleMode || isMini) && effectiveTarget === 'remote' && (
@@ -1040,8 +1046,11 @@ export default function Connect() {
         server — so auto-sync could never be switched on by the machine that
         actually owns the vault. Simple mode still hides it, because it hides
         every server-shaped control.
+        Hidden in Mini for a blunter reason: Mini has no vault, so there is
+        nothing here to replicate and its address field would configure a
+        transfer that can never run.
       */}
-      {!simpleMode && (
+      {!simpleMode && !isMini && (
         <GlassCard className="mt-4 p-5">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-semibold text-ink">
@@ -1068,7 +1077,18 @@ export default function Connect() {
           <Field label={labels.vaultReplicaUrl}>
             <Input
               value={replica?.url ?? ''}
-              onChange={(e) => setReplica((r) => (r ? { ...r, url: e.target.value } : r))}
+              // Typing here before the replica state has loaded used to be
+              // discarded, because the updater returned the null it was given.
+              // Same silent field as above; seed a blank config instead.
+              onChange={(e) =>
+                setReplica((r) => ({
+                  hasToken: false,
+                  autoSync: false,
+                  last: null,
+                  ...(r ?? {}),
+                  url: e.target.value,
+                }))
+              }
               onBlur={(e) => void saveReplicaUrl(e.target.value)}
               placeholder="https://brain.example.com"
             />
