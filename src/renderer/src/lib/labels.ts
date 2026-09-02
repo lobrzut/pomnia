@@ -475,6 +475,8 @@ export interface UiLabels {
   floatingMonitorPin: string
   floatingMonitorUnpin: string
   floatingMonitorOpenHint: string
+  agentBehaviourTitle: string
+  agentBehaviourLead: string
   handshake: string
   handshakePlaceholder: string
   handshakePhrase: string
@@ -1294,6 +1296,9 @@ const PL_LABELS: UiLabels = {
   floatingMonitorPin: 'Przypnij — zawsze na wierzchu',
   floatingMonitorUnpin: 'Odepnij — nie trzymaj na wierzchu',
   floatingMonitorOpenHint: 'Kliknij, aby otworzyć Pomnię na „Jak to działa”. Podwójne kliknięcie — zamknij.',
+  agentBehaviourTitle: 'Zachowanie agenta',
+  agentBehaviourLead:
+    'Stosuje je serwer, który odpowiada agentom — nie ta aplikacja. Przy zdalnym mózgu zmiana jest wysyłana na serwer.',
   handshake: 'Handshake',
   handshakePlaceholder: 'OK to Go Go Go',
   handshakePhrase: 'Fraza dowodu',
@@ -2163,6 +2168,9 @@ const EN_LABELS: UiLabels = {
   floatingMonitorPin: 'Pin — always on top',
   floatingMonitorUnpin: 'Unpin — do not stay on top',
   floatingMonitorOpenHint: 'Click to open Pomnia on “How it works”. Double-click — close.',
+  agentBehaviourTitle: 'Agent behaviour',
+  agentBehaviourLead:
+    'Applied by the server that answers your agents, not by this app. With a remote brain the change is sent to the server.',
   handshake: 'Handshake',
   handshakePlaceholder: 'OK to Go Go Go',
   handshakePhrase: 'Proof phrase',

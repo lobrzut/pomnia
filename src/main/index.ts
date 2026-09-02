@@ -71,6 +71,7 @@ import { brainCore, killLeftoverBrainHelpers } from './brainCore.js'
 import { startMcpActivityPoll, stopMcpActivityPoll, setMcpActivityWindowFocused } from './mcpActivityPoll.js'
 import { checkForUpdate, describeUpdate } from './updateCheck.js'
 import { buildDataLocationsSnapshot, detectInstallForm } from '@core/dataLocations.js'
+import { pushRemoteBehaviour } from '@core/brain/remoteBehaviour.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { runDocumentOcr } from './docOcr.js'
 import { removeLibraryDocumentWithIndex } from './libraryDocRemove.js'
@@ -1742,6 +1743,41 @@ function registerIpc(): void {
       }
       if (Object.prototype.hasOwnProperty.call(patch, 'autoCheckpointEnabled')) {
         brainCore.setAutoCheckpoint(next.autoCheckpointEnabled !== false)
+      }
+
+      // Both settings above are server behaviour, not app preferences:
+      // brain-core injects the phrase into every tool description an agent
+      // reads, and refuses checkpoint_session when auto-checkpoint is off.
+      // The two calls above configure the brain-core this app started itself,
+      // which does nothing when the brain runs elsewhere -- so on a remote
+      // target both toggles were decoration, writing a local file the
+      // answering side never read. The server has accepted these over
+      // PUT /admin/behaviour all along; nobody was calling it.
+      const touchedBehaviour =
+        Object.prototype.hasOwnProperty.call(patch, 'handshakePhrase') ||
+        Object.prototype.hasOwnProperty.call(patch, 'handshakeEnabled') ||
+        Object.prototype.hasOwnProperty.call(patch, 'autoCheckpointEnabled')
+      if (touchedBehaviour && next.brainTarget === 'remote') {
+        void pushRemoteBehaviour({
+          brainUrl: next.brainMcpUrl,
+          adminToken: next.replicaToken,
+          next: {
+            handshakePhrase: next.handshakePhrase,
+            handshakeEnabled: next.handshakeEnabled,
+            autoCheckpointEnabled: next.autoCheckpointEnabled,
+          },
+        }).then((r) => {
+          if (r.ok) {
+            log.info(
+              'pushed agent behaviour to remote brain:',
+              Object.keys(r.applied).join(', ') || '(nothing)',
+            )
+          } else {
+            // Said out loud rather than swallowed: a toggle that did not reach
+            // the server is a toggle that did nothing.
+            log.warn(`agent behaviour not applied on the remote brain (${r.reason}): ${r.detail}`)
+          }
+        })
       }
       return next
     },

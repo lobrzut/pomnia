@@ -646,10 +646,17 @@ export default function Settings() {
         </div>
       </GlassCard>
 
+      {/*
+        Handshake and auto-checkpoint in one card, because they are one
+        subject: how the agent behaves, applied by whichever brain-core is
+        answering. Two cards suggested two mechanisms and two places to look
+        when the agent does not do what was asked.
+      */}
       <GlassCard className="mb-4 p-5">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
-          <Handshake className="h-4 w-4 text-mint" /> {labels.handshake}
+        <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
+          <Handshake className="h-4 w-4 text-mint" /> {labels.agentBehaviourTitle}
         </div>
+        <p className="mb-4 text-xs leading-relaxed text-ink-dim">{labels.agentBehaviourLead}</p>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-medium text-ink">{labels.handshakeEnabled}</div>
@@ -695,9 +702,8 @@ export default function Settings() {
         </div>
         {phraseError ? <p className="mt-2 text-xs text-rose-300/90">{phraseError}</p> : null}
         <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">{labels.handshakeRefreshHint}</p>
-      </GlassCard>
 
-      <GlassCard className="mb-4 p-5">
+        <div className="my-4 h-px bg-white/8" />
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
           <Brain className="h-4 w-4 text-mint" /> {labels.autoCheckpoint}
         </div>
