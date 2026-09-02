@@ -971,7 +971,6 @@ function registerIpc(): void {
 
   ipcMain.handle('verify', () => requireVault().verify())
 
-  ipcMain.handle('conversations', async (_e, id: string) => (await requireVault().getSnapshotPayload(id)).conversations)
 
   // Aggregate conversations across every snapshot (dedup by id, newest wins). No GPU.
   ipcMain.handle('vault:conversations', async () => {
@@ -1120,7 +1119,6 @@ function registerIpc(): void {
     return { sealed, added, updated, skipped, sources }
   })
 
-  ipcMain.handle('reveal', (_e, p: string) => shell.openPath(p))
   ipcMain.handle('reveal:installDir', async () => {
     // Packaged: …/Programs/Pomnia/Pomnia.exe — optional last-resort AV path browse.
     const dir = app.isPackaged ? dirname(process.execPath) : app.getAppPath()
@@ -1749,24 +1747,14 @@ function registerIpc(): void {
     },
   )
 
-  ipcMain.handle('floating-monitor:show', async () => {
-    await showFloatingMonitor({ force: true })
-    return { visible: isFloatingMonitorVisible() }
-  })
   ipcMain.handle('floating-monitor:hide', () => {
     hideFloatingMonitor()
     return { visible: false }
-  })
-  ipcMain.handle('floating-monitor:toggle', async () => {
-    const visible = await toggleFloatingMonitor()
-    refreshTrayMenu(win, requestQuit)
-    return { visible }
   })
   ipcMain.handle('floating-monitor:open-main', () => {
     openMainOnGuide()
     return { ok: true }
   })
-  ipcMain.handle('floating-monitor:is-visible', () => ({ visible: isFloatingMonitorVisible() }))
   ipcMain.handle('floating-monitor:get-always-on-top', () => ({
     alwaysOnTop: isFloatingAlwaysOnTop(),
   }))
@@ -1775,16 +1763,6 @@ function registerIpc(): void {
     return { alwaysOnTop }
   })
 
-  ipcMain.handle('handshake:get-phrase', () => ({
-    phrase: getHandshakePhrase(),
-    enabled: isHandshakeEnabled(),
-  }))
-
-  ipcMain.handle('profile-preview:show', async () => {
-    await showProfilePreview()
-    refreshTrayMenu(win, requestQuit)
-    return { visible: true }
-  })
   ipcMain.handle('profile-preview:hide', () => {
     hideProfilePreview()
     refreshTrayMenu(win, requestQuit)
@@ -2166,9 +2144,6 @@ function registerIpc(): void {
     }
   })
 
-  ipcMain.handle('connect:skillsList', (_e, brainUrl: string, token?: string) =>
-    listAllSkills(brainUrl, { token })
-  )
 
   ipcMain.handle('connect:skillsSync', (_e, brainUrl: string, token?: string) =>
     syncSkills(brainUrl, brainSkillsDir(vaultPath), { token })

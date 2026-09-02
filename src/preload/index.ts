@@ -21,7 +21,6 @@ const bridge = {
     return () => ipcRenderer.removeListener('backup:progress', l)
   },
   verify: () => ipcRenderer.invoke('verify'),
-  getConversations: (id: string) => ipcRenderer.invoke('conversations', id),
   vaultConversations: () => ipcRenderer.invoke('vault:conversations'),
   vaultConversation: (snapshotId: string, id: string) => ipcRenderer.invoke('vault:conversation', snapshotId, id),
   vaultSearchText: (query: string) => ipcRenderer.invoke('vault:searchText', query),
@@ -41,7 +40,6 @@ const bridge = {
   docList: () => ipcRenderer.invoke('doc:list'),
   docRemove: (docId: string) => ipcRenderer.invoke('doc:remove', docId),
   brainExport: (id: string, outDir: string) => ipcRenderer.invoke('brain:export', id, outDir),
-  revealPath: (p: string) => ipcRenderer.invoke('reveal', p),
   skillsList: () => ipcRenderer.invoke('skills:list'),
   skillsReveal: (target: string, mode?: 'file' | 'folder') =>
     ipcRenderer.invoke('skills:reveal', target, mode ?? 'file'),
@@ -130,7 +128,6 @@ const bridge = {
       | { ok: true; path: string; bytes: number; handshakePath?: string; agentsPath?: string }
       | { ok: false; error: string; detail?: string; path?: string }
     >,
-  connectSkillsList: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsList', brainUrl, token),
   connectSkillsSync: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsSync', brainUrl, token),
   connectMcpTokenCreate: (brainUrl: string, name: string, adminToken?: string) =>
     ipcRenderer.invoke('connect:mcpTokenCreate', brainUrl, name, adminToken),
@@ -166,17 +163,12 @@ const bridge = {
     return () => ipcRenderer.removeListener('app:ui-locale', l)
   },
   openLogs: () => ipcRenderer.invoke('app:openLogs') as Promise<string>,
-  floatingMonitorShow: () => ipcRenderer.invoke('floating-monitor:show') as Promise<{ visible: boolean }>,
   floatingMonitorHide: () => ipcRenderer.invoke('floating-monitor:hide') as Promise<{ visible: boolean }>,
-  floatingMonitorToggle: () => ipcRenderer.invoke('floating-monitor:toggle') as Promise<{ visible: boolean }>,
   floatingMonitorOpenMain: () => ipcRenderer.invoke('floating-monitor:open-main') as Promise<{ ok: boolean }>,
-  floatingMonitorIsVisible: () => ipcRenderer.invoke('floating-monitor:is-visible') as Promise<{ visible: boolean }>,
   floatingMonitorGetAlwaysOnTop: () =>
     ipcRenderer.invoke('floating-monitor:get-always-on-top') as Promise<{ alwaysOnTop: boolean }>,
   floatingMonitorSetAlwaysOnTop: (on: boolean) =>
     ipcRenderer.invoke('floating-monitor:set-always-on-top', on) as Promise<{ alwaysOnTop: boolean }>,
-  handshakeGetPhrase: () =>
-    ipcRenderer.invoke('handshake:get-phrase') as Promise<{ phrase: string; enabled?: boolean }>,
   onHandshakePhrase: (cb: (e: { phrase: string; enabled?: boolean }) => void) => {
     const l = (_: IpcRendererEvent, e: { phrase: string; enabled?: boolean }) => cb(e)
     ipcRenderer.on('handshake:phrase', l)

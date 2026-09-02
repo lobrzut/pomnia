@@ -66,7 +66,6 @@ export interface PomniaBridge {
   backup(sources: SourceId[], note?: string): Promise<Snapshot[]>
   onBackupProgress(cb: (e: BackupProgressEvent) => void): () => void
   verify(): Promise<{ ok: boolean; checked: number; errors: string[] }>
-  getConversations(snapshotId: string): Promise<Conversation[]>
   vaultConversations(): Promise<ConversationMeta[]>
   vaultConversation(snapshotId: string, id: string): Promise<Conversation | null>
   vaultSearchText(query: string): Promise<TextHit[]>
@@ -91,7 +90,6 @@ export interface PomniaBridge {
   docList(): Promise<LibraryDocListItem[]>
   docRemove(docId: string): Promise<LibraryDocRemoveResult>
   brainExport(snapshotId: string, outDir: string): Promise<{ count: number; dir: string }>
-  revealPath(p: string): Promise<void>
   skillsList(): Promise<SkillsListResult>
   skillsReveal(target: string, mode?: 'file' | 'folder'): Promise<{ ok: boolean; error: string | null }>
   /** Open the app install folder (optional AV last-resort paths). */
@@ -181,7 +179,6 @@ export interface PomniaBridge {
     | { ok: true; path: string; bytes: number; handshakePath?: string; agentsPath?: string }
     | { ok: false; error: string; detail?: string; path?: string }
   >
-  connectSkillsList(brainUrl: string, token?: string): Promise<SkillListEntry[]>
   connectSkillsSync(brainUrl: string, token?: string): Promise<SkillSyncResult>
   appUpdateCheck(): Promise<{
     current: string
@@ -295,14 +292,10 @@ export interface PomniaBridge {
   onUiLocale(cb: (locale: 'pl' | 'en') => void): () => void
   openLogs(): Promise<string>
   appVersion(): Promise<{ version: string; identity: string }>
-  floatingMonitorShow(): Promise<{ visible: boolean }>
   floatingMonitorHide(): Promise<{ visible: boolean }>
-  floatingMonitorToggle(): Promise<{ visible: boolean }>
   floatingMonitorOpenMain(): Promise<{ ok: boolean }>
-  floatingMonitorIsVisible(): Promise<{ visible: boolean }>
   floatingMonitorGetAlwaysOnTop(): Promise<{ alwaysOnTop: boolean }>
   floatingMonitorSetAlwaysOnTop(on: boolean): Promise<{ alwaysOnTop: boolean }>
-  handshakeGetPhrase(): Promise<{ phrase: string; enabled?: boolean }>
   onHandshakePhrase(cb: (e: { phrase: string; enabled?: boolean }) => void): () => void
   profilePreviewShow(): Promise<{ visible: boolean }>
   profilePreviewHide(): Promise<{ visible: boolean }>
@@ -445,19 +438,6 @@ function mockBridge(): PomniaBridge {
     },
     async verify() {
       return { ok: true, checked: 132, errors: [] }
-    },
-    async getConversations() {
-      return [
-        {
-          id: 'demo',
-          source: 'claude-code',
-          title: 'Designing the Pomnia vault',
-          messages: [
-            { role: 'user', text: 'How should the vault dedupe files?' },
-            { role: 'assistant', text: 'Content-addressed blobs keyed by SHA-256 — identical files store once.' }
-          ]
-        } as Conversation
-      ]
     },
     async vaultConversations() {
       const demo: { id: string; source: SourceId; title: string; messages: number; updatedAt: string }[] = [
@@ -603,7 +583,6 @@ function mockBridge(): PomniaBridge {
     async brainExport(_id, dir) {
       return { count: 38, dir }
     },
-    async revealPath() {},
     async skillsList() {
       return {
         skillsRoot: 'C:/Vault/skills',
@@ -900,12 +879,6 @@ function mockBridge(): PomniaBridge {
         bytesUploaded: 0,
       }
     },
-    async connectSkillsList() {
-      return [
-        { kind: 'brain', name: 'trading-digest', description: 'Zbiera notatki tradingowe z vault…', model: 'qwen2.5:14b' },
-        { kind: 'cli', name: '09-web-security', description: 'Web hacking / bug bounty expertise' }
-      ] as SkillListEntry[]
-    },
     async connectSkillsSync() {
       await new Promise((r) => setTimeout(r, 700))
       return { fetched: 12, written: 12, errors: [] } as SkillSyncResult
@@ -966,29 +939,17 @@ function mockBridge(): PomniaBridge {
     async appVersion() {
       return { version: '0.1.8', identity: '0.1.8 · mock · 1970-01-01 00:00' }
     },
-    async floatingMonitorShow() {
-      return { visible: true }
-    },
     async floatingMonitorHide() {
       return { visible: false }
     },
-    async floatingMonitorToggle() {
-      return { visible: true }
-    },
     async floatingMonitorOpenMain() {
       return { ok: true }
-    },
-    async floatingMonitorIsVisible() {
-      return { visible: false }
     },
     async floatingMonitorGetAlwaysOnTop() {
       return { alwaysOnTop: true }
     },
     async floatingMonitorSetAlwaysOnTop(on) {
       return { alwaysOnTop: on }
-    },
-    async handshakeGetPhrase() {
-      return { phrase: mockHandshakePhrase, enabled: mockHandshakeEnabled }
     },
     onHandshakePhrase() {
       return () => {}
