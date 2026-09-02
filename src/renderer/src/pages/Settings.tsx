@@ -176,7 +176,10 @@ function HealthCheck() {
         })
       }
 
-      if (effectiveTarget === 'remote') {
+      // Mini has no deploy folder to configure, so the row could only ever
+      // read 'not configured (optional)' — a permanent line about a setting
+      // that does not exist here.
+      if (!isMini && effectiveTarget === 'remote') {
         next.push({
           id: 'deploy',
           label: labels.healthDeployPath,
