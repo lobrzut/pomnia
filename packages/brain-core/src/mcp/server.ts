@@ -75,6 +75,7 @@ import { createDistillJob, parseConversation } from '../distill/index.js'
 import { DEFAULT_DISTILL_MODEL } from '../distill/ollamaChat.js'
 import { renderAdminPage } from './adminPage.js'
 import { renderStatusPage } from './statusPage.js'
+import { noteMcpBody, seenClients } from './clientRegistry.js'
 import { APPLE_TOUCH_B64, FAVICON_ICO_B64, ICON_PNG_B64 } from './brandAssets.js'
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
@@ -852,6 +853,15 @@ export async function createBrainServer(
             res.end(JSON.stringify(getMcpActivitySnapshot()))
             return
           }
+          // Agents that have actually connected, as they introduced
+          // themselves. Behind the same auth as everything else on /mcp: the
+          // names of the tools somebody uses are theirs, not public.
+          if (pathOnly === '/mcp/clients' || pathOnly === '/mcp/clients/') {
+            res.statusCode = 200
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ clients: seenClients() }))
+            return
+          }
           if (!ctx) {
             res.statusCode = 503
             res.end('mcp not ready')
@@ -1451,7 +1461,32 @@ export async function createBrainServer(
         res.on('close', cleanup)
 
         try {
-          await transport.handleRequest(req, res)
+          // Read the body ourselves so the registry can see who is calling.
+          //
+          // Every MCP client introduces itself in `initialize` with a name and
+          // version. That is the only place the server learns which agents
+          // exist, and it is better evidence than a config file: a client that
+          // has called is a client that works, whether or not anyone wrote a
+          // spec for it. The transport accepts a pre-parsed body precisely so a
+          // caller can do this; without it, handleRequest consumes the stream
+          // and there is nothing left to look at.
+          //
+          // A body that will not parse is passed through untouched: rejecting
+          // it here would turn a transport-level error into a different, worse
+          // one, and the transport's own message is the accurate one.
+          let parsedBody: unknown
+          if (req.method === 'POST') {
+            const chunks: Buffer[] = []
+            for await (const c of req) chunks.push(c as Buffer)
+            const raw = Buffer.concat(chunks).toString('utf8')
+            try {
+              parsedBody = JSON.parse(raw)
+              noteMcpBody(parsedBody)
+            } catch {
+              parsedBody = undefined
+            }
+          }
+          await transport.handleRequest(req, res, parsedBody)
         } catch (err) {
           console.error('[pomnia-core] transport error:', err)
           if (!res.headersSent) {
