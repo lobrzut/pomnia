@@ -33,7 +33,7 @@ import { urlsPointAtSameBrain } from './mcpUrl.js'
 export type WiredState = 'wired' | 'unreachable' | 'partial' | 'not_wired' | 'not_installed' | 'config_error'
 
 /** Canonical keys written by new snippets. */
-const POMNIA_KEYS = [MCP_POMNIA_KEY, MCP_POMNIA_VAULT_KEY, MCP_POMNIA_LIBRARY_KEY] as const
+export const POMNIA_KEYS = [MCP_POMNIA_KEY, MCP_POMNIA_VAULT_KEY, MCP_POMNIA_LIBRARY_KEY] as const
 
 export interface ClientStatus {
   id: ClientId

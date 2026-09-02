@@ -7,6 +7,8 @@
  */
 import { promises as fs } from 'node:fs'
 import { CLIENTS, buildSnippet, type BrainTarget, type ClientId } from './snippet.js'
+import { repairReason } from './mcpRepair.js'
+import { POMNIA_KEYS, __testPickUrl } from './status.js'
 import type { OS } from '../model.js'
 
 export const MCP_MANAGED_KEYS = [
@@ -83,6 +85,20 @@ function sameManagedBlock(
   return true
 }
 
+/** Our own server object in a client's config, whichever key it lives under. */
+function managedEntry(mcp: Record<string, unknown>): unknown {
+  for (const key of POMNIA_KEYS) {
+    if (mcp[key]) return mcp[key]
+  }
+  return mcp['brain-rag'] ?? undefined
+}
+
+/** URL and token as that client would actually use them. */
+function readEntry(entry: unknown): { url?: string; token?: string } {
+  const v = __testPickUrl(entry)
+  return { url: v.url, token: v.token }
+}
+
 export async function syncManagedMcpConfigs(opts: {
   brainUrl: string
   target: BrainTarget
@@ -153,8 +169,13 @@ export async function syncManagedMcpConfigs(opts: {
     //
     // Stable key order both sides, so a rewrite means a real difference rather
     // than JSON.stringify visiting properties in another order.
-    if (sameManagedBlock(mcp, nextManaged)) {
-      skipped.push({ id: spec.id, reason: 'already correct' })
+    const verdict = repairReason(managedEntry(mcp), readEntry(managedEntry(mcp)), {
+      brainUrl,
+      target: opts.target,
+      os,
+    })
+    if (!verdict) {
+      skipped.push({ id: spec.id, reason: 'no defect to repair' })
       continue
     }
 

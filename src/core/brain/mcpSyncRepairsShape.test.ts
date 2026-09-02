@@ -55,7 +55,7 @@ describe('syncManagedMcpConfigs — repairs the block, not just the address', ()
     await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: 'win32', home })
     const second = await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: 'win32', home })
     expect(second.updated).toEqual([])
-    expect(second.skipped.some((s) => s.reason === 'already correct')).toBe(true)
+    expect(second.skipped.some((s) => s.reason === 'no defect to repair')).toBe(true)
   })
 
   it('still rewrites when the address itself changed', async () => {
@@ -78,5 +78,36 @@ describe('syncManagedMcpConfigs — repairs the block, not just the address', ()
       mcpServers: Record<string, { url?: string }>
     }
     expect(j.mcpServers.other.url).toBe('http://x/y')
+  })
+
+  it('does not flatten a hand edit that still works', async () => {
+    // The correction overshot once already: comparing against what the
+    // generator would write rewrote anything that merely differed, so a
+    // deliberate edit was undone at the next status check. Rewriting is for
+    // defects.
+    const { mkdir } = await import('node:fs/promises')
+    await mkdir(join(home, '.cursor'), { recursive: true })
+    await writeFile(
+      cursorPath(),
+      JSON.stringify(
+        {
+          mcpServers: {
+            pomnia: {
+              url: `${BRAIN}/mcp`,
+              headers: { Authorization: 'Bearer btk_x', 'X-Note': 'mine' },
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      'utf8',
+    )
+    const r = await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: 'win32', home })
+    expect(r.updated).toEqual([])
+    const j = JSON.parse(await readFile(cursorPath(), 'utf8')) as {
+      mcpServers: { pomnia: { headers: Record<string, string> } }
+    }
+    expect(j.mcpServers.pomnia.headers['X-Note']).toBe('mine')
   })
 })
