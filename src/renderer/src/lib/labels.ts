@@ -516,6 +516,8 @@ export interface UiLabels {
   profilePreviewEmptyVault: string
   profilePreviewEmptyBrain: string
   profilePreviewEmptyKnowledge: string
+  /** Mini's page lead: one instruction, not seven client recipes. */
+  connectPageLeadMini: string
   connectPageLead: string
   connectChecklistTitle: string
   connectStepUrl: string
@@ -1331,6 +1333,8 @@ const PL_LABELS: UiLabels = {
   profilePreviewEmptyVault: 'Sejf zablokowany — odblokuj vault, żeby zobaczyć profil.',
   profilePreviewEmptyBrain: 'Lokalna wyszukiwarka nie działa — uruchom Brain na stronie Brain.',
   profilePreviewEmptyKnowledge: 'Uzupełnij § PROFIL (kim jesteś) i Zapisz — TECH to projekt, nie Ty.',
+  connectPageLeadMini:
+    'Jedno polecenie, które agent wykonuje sam. Nie musisz wiedzieć, gdzie trzyma swój plik konfiguracyjny ani którego z trzech kształtów potrzebuje.',
   connectPageLead:
     'Skopiuj konfigurację MCP i wklej u klienta (Cursor, Claude, Antigravity…) — Pomnia przepisuje blok `pomnia` na Brain tej aplikacji, inne serwery zostawia.',
   connectChecklistTitle: 'Pierwsze podłączenie (4 kroki)',
@@ -2493,6 +2497,8 @@ const EN_LABELS: UiLabels = {
   flowIdleHoverCaption: 'Hover an element to see what it does',
   guideFlowReplay: 'Replay demo',
   guideFlowReplayLast: 'Replay last activity',
+  connectPageLeadMini:
+    'One instruction the agent carries out itself. You do not need to know where it keeps its config file, or which of three shapes it wants.',
   connectPageLead:
     'Copy the MCP config and paste it in your client (Cursor, Claude, Antigravity…) — Pomnia rewrites the `pomnia` block to this app’s Brain and leaves other servers alone.',
   connectStepReload: 'Reload the MCP client (e.g. Reload Window)',

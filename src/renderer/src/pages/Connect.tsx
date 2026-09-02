@@ -407,7 +407,7 @@ export default function Connect() {
   const checklistDone = {
     url: effectiveTarget === 'embedded' || !!remoteBrainUrl.trim(),
     token: effectiveTarget === 'embedded' || !!connectToken.trim(),
-    copy: copied === 'code' || copied === 'mcp-full',
+    copy: copied === 'code' || copied === 'mcp-full' || copied === 'agent-prompt',
     reload: connectedCount > 0,
   }
 
@@ -419,8 +419,14 @@ export default function Connect() {
         </div>
         <div>
           <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.mcpConnect}</h1>
-          <p className="text-sm text-ink-dim">{labels.connectPageLead}</p>
-          <p className="mt-1 text-[11px] text-ink-faint">{labels.connectMacNoAppHint}</p>
+          <p className="text-sm text-ink-dim">
+            {isMini ? labels.connectPageLeadMini : labels.connectPageLead}
+          </p>
+          {/* The doc link explains editing config files by hand — the thing Mini
+              exists to make unnecessary. */}
+          {!isMini && (
+            <p className="mt-1 text-[11px] text-ink-faint">{labels.connectMacNoAppHint}</p>
+          )}
         </div>
       </div>
 
@@ -471,8 +477,12 @@ export default function Connect() {
         </GlassCard>
       )}
 
-      {/* Incomplete mcp.json warning */}
-      {partialClients.length > 0 && (
+      {/*
+        Hidden in Mini: its only action is 'build me that client's snippet',
+        which Mini does not do. The instruction above is the repair, and it is
+        the same repair for every client.
+      */}
+      {!isMini && partialClients.length > 0 && (
         <GlassCard className="mb-5 border border-amber/30 bg-amber/5 p-5">
           <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-amber">
             <AlertTriangle className="h-4 w-4" /> {labels.connectPartialTitle}
@@ -503,7 +513,7 @@ export default function Connect() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-ink">
-              {simpleMode ? labels.embeddedBrain : labels.brainServer}
+              {simpleMode && !isMini ? labels.embeddedBrain : labels.brainServer}
             </span>
             {brainOk !== null && (
               <span
@@ -691,8 +701,19 @@ export default function Connect() {
         )}
       </GlassCard>
 
-      {/* Snippet for the picked client */}
-      {picked && (
+      {/*
+        Mini does not build per-client snippets.
+
+        Seven specs exist in this app to save a paste, and the instruction card
+        above saves the same paste for every client including the ones nobody
+        has written a spec for. Keeping both would mean two ways to do one
+        thing, and the narrower one on top.
+
+        The client list stays: knowing which agents are wired, and whether each
+        one's own token is accepted, is information. Generating their files is
+        machinery.
+      */}
+      {!isMini && picked && (
         <GlassCard className="mb-5 p-5">
           {snippetLoading || !snippet ? (
             <div className="flex items-center gap-2 text-sm text-ink-dim">
