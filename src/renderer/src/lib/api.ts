@@ -243,12 +243,24 @@ export interface PomniaBridge {
    * kept in main and never comes back; the agent token minted from it does,
    * because the page needs it for the snippet.
    */
-  /** Notes parsed and waiting to be sent to the server. */
-  miniIngestState(): Promise<{ staged: number }>
+  /**
+   * Notes parsed and waiting to be sent, with the size and — only once an
+   * upload has actually been timed — how long the next one should take.
+   */
+  miniIngestState(): Promise<{
+    staged: number
+    bytes: number
+    etaSeconds: number | null
+    rateSamples: number
+  }>
   miniIngestPick(): Promise<string[]>
-  miniIngestFiles(paths: string[]): Promise<{
+  miniIngestFiles(
+    paths: string[],
+    opts?: { ollamaUrl?: string; model?: string },
+  ): Promise<{
     files: { file: string; kind: 'document' | 'export'; notes: number; detail: string; error?: string }[]
     staged: number
+    rawTranscripts: boolean
   }>
   miniIngestPush(): Promise<
     | { ok: true; result: { uploaded: number; unchanged: number; failed: unknown[] } }
@@ -925,7 +937,7 @@ function mockBridge(): PomniaBridge {
       return { fetched: 12, written: 12, errors: [] } as SkillSyncResult
     },
     async miniIngestState() {
-      return { staged: 0 }
+      return { staged: 0, bytes: 0, etaSeconds: null, rateSamples: 0 }
     },
     async miniIngestPick() {
       return ['C:/przyklad/Thinking Fast and Slow.pdf', 'C:/przyklad/chatgpt-export.zip']
@@ -940,6 +952,7 @@ function mockBridge(): PomniaBridge {
           detail: i === 0 ? 'unpdf, 412 str.' : 'chatgpt',
         })),
         staged: 35,
+        rawTranscripts: false,
       }
     },
     async miniIngestPush() {

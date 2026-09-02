@@ -19,7 +19,14 @@ describe('build flavour', () => {
     // Connect is the reason it exists; Settings carries the server and the
     // token; Import is how material reaches a memory Mini does not hold — it
     // parses here and sends to the server, the only sink it has.
-    expect([...MINI_ROUTES]).toEqual(['connect', 'import', 'settings'])
+    expect([...MINI_ROUTES]).toEqual(['connect', 'settings', 'import'])
+  })
+
+  it('puts the reason it exists first and the errand last', () => {
+    // The sidebar renders in this order, so Connect leads and Import — the
+    // occasional job, not the daily screen — sits at the bottom.
+    expect(MINI_ROUTES[0]).toBe('connect')
+    expect(MINI_ROUTES[MINI_ROUTES.length - 1]).toBe('import')
   })
 
   it('lands on Connect, not on a page it does not have', () => {

@@ -36,7 +36,13 @@ function navItems(): { id: Route; label: string; icon: typeof LayoutDashboard }[
     { id: 'connect', label: L.navConnect, icon: NAV_ICONS.connect },
     { id: 'settings', label: L.navSettings, icon: NAV_ICONS.settings }
   ]
-  return isMini ? all.filter((n) => (MINI_ROUTES as readonly Route[]).includes(n.id)) : all
+  if (!isMini) return all
+  // Ordered by MINI_ROUTES, not by the full app's list: Connect is the reason
+  // Mini exists and belongs at the top of its own sidebar.
+  const order = MINI_ROUTES as readonly Route[]
+  return all
+    .filter((n) => order.includes(n.id))
+    .sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
 }
 
 export function TitleBar() {

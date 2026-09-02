@@ -132,7 +132,8 @@ const bridge = {
   mcpSeenClients: (brainUrl: string, token?: string) => ipcRenderer.invoke('mcp:seenClients', brainUrl, token),
   miniIngestState: () => ipcRenderer.invoke('mini:ingestState'),
   miniIngestPick: () => ipcRenderer.invoke('mini:ingestPick'),
-  miniIngestFiles: (paths: string[]) => ipcRenderer.invoke('mini:ingestFiles', paths),
+  miniIngestFiles: (paths: string[], opts?: { ollamaUrl?: string; model?: string }) =>
+    ipcRenderer.invoke('mini:ingestFiles', paths, opts),
   miniIngestPush: () => ipcRenderer.invoke('mini:ingestPush'),
   miniIngestClear: () => ipcRenderer.invoke('mini:ingestClear'),
   connectTokenAdopt: (brainUrl: string, token: string) =>

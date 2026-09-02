@@ -21,10 +21,15 @@
  *   detection is why this does not ask the user which assistant a file came
  *   from — the file says so, and a person picking from a list gets it wrong.
  *
- * Conversations are staged verbatim, as transcripts. Distilling them needs a
- * chat model and that is the next piece; a transcript in the memory is worth
- * more than a transcript on a disk nobody searches, and it is honest about
- * being raw.
+ * Conversations are distilled when an Ollama is given, and staged verbatim as
+ * transcripts when it is not. Both are recorded per file, because the
+ * difference matters later: a distilled note is durable knowledge, a
+ * transcript is the raw material it was made from, and an index that cannot
+ * tell them apart returns the shape of a conversation instead of its point.
+ *
+ * The Ollama is the caller's to choose — a box on the LAN, the server, this
+ * machine. Nothing here assumes localhost, because the reason to run Mini is
+ * usually that the heavy parts live somewhere else.
  */
 
 import { createHash } from 'node:crypto'
@@ -34,6 +39,8 @@ import { extname, basename, join } from 'node:path'
 import { buildExtractedMarkdown, extractionPathLabel, parseDocument } from '@pomnia/doc-parser'
 
 import { STAGING_NOTES_DIR, stagedNoteName } from '@core/brain/miniIngest.js'
+import { distillConversation } from '@core/brain/distill.js'
+import { defaultOllamaConfig, Ollama } from '@core/brain/ollama.js'
 import { parseExportFile } from '@core/import/archives.js'
 import { log } from '@core/index.js'
 
@@ -53,6 +60,15 @@ export interface IngestedFile {
 export interface IngestSummary {
   files: IngestedFile[]
   staged: number
+  /** True when conversations went in raw because no model was available. */
+  rawTranscripts: boolean
+}
+
+export interface IngestOptions {
+  /** Where a chat model lives. Absent means: stage transcripts, say so. */
+  ollamaUrl?: string
+  model?: string
+  onProgress?: (done: number, total: number, file: string) => void
 }
 
 /** Everything Mini has parsed and not yet sent. */
@@ -66,11 +82,31 @@ function notesDir(userDataDir: string): string {
 
 /** How many notes are waiting to be sent. */
 export async function stagedCount(userDataDir: string): Promise<number> {
+  return (await stagedStats(userDataDir)).notes
+}
+
+/**
+ * What is waiting, in notes and in bytes.
+ *
+ * Bytes because 'how long will this take' has no answer without them, and a
+ * count alone hides the difference between thirty checkpoints and one scanned
+ * book — which is three orders of magnitude.
+ */
+export async function stagedStats(userDataDir: string): Promise<{ notes: number; bytes: number }> {
   try {
-    const entries = await fs.readdir(notesDir(userDataDir))
-    return entries.filter((f) => f.endsWith('.md')).length
+    const dir = notesDir(userDataDir)
+    const entries = (await fs.readdir(dir)).filter((f) => f.endsWith('.md'))
+    let bytes = 0
+    for (const f of entries) {
+      try {
+        bytes += (await fs.stat(join(dir, f))).size
+      } catch {
+        /* vanished between listing and stat; it simply will not be sent */
+      }
+    }
+    return { notes: entries.length, bytes }
   } catch {
-    return 0
+    return { notes: 0, bytes: 0 }
   }
 }
 
@@ -121,11 +157,29 @@ function conversationMarkdown(
 export async function ingestFiles(
   userDataDir: string,
   paths: string[],
+  opts: IngestOptions = {},
 ): Promise<IngestSummary> {
   const dir = notesDir(userDataDir)
   await fs.mkdir(dir, { recursive: true })
 
+  // Ask once, not per conversation: an unreachable Ollama is a fact about
+  // the run, and forty timeouts is a slow way to learn it.
+  const url = opts.ollamaUrl?.trim()
+  // Start from the defaults so the embedding model keeps its usual value —
+  // distillation does not use it, but the config requires it and inventing a
+  // second default here is how two of them drift apart.
+  const ollama = url
+    ? new Ollama({
+        ...defaultOllamaConfig(),
+        baseUrl: url,
+        ...(opts.model ? { chatModel: opts.model } : {}),
+      })
+    : null
+  const canDistill = ollama ? await ollama.reachable() : false
+  if (url && !canDistill) log.warn('mini ingest: ollama unreachable at', url, '- staging raw')
+
   const files: IngestedFile[] = []
+  let rawTranscripts = false
   for (const p of paths) {
     const ext = extname(p).toLowerCase()
     const name = basename(p)
@@ -155,18 +209,38 @@ export async function ingestFiles(
         })
       } else if (EXPORT_EXTS.has(ext)) {
         const r = await parseExportFile(p)
+        let distilled = 0
         for (const c of r.conversations) {
-          await writeNote(
-            dir,
-            stagedNoteName(c.title || name),
-            conversationMarkdown(c.title || name, c.source, c.messages ?? []),
-          )
+          let body: string | null = null
+          if (ollama && canDistill) {
+            try {
+              const note = await distillConversation(c, ollama, opts.model)
+              // The distiller says outright when it found nothing durable.
+              // Keeping those would fill the memory with notes that exist
+              // only to say a conversation happened.
+              if (note.quality !== 'ok') continue
+              body = note.markdown
+              distilled++
+            } catch (e) {
+              log.warn('distill failed for', c.title, e)
+            }
+          }
+          if (!body) {
+            body = conversationMarkdown(c.title || name, c.source, c.messages ?? [])
+            rawTranscripts = true
+          }
+          await writeNote(dir, stagedNoteName(c.title || name), body)
         }
         files.push({
           file: name,
           kind: 'export',
           notes: r.conversations.length,
-          detail: r.detected,
+          // Say which of the two happened, and how many survived the quality
+          // gate: 34 conversations becoming 9 notes is the normal outcome and
+          // looks like a bug when it is not explained.
+          detail: canDistill
+            ? `${r.detected} — destylacja: ${distilled}/${r.conversations.length}`
+            : `${r.detected} — transkrypty`,
         })
       } else {
         files.push({ file: name, kind: 'document', notes: 0, detail: ext, error: 'unsupported' })
@@ -177,5 +251,5 @@ export async function ingestFiles(
     }
   }
 
-  return { files, staged: await stagedCount(userDataDir) }
+  return { files, staged: await stagedCount(userDataDir), rawTranscripts }
 }

@@ -47,6 +47,8 @@ export interface AppSettings {
    */
   replicaUrl?: string
   replicaToken?: string
+  /** Measured upload throughput, so an ETA is reported rather than guessed. */
+  uploadRate?: { bytesPerSec: number; samples: number }
   /** Push after every distillation. Off until asked for. */
   replicaAutoSync?: boolean
   /**
@@ -157,6 +159,7 @@ export async function loadAppSettings(): Promise<AppSettings> {
       connectToken: parsed.connectToken,
       replicaUrl: parsed.replicaUrl,
       replicaToken: parsed.replicaToken,
+      uploadRate: parsed.uploadRate,
       replicaAutoSync: parsed.replicaAutoSync ?? false,
       lastReplication: parsed.lastReplication,
       embeddedBrainAutoStart: parsed.embeddedBrainAutoStart ?? DEFAULTS.embeddedBrainAutoStart,

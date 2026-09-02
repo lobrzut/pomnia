@@ -84,9 +84,16 @@ function loadFloatingUrl(win: BrowserWindow): void {
   void win.loadFile(join(__dirname, '../renderer/index.html'), { hash: '/floating-monitor' })
 }
 
+/** Mini has neither a vault nor an onboarding, so both gates below are false forever. */
+const IS_MINI = import.meta.env?.MAIN_VITE_POMNIA_FLAVOUR === 'mini'
+
 export function canAutoShowFloatingMonitor(vaultOpen: boolean): boolean {
   const s = getAppSettings()
-  if (!vaultOpen || s.onboarded === false) return false
+  // In Mini the two preconditions can never be met — there is no vault to open
+  // and no onboarding to finish — so the 'show on minimise' switch sat on,
+  // promising a thing that could not happen. What the monitor reports there is
+  // MCP traffic polled from the server, which needs neither.
+  if (!IS_MINI && (!vaultOpen || s.onboarded === false)) return false
   return s.floatingMonitorOnMinimize !== false
 }
 

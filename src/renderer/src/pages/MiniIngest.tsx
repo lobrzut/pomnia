@@ -15,9 +15,9 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { FileUp, Send, Trash2, UploadCloud } from 'lucide-react'
+import { ChevronDown, ChevronRight, Cpu, Download, FileUp, Send, Trash2, UploadCloud } from 'lucide-react'
 
-import { Button, GlassCard, Spinner } from '../components/ui'
+import { Button, GlassCard, Input, Spinner } from '../components/ui'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
@@ -27,29 +27,73 @@ type Parsed = Awaited<ReturnType<typeof api.miniIngestFiles>>['files']
 export default function MiniIngest() {
   const labels = uiLabels()
   const toast = useStore((s) => s.toast)
+  const ollamaUrl = useStore((s) => s.ollamaUrl)
+  const setOllamaUrl = useStore((s) => s.setOllamaUrl)
   const [staged, setStaged] = useState(0)
+  const [bytes, setBytes] = useState(0)
+  const [eta, setEta] = useState<number | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const [ollama, setOllama] = useState<{ reachable: boolean; models: string[]; chatModel: string } | null>(null)
+  const [model, setModel] = useState('')
+  const [pulling, setPulling] = useState(false)
+  const [showOllama, setShowOllama] = useState(false)
   const [files, setFiles] = useState<Parsed>([])
   const [parsing, setParsing] = useState(false)
   const [sending, setSending] = useState(false)
 
   const refresh = useCallback(async () => {
-    setStaged((await api.miniIngestState()).staged)
+    const st = await api.miniIngestState()
+    setStaged(st.staged)
+    setBytes(st.bytes)
+    setEta(st.etaSeconds)
   }, [])
+
+  const checkOllama = useCallback(async () => {
+    const st = await api.brainStatus(ollamaUrl || undefined)
+    setOllama({ reachable: st.reachable, models: st.models, chatModel: st.chatModel })
+    setModel((m) => m || st.chatModel)
+  }, [ollamaUrl])
 
   useEffect(() => {
     void refresh()
-  }, [refresh])
+    void checkOllama().catch(() => setOllama({ reachable: false, models: [], chatModel: '' }))
+  }, [refresh, checkOllama])
 
   async function pick() {
     const paths = await api.miniIngestPick()
+    await ingest(paths)
+  }
+
+  /**
+   * Dropped files reach us as File objects, and only the preload can turn
+   * one into a path — the renderer is not allowed to know where a file is.
+   */
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragging(false)
+    const paths = Array.from(e.dataTransfer.files)
+      .map((f) => api.getPathForFile(f))
+      .filter(Boolean)
+    void ingest(paths)
+  }
+
+  async function ingest(paths: string[]) {
     if (paths.length === 0) return
     setParsing(true)
     try {
-      const r = await api.miniIngestFiles(paths)
+      const r = await api.miniIngestFiles(paths, { ollamaUrl: ollamaUrl || undefined, model })
       // Append rather than replace: picking a second batch is adding to what is
       // staged, and wiping the first list would hide what is about to be sent.
       setFiles((prev) => [...prev, ...r.files])
       setStaged(r.staged)
+      // The size and the estimate change with what was just parsed.
+      void refresh()
+      if (r.rawTranscripts) {
+        // Not an error, and not a success either: the material went in, but
+        // as raw conversation rather than as knowledge. Saying so is the
+        // difference between a memory and a pile of logs.
+        toast({ kind: 'warn', title: labels.ingestRawTitle, detail: labels.ingestRawDetail })
+      }
       const bad = r.files.filter((f) => f.error)
       if (bad.length) {
         toast({
@@ -104,13 +148,105 @@ export default function MiniIngest() {
         </div>
       </div>
 
+      {/*
+        The distiller, and where it lives. Nothing here assumes localhost:
+        the reason to run Mini is usually that the heavy parts are on another
+        machine, and a 9 GB model is the heaviest part there is.
+      */}
       <GlassCard className="mb-5 p-5">
+        {/*
+          Collapsed by default: the address and the model are set once and
+          then never touched, while the status line above them is the part
+          worth seeing on every visit. Folded away, it still answers the only
+          question this card exists for — will the next import be distilled.
+        */}
+        <button
+          onClick={() => setShowOllama((v) => !v)}
+          className="no-drag flex w-full items-center justify-between gap-3 text-left"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <Cpu className="h-4 w-4 text-iris" /> {labels.ingestOllamaTitle}
+          </span>
+          <span className="flex items-center gap-2">
+            <span className={`text-[11px] ${ollama?.reachable ? 'text-ink-faint' : 'text-amber'}`}>
+              {ollama === null
+                ? labels.ingestOllamaChecking
+                : !ollama.reachable
+                  ? labels.ingestOllamaUnreachable
+                  : ollama.models.includes(model)
+                    ? labels.ingestOllamaReady(model)
+                    : labels.ingestOllamaModelMissing(model)}
+            </span>
+            {showOllama ? (
+              <ChevronDown className="h-4 w-4 text-ink-faint" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-ink-faint" />
+            )}
+          </span>
+        </button>
+        {showOllama && (
+        <>
+        <p className="mb-3 mt-3 text-xs text-ink-dim">{labels.ingestOllamaLead}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Input
+            value={ollamaUrl}
+            onChange={(e) => setOllamaUrl(e.target.value)}
+            onBlur={() => void checkOllama().catch(() => setOllama({ reachable: false, models: [], chatModel: '' }))}
+            placeholder="http://127.0.0.1:11434"
+            className="w-64"
+          />
+          <Input
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder={ollama?.chatModel || 'qwen2.5:14b'}
+            className="w-48"
+          />
+          {ollama?.reachable && model && !ollama.models.includes(model) && (
+            <Button
+              variant="soft"
+              disabled={pulling}
+              onClick={() => {
+                setPulling(true)
+                void api
+                  .ollamaPull(model, ollamaUrl || undefined)
+                  .then(() => checkOllama())
+                  .then(() => toast({ kind: 'success', title: labels.ingestModelPulled(model), detail: '' }))
+                  .catch((e: Error) => toast({ kind: 'error', title: labels.ingestModelPullFailed, detail: e.message }))
+                  .finally(() => setPulling(false))
+              }}
+            >
+              {pulling ? <Spinner className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
+              {labels.ingestModelPull}
+            </Button>
+          )}
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">{labels.ingestOllamaHint}</p>
+        </>
+        )}
+      </GlassCard>
+
+      {/* The handlers live on a wrapper: GlassCard takes no DOM props, and
+          giving it a pass-through just for this would widen its surface for
+          one caller. */}
+      <div
+        onDragOver={(e: React.DragEvent) => {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'copy'
+          setDragging(true)
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        className={`mb-5 rounded-2xl transition-shadow ${dragging ? 'ring-2 ring-iris/60' : ''}`}
+      >
+      <GlassCard className="p-5">
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={() => void pick()} disabled={parsing || sending}>
             {parsing ? <Spinner className="h-4 w-4" /> : <FileUp className="h-4 w-4" />}
             {labels.ingestPick}
           </Button>
-          <span className="text-[11px] text-ink-faint">{labels.ingestFormats}</span>
+          <span className="text-[11px] text-ink-faint">
+            {dragging ? labels.ingestDropNow : labels.ingestFormats}
+          </span>
         </div>
 
         {files.length > 0 && (
@@ -134,10 +270,15 @@ export default function MiniIngest() {
           </div>
         )}
       </GlassCard>
+      </div>
 
       <GlassCard className="p-5">
         <p className="mb-3 text-xs text-ink-dim">
           {staged > 0 ? labels.ingestStaged(staged) : labels.ingestNothingStaged}
+          {staged > 0 && ` · ${labels.ingestBytes(bytes)}`}
+          {/* Only after a real upload has been timed. Before that, saying
+              nothing is the honest answer. */}
+          {staged > 0 && (eta === null ? ` · ${labels.ingestEtaUnknown}` : ` · ${labels.ingestEta(eta)}`)}
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={() => void send()} disabled={sending || parsing || staged === 0}>

@@ -73,7 +73,8 @@ import { checkForUpdate, describeUpdate } from './updateCheck.js'
 import { buildDataLocationsSnapshot, detectInstallForm } from '@core/dataLocations.js'
 import { pushRemoteBehaviour } from '@core/brain/remoteBehaviour.js'
 import { pushStagedNotes } from '@core/brain/miniIngest.js'
-import { clearStaging, ingestFiles, stagedCount, stagingRoot } from './miniIngest.js'
+import { estimateSeconds, recordUpload } from '@core/brain/uploadEstimate.js'
+import { clearStaging, ingestFiles, stagedCount, stagedStats, stagingRoot } from './miniIngest.js'
 
 /** Mini has no brain of its own, so every target it can have is remote. */
 const IS_MINI = import.meta.env?.MAIN_VITE_POMNIA_FLAVOUR === 'mini'
@@ -2038,7 +2039,14 @@ function registerIpc(): void {
   // ── Connect to Brain (live probe + rewrite Pomnia-managed MCP block) ──
   ipcMain.handle('connect:status', async (_e, brainUrl?: string, token?: string, target?: 'embedded' | 'remote') => {
     const saved = getAppSettings()
-    const resolvedTarget = target ?? saved.brainTarget ?? 'embedded'
+    // Mini is always remote. Reading the stored target here is the same defect
+    // as the frozen address field, and this is its worst home: Mini would take
+    // the inherited 'embedded', aim at 127.0.0.1:7862 and rewrite the Pomnia
+    // block in up to six client configs. The probe below has been catching it —
+    // nothing answers that port under Mini — but on a machine also running the
+    // full Desktop something does, and then every agent would be quietly
+    // repointed at Desktop's private brain instead of the server.
+    const resolvedTarget = IS_MINI ? 'remote' : (target ?? saved.brainTarget ?? 'embedded')
     const url =
       brainUrl?.trim() ||
       (resolvedTarget === 'embedded'
@@ -2206,9 +2214,18 @@ function registerIpc(): void {
    * hold. Parsing happens here because doc-parser and the export readers are
    * main-process code; the renderer only ever sees counts and names.
    */
-  ipcMain.handle('mini:ingestState', async () => ({
-    staged: await stagedCount(app.getPath('userData')),
-  }))
+  ipcMain.handle('mini:ingestState', async () => {
+    const st = await stagedStats(app.getPath('userData'))
+    const rate = getAppSettings().uploadRate ?? null
+    return {
+      staged: st.notes,
+      bytes: st.bytes,
+      // null until a real upload has been timed. A guessed ETA is believed
+      // because it carries a unit, and it is wrong by whatever the link is.
+      etaSeconds: estimateSeconds(st.bytes, rate),
+      rateSamples: rate?.samples ?? 0,
+    }
+  })
 
   ipcMain.handle('mini:ingestPick', async () => {
     const r = await dialog.showOpenDialog(win!, {
@@ -2222,19 +2239,33 @@ function registerIpc(): void {
     return r.canceled ? [] : r.filePaths
   })
 
-  ipcMain.handle('mini:ingestFiles', async (_e, paths: string[]) =>
-    ingestFiles(app.getPath('userData'), Array.isArray(paths) ? paths : []),
+  ipcMain.handle(
+    'mini:ingestFiles',
+    async (_e, paths: string[], opts?: { ollamaUrl?: string; model?: string }) =>
+      ingestFiles(app.getPath('userData'), Array.isArray(paths) ? paths : [], {
+        // Fall back to the saved Ollama, so the address is configured once
+        // rather than being re-typed on every import.
+        ollamaUrl: opts?.ollamaUrl?.trim() || getAppSettings().ollamaUrl,
+        model: opts?.model,
+      }),
   )
 
   ipcMain.handle('mini:ingestPush', async () => {
     const s = getAppSettings()
     const userData = app.getPath('userData')
+    const started = Date.now()
     const r = await pushStagedNotes({
       stagingRoot: stagingRoot(userData),
       target: brainBaseUrl(s.brainMcpUrl ?? ''),
       adminToken: s.replicaToken,
       staged: await stagedCount(userData),
     })
+    if (r.ok) {
+      // Measure what actually happened, so the next upload can be estimated
+      // from this link rather than from an assumption about links.
+      const rate = recordUpload(s.uploadRate ?? null, r.result.bytesUploaded, Date.now() - started)
+      if (rate) await setAppSettings({ uploadRate: rate })
+    }
     // Only clear what the server confirmed it took. Clearing on any answer
     // would throw away a 400-page parse because one file in the batch failed.
     if (r.ok && r.result.failed.length === 0) await clearStaging(userData)

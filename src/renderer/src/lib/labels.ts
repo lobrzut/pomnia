@@ -7,6 +7,7 @@ import { formatPipelineProgressLabel } from '@core/pipelineLabels.js'
 import type { ActivityState } from './types'
 import { getUiLocale } from './uiLocale'
 import { plCount } from './plPlural'
+import { formatBytes, formatDuration } from '@core/brain/uploadEstimate'
 
 const ACTIVITY_KIND_PL: Record<Exclude<ActivityState['kind'], 'idle'>, string> = {
   distill: 'destylacja',
@@ -489,6 +490,22 @@ export interface UiLabels {
   tokenHaveAdmin: string
   tokenNoAdmin: string
   navImportMini: string
+  ingestOllamaTitle: string
+  ingestOllamaLead: string
+  ingestOllamaHint: string
+  ingestOllamaChecking: string
+  ingestOllamaUnreachable: string
+  ingestOllamaReady: (model: string) => string
+  ingestOllamaModelMissing: (model: string) => string
+  ingestModelPull: string
+  ingestModelPulled: (model: string) => string
+  ingestModelPullFailed: string
+  ingestRawTitle: string
+  ingestRawDetail: string
+  ingestDropNow: string
+  ingestBytes: (bytes: number) => string
+  ingestEta: (seconds: number) => string
+  ingestEtaUnknown: string
   ingestTitle: string
   ingestLead: string
   ingestPick: string
@@ -1351,6 +1368,24 @@ const PL_LABELS: UiLabels = {
   tokenHaveAdmin: 'Token admina zapisany.',
   tokenNoAdmin: 'Bez tokena admina Tryb Brain zapisze się tylko lokalnie.',
   navImportMini: 'Do Pomnia',
+  ingestOllamaTitle: 'Destylacja',
+  ingestOllamaLead: 'Adres Ollamy i model. Może stać gdziekolwiek — na tej maszynie, na serwerze, w sieci.',
+  ingestOllamaHint:
+    'Bez Ollamy rozmowy trafią jako surowe transkrypty. Dokumenty i tak nie wymagają modelu.',
+  ingestOllamaChecking: 'sprawdzam…',
+  ingestOllamaUnreachable: 'Ollama nieosiągalna — rozmowy pójdą surowe',
+  ingestOllamaReady: (model) => `gotowe: ${model}`,
+  ingestOllamaModelMissing: (model) => `brak modelu ${model}`,
+  ingestModelPull: 'Pobierz model',
+  ingestModelPulled: (model) => `Model ${model} pobrany`,
+  ingestModelPullFailed: 'Nie udało się pobrać modelu',
+  ingestRawTitle: 'Rozmowy zapisane jako transkrypty',
+  ingestRawDetail:
+    'Bez działającej Ollamy nie ma z czego zrobić notatki. Materiał jest w środku, ale surowy.',
+  ingestDropNow: 'Upuść tutaj.',
+  ingestBytes: (bytes) => formatBytes(bytes, 'pl'),
+  ingestEta: (seconds) => `ok. ${formatDuration(seconds)}`,
+  ingestEtaUnknown: 'czas nieznany — pierwsza wysyłka go zmierzy',
   ingestTitle: 'Do Pomnia',
   ingestLead: 'Wrzuć pliki — Pomnia rozpozna, co to jest, i wyśle na serwer.',
   ingestPick: 'Wybierz pliki',
@@ -2274,6 +2309,24 @@ const EN_LABELS: UiLabels = {
   tokenHaveAdmin: 'Admin token stored.',
   tokenNoAdmin: 'Without an admin token, Brain mode saves locally only.',
   navImportMini: 'To Pomnia',
+  ingestOllamaTitle: 'Distillation',
+  ingestOllamaLead: 'Ollama address and model. It can live anywhere — this machine, the server, the LAN.',
+  ingestOllamaHint:
+    'Without Ollama, conversations go in as raw transcripts. Documents need no model either way.',
+  ingestOllamaChecking: 'checking…',
+  ingestOllamaUnreachable: 'Ollama unreachable — conversations will go in raw',
+  ingestOllamaReady: (model) => `ready: ${model}`,
+  ingestOllamaModelMissing: (model) => `model ${model} not installed`,
+  ingestModelPull: 'Download model',
+  ingestModelPulled: (model) => `Model ${model} downloaded`,
+  ingestModelPullFailed: 'Could not download the model',
+  ingestRawTitle: 'Conversations stored as transcripts',
+  ingestRawDetail:
+    'Without a working Ollama there is nothing to make a note from. The material is in, but raw.',
+  ingestDropNow: 'Drop here.',
+  ingestBytes: (bytes) => formatBytes(bytes, 'en'),
+  ingestEta: (seconds) => `about ${formatDuration(seconds)}`,
+  ingestEtaUnknown: 'time unknown — the first upload will measure it',
   ingestTitle: 'To Pomnia',
   ingestLead: 'Drop files in — Pomnia works out what they are and sends them to the server.',
   ingestPick: 'Choose files',
