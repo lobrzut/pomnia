@@ -582,7 +582,13 @@ export default function Connect() {
         )}
 
         <div className="flex flex-wrap items-center gap-3">
-          {!simpleMode && (
+          {/*
+            Mini always shows these. `simpleMode` hides the address and token
+            because the full app can fall back to a brain inside itself — Mini
+            cannot, so hiding them leaves it saying "no server URL configured"
+            with nowhere to configure one. That is what a fresh install did.
+          */}
+          {(!simpleMode || isMini) && (
           <Input
             value={brainUrl}
             onChange={(e) => {
@@ -594,7 +600,7 @@ export default function Connect() {
             readOnly={effectiveTarget === 'embedded'}
           />
           )}
-          {!simpleMode && brainTarget === 'remote' && (
+          {(!simpleMode || isMini) && effectiveTarget === 'remote' && (
             <>
               <Input
                 value={connectToken}

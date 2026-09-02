@@ -63,7 +63,11 @@ function HealthCheck() {
       }
       // Remote brain: search/MCP live on the server. Local Ollama is distill-only —
       // never paint install-or-die red when Master is remote.
-      if (remoteBrain) {
+      // Mini reports nothing about Ollama or models. It does not distil, so a
+      // missing chat model is not a fault of its — and the row that suggested
+      // starting the local search engine pointed at a Brain tab Mini has not
+      // got, which is worse than saying nothing.
+      if (!isMini && remoteBrain) {
         const suggestedOllama = remoteBrainUrl.trim()
           ? ollamaUrlFromBrainUrl(remoteBrainUrl.trim())
           : 'http://HOST:11434'
@@ -87,7 +91,7 @@ function HealthCheck() {
           ok: null,
           detail: labels.healthOllamaOptionalRemote(suggestedOllama),
         })
-      } else {
+      } else if (!isMini) {
         next.push({
           id: 'ollama',
           label: labels.healthOllama,
@@ -125,7 +129,8 @@ function HealthCheck() {
         })
       }
 
-      if (effectiveTarget === 'embedded') {
+      // brain-core inside the app is a thing Mini does not have.
+      if (!isMini && effectiveTarget === 'embedded') {
         const core = await api.brainCoreStatus()
         next.push({
           id: 'core',
