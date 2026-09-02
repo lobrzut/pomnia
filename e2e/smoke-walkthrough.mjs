@@ -269,9 +269,16 @@ try {
     const created = await clickAny(page, ['Utwórz i dalej', 'Create & continue'], { timeout: 15_000 })
     notes.reached.push(`vault-create:${created}`)
 
-    // Wait for vault files on disk (IPC create)
+    // Wait for every file, not just the first one written.
+    //
+    // Vault.create writes header.json, then saveManifest(), then saveLibrary().
+    // Waiting on header.json alone returns while the other two are still in
+    // flight, and the assertion below then reports them missing — which is
+    // what this test did: it named manifest.cvb and library.cvb and never
+    // header.json, because header.json had always arrived.
+    const REQUIRED = ['header.json', 'manifest.cvb', 'library.cvb']
     const deadline = Date.now() + 30_000
-    while (Date.now() < deadline && !existsSync(join(vaultDir, 'header.json'))) {
+    while (Date.now() < deadline && !REQUIRED.every((f) => existsSync(join(vaultDir, f)))) {
       await page.waitForTimeout(200)
     }
     assertVaultOnDisk()
