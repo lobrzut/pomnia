@@ -111,6 +111,7 @@ export default function Connect() {
   const [mode, setMode] = useState<'new' | 'merge'>('new')
   const [copied, setCopied] = useState<string | null>(null)
   const [minting, setMinting] = useState(false)
+  const [showPrompt, setShowPrompt] = useState(false)
   const [writingBrief, setWritingBrief] = useState(false)
 
   /**
@@ -439,13 +440,19 @@ export default function Connect() {
       */}
       {isMini && (
         <GlassCard className="mb-5 p-5">
-          <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
-            <Plug className="h-4 w-4 text-mint" /> {labels.agentPromptTitle}
-          </div>
+          {/* No card title: the page header two lines above says the same thing,
+              and one screen with one action does not need it said twice. */}
           <p className="mb-3 text-xs leading-relaxed text-ink-dim">{labels.agentPromptLead}</p>
-          <pre className="mb-3 max-h-64 overflow-auto rounded-xl border border-white/8 bg-black/30 p-3 text-[11px] leading-relaxed text-ink-dim">
-            {agentPrompt}
-          </pre>
+          {/*
+            Collapsed by default. The instruction is sixty lines of monospace
+            written for a machine to act on, and it is meant to be copied, not
+            read — leaving it open makes one action look like a document.
+          */}
+          {showPrompt && (
+            <pre className="mb-3 max-h-64 overflow-auto rounded-xl border border-white/8 bg-black/30 p-3 text-[11px] leading-relaxed text-ink-dim">
+              {agentPrompt}
+            </pre>
+          )}
           <div className="flex flex-wrap items-center gap-3">
             <Button
               onClick={() => {
@@ -457,6 +464,12 @@ export default function Connect() {
               <Copy className="h-4 w-4" />
               {copied === 'agent-prompt' ? labels.agentPromptCopied : labels.agentPromptCopy}
             </Button>
+            <button
+              onClick={() => setShowPrompt((v) => !v)}
+              className="no-drag text-[11px] font-medium text-iris hover:underline"
+            >
+              {showPrompt ? labels.agentPromptHide : labels.agentPromptShow}
+            </button>
             <span className="text-[11px] text-amber">{labels.agentPromptSecret}</span>
           </div>
         </GlassCard>
@@ -620,6 +633,11 @@ export default function Connect() {
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-ink">{labels.agentBrainMode}</div>
             <p className="mt-1 text-xs leading-relaxed text-ink-dim">{labels.agentBrainModeHint}</p>
+            {/* The mechanics, one step quieter. They matter when something is
+                wrong and are noise when it is not. */}
+            <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
+              {labels.agentBrainModeHintMore}
+            </p>
           </div>
           <Toggle
             checked={agentBrainMode}

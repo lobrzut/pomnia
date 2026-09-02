@@ -536,6 +536,7 @@ export interface UiLabels {
   /** Connect → opt-in agent rule (read auto / write on command). Not Desktop auto-capture. */
   agentBrainMode: string
   agentBrainModeHint: string
+  agentBrainModeHintMore: string
   agentBrainModeBriefTitle: string
   agentBrainModeBriefCopy: string
   agentBrainModeBriefWrite: string
@@ -574,6 +575,8 @@ export interface UiLabels {
   agentPromptCopy: string
   agentPromptCopied: string
   agentPromptSecret: string
+  agentPromptShow: string
+  agentPromptHide: string
   strategyHybrid: string
   strategySnapshot: string
   strategySnapshotHint: string
@@ -1354,7 +1357,9 @@ const PL_LABELS: UiLabels = {
     'Bez aplikacji Desktop: docs/CURSOR-MCP.md — ten sam pełny JSON MCP (przykład Cursor; kształt dla innych klientów w Connect).',
   agentBrainMode: 'Tryb Brain dla agenta',
   agentBrainModeHint:
-    'Dokłada regułę (Cursor rules / CLAUDE.md / Antigravity ~/.gemini/config/GEMINI.md) + silniejsze opisy narzędzi MCP: agent sam czyta profil, skille i pamięć; milestone → checkpoint_session (gdy Auto-checkpoint ON); świadomy zapis na „zapisz do Pomnia”. „Połączony” w Connect = plik MCP `pomnia`, nie gwarancja że agent już sprawdził w Pomnia.',
+    'Dopisuje agentowi regułę: sam czyta pamięć na starcie i zapisuje kamienie milowe, zamiast czekać na polecenie.',
+  agentBrainModeHintMore:
+    'Reguła trafia tam, gdzie dany klient jej szuka (Cursor rules, CLAUDE.md, GEMINI.md). „Połączony” znaczy tylko, że plik MCP istnieje — nie że agent już z pamięci skorzystał.',
   agentBrainModeBriefTitle: 'Reguła agenta (Tryb Brain / Pomnia)',
   agentBrainModeBriefCopy: 'Kopiuj regułę do pliku',
   agentBrainModeBriefWrite: 'Zapisz regułę na dysk',
@@ -1392,6 +1397,8 @@ const PL_LABELS: UiLabels = {
   agentPromptCopy: 'Kopiuj polecenie',
   agentPromptCopied: 'Skopiowane',
   agentPromptSecret: 'Zawiera Twój token — to sekret. Nie wklejaj go tam, gdzie pokazujesz komuś ekran.',
+  agentPromptShow: 'Pokaż treść',
+  agentPromptHide: 'Ukryj',
   strategyHybrid: 'czaty + config',
   strategySnapshot: 'tylko config',
   strategySnapshotHint:
@@ -2222,6 +2229,8 @@ const EN_LABELS: UiLabels = {
   agentPromptCopy: 'Copy the instruction',
   agentPromptCopied: 'Copied',
   agentPromptSecret: 'Contains your token — treat it as a secret. Not for a window you are screen-sharing.',
+  agentPromptShow: 'Show it',
+  agentPromptHide: 'Hide',
   strategyHybrid: 'chats + config',
   strategySnapshot: 'config only',
   strategySnapshotHint:
@@ -2506,7 +2515,9 @@ const EN_LABELS: UiLabels = {
     'Without Desktop: docs/CURSOR-MCP.md — same MCP JSON (Cursor example; other clients via Connect).',
   agentBrainMode: 'Agent Brain Mode',
   agentBrainModeHint:
-    'Adds a rule (Cursor rules / CLAUDE.md / Antigravity ~/.gemini/config/GEMINI.md) plus stronger MCP tool descriptions: agent auto-reads profile, skills, and memory; milestone → checkpoint_session (when Auto-checkpoint ON); conscious save on “save to Pomnia”. Connect “wired” = MCP config `pomnia`, not a guarantee the agent already checked Pomnia.',
+    'Adds a rule so the agent reads your memory at the start and records milestones by itself, instead of waiting to be told.',
+  agentBrainModeHintMore:
+    'The rule goes where each client looks for one (Cursor rules, CLAUDE.md, GEMINI.md). "Connected" only means the MCP file exists — not that the agent has used the memory yet.',
   agentBrainModeBriefTitle: 'Agent rule (Brain Mode / Pomnia)',
   agentBrainModeBriefCopy: 'Copy rule to file path',
   agentBrainModeBriefWrite: 'Save rule to disk',
