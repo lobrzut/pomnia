@@ -510,7 +510,6 @@ export interface UiLabels {
   ingestPushResult: (uploaded: number, unchanged: number, failed: number) => string
   ingestOcrLimit: string
   ingestOcrProgress: (done: number, total: number, file: string) => string
-  ingestOcrPages: string
   ingestOcr: string
   ingestOcrHint: string
   ingestTitle: string
@@ -1402,7 +1401,6 @@ const PL_LABELS: UiLabels = {
   ingestOcrLimit: 'ogranicz do:',
   ingestOcrProgress: (done, total, file) =>
     `OCR ${done}/${total} str. — ${file} (ok. 4 s na stronę)`,
-  ingestOcrPages: 'stron:',
   ingestOcr: 'Skany czytane przez OCR',
   ingestOcrHint:
     'PDF bez warstwy tekstowej inaczej nie da nic, więc dzieje się to samo. Cały dokument, ok. 4 s na stronę. Strony-obrazki są odrzucane.',
@@ -2356,7 +2354,6 @@ const EN_LABELS: UiLabels = {
   ingestOcrLimit: 'cap at:',
   ingestOcrProgress: (done, total, file) =>
     `OCR ${done}/${total} pages — ${file} (about 4 s per page)`,
-  ingestOcrPages: 'pages:',
   ingestOcr: 'Scans are read with OCR',
   ingestOcrHint:
     'A PDF with no text layer yields nothing otherwise, so this just happens. Whole document, about 4 s per page. Picture pages are dropped.',
