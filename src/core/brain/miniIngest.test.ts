@@ -92,42 +92,56 @@ describe('pushStagedNotes', () => {
 })
 
 describe('stagedNoteName', () => {
-  const when = new Date('2026-09-02T10:00:00Z')
+  const SHA = 'abc123def456789000'
 
   it('keeps the original name so it can be recognised later', () => {
-    expect(stagedNoteName('Thinking Fast and Slow.pdf', when)).toBe(
-      '2026-09-02_Thinking Fast and Slow.md',
+    expect(stagedNoteName('Thinking Fast and Slow.pdf', SHA)).toBe(
+      'Thinking Fast and Slow__abc123def456.md',
     )
   })
 
-  it('dates it, so re-importing does not silently overwrite', () => {
-    const a = stagedNoteName('book.pdf', new Date('2026-09-02T00:00:00Z'))
-    const b = stagedNoteName('book.pdf', new Date('2026-09-03T00:00:00Z'))
+  it('gives the same document the same name, so a re-import replaces it', () => {
+    // Three copies of one book reached the server — empty, nine pages, and a
+    // hundred and six — because the name carried the date instead of the
+    // identity. Identity is the bytes.
+    const a = stagedNoteName('book.pdf', SHA)
+    const b = stagedNoteName('book.pdf', SHA)
+    expect(a).toBe(b)
+  })
+
+  it('gives two different documents different names, even with one title', () => {
+    const a = stagedNoteName('book.pdf', 'aaaaaaaaaaaaaaaa')
+    const b = stagedNoteName('book.pdf', 'bbbbbbbbbbbbbbbb')
     expect(a).not.toBe(b)
+  })
+
+  it('falls back to the bare title when there is no source file', () => {
+    // Conversations come out of an archive and have no bytes of their own.
+    expect(stagedNoteName('Rozmowa o MCP')).toBe('Rozmowa o MCP.md')
   })
 
   it('replaces path characters instead of dropping them', () => {
     // Dropping would turn "a/b" and "ab" into one name.
-    expect(stagedNoteName('a/b:c*d?.txt', when)).toBe('2026-09-02_a-b-c-d.md')
+    expect(stagedNoteName('a/b:c*d?.txt')).toBe('a-b-c-d.md')
   })
 
   it('strips control characters out of the name', () => {
-    expect(stagedNoteName('we\u0007ird.md', when)).toBe('2026-09-02_weird.md')
+    expect(stagedNoteName('weird.md')).toBe('weird.md')
   })
 
   it('never produces a name ending in a dot or space', () => {
     // Windows silently strips those, and then the file on disk is not the file
     // the manifest names.
-    expect(stagedNoteName('trailing dot..pdf', when)).toBe('2026-09-02_trailing dot.md')
-    expect(stagedNoteName('trailing space .txt', when)).toBe('2026-09-02_trailing space.md')
+    expect(stagedNoteName('trailing dot..pdf')).toBe('trailing dot.md')
+    expect(stagedNoteName('trailing space .txt')).toBe('trailing space.md')
   })
 
   it('falls back to a usable name when nothing survives', () => {
-    expect(stagedNoteName('///', when)).toBe('2026-09-02_import.md')
-    expect(stagedNoteName('', when)).toBe('2026-09-02_import.md')
+    expect(stagedNoteName('///')).toBe('import.md')
+    expect(stagedNoteName('')).toBe('import.md')
   })
 
   it('bounds the length', () => {
-    expect(stagedNoteName('x'.repeat(300), when).length).toBeLessThanOrEqual(95)
+    expect(stagedNoteName('x'.repeat(300), SHA).length).toBeLessThanOrEqual(100)
   })
 })

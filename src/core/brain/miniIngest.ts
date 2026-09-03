@@ -85,12 +85,21 @@ export async function pushStagedNotes(opts: IngestPushOptions): Promise<IngestPu
 /**
  * A filename for a note that will sit beside notes from every other source.
  *
- * Derived from the original so it can be recognised months later, and dated so
- * two imports of the same book do not silently become one file. Everything the
- * filesystem or the sync protocol could trip on is replaced rather than
- * stripped, because stripping turns two different titles into one name.
+ * Readable, so it can be recognised months later, and ending in a short hash of
+ * the source bytes, so the same document always lands on the same name.
+ *
+ * The date used to lead the name, on the reasoning that two imports of one book
+ * should not silently become one file. That was backwards. Re-importing a book
+ * after fixing its extraction left three copies on the server — one empty, one
+ * of nine pages, one of a hundred and six — and search returned the same book
+ * three times at three qualities. Identity is the source bytes, not the day, so
+ * the hash decides the name and the sync replaces instead of accumulating. Two
+ * genuinely different files cannot collide, because their bytes differ.
+ *
+ * Everything the filesystem or the sync protocol could trip on is replaced
+ * rather than stripped: stripping turns two different titles into one name.
  */
-export function stagedNoteName(sourceName: string, when: Date = new Date()): string {
+export function stagedNoteName(sourceName: string, sourceSha?: string): string {
   const base = sourceName
     .replace(/\.[A-Za-z0-9]{1,8}$/, '')
     .replace(/[\u0000-\u001f\u007f]/g, '')
@@ -103,6 +112,8 @@ export function stagedNoteName(sourceName: string, when: Date = new Date()): str
     // not a name, and Windows silently drops a trailing dot or space — after
     // which the file on disk is not the file the manifest names.
     .replace(/^[-.\s]+|[-.\s]+$/g, '')
-  const stamp = when.toISOString().slice(0, 10)
-  return `${stamp}_${base || 'import'}.md`
+  const stem = base || 'import'
+  // No hash means a conversation, which has no source file: the name is just
+  // the title, and writeNote still refuses to overwrite a different note.
+  return sourceSha ? `${stem}__${sourceSha.slice(0, 12)}.md` : `${stem}.md`
 }

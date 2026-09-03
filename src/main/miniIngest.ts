@@ -150,8 +150,19 @@ export async function clearStaging(userDataDir: string): Promise<void> {
  * would otherwise collide on the dated name and the second would silently
  * replace the first — losing material the person believes they imported.
  */
-async function writeNote(dir: string, name: string, body: string): Promise<void> {
+async function writeNote(
+  dir: string,
+  name: string,
+  body: string,
+  opts: { replace?: boolean } = {},
+): Promise<void> {
   const stem = name.replace(/\.md$/, '')
+  // A document keyed by its own bytes should overwrite itself; only names
+  // that could belong to two different things need the suffix dance.
+  if (opts.replace) {
+    await fs.writeFile(join(dir, `${stem}.md`), body, 'utf8')
+    return
+  }
   for (let n = 0; ; n++) {
     const candidate = join(dir, n === 0 ? `${stem}.md` : `${stem}-${n}.md`)
     try {
@@ -274,9 +285,10 @@ export async function ingestFiles(
         }
 
         const bytes = await fs.readFile(p)
+        const sha = createHash('sha256').update(bytes).digest('hex')
         const md = buildExtractedMarkdown(doc.markdown, {
           source_file: name,
-          source_sha256: createHash('sha256').update(bytes).digest('hex'),
+          source_sha256: sha,
           format: doc.format,
           extraction_tier: doc.meta.tier,
           extraction_sparse: doc.meta.sparse,
@@ -285,7 +297,10 @@ export async function ingestFiles(
           imported_at: new Date().toISOString(),
           imported_via: 'pomnia-mini',
         })
-        await writeNote(dir, stagedNoteName(name), md)
+        // Same document, same name: a re-import replaces its own note on the
+        // server rather than adding another copy of the same book at another
+        // quality.
+        await writeNote(dir, stagedNoteName(name, sha), md, { replace: true })
         files.push({
           file: name,
           kind: 'document',
