@@ -502,6 +502,20 @@ export interface UiLabels {
   ingestOcrProgress: (done: number, total: number, file: string) => string
   ingestOcr: string
   ingestOcrHint: string
+  skillsTitle: string
+  skillsLead: string
+  skillsRefresh: string
+  skillsEmpty: string
+  skillsCount: (n: number) => string
+  skillsKind: (kind: 'brain' | 'cli' | 'other') => string
+  skillsBackToList: string
+  skillsSave: string
+  skillsSaved: (name: string) => string
+  skillsSavedUnchanged: string
+  skillsSavedDetail: string
+  skillsDirty: string
+  skillsSavedHint: string
+  skillsRemoteReason: (code: string) => string
   ingestTitle: string
   ingestLead: string
   ingestPick: string
@@ -799,6 +813,7 @@ export interface UiLabels {
   navBrowse: string
   navImport: string
   navBrain: string
+  navSkills: string
   navConnect: string
   navSettings: string
   navGuide: string
@@ -1383,6 +1398,27 @@ const PL_LABELS: UiLabels = {
   ingestOcr: 'Skany czytane przez OCR',
   ingestOcrHint:
     'PDF bez warstwy tekstowej inaczej nie da nic, więc dzieje się to samo. Cały dokument, ok. 4 s na stronę. Strony-obrazki są odrzucane.',
+  skillsTitle: 'Skille',
+  skillsLead: 'Te, które leżą na serwerze. Podgląd i edycja — bez vaultu na tej maszynie.',
+  skillsRefresh: 'Odśwież',
+  skillsEmpty: 'Serwer nie ma skilli.',
+  skillsCount: (n) => `${plCount(n, 'skill', 'skille', 'skilli')} na serwerze.`,
+  skillsKind: (kind) => (kind === 'brain' ? 'workflow' : kind === 'cli' ? 'ekspertyza' : 'plik'),
+  skillsBackToList: 'Wróć do listy',
+  skillsSave: 'Zapisz na serwer',
+  skillsSaved: (name) => `Zapisano: ${name}`,
+  skillsSavedUnchanged: 'Bez zmian — treść była identyczna',
+  skillsSavedDetail: 'Agenci zobaczą to przy następnym odczycie.',
+  skillsDirty: 'Niezapisane zmiany.',
+  skillsSavedHint: 'Zapisane.',
+  skillsRemoteReason: (code) =>
+    code === 'no-target'
+      ? 'Brak adresu serwera — uzupełnij w zakładce Connect'
+      : code === 'no-token'
+        ? 'Potrzebny token admina — token agenta nie ma prawa czytać plików vaultu'
+        : code === 'unsafe-path'
+          ? 'Odrzucona ścieżka — wychodzi poza katalog skilli'
+          : 'Serwer nie odpowiedział',
   ingestTitle: 'Do Pomnia',
   ingestLead: 'Wrzuć pliki — Pomnia rozpozna, co to jest, i wyśle na serwer.',
   ingestPick: 'Wybierz pliki',
@@ -1708,6 +1744,7 @@ const PL_LABELS: UiLabels = {
   navBrowse: 'Czaty',
   navImport: 'Import',
   navBrain: 'Brain',
+  navSkills: 'Skille',
   navConnect: 'Connect',
   navSettings: 'Ustawienia',
   navGuide: 'Jak to działa',
@@ -2326,6 +2363,27 @@ const EN_LABELS: UiLabels = {
   ingestOcr: 'Scans are read with OCR',
   ingestOcrHint:
     'A PDF with no text layer yields nothing otherwise, so this just happens. Whole document, about 4 s per page. Picture pages are dropped.',
+  skillsTitle: 'Skills',
+  skillsLead: 'The ones on the server. Read and edit them — no vault on this machine.',
+  skillsRefresh: 'Refresh',
+  skillsEmpty: 'The server has no skills.',
+  skillsCount: (n) => `${n} ${n === 1 ? 'skill' : 'skills'} on the server.`,
+  skillsKind: (kind) => (kind === 'brain' ? 'workflow' : kind === 'cli' ? 'expertise' : 'file'),
+  skillsBackToList: 'Back to the list',
+  skillsSave: 'Save to the server',
+  skillsSaved: (name) => `Saved: ${name}`,
+  skillsSavedUnchanged: 'Unchanged — the content was identical',
+  skillsSavedDetail: 'Agents will see it on their next read.',
+  skillsDirty: 'Unsaved changes.',
+  skillsSavedHint: 'Saved.',
+  skillsRemoteReason: (code) =>
+    code === 'no-target'
+      ? 'No server address — fill it in under Connect'
+      : code === 'no-token'
+        ? 'Needs an admin token — an agent token cannot read vault files'
+        : code === 'unsafe-path'
+          ? 'Path refused — it climbs out of the skills directory'
+          : 'The server did not answer',
   ingestTitle: 'To Pomnia',
   ingestLead: 'Drop files in — Pomnia works out what they are and sends them to the server.',
   ingestPick: 'Choose files',
@@ -2499,6 +2557,7 @@ const EN_LABELS: UiLabels = {
   navBrowse: 'Chats',
   navImport: 'Import',
   navBrain: 'Brain',
+  navSkills: 'Skills',
   navConnect: 'Connect',
   navSettings: 'Settings',
   navGuide: 'How it works',

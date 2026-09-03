@@ -26,6 +26,7 @@ import FloatingMonitor from './pages/FloatingMonitor'
 import ProfilePreview from './pages/ProfilePreview'
 import { isMini, MINI_ROUTES } from './lib/flavour'
 import MiniIngest from './pages/MiniIngest'
+import MiniSkills from './pages/MiniSkills'
 
 const ALL_PAGES = {
   dashboard: Dashboard,
@@ -37,7 +38,9 @@ const ALL_PAGES = {
   connect: Connect,
   settings: Settings,
   guide: HowItWorks,
-  skills: Skills,
+  // Mini gets its own: the full Skills page reads the vault, and Mini reaches
+  // the same files on the server instead.
+  skills: isMini ? MiniSkills : Skills,
 } as const
 
 /**

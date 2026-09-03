@@ -129,6 +129,10 @@ const bridge = {
       | { ok: false; error: string; detail?: string; path?: string }
     >,
   mcpSeenClients: (brainUrl: string, token?: string) => ipcRenderer.invoke('mcp:seenClients', brainUrl, token),
+  skillsRemoteList: () => ipcRenderer.invoke('skills:remoteList'),
+  skillsRemoteRead: (path: string) => ipcRenderer.invoke('skills:remoteRead', path),
+  skillsRemoteWrite: (path: string, content: string) =>
+    ipcRenderer.invoke('skills:remoteWrite', path, content),
   miniIngestState: () => ipcRenderer.invoke('mini:ingestState'),
   miniIngestPick: () => ipcRenderer.invoke('mini:ingestPick'),
   miniIngestFiles: (

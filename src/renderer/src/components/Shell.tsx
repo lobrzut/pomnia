@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Pomnia
 import { motion } from 'framer-motion'
 import { isMini, MINI_ROUTES } from '../lib/flavour'
-import { BrainCircuit, Import as ImportIcon, LayoutDashboard, Lock, Map, MessagesSquare, Minus, Plug, Settings as Cog, Square, X } from 'lucide-react'
+import { BookOpen, BrainCircuit, Import as ImportIcon, LayoutDashboard, Lock, Map, MessagesSquare, Minus, Plug, Settings as Cog, Square, X } from 'lucide-react'
 import clsx from 'clsx'
 import { AppLogo } from './AppLogo'
 import { Spinner } from './ui'
@@ -18,7 +18,7 @@ const NAV_ICONS: Record<Route, typeof LayoutDashboard> = {
   connect: Plug,
   settings: Cog,
   guide: Map,
-  skills: LayoutDashboard,
+  skills: BookOpen,
 }
 
 function navItems(): { id: Route; label: string; icon: typeof LayoutDashboard }[] {
@@ -34,6 +34,10 @@ function navItems(): { id: Route; label: string; icon: typeof LayoutDashboard }[
     { id: 'import', label: isMini ? L.navImportMini : L.navImport, icon: NAV_ICONS.import },
     { id: 'brain', label: L.navBrain, icon: NAV_ICONS.brain },
     { id: 'connect', label: L.navConnect, icon: NAV_ICONS.connect },
+    // The skills route had no sidebar entry: the full app reaches it from
+    // elsewhere, so filtering MINI_ROUTES against this list silently
+    // dropped it and Mini's fourth screen was unreachable.
+    { id: 'skills', label: L.navSkills, icon: NAV_ICONS.skills },
     { id: 'settings', label: L.navSettings, icon: NAV_ICONS.settings }
   ]
   if (!isMini) return all

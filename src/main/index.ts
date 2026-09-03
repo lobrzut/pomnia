@@ -71,6 +71,7 @@ import { pushRemoteBehaviour } from '@core/brain/remoteBehaviour.js'
 import { pushStagedNotes } from '@core/brain/miniIngest.js'
 import { estimateSeconds, recordUpload } from '@core/brain/uploadEstimate.js'
 import { clearStaging, ingestFiles, stagedCount, stagedStats, stagingRoot } from './miniIngest.js'
+import { listRemoteSkills, readRemoteSkill, writeRemoteSkill } from './remoteSkills.js'
 
 /** Mini has no brain of its own, so every target it can have is remote. */
 const IS_MINI = import.meta.env?.MAIN_VITE_POMNIA_FLAVOUR === 'mini'
@@ -2205,6 +2206,30 @@ function registerIpc(): void {
    * hold. Parsing happens here because doc-parser and the export readers are
    * main-process code; the renderer only ever sees counts and names.
    */
+  /*
+   * Skills on the server, read and written over the replication endpoints.
+   * The admin token stays here; the renderer sends a path and gets text.
+   */
+  const skillsAuth = (): { url?: string; token?: string } => {
+    const s = getAppSettings()
+    return { url: s.brainMcpUrl, token: s.replicaToken }
+  }
+
+  ipcMain.handle('skills:remoteList', async () => {
+    const a = skillsAuth()
+    return listRemoteSkills(a.url, a.token)
+  })
+
+  ipcMain.handle('skills:remoteRead', async (_e, path: string) => {
+    const a = skillsAuth()
+    return readRemoteSkill(String(path ?? ''), a.url, a.token)
+  })
+
+  ipcMain.handle('skills:remoteWrite', async (_e, path: string, content: string) => {
+    const a = skillsAuth()
+    return writeRemoteSkill(String(path ?? ''), String(content ?? ''), a.url, a.token)
+  })
+
   ipcMain.handle('mini:ingestState', async () => {
     const st = await stagedStats(app.getPath('userData'))
     const rate = getAppSettings().uploadRate ?? null

@@ -15,11 +15,11 @@ describe('build flavour', () => {
     expect(isMini).toBe(false)
   })
 
-  it('ships exactly the three screens Mini is for', () => {
+  it('ships exactly the four screens Mini is for', () => {
     // Connect is the reason it exists; Settings carries the server and the
     // token; Import is how material reaches a memory Mini does not hold — it
     // parses here and sends to the server, the only sink it has.
-    expect([...MINI_ROUTES]).toEqual(['connect', 'settings', 'import'])
+    expect([...MINI_ROUTES]).toEqual(['connect', 'settings', 'skills', 'import'])
   })
 
   it('puts the reason it exists first and the errand last', () => {

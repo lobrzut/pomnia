@@ -244,6 +244,19 @@ export interface PomniaBridge {
     releaseUrl?: string
     detail?: string
   }>
+  /**
+   * Skills that live on the server, over the replication endpoints. The admin
+   * token never leaves main; the renderer sends a path and gets text back.
+   */
+  skillsRemoteList(): Promise<
+    | { skills: { path: string; kind: 'brain' | 'cli' | 'other'; name: string; size: number }[] }
+    | { error: string; detail: string }
+  >
+  skillsRemoteRead(path: string): Promise<{ path: string; content: string } | { error: string; detail: string }>
+  skillsRemoteWrite(
+    path: string,
+    content: string,
+  ): Promise<{ path: string; unchanged: boolean } | { error: string; detail: string }>
   miniIngestState(): Promise<{
     staged: number
     bytes: number
@@ -932,6 +945,26 @@ function mockBridge(): PomniaBridge {
           { name: 'some-agent-2027', firstSeen: now - 3_600_000, lastSeen: now - 900_000, connects: 2 },
         ],
       }
+    },
+    async skillsRemoteList() {
+      await new Promise((r) => setTimeout(r, 300))
+      return {
+        skills: [
+          { path: 'skills/brain/bug-recon.md', kind: 'brain' as const, name: 'bug-recon', size: 1767 },
+          { path: 'skills/brain/build-our-way.md', kind: 'brain' as const, name: 'build-our-way', size: 10027 },
+          { path: 'skills/cli/think-for-me/SKILL.md', kind: 'cli' as const, name: 'think-for-me', size: 4200 },
+        ],
+      }
+    },
+    async skillsRemoteRead(path) {
+      await new Promise((r) => setTimeout(r, 250))
+      return { path, content: `# ${path}
+
+Przykładowa treść skilla.` }
+    },
+    async skillsRemoteWrite(path) {
+      await new Promise((r) => setTimeout(r, 400))
+      return { path, unchanged: false }
     },
     async miniIngestState() {
       return { staged: 0, bytes: 0, etaSeconds: null, rateSamples: 0 }

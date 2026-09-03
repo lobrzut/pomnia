@@ -50,4 +50,4 @@ export const isMini = FLAVOUR === 'mini'
  * The sidebar follows this order, rather than the full app's, so the reason
  * Mini exists is at the top of it.
  */
-export const MINI_ROUTES = ['connect', 'settings', 'import'] as const
+export const MINI_ROUTES = ['connect', 'settings', 'skills', 'import'] as const
