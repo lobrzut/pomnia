@@ -630,7 +630,6 @@ export interface UiLabels {
    */
   profileBlurbs: Record<VramProfileId, string>
   /** Generic MCP setup: one prompt the user pastes into any agent. */
-  agentPromptTitle: string
   manualShow: string
   manualHide: string
   manualLead: (outerKey: string) => string
@@ -1531,7 +1530,6 @@ const PL_LABELS: UiLabels = {
     lite: 'Na kartę, na której ósemka się nie zmieści. Wybrana przez to, co działa, nie przez jakość — niemierzona względem bramki.',
     standard: 'Najlepszy zmierzony przerób: wyższe oceny niż 14B i mniej więcej dwukrotnie szybciej.',
   },
-  agentPromptTitle: 'Podłącz dowolnego agenta',
   manualShow: 'Wolę wkleić sam do pliku konfiguracyjnego →',
   manualHide: 'Ukryj konfigurację ręczną',
   manualLead: (outerKey) => `Wklej jeden kształt pod klucz \`${outerKey}\` w pliku MCP klienta.`,
@@ -2449,7 +2447,6 @@ const EN_LABELS: UiLabels = {
     lite: 'For a card the 8B will not fit on. Chosen by what runs, not by quality — not measured against the gate.',
     standard: 'Best measured notes per second: higher scores than the 14B and roughly twice the speed.',
   },
-  agentPromptTitle: 'Connect any agent',
   manualShow: 'I would rather paste it into the config myself →',
   manualHide: 'Hide manual setup',
   manualLead: (outerKey) => `Paste one shape under the \`${outerKey}\` key in your client's MCP file.`,

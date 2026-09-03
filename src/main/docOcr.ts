@@ -72,15 +72,18 @@ export async function runDocumentOcr(
     }
 
     const merged = applyOcrToDocument(tier1, ocr)
-    // Say what was read and what was thrown away: pages attempted and pages
-    // kept are different numbers, and the second is what the library gained.
+    // Say what was thrown away, and only then. Per-page progress already
+    // renders as `(done/total)`, so an unconditional summary here just blinks
+    // a second counter at someone whose job has finished.
     const dropped = ocr.dropped ?? 0
-    onProgress?.({
-      phase: 'ocr',
-      done: ocr.pages.length,
-      total: ocr.attempted ?? ocr.pages.length,
-      detail: dropped ? `odrzucone jako obrazki: ${dropped}` : undefined,
-    })
+    if (dropped > 0) {
+      onProgress?.({
+        phase: 'ocr',
+        done: ocr.pages.length,
+        total: ocr.attempted ?? ocr.pages.length,
+        detail: m().ocrDroppedPictures(dropped),
+      })
+    }
     const sha16 = doc.contentSha.slice(0, 16)
     const md = buildExtractedMarkdown(merged.markdown, {
       source_file: doc.originalName,

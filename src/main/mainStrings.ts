@@ -106,6 +106,7 @@ export interface MainStrings {
 
   // ── ocr ──────────────────────────────────────────────────────────────────
   ocrNoText: string
+  ocrDroppedPictures: (n: number) => string
 
   // ── vault health ─────────────────────────────────────────────────────────
   healthNoIndexTitle: string
@@ -208,6 +209,7 @@ const PL: MainStrings = {
   brainProcessFailed: (detail) => `Proces wyszukiwarki nie wystartował: ${detail}`,
 
   ocrNoText: 'OCR nie zwrócił tekstu — sprawdź tessdata (eng/pol) i @napi-rs/canvas',
+  ocrDroppedPictures: (n) => `odrzucone jako obrazki: ${n}`,
 
   healthNoIndexTitle: 'Brak lokalnego indeksu',
   healthNoIndexDetail: (notes) =>
@@ -316,6 +318,7 @@ const EN: MainStrings = {
   brainProcessFailed: (detail) => `The search engine process did not start: ${detail}`,
 
   ocrNoText: 'OCR returned no text — check tessdata (eng/pol) and @napi-rs/canvas',
+  ocrDroppedPictures: (n) => `dropped as pictures: ${n}`,
 
   healthNoIndexTitle: 'No local index',
   healthNoIndexDetail: (notes) =>
