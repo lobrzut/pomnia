@@ -139,6 +139,11 @@ const bridge = {
     ipcRenderer.invoke('mini:ingestFiles', paths, opts),
   miniIngestPush: () => ipcRenderer.invoke('mini:ingestPush'),
   miniIngestClear: () => ipcRenderer.invoke('mini:ingestClear'),
+  onMiniIngestProgress: (cb: (ev: { file: string; phase: 'ocr'; done: number; total: number }) => void) => {
+    const h = (_e: IpcRendererEvent, ev: { file: string; phase: 'ocr'; done: number; total: number }): void => cb(ev)
+    ipcRenderer.on('mini:ingestProgress', h)
+    return () => ipcRenderer.removeListener('mini:ingestProgress', h)
+  },
   connectTokenAdopt: (brainUrl: string, token: string) =>
     ipcRenderer.invoke('connect:tokenAdopt', brainUrl, token),
   connectMcpTokenCreate: (brainUrl: string, name: string, adminToken?: string) =>

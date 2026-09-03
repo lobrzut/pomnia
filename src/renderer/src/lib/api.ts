@@ -267,6 +267,10 @@ export interface PomniaBridge {
     | { ok: false; reason: string; detail: string }
   >
   miniIngestClear(): Promise<{ staged: number }>
+  /** Fires while OCR runs; returns an unsubscribe. */
+  onMiniIngestProgress(
+    cb: (ev: { file: string; phase: 'ocr'; done: number; total: number }) => void,
+  ): () => void
   connectTokenAdopt(
     brainUrl: string,
     token: string,
@@ -958,6 +962,9 @@ function mockBridge(): PomniaBridge {
     async miniIngestPush() {
       await new Promise((r) => setTimeout(r, 800))
       return { ok: true as const, result: { uploaded: 35, unchanged: 0, failed: [] } }
+    },
+    onMiniIngestProgress() {
+      return () => {}
     },
     async miniIngestClear() {
       return { staged: 0 }

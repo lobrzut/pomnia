@@ -75,14 +75,28 @@ export interface IngestOptions {
   ollamaUrl?: string
   model?: string
   /**
-   * Read scanned pages with OCR. Off by default and asked for explicitly,
-   * because it is slow and it samples: `ocrPages` pages, not the book. A
-   * setting that quietly turned 147 scanned pages into 3 pages of text
-   * would be the same lie as staging the empty note was.
+   * Read scanned pages with OCR. On unless switched off.
+   *
+   * It was opt-in, on the grounds that four seconds a page is expensive. But
+   * a PDF with no text layer has exactly one way to yield anything, so asking
+   * permission was asking a question with one answer — and the cost of
+   * getting it wrong was an empty note that looked like a real one.
    */
   ocr?: boolean
+  /**
+   * Pages to read. 0, the default, means the whole document.
+   *
+   * A cap turns a book into a sample of a book, and a sample indexed as
+   * knowledge answers questions it has no business answering. Ten minutes
+   * once, for a 147-page scan, is the honest price.
+   */
   ocrPages?: number
-  onProgress?: (done: number, total: number, file: string) => void
+  /**
+   * Called while OCR runs. At roughly four seconds a page — measured on a
+   * 147-page scan — a whole book is ten minutes, and ten minutes of a
+   * spinner is indistinguishable from ten minutes of a hang.
+   */
+  onProgress?: (ev: { file: string; phase: 'ocr'; done: number; total: number }) => void
 }
 
 /** Everything Mini has parsed and not yet sent. */
@@ -214,10 +228,18 @@ export async function ingestFiles(
         // every page in the file reported 137 chars/page for a book where
         // 127 of 147 pages were blank — a number that described nothing.
         let textPages = 0
-        if (opts.ocr && doc.meta.sparse && doc.format === 'pdf') {
+        if (opts.ocr !== false && doc.meta.sparse && doc.format === 'pdf') {
           try {
-            const pages = Math.max(1, opts.ocrPages ?? 3)
-            const ocr = await runOcr(p, { prefer: 'tesseract', maxPages: pages })
+            // 0 means the whole document: the page count is only known here,
+            // after parsing, so the caller cannot name it in advance.
+            const asked = opts.ocrPages ?? 0
+            const pages = asked === 0 ? parsed.meta.pageCount : Math.max(1, asked)
+            const ocr = await runOcr(p, {
+              prefer: 'tesseract',
+              maxPages: pages,
+              onProgress: (ev) =>
+                opts.onProgress?.({ file: name, phase: 'ocr', done: ev.done, total: ev.total }),
+            })
             if (ocr.method !== 'none' && ocr.pages.length > 0) {
               doc = applyOcrToDocument(doc, ocr)
               textPages = ocr.pages.length
@@ -243,9 +265,10 @@ export async function ingestFiles(
             kind: 'document',
             notes: 0,
             detail: `${parsed.meta.pageCount} str.`,
-            error: opts.ocr
-              ? 'skan bez warstwy tekstowej — OCR też nic nie odczytał'
-              : 'skan bez warstwy tekstowej — włącz OCR w sekcji Destylacja',
+            error:
+              opts.ocr === false
+                ? 'skan bez warstwy tekstowej — OCR wyłączony'
+                : 'skan bez warstwy tekstowej — OCR też nic nie odczytał',
           })
           continue
         }

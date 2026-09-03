@@ -83,7 +83,7 @@ Agent rules include **PRIORITY** session-start (`get_user_profile` + search) and
 
 ### Thin OCR (scanned PDFs)
 
-On Import: when the text layer is sparse → **Run OCR** (`tesseract.js`, eng+pol; max ~3 sparse pages). **No scribe.js** (AGPL). Tessdata in `resources/tessdata` (`npm run stage:tessdata`).
+On Import: when the text layer is sparse → OCR runs (`tesseract.js`, eng+pol), over the whole document by default at roughly 4 s/page; pages that score as pictures rather than text are dropped. **No scribe.js** (AGPL). Tessdata in `resources/tessdata` (`npm run stage:tessdata`).
 
 **Common issues:**
 

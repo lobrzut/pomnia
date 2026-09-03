@@ -508,6 +508,8 @@ export interface UiLabels {
   ingestEtaUnknown: string
   ingestModelCustom: string
   ingestPushResult: (uploaded: number, unchanged: number, failed: number) => string
+  ingestOcrLimit: string
+  ingestOcrProgress: (done: number, total: number, file: string) => string
   ingestOcrPages: string
   ingestOcr: string
   ingestOcrHint: string
@@ -1397,10 +1399,13 @@ const PL_LABELS: UiLabels = {
     (unchanged ? `, ${unchanged} bez zmian` : '') +
     (failed ? `, ${plCount(failed, 'nieudana', 'nieudane', 'nieudanych')}` : '') +
     '. Serwer nic nie skasował.',
+  ingestOcrLimit: 'ogranicz do:',
+  ingestOcrProgress: (done, total, file) =>
+    `OCR ${done}/${total} str. — ${file} (ok. 4 s na stronę)`,
   ingestOcrPages: 'stron:',
-  ingestOcr: 'OCR dla skanów',
+  ingestOcr: 'Skany czytane przez OCR',
   ingestOcrHint:
-    'Skan bez warstwy tekstowej inaczej nie da nic. Czyta próbkę stron, nie całość — powie ile.',
+    'PDF bez warstwy tekstowej inaczej nie da nic, więc dzieje się to samo. Cały dokument, ok. 4 s na stronę. Strony-obrazki są odrzucane.',
   ingestTitle: 'Do Pomnia',
   ingestLead: 'Wrzuć pliki — Pomnia rozpozna, co to jest, i wyśle na serwer.',
   ingestPick: 'Wybierz pliki',
@@ -2348,10 +2353,13 @@ const EN_LABELS: UiLabels = {
     (unchanged ? `, ${unchanged} unchanged` : '') +
     (failed ? `, ${failed} failed` : '') +
     '. The server deleted nothing.',
+  ingestOcrLimit: 'cap at:',
+  ingestOcrProgress: (done, total, file) =>
+    `OCR ${done}/${total} pages — ${file} (about 4 s per page)`,
   ingestOcrPages: 'pages:',
-  ingestOcr: 'OCR for scans',
+  ingestOcr: 'Scans are read with OCR',
   ingestOcrHint:
-    'A scan with no text layer yields nothing otherwise. Reads a sample of pages, not the whole file — it says how many.',
+    'A PDF with no text layer yields nothing otherwise, so this just happens. Whole document, about 4 s per page. Picture pages are dropped.',
   ingestTitle: 'To Pomnia',
   ingestLead: 'Drop files in — Pomnia works out what they are and sends them to the server.',
   ingestPick: 'Choose files',

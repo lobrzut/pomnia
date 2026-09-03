@@ -2251,8 +2251,11 @@ function registerIpc(): void {
         // rather than being re-typed on every import.
         ollamaUrl: opts?.ollamaUrl?.trim() || getAppSettings().ollamaUrl,
         model: opts?.model,
-        ocr: opts?.ocr === true,
+        ocr: opts?.ocr !== false,
         ocrPages: opts?.ocrPages,
+        // A whole-book OCR is ten minutes. Without this the window shows a
+        // spinner for all of it, which looks exactly like a hang.
+        onProgress: (ev) => win?.webContents.send('mini:ingestProgress', ev),
       }),
   )
 

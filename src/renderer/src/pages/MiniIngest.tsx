@@ -45,10 +45,11 @@ export default function MiniIngest() {
   const [model, setModel] = useState('')
   const [pulling, setPulling] = useState(false)
   const [showOllama, setShowOllama] = useState(false)
-  const [ocr, setOcr] = useState(false)
-  // Three pages of a 147-page book is not a sample, it is a title page.
-  // Ten is still a sample and says so; the number is here to be raised.
-  const [ocrPages, setOcrPages] = useState(10)
+  // 0 means the whole document, which is the default: a cap turns a book into
+  // a sample of a book, and a sample indexed as knowledge answers questions it
+  // has no business answering.
+  const [ocrPages, setOcrPages] = useState(0)
+  const [progress, setProgress] = useState<{ file: string; done: number; total: number } | null>(null)
   const [files, setFiles] = useState<Parsed>([])
   const [parsing, setParsing] = useState(false)
   const [sending, setSending] = useState(false)
@@ -70,6 +71,8 @@ export default function MiniIngest() {
     void refresh()
     void checkOllama().catch(() => setOllama({ reachable: false, models: [], chatModel: '' }))
   }, [refresh, checkOllama])
+
+  useEffect(() => api.onMiniIngestProgress((ev) => setProgress(ev)), [])
 
   async function pick() {
     const paths = await api.miniIngestPick()
@@ -96,7 +99,8 @@ export default function MiniIngest() {
       const r = await api.miniIngestFiles(paths, {
         ollamaUrl: ollamaUrl || undefined,
         model,
-        ocr,
+        // 0 asks for the whole document; main knows the page count, the
+        // renderer does not.
         ocrPages,
       })
       // Append rather than replace: picking a second batch is adding to what is
@@ -123,6 +127,7 @@ export default function MiniIngest() {
       toast({ kind: 'error', title: labels.ingestParseFailed, detail: (e as Error).message })
     } finally {
       setParsing(false)
+      setProgress(null)
     }
   }
 
@@ -262,32 +267,29 @@ export default function MiniIngest() {
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">{labels.ingestOllamaHint}</p>
 
-        {/* OCR sits here because it is the same question — what turns a file
-            into text — and it is off by default because it samples pages
-            rather than reading the document. A switch that quietly turned
-            147 scanned pages into three pages of text would be the same lie
-            as staging the empty note was. */}
+        {/*
+          OCR is not a choice any more. A PDF with no text layer has exactly one
+          way to yield anything, so the switch asked a question with one answer,
+          and getting it wrong produced an empty note that looked real. It runs
+          on scans, over the whole document; the field below is for capping it,
+          which is the exception rather than the setting.
+        */}
         <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
           <div>
             <div className="text-[13px] text-ink">{labels.ingestOcr}</div>
             <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">{labels.ingestOcrHint}</p>
           </div>
-          <div className="flex shrink-0 items-center gap-3">
-            {ocr && (
-              <label className="flex items-center gap-2 text-[11px] text-ink-faint">
-                {labels.ingestOcrPages}
-                <input
-                  type="number"
-                  min={1}
-                  max={500}
-                  value={ocrPages}
-                  onChange={(e) => setOcrPages(Math.max(1, Math.min(500, Number(e.target.value) || 1)))}
-                  className="no-drag w-16 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-ink"
-                />
-              </label>
-            )}
-            <Toggle checked={ocr} onChange={setOcr} aria-label={labels.ingestOcr} />
-          </div>
+          <label className="flex shrink-0 items-center gap-2 text-[11px] text-ink-faint">
+            {labels.ingestOcrLimit}
+            <input
+              type="number"
+              min={0}
+              max={2000}
+              value={ocrPages}
+              onChange={(e) => setOcrPages(Math.max(0, Math.min(2000, Number(e.target.value) || 0)))}
+              className="no-drag w-16 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-ink"
+            />
+          </label>
         </div>
         </>
         )}
@@ -313,7 +315,13 @@ export default function MiniIngest() {
             {labels.ingestPick}
           </Button>
           <span className="text-[11px] text-ink-faint">
-            {dragging ? labels.ingestDropNow : labels.ingestFormats}
+            {/* Four seconds a page, measured. A whole book is ten minutes,
+                and ten minutes of a spinner looks like a hang. */}
+            {progress
+              ? labels.ingestOcrProgress(progress.done, progress.total, progress.file)
+              : dragging
+                ? labels.ingestDropNow
+                : labels.ingestFormats}
           </span>
         </div>
 
