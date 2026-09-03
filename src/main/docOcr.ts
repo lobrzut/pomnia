@@ -51,7 +51,14 @@ export async function runDocumentOcr(
     onProgress?.({ phase: 'ocr', done: 0, total: 1, detail: 'tesseract…' })
     const ocr = await runOcr(tmpPath, {
       prefer: 'tesseract',
-      maxPages: 3,
+      // The whole document, not three pages of it.
+      //
+      // Three was chosen when OCR was a thin sample. Measured since: about
+      // four seconds a page, so a 147-page scan is ten minutes once — and
+      // three pages of a book, indexed as the book, answers questions it
+      // has no business answering. `runOcr` drops pages that come back as
+      // picture-noise, so length costs time rather than quality.
+      maxPages: tier1.meta.pageCount || 3,
       onProgress: (ev: { done: number; total: number; page: number }) =>
         onProgress?.({
           phase: 'ocr',
@@ -65,6 +72,15 @@ export async function runDocumentOcr(
     }
 
     const merged = applyOcrToDocument(tier1, ocr)
+    // Say what was read and what was thrown away: pages attempted and pages
+    // kept are different numbers, and the second is what the library gained.
+    const dropped = ocr.dropped ?? 0
+    onProgress?.({
+      phase: 'ocr',
+      done: ocr.pages.length,
+      total: ocr.attempted ?? ocr.pages.length,
+      detail: dropped ? `odrzucone jako obrazki: ${dropped}` : undefined,
+    })
     const sha16 = doc.contentSha.slice(0, 16)
     const md = buildExtractedMarkdown(merged.markdown, {
       source_file: doc.originalName,
