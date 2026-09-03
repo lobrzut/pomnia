@@ -128,7 +128,6 @@ const bridge = {
       | { ok: true; path: string; bytes: number; handshakePath?: string; agentsPath?: string }
       | { ok: false; error: string; detail?: string; path?: string }
     >,
-  connectSkillsSync: (brainUrl: string, token?: string) => ipcRenderer.invoke('connect:skillsSync', brainUrl, token),
   mcpSeenClients: (brainUrl: string, token?: string) => ipcRenderer.invoke('mcp:seenClients', brainUrl, token),
   miniIngestState: () => ipcRenderer.invoke('mini:ingestState'),
   miniIngestPick: () => ipcRenderer.invoke('mini:ingestPick'),

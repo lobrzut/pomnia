@@ -296,11 +296,6 @@ export interface UiLabels {
   copyFailed: string
   copied: string
   statusCheckFailed: string
-  skillSyncOk: (n: number) => string
-  skillSyncNone: string
-  skillSyncFailed: string
-  skillSyncErrorsDetail: (n: number) => string
-  skillSyncAvailableOffline: string
   embeddedSnippetHint: string
   urlChangeHint: string
   snippetFilePath: string
@@ -331,7 +326,6 @@ export interface UiLabels {
   brainReadOnly: string
   brainReadOnlyBy: (owner: string) => string
   brainStoppedStartInTab: string
-  skillsNoneOnServer: string
   snippetLocalModeHint: string
   snippetRemoteBrainCoreHint: string
   /** Legacy Python hub 3×SSE snippet note. */
@@ -412,10 +406,6 @@ export interface UiLabels {
   connectSnippetMerge: string
   connectCopyAction: string
   connectMergeKeysHint: (mcpKey: string) => string
-  connectSkillsTitle: string
-  connectSkillsBadge: string
-  connectSkillsLead: string
-  connectSkillsSync: string
   guideAltPath: string
   pendingIndexesWaiting: (n: number) => string
   healthModelMissing: (pullCmd: string) => string
@@ -1166,11 +1156,6 @@ const PL_LABELS: UiLabels = {
   copyFailed: 'Nie udało się skopiować',
   copied: 'Skopiowano',
   statusCheckFailed: 'Nie udało się sprawdzić statusu',
-  skillSyncOk: (n) => `Zsynchronizowano ${n} skill(i)`,
-  skillSyncNone: 'Brak skilli',
-  skillSyncFailed: 'Sync skilli nieudany',
-  skillSyncErrorsDetail: (n) => `${n} błąd(ów) — konsola`,
-  skillSyncAvailableOffline: 'Dostępne offline.',
   embeddedSnippetHint: 'Snippety wskazują na localhost — jeden serwer MCP, bez tokena.',
   urlChangeHint: 'Zmiana URL/tokena odświeża snippet automatycznie.',
   snippetFilePath: 'ścieżka pliku',
@@ -1199,7 +1184,6 @@ const PL_LABELS: UiLabels = {
   brainReadOnly: 'tylko odczyt',
   brainReadOnlyBy: (owner) => `tylko odczyt — vault trzyma ${owner}`,
   brainStoppedStartInTab: 'lokalny brain zatrzymany — uruchom w zakładce Brain',
-  skillsNoneOnServer: 'Serwer Brain nie ma jeszcze skilli.',
   snippetLocalModeHint: 'Tryb lokalny: jeden serwer pomnia na /mcp — bez Bearer tokena.',
   snippetRemoteBrainCoreHint:
     'Remote brain-core: jeden serwer `pomnia` → /mcp + Bearer — nie stare 3×SSE.',
@@ -1287,11 +1271,6 @@ const PL_LABELS: UiLabels = {
   connectSnippetMerge: 'Merge do istniejącego',
   connectCopyAction: 'Kopiuj',
   connectMergeKeysHint: (mcpKey) => `Dodaj te klucze do obiektu "${mcpKey}".`,
-  connectSkillsTitle: 'Skille Brain',
-  connectSkillsBadge: 'offline po synchronizacji',
-  connectSkillsLead:
-    'Pobierz skille workflow i expertise z serwera Brain, żeby były dostępne także poza LAN.',
-  connectSkillsSync: 'Sync skilli',
   guideAltPath: 'Osobna ścieżka',
   pendingIndexesWaiting: (n) => `${n} indeksów czeka`,
   healthModelMissing: (pullCmd) => `Brak modelu — ${pullCmd}`,
@@ -2119,11 +2098,6 @@ const EN_LABELS: UiLabels = {
   copyFailed: 'Could not copy',
   copied: 'Copied',
   statusCheckFailed: 'Could not check status',
-  skillSyncOk: (n) => `Synced ${n} skill(s)`,
-  skillSyncNone: 'No skills',
-  skillSyncFailed: 'Skill sync failed',
-  skillSyncErrorsDetail: (n) => `${n} error(s) — see the console`,
-  skillSyncAvailableOffline: 'Available offline.',
   embeddedSnippetHint: 'Snippets point at localhost — one MCP server, no token.',
   urlChangeHint: 'Changing the URL or token refreshes the snippet automatically.',
   snippetFilePath: 'file path',
@@ -2152,7 +2126,6 @@ const EN_LABELS: UiLabels = {
   brainReadOnly: 'read-only',
   brainReadOnlyBy: (owner) => `read-only — the vault is held by ${owner}`,
   brainStoppedStartInTab: 'local brain stopped — start it in the Brain tab',
-  skillsNoneOnServer: 'The Brain server has no skills yet.',
   snippetLocalModeHint: 'Local mode: one pomnia server on /mcp — no bearer token.',
   snippetRemoteBrainCoreHint:
     'Remote brain-core: one `pomnia` server → /mcp + Bearer — not the old 3×SSE hub.',
@@ -2240,11 +2213,6 @@ const EN_LABELS: UiLabels = {
   connectSnippetMerge: 'Merge into existing',
   connectCopyAction: 'Copy',
   connectMergeKeysHint: (mcpKey) => `Add these keys to the "${mcpKey}" object.`,
-  connectSkillsTitle: 'Brain skills',
-  connectSkillsBadge: 'offline-capable once synced',
-  connectSkillsLead:
-    "Pull workflow + expertise skills from your Brain server so they're available even when you're not on the LAN.",
-  connectSkillsSync: 'Sync skills',
   guideAltPath: 'Separate path',
   pendingIndexesWaiting: (n) => `${n} indexes waiting`,
   healthModelMissing: (pullCmd) => `Model missing — ${pullCmd}`,

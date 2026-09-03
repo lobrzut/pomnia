@@ -15,7 +15,6 @@ import {
   createMcpToken,
   currentOS,
   defaultOllamaConfig,
-  deployDashboard,
   deployFilesystem,
   copyNoteThroughQualityGate,
   deployDistilledToBrain,
@@ -26,7 +25,6 @@ import {
   homeDir,
   hostName,
   isDistillableSource,
-  listAllSkills,
   processedIdsAfterDistill,
   loadIndex,
   log,
@@ -53,8 +51,6 @@ import {
   syncVaultSurface,
   setLogSink,
   initFileLog,
-  syncSkills,
-  triggerReindex,
   userName,
   type BackupOptions,
   type ClientId,
@@ -1295,22 +1291,20 @@ function registerIpc(): void {
           })
           const dep = await deployDistilledToBrain({
             notesDir: dir,
-            dashboardUrl: opts.deployUrl,
             filesystemTarget: opts.deployTarget,
-            reindex: opts.reindex !== false,
-            token: opts.deployToken
           })
-          // Remote attempt owns the deploy stats (incl. method=none → UI warns).
           deployed = dep.copied
           deployMethod = dep.method
-          reindexed = dep.reindex || reindexed
           emitBrainProgress({
             phase: 'deploy',
             done: 1,
             total: 1,
+            // No HTTP fallback any more: without a mounted folder there is
+            // nowhere to copy to, and saying 'enable the save-note API' would
+            // point at a route brain-core does not serve.
             detail: dep.method === 'none'
-              ? 'deploy skipped — set deploy folder or enable save-note API on Brain'
-              : `${dep.copied} note(s) via ${dep.method}${dep.reindex ? ' · reindex ok' : ' · reindex failed'}`
+              ? 'deploy skipped — no deploy folder set'
+              : `${dep.copied} note(s) copied to the deploy folder`
           })
         }
 
@@ -2022,15 +2016,12 @@ function registerIpc(): void {
           }
         }
       } else {
-        const convs = await collectLive(opts.sources ?? [])
-        const r = await deployDashboard(convs, opts.url || 'http://localhost:7860')
-        detail = `Pushed to Brain: ${r.ok} ok, ${r.failed} failed`
-        if (r.failed > 0) problems.push(`${r.failed} note(s) failed to push`)
-      }
-      if (opts.reindex && opts.url) {
-        const ok = await triggerReindex(opts.url, opts.token)
-        detail += ok ? ' · reindex triggered' : ' · reindex failed'
-        if (!ok) problems.push('remote reindex trigger failed')
+        // The dashboard target is gone. It posted to /api/vault/save-note,
+        // /api/vault/save-chat and /api/library/reindex on the retired Python
+        // hub's own port — all three answer 404 on brain-core, verified
+        // against the live server. Notes reach a remote brain through vault
+        // replication, which is what actually runs every day.
+        throw new Error('deploy target "dashboard" was removed; use filesystem or vault replication')
       }
       return { detail, ok: problems.length === 0, problems }
     }
@@ -2302,9 +2293,6 @@ function registerIpc(): void {
     }
   })
 
-  ipcMain.handle('connect:skillsSync', (_e, brainUrl: string, token?: string) =>
-    syncSkills(brainUrl, brainSkillsDir(vaultPath), { token })
-  )
 
   /**
    * Take one pasted token and work out what to do with it.

@@ -153,63 +153,8 @@ export async function copyNoteThroughQualityGate(
   return { dest, path: out }
 }
 
-/** Push raw conversations to Brain's dashboard; Brain distills + stores them. */
-export async function deployDashboard(
-  conversations: Conversation[],
-  baseUrl: string
-): Promise<{ ok: number; failed: number }> {
-  let ok = 0
-  let failed = 0
-  for (const c of conversations) {
-    try {
-      const r = await fetch(`${baseUrl}/api/vault/save-chat`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          title: c.title,
-          model: c.meta?.model,
-          messages: c.messages.map((m) => ({ role: m.role, content: m.text }))
-        }),
-        signal: AbortSignal.timeout(60_000)
-      })
-      r.ok ? ok++ : failed++
-    } catch {
-      failed++
-    }
-  }
-  return { ok, failed }
-}
 
-/** Ask Brain to (re)embed the vault + library into its vector DB. */
-export async function triggerReindex(baseUrl: string, token?: string): Promise<boolean> {
-  try {
-    const headers: Record<string, string> = { 'content-type': 'application/json' }
-    if (token?.trim()) headers.Authorization = `Bearer ${token.trim()}`
-    const r = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/library/reindex`, {
-      method: 'POST',
-      headers,
-      body: '{}',
-      signal: AbortSignal.timeout(15_000)
-    })
-    return r.ok
-  } catch {
-    return false
-  }
-}
 
-/** MCP gateway (:7862) → dashboard API (:7860). */
-export function dashboardUrlFromBrainUrl(brainUrl: string): string {
-  try {
-    const u = new URL(brainUrl)
-    u.port = '7860'
-    u.pathname = ''
-    u.search = ''
-    u.hash = ''
-    return u.toString().replace(/\/$/, '')
-  } catch {
-    return brainUrl.replace(/:7862\b/, ':7860').replace(/\/+$/, '')
-  }
-}
 
 /**
  * Copy finished .md notes from a local staging dir into Brain's vault/distilled
@@ -246,81 +191,32 @@ export async function deployDistilledFiles(notesDir: string, targetDir: string):
   return copied
 }
 
-/** POST pre-distilled markdown to Brain dashboard (KVM / homelab). */
-export async function deployDistilledHttp(
-  notesDir: string,
-  dashboardUrl: string,
-  token?: string
-): Promise<{ ok: number; failed: number; api: 'save-note' | 'none' }> {
-  const base = dashboardUrl.replace(/\/+$/, '')
-  const headers: Record<string, string> = { 'content-type': 'application/json' }
-  if (token?.trim()) headers.Authorization = `Bearer ${token.trim()}`
-  let ok = 0
-  let failed = 0
-  let api: 'save-note' | 'none' = 'none'
-  for (const name of await fs.readdir(notesDir)) {
-    if (!name.endsWith('.md') || name.startsWith('.')) continue
-    const markdown = await fs.readFile(path.join(notesDir, name), 'utf8')
-    try {
-      const r = await fetch(`${base}/api/vault/save-note`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ markdown, filename: name }),
-        signal: AbortSignal.timeout(60_000)
-      })
-      if (r.status === 404 && api === 'none') {
-        log.warn('Brain save-note API not found — use filesystem deploy target or mount SMB share')
-        return { ok: 0, failed: 1, api: 'none' }
-      }
-      api = 'save-note'
-      r.ok ? ok++ : failed++
-    } catch (e) {
-      failed++
-      log.warn('save-note failed:', name, (e as Error).message)
-    }
-  }
-  return { ok, failed, api }
-}
 
 export interface DeployDistilledResult {
   copied: number
-  httpOk: number
-  httpFailed: number
-  method: 'filesystem' | 'http' | 'none'
-  reindex: boolean
+  method: 'filesystem' | 'none'
 }
 
 /**
- * Push host-distilled notes to a remote Brain (KVM/homelab).
- * Prefers filesystem target (SMB/NFS mount); falls back to HTTP save-note API.
+ * Copy host-distilled notes to a remote Brain's vault, over a mounted share.
+ *
+ * The HTTP half of this is gone. It posted to /api/vault/save-note and then
+ * asked /api/library/reindex to pick them up — both on the retired Python hub's
+ * own port. brain-core answers 404 to all of it, verified against the live
+ * server, so every note this pushed since that migration went nowhere while the
+ * UI reported a count.
+ *
+ * A mounted target still works and is what the setting in Brain names. Notes
+ * reach a remote brain the other way through vault replication, which is the
+ * path that actually runs every day.
  */
 export async function deployDistilledToBrain(opts: {
   notesDir: string
-  dashboardUrl: string
   filesystemTarget?: string
-  reindex?: boolean
-  token?: string
 }): Promise<DeployDistilledResult> {
-  const dashboardUrl = dashboardUrlFromBrainUrl(opts.dashboardUrl)
-  let copied = 0
-  let httpOk = 0
-  let httpFailed = 0
-  let method: DeployDistilledResult['method'] = 'none'
-
-  if (opts.filesystemTarget) {
-    copied = await deployDistilledFiles(opts.notesDir, opts.filesystemTarget)
-    method = 'filesystem'
-  } else {
-    const http = await deployDistilledHttp(opts.notesDir, dashboardUrl, opts.token)
-    httpOk = http.ok
-    httpFailed = http.failed
-    method = http.api === 'none' ? 'none' : 'http'
-    copied = httpOk
+  if (!opts.filesystemTarget) return { copied: 0, method: 'none' }
+  return {
+    copied: await deployDistilledFiles(opts.notesDir, opts.filesystemTarget),
+    method: 'filesystem',
   }
-
-  const reindex =
-    opts.reindex !== false && method !== 'none'
-      ? await triggerReindex(dashboardUrl, opts.token)
-      : false
-  return { copied, httpOk, httpFailed, method, reindex }
 }

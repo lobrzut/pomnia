@@ -22,7 +22,6 @@ import {
   Vault,
   buildIndex,
   defaultOllamaConfig,
-  deployDashboard,
   deployFilesystem,
   buildSnippet,
   checkAllClients,
@@ -30,7 +29,6 @@ import {
   distillAll,
   exportConversationsToDir,
   getAdapter,
-  listAllSkills,
   listClients,
   loadIndex,
   parseExportPath,
@@ -40,8 +38,6 @@ import {
   formatDoctorLines,
   saveIndex,
   searchIndex,
-  syncSkills,
-  triggerReindex,
   type ClientId,
   type Conversation,
   type SourceId
@@ -342,26 +338,6 @@ async function cmdBrain(p: Parsed): Promise<void> {
     return
   }
 
-  if (sub === 'skills') {
-    const action = String(p.positional[1] || 'sync')
-    const url = String(p.flags.url || p.flags.brain || 'http://localhost:7860').replace(/\/$/, '')
-    const target = String(p.flags.target || p.flags.out || path.join(process.cwd(), '.pomnia-skills'))
-    const token = typeof p.flags.token === 'string' ? p.flags.token : process.env.BRAIN_TOKEN
-    if (action === 'list') {
-      const cat = await listAllSkills(url, { token })
-      console.log(C.bold(`\n  ${cat.length} skills @ ${url}\n`))
-      for (const s of cat) console.log(`  ${C.cyan(s.kind.padEnd(5))} ${s.name}${s.description ? C.dim(' — ' + s.description.slice(0, 80)) : ''}`)
-      return
-    }
-    if (action === 'sync') {
-      console.log(C.dim(`  syncing skills from ${url} → ${target}…`))
-      const r = await syncSkills(url, target, { token })
-      console.log(`  ${C.green('✔')} ${r.written} written, ${r.errors.length} errors`)
-      for (const e of r.errors) console.log(`  ${C.yellow('⚠')} ${e.name}: ${e.reason}`)
-      return
-    }
-    throw new Error('usage: brain skills list|sync [--url http://brain:7860] [--target DIR] [--token btk_…]')
-  }
 
   if (sub === 'deploy') {
     const to = String(p.flags.to || 'filesystem')
@@ -373,17 +349,11 @@ async function cmdBrain(p: Parsed): Promise<void> {
       await fs.mkdir(target, { recursive: true })
       for (const n of notes) await fs.writeFile(path.join(target, n.notePath), n.text, 'utf8')
       console.log(`  ${C.green('✔')} copied ${notes.length} notes → ${target}`)
-    } else if (to === 'dashboard') {
-      const url = String(p.flags.url || 'http://localhost:7860')
-      const convs = await collectLive(p.flags)
-      console.log(C.dim(`  pushing ${convs.length} chats to ${url} (Brain distills)…`))
-      const r = await deployDashboard(convs, url)
-      console.log(`  ${C.green('✔')} ${r.ok} ok, ${r.failed} failed`)
-    } else throw new Error('--to must be filesystem|dashboard')
-    if (p.flags.reindex && typeof p.flags.url === 'string') {
-      const token = typeof p.flags.token === 'string' ? p.flags.token : process.env.BRAIN_TOKEN
-      const ok = await triggerReindex(String(p.flags.url), token)
-      console.log(ok ? `  ${C.green('✔')} reindex triggered` : `  ${C.yellow('⚠')} reindex call failed`)
+    } else {
+      // `--to dashboard` posted to the retired hub's /api/vault/save-chat,
+      // and `--reindex` to its /api/library/reindex. brain-core answers 404
+      // to both, verified against a live server.
+      throw new Error('--to must be filesystem (dashboard was removed: brain-core has no such API)')
     }
     return
   }
@@ -397,8 +367,6 @@ async function cmdBrain(p: Parsed): Promise<void> {
   ${C.cyan('search')}   --notes DIR "<query>" [--k N]
   ${C.cyan('pipeline')} --out DIR [--sources all] [--model M] [--limit N]   ${C.dim('(distill + index)')}
   ${C.cyan('deploy')}   --to filesystem --notes DIR --target VAULTDIR
-  ${C.cyan('deploy')}   --to dashboard  --url http://host:7860 [--reindex]
-  ${C.cyan('skills')}   list | sync [--url http://brain:7860] [--target DIR] [--token btk_…]
   ${C.cyan('snippet')}  --client <id> [--url http://brain:7862] [--token btk_…]   ${C.dim('(copy-paste mcp config for one client)')}
 `)
 }

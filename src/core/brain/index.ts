@@ -22,13 +22,10 @@ export {
 export type { LocalIndex, IndexEntry, SearchHit, NoteForIndex } from './localIndex.js'
 export {
   deployFilesystem,
-  deployDashboard,
-  triggerReindex,
   noteFilename,
   sessionIdFileSuffix,
   matchesSessionNote,
   removePriorSessionNotes,
-  dashboardUrlFromBrainUrl,
   deployDistilledToBrain,
   deployDistilledFiles,
   copyNoteThroughQualityGate,
@@ -42,8 +39,6 @@ export {
   upsertQualityFrontmatter,
 } from './qualityGate.js'
 export type { QualityLabel, QualityDestination } from './qualityGate.js'
-export { listAllSkills, syncSkills, readLocalIndex } from './skills.js'
-export type { SkillKind, SkillListEntry, SkillSyncResult } from './skills.js'
 export {
   CLIENTS,
   getClient,

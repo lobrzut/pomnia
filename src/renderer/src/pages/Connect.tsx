@@ -459,28 +459,6 @@ export default function Connect() {
     }
   }
 
-  async function syncSkills() {
-    setSyncing(true)
-    try {
-      // Skills live on the dashboard (:7860), not the MCP gateway/auth-proxy
-      // (:7862) that brainUrl normally points at for client status + snippets —
-      // two different services on two different ports. Derive by convention.
-      const skillsDash = dashboardUrlFromBrainUrl(brainUrl)
-      const r = await api.connectSkillsSync(skillsDash, connectToken || undefined)
-      toast(
-        r.errors.length
-          ? { kind: 'warn', title: labels.skillSyncOk(r.written), detail: labels.skillSyncErrorsDetail(r.errors.length) }
-          : r.written === 0
-            ? { kind: 'info', title: labels.skillSyncNone, detail: labels.skillsNoneOnServer }
-            : { kind: 'success', title: labels.skillSyncOk(r.written), detail: labels.skillSyncAvailableOffline }
-      )
-      if (r.errors.length) console.warn('skill sync errors', r.errors)
-    } catch (e) {
-      toast({ kind: 'error', title: labels.skillSyncFailed, detail: (e as Error).message })
-    } finally {
-      setSyncing(false)
-    }
-  }
 
   // Default to showing only clients we actually detect on disk; the user can
   // override per-client in Settings (pin a not-yet-installed one, or hide one).
@@ -1148,24 +1126,6 @@ export default function Connect() {
         </GlassCard>
       )}
 
-      {/* Skills sync — the retired hub's dashboard API. brain-core serves
-          skills through vault replication instead, and Mini has no vault to
-          receive them, so in Mini this button could only ever fail. */}
-      {effectiveTarget === 'remote' && !isMini && (
-      <GlassCard className="p-5">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <Sparkles className="h-4 w-4 text-amber" /> {labels.connectSkillsTitle}
-          </div>
-          <Badge color="#9aa3bd">{labels.connectSkillsBadge}</Badge>
-        </div>
-        <p className="mb-3 text-xs text-ink-faint">{labels.connectSkillsLead}</p>
-        <Button onClick={() => void syncSkills()} disabled={syncing}>
-          {syncing ? <Spinner className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-          {labels.connectSkillsSync}
-        </Button>
-      </GlassCard>
-      )}
 
       {/*
         Vault replication — deliberately NOT gated on the engine target.

@@ -26,8 +26,6 @@ import type {
   ConversationMeta,
   DetectedSource,
   OllamaPullEvent,
-  SkillListEntry,
-  SkillSyncResult,
   Snapshot,
   Snippet,
   SourceId,
@@ -187,15 +185,6 @@ export interface PomniaBridge {
     supported: boolean
     clients: { name: string; version?: string; firstSeen: number; lastSeen: number; connects: number }[]
   }>
-  connectSkillsSync(brainUrl: string, token?: string): Promise<SkillSyncResult>
-  appUpdateCheck(): Promise<{
-    current: string
-    checkedAt: string
-    state: 'current' | 'available' | 'unreachable'
-    latest?: string | null
-    releaseUrl?: string
-    detail?: string
-  }>
   appDataLocations(): Promise<{
     platform: 'win32' | 'darwin' | 'linux'
     installForm: 'appimage' | 'deb' | 'nsis' | 'dmg' | 'dev' | 'unknown'
@@ -247,6 +236,14 @@ export interface PomniaBridge {
    * Notes parsed and waiting to be sent, with the size and — only once an
    * upload has actually been timed — how long the next one should take.
    */
+  appUpdateCheck(): Promise<{
+    current: string
+    checkedAt: string
+    state: 'current' | 'available' | 'unreachable'
+    latest?: string | null
+    releaseUrl?: string
+    detail?: string
+  }>
   miniIngestState(): Promise<{
     staged: number
     bytes: number
@@ -935,10 +932,6 @@ function mockBridge(): PomniaBridge {
           { name: 'some-agent-2027', firstSeen: now - 3_600_000, lastSeen: now - 900_000, connects: 2 },
         ],
       }
-    },
-    async connectSkillsSync() {
-      await new Promise((r) => setTimeout(r, 700))
-      return { fetched: 12, written: 12, errors: [] } as SkillSyncResult
     },
     async miniIngestState() {
       return { staged: 0, bytes: 0, etaSeconds: null, rateSamples: 0 }

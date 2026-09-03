@@ -9,7 +9,7 @@ export type {
   Conversation,
   Message
 } from '@core/model'
-export type { ClientId, ClientStatus, WiredState, Snippet, BrainPing, SkillListEntry, SkillSyncResult, BrainTarget } from '@core/brain/index'
+export type { ClientId, ClientStatus, WiredState, Snippet, BrainPing, BrainTarget } from '@core/brain/index'
 
 export interface VaultStatus {
   open: boolean
