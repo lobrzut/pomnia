@@ -516,12 +516,20 @@ export default function Connect() {
         the connection by calling a tool. Every per-client spec in this app
         exists to save that paste; none of them is what makes MCP work. An
         agent released tomorrow is covered by this and by nothing else.
+
+        Shown in both builds, and first. The per-client cards below it are a
+        shortcut for the six clients someone wrote code for; this is the
+        method, and it is the only thing on the page that covers a client
+        nobody has heard of yet.
       */}
-      {isMini && (
+      {effectiveTarget === 'remote' && (
         <GlassCard className="mb-5 p-5">
-          {/* No card title and no lead: the page header two lines above already
-              says what this does, and saying it twice in different words is how
-              a one-action screen starts reading like a manual. */}
+          {/* In Mini the page header two lines above already says what this
+              does. The full app's header talks about per-client configs, so
+              there the card has to say it itself. */}
+          {!isMini && (
+            <p className="mb-3 text-xs leading-relaxed text-ink-dim">{labels.agentPromptLeadFull}</p>
+          )}
           {/*
             Collapsed by default. The instruction is sixty lines of monospace
             written for a machine to act on, and it is meant to be copied, not
@@ -558,6 +566,7 @@ export default function Connect() {
             refuses, a client with no chat window, or simply someone who
             would rather edit the file, all end up here.
           */}
+          {isMini && (
           <div className="mt-4 border-t border-white/8 pt-3">
             <button
               onClick={() => setShowManual((v) => !v)}
@@ -594,6 +603,7 @@ export default function Connect() {
               </div>
             )}
           </div>
+          )}
         </GlassCard>
       )}
 

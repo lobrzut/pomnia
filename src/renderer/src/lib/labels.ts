@@ -627,6 +627,7 @@ export interface UiLabels {
   manualOuterKeyNote: string
   manualCopy: string
   manualCopied: string
+  agentPromptLeadFull: string
   agentPromptCopy: string
   agentPromptCopied: string
   agentPromptSecret: string
@@ -1521,6 +1522,8 @@ const PL_LABELS: UiLabels = {
   manualOuterKeyNote: 'VS Code nazywa ten klucz `servers`.',
   manualCopy: 'Kopiuj',
   manualCopied: 'Skopiowane',
+  agentPromptLeadFull:
+    'Najszybsza droga: agent sam znajdzie swój plik i dopisze Pomnię. Działa też z klientem, którego nie ma na liście poniżej.',
   agentPromptCopy: 'Kopiuj polecenie',
   agentPromptCopied: 'Skopiowane',
   agentPromptSecret: 'Zawiera Twój token.',
@@ -2427,6 +2430,8 @@ const EN_LABELS: UiLabels = {
   manualOuterKeyNote: 'VS Code calls this key `servers`.',
   manualCopy: 'Copy',
   manualCopied: 'Copied',
+  agentPromptLeadFull:
+    'The quickest way in: the agent finds its own config and adds Pomnia. Works with a client that is not on the list below, too.',
   agentPromptCopy: 'Copy the instruction',
   agentPromptCopied: 'Copied',
   agentPromptSecret: 'Contains your token.',
