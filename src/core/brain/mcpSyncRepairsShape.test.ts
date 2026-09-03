@@ -13,6 +13,18 @@ import { syncManagedMcpConfigs } from './mcpSync.js'
  * later version looked at that entry, agreed about the address, and left the
  * break in place. Upgrading could not repair it.
  */
+/**
+ * Run against the host's own OS.
+ *
+ * These passed `os: 'win32'` while writing their fixtures with the host's
+ * `path.join`. On Windows the two agree and everything worked. On Linux the
+ * production code built `home\.cursor\mcp.json` — one filename containing
+ * backslashes — and never found the file the test had written, so three cases
+ * failed and the other two passed for the wrong reason: 'nothing was rewritten'
+ * is trivially true when nothing was read. CI was red for a day because of it.
+ */
+const HOST_OS = process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'darwin' : 'linux'
+
 describe('syncManagedMcpConfigs — repairs the block, not just the address', () => {
   let home: string
   const BRAIN = 'http://192.168.1.248:7865'
@@ -45,22 +57,22 @@ describe('syncManagedMcpConfigs — repairs the block, not just the address', ()
 
   it('rewrites an entry whose URL is right and whose token is missing', async () => {
     await writeCursor({ url: `${BRAIN}/mcp` })
-    const r = await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: 'win32', home })
+    const r = await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: HOST_OS, home })
     expect(r.updated.some((u) => u.id === 'cursor')).toBe(true)
     expect(JSON.stringify(await readCursor())).toContain('btk_x')
   })
 
   it('leaves an entry alone when it already says exactly the right thing', async () => {
     await writeCursor({ url: `${BRAIN}/mcp` })
-    await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: 'win32', home })
-    const second = await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: 'win32', home })
+    await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: HOST_OS, home })
+    const second = await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: HOST_OS, home })
     expect(second.updated).toEqual([])
     expect(second.skipped.some((s) => s.reason === 'no defect to repair')).toBe(true)
   })
 
   it('still rewrites when the address itself changed', async () => {
     await writeCursor({ url: 'http://192.168.1.99:7865/mcp', headers: { Authorization: 'Bearer btk_x' } })
-    const r = await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: 'win32', home })
+    const r = await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: HOST_OS, home })
     expect(r.updated.some((u) => u.id === 'cursor')).toBe(true)
     expect(JSON.stringify(await readCursor())).toContain('192.168.1.248')
   })
@@ -73,7 +85,7 @@ describe('syncManagedMcpConfigs — repairs the block, not just the address', ()
       JSON.stringify({ mcpServers: { pomnia: { url: `${BRAIN}/mcp` }, other: { url: 'http://x/y' } } }, null, 2),
       'utf8',
     )
-    await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: 'win32', home })
+    await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: HOST_OS, home })
     const j = JSON.parse(await readFile(cursorPath(), 'utf8')) as {
       mcpServers: Record<string, { url?: string }>
     }
@@ -103,7 +115,7 @@ describe('syncManagedMcpConfigs — repairs the block, not just the address', ()
       ),
       'utf8',
     )
-    const r = await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: 'win32', home })
+    const r = await syncManagedMcpConfigs({ brainUrl: BRAIN, target: 'remote', token: 'btk_x', os: HOST_OS, home })
     expect(r.updated).toEqual([])
     const j = JSON.parse(await readFile(cursorPath(), 'utf8')) as {
       mcpServers: { pomnia: { headers: Record<string, string> } }
