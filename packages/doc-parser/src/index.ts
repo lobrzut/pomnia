@@ -17,6 +17,7 @@ export type { ExtractedFrontmatter } from './frontmatter.js'
 export {
   runOcr,
   pageTextQuality,
+  filterNoiseBlocks,
   OCR_QUALITY_FLOOR,
   suggestOcr,
   selectSparsePages,

@@ -50,6 +50,8 @@ export interface OcrResult {
   attempted?: number
   /** How many of those were dropped as picture-noise. */
   dropped?: number
+  /** Blocks discarded inside pages that were otherwise kept. */
+  blocksDropped?: number
   /** Pages that were sent to OCR. */
   ocrPageNumbers: number[]
 }
@@ -239,17 +241,22 @@ export async function runOcr(pdfPath: string, opts?: OcrOptions): Promise<OcrRes
     opts?.onProgress?.({ done: i + 1, total: pageNums.length, page })
   }
 
-  // Keep only pages that read like text. Reporting the drop count matters:
-  // '20 pages OCR'd' and '11 pages kept' are different facts, and the second
-  // is the one that says what the memory actually gained.
-  const kept = pages.filter(
-    (p) => p.text.trim().length >= OCR_MIN_CHARS && pageTextQuality(p.text) >= OCR_QUALITY_FLOOR,
-  )
+  // Filter inside each page, then drop the pages that had nothing left.
+  // Reporting both counts matters: '20 pages OCR'd' and '11 kept' are
+  // different facts, and the second says what the memory actually gained.
+  let blocksDropped = 0
+  const kept: { page: number; text: string }[] = []
+  for (const p of pages) {
+    const f = filterNoiseBlocks(p.text)
+    blocksDropped += f.dropped
+    if (f.text.trim().length >= OCR_MIN_CHARS) kept.push({ page: p.page, text: f.text })
+  }
 
   return {
     method: kept.length > 0 ? 'tesseract' : 'none',
     pages: kept,
     ocrPageNumbers: pageNums,
+    blocksDropped,
     attempted: pages.length,
     dropped: pages.length - kept.length,
   }
@@ -276,6 +283,32 @@ export function pageTextQuality(text: string): number {
     (t) => t.length >= 3 && [...t].filter((c) => /\p{L}/u.test(c)).length / t.length >= 0.7,
   ).length
   return wordish / tokens.length
+}
+
+/**
+ * Keep the text on a page that is part picture.
+ *
+ * The floor used to judge whole pages, and a page with a diagram and two
+ * paragraphs scored like the diagram and lost the paragraphs with it. In a
+ * scanned primer that is most of the book: text above the figure, text below
+ * it, and OCR noise in the middle scoring the whole page down.
+ *
+ * Blocks are separated by blank lines, which is what tesseract emits between
+ * layout regions, so this is the coarsest honest unit — not a layout analysis,
+ * just a refusal to throw away a paragraph because it shared a page.
+ */
+export function filterNoiseBlocks(text: string): { text: string; kept: number; dropped: number } {
+  const blocks = text.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean)
+  const good: string[] = []
+  let dropped = 0
+  for (const b of blocks) {
+    // Short blocks are headings and captions more often than noise, and they
+    // score fine when they are words. Judge them the same way; only the length
+    // floor for a whole page does not apply to one line of it.
+    if (pageTextQuality(b) >= OCR_QUALITY_FLOOR) good.push(b)
+    else dropped++
+  }
+  return { text: good.join('\n\n'), kept: good.length, dropped }
 }
 
 /** Below this a page is a picture the OCR guessed at, not text. */
