@@ -236,12 +236,33 @@ export async function indexFiles(
     for (let i = 0; i < chunks.length; i += BATCH) {
       if (signal?.aborted) throwIfAborted(signal, 'reindex aborted')
       const batch = chunks.slice(i, i + BATCH)
+      /*
+       * Embed the note's date with every chunk, store the chunk without it.
+       *
+       * Removing the whole YAML header measured +3.0% — session ids and
+       * Windows paths spent 14% of the index earning false keyword matches.
+       * The date was thrown out with them, and it is the one field a question
+       * can actually be about. A note carries it once, chunking splits at 1500
+       * characters, so every chunk after the first had no date in it at all.
+       *
+       * Measured on LoCoMo, 495 questions with a named evidence turn:
+       *
+       *   date in the header only    recall@5 69.9%   temporal 31.6%
+       *   date on every chunk        recall@5 77.4%   temporal 52.6%
+       *
+       * The temporal slice is n=19, so read that number as a direction rather
+       * than a figure; the 7.5pp overall gain is on all 495.
+       *
+       * Stored text stays bare, so the keyword lane cannot match a date the
+       * reader never sees, and citations show the note rather than a prefix.
+       */
+      const forEmbed = noteDate ? batch.map((c) => `${noteDate}\n\n${c}`) : batch
       // Embedding happens OUTSIDE the write transaction — Ollama can take
       // seconds per batch and holding a write lock that long is rude to
       // any concurrent search. The `search_document: ` prefix is applied by
       // EmbedClient; Ollama's template does NOT add it, contrary to what this
       // comment used to claim (measured: cosine 0.92 between prefixed and bare).
-      const vecs = await embedder.embedBatch(batch, 'document', signal)
+      const vecs = await embedder.embedBatch(forEmbed, 'document', signal)
 
       // Hand the machine back between batches. The ONNX threads are native and
       // do not yield on their own, so on a small box a long reindex starved the
@@ -250,7 +271,7 @@ export async function indexFiles(
       // per batch costs almost nothing over a run and keeps the server able to
       // say what it is doing.
       await new Promise((r) => setTimeout(r, INDEX_BREATH_MS))
-      if (vecs.length !== batch.length) {
+      if (vecs.length !== forEmbed.length) {
         throw new Error(`embed count mismatch: got ${vecs.length} for ${batch.length} chunks (${name})`)
       }
       const write = db.transaction(() => {
