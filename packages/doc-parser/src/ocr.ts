@@ -15,10 +15,17 @@ import { markdownFromPages } from './extractedPages.js'
 import { parsePdf } from './pdf.js'
 import type { ParsedDocument, ParsedPage } from './types.js'
 
-export type OcrMethod = 'tesseract' | 'ollama-vision' | 'none'
+/**
+ * How the text was produced.
+ *
+ * `ollama-vision` used to sit here beside them, and nothing implemented it:
+ * asking for it fell through to tesseract. A type that offers a choice the
+ * code cannot make is a promise the caller has no way to check.
+ */
+export type OcrMethod = 'tesseract' | 'none'
 
 export interface OcrOptions {
-  /** auto = tesseract (vision deferred). ollama-vision not implemented in this slice. */
+  /** Only tesseract today; `auto` means the same thing. */
   prefer?: 'auto' | OcrMethod
   ollamaUrl?: string
   /** Max sparse pages to OCR (thin default: 3). */
@@ -198,9 +205,6 @@ async function recognizePng(
  */
 export async function runOcr(pdfPath: string, opts?: OcrOptions): Promise<OcrResult> {
   const prefer = opts?.prefer ?? 'auto'
-  if (prefer === 'ollama-vision') {
-    // Slice scope: vision deferred — fall through to tesseract.
-  }
   if (prefer === 'none') {
     return { method: 'none', pages: [], ocrPageNumbers: [] }
   }

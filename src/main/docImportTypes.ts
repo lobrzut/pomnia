@@ -22,6 +22,6 @@ export interface DocImportResult {
 
 /** Result of on-demand OCR + optional single-doc re-index. */
 export interface DocOcrResult extends DocImportResult {
-  ocrMethod: 'tesseract' | 'ollama-vision' | 'none'
+  ocrMethod: 'tesseract' | 'none'
   ocrPages: number
 }

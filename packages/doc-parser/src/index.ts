@@ -16,6 +16,8 @@ export { buildExtractedMarkdown } from './frontmatter.js'
 export type { ExtractedFrontmatter } from './frontmatter.js'
 export {
   runOcr,
+  pageTextQuality,
+  OCR_QUALITY_FLOOR,
   suggestOcr,
   selectSparsePages,
   mergeOcrPages,

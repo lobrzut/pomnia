@@ -138,7 +138,7 @@ export interface DocImportResult {
 }
 
 export interface DocOcrResult extends DocImportResult {
-  ocrMethod: 'tesseract' | 'ollama-vision' | 'none'
+  ocrMethod: 'tesseract' | 'none'
   ocrPages: number
 }
 
