@@ -89,6 +89,14 @@ export interface MainStrings {
   trayStopBrainCancelIndex: string
   trayStopBrain: string
   trayQuit: string
+  healthAlertTitle: string
+  healthAlertUnauthorized: string
+  healthAlertUnreachable: string
+  healthAlertNoTarget: string
+  healthOkTitle: string
+  healthOkBody: string
+  trayHealthOk: string
+  trayHealthBad: (what: string) => string
   trayBrainStarting: string
   trayBrainStopped: string
   trayBrainStoppedWith: (why: string) => string
@@ -193,6 +201,16 @@ const PL: MainStrings = {
   trayStopBrainCancelIndex: 'Zatrzymaj lokalną wyszukiwarkę (anuluj indeks)',
   trayStopBrain: 'Zatrzymaj lokalną wyszukiwarkę',
   trayQuit: 'Zakończ',
+  healthAlertTitle: 'Pomnia nie jest podpięta',
+  healthAlertUnauthorized:
+    'Serwer odrzuca token. Agenci nadal odpowiadają, ale bez pamięci — wklej nowy token w zakładce Connect.',
+  healthAlertUnreachable:
+    'Brak odpowiedzi z serwera Pomnia. Agenci nadal odpowiadają, ale bez pamięci.',
+  healthAlertNoTarget: 'Nie ustawiono adresu serwera — Pomnia nie ma z czym się połączyć.',
+  healthOkTitle: 'Pomnia znowu działa',
+  healthOkBody: 'Połączenie i token w porządku.',
+  trayHealthOk: 'Połączona',
+  trayHealthBad: (what) => `UWAGA: ${what}`,
   trayBrainStarting: 'Lokalna wyszukiwarka: uruchamianie…',
   trayBrainStopped: 'Lokalna wyszukiwarka: zatrzymana',
   trayBrainStoppedWith: (why) => `Lokalna wyszukiwarka: zatrzymana (${why})`,
@@ -302,6 +320,15 @@ const EN: MainStrings = {
   trayStopBrainCancelIndex: 'Stop the local search engine (cancel indexing)',
   trayStopBrain: 'Stop the local search engine',
   trayQuit: 'Quit',
+  healthAlertTitle: 'Pomnia is not connected',
+  healthAlertUnauthorized:
+    'The server is refusing the token. Agents will still answer, but without memory — paste a new token under Connect.',
+  healthAlertUnreachable: 'No answer from the Pomnia server. Agents will still answer, but without memory.',
+  healthAlertNoTarget: 'No server address set — Pomnia has nothing to connect to.',
+  healthOkTitle: 'Pomnia is back',
+  healthOkBody: 'Connection and token are fine.',
+  trayHealthOk: 'Connected',
+  trayHealthBad: (what) => `WARNING: ${what}`,
   trayBrainStarting: 'Local search engine: starting…',
   trayBrainStopped: 'Local search engine: stopped',
   trayBrainStoppedWith: (why) => `Local search engine: stopped (${why})`,

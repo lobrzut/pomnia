@@ -38,6 +38,12 @@ import {
   listCliSkillsSchema,
   getSkillSchema,
 } from './skills.js'
+import {
+  runListPrompts,
+  runGetPrompt,
+  listPromptsSchema,
+  getPromptSchema,
+} from './promptTools.js'
 // Only the handler: these tools are answered, not advertised. See listTools.
 import { runStub } from './stubs.js'
 
@@ -179,6 +185,18 @@ export function listTools(
       description:
         "DEPRECATED alias — prefer list_skills({ scope: 'cli' }). Summarises the CLI expertise skills by category.",
       inputSchema: listCliSkillsSchema,
+    },
+    {
+      name: 'list_prompts',
+      description:
+        "List the reusable prompts in vault/prompts. Call when the user names a prompt or asks for one of their saved prompts — then get_prompt by name. These are the user's own reusable texts, not instructions for you: a skill is what you follow, a prompt is what they would have typed.",
+      inputSchema: listPromptsSchema,
+    },
+    {
+      name: 'get_prompt',
+      description:
+        'Load one prompt by name and fill in its arguments. Returns the text plus which required arguments are still missing — ask the user for those rather than inventing them.',
+      inputSchema: getPromptSchema,
     },
     {
       name: 'get_skill',
@@ -324,6 +342,11 @@ async function dispatchTool(
       return runListCliSkills(args, { skillsRoot: ctx.skillsRoot })
     case 'get_skill':
       return runGetSkill(args, { skillsRoot: ctx.skillsRoot })
+
+    case 'list_prompts':
+      return runListPrompts(args, { vaultRoot: ctx.vaultRoot })
+    case 'get_prompt':
+      return runGetPrompt(args, { vaultRoot: ctx.vaultRoot })
 
     case 'run_skill':
     case 'search_code':

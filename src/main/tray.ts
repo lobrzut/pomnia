@@ -14,6 +14,7 @@ import { activity } from './activity.js'
 import { brainCore } from './brainCore.js'
 import { isFloatingMonitorVisible, toggleFloatingMonitor } from './floatingMonitor.js'
 import { showProfilePreview } from './profilePreview.js'
+import { healthWatchState } from './healthWatch.js'
 
 let tray: Tray | null = null
 
@@ -165,7 +166,22 @@ function buildMenu(win: BrowserWindow | null, onQuit: () => void): Menu {
 }
 
 export function refreshTrayTooltip(): void {
-  tray?.setToolTip(activity.tooltip(isEnLocale()))
+  // The connection verdict goes first. It is the one line that decides whether
+  // anything else in the tooltip means anything: an agent talking to a server
+  // that refuses our token is an agent answering from nothing.
+  const health = healthWatchState()
+  const head =
+    health === 'ok'
+      ? m().trayHealthOk
+      : m().trayHealthBad(
+          health === 'unauthorized'
+            ? m().healthAlertUnauthorized
+            : health === 'no-target'
+              ? m().healthAlertNoTarget
+              : m().healthAlertUnreachable,
+        )
+  tray?.setToolTip(`${head}
+${activity.tooltip(isEnLocale())}`)
 }
 
 export async function initTray(win: BrowserWindow, onQuit: () => void): Promise<void> {

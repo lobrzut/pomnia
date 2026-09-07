@@ -109,7 +109,8 @@ import {
   shouldHideOnMinimize,
   type ColorSchemeSetting,
 } from './appSettings.js'
-import { destroyTray, initTray, refreshTrayMenu } from './tray.js'
+import { destroyTray, initTray, refreshTrayMenu, refreshTrayTooltip } from './tray.js'
+import { checkHealthNow, showHealthNotification, startHealthWatch, stopHealthWatch } from './healthWatch.js'
 import {
   destroyFloatingMonitor,
   getFloatingWebContents,
@@ -1918,6 +1919,7 @@ description:
     destroyFloatingMonitor()
     destroyProfilePreview()
     destroyTray()
+    stopHealthWatch()
     // Hard deadline: never leave a half-quit main that still owns Pomnia.exe
     // (NSIS "cannot be closed" / zombie :7862). brainCore.stop() itself caps at ~7s.
     const hardDeadline = setTimeout(() => {
@@ -2453,6 +2455,9 @@ description:
       }
 
       await setAppSettings({ replicaToken: clean })
+      // The whole point of pasting a token is to fix the connection; waiting a
+      // minute to find out whether it worked is the wait this feature removes.
+      void checkHealthNow().then(() => refreshTrayTooltip())
       const host = (() => {
         try {
           return new URL(base).hostname
@@ -2591,6 +2596,29 @@ app.whenReady().then(async () => {
       log.warn('tray not initialised:', (e as Error).message),
     )
   }
+
+  /*
+   * Watch the connection whether or not anyone is looking at a window.
+   *
+   * The failure this exists for is silent: a token gets revoked, every screen
+   * starts failing, and the first sign of it is an agent answering from nothing
+   * mid-conversation. The app knew; nothing said so.
+   */
+  startHealthWatch((state, recovered) => {
+    refreshTrayTooltip()
+    if (recovered) {
+      showHealthNotification(m().healthOkTitle, m().healthOkBody)
+      return
+    }
+    showHealthNotification(
+      m().healthAlertTitle,
+      state === 'unauthorized'
+        ? m().healthAlertUnauthorized
+        : state === 'no-target'
+          ? m().healthAlertNoTarget
+          : m().healthAlertUnreachable,
+    )
+  })
   // Ephemeral profile preview — Ctrl+Shift+U (avoid P clash with print / other apps).
   const hkProfile = globalShortcut.register('CommandOrControl+Shift+U', () => {
     // A hotkey that does nothing and says nothing is indistinguishable from a
