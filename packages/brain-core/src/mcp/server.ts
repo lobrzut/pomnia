@@ -85,7 +85,10 @@ import {
   CallToolRequestSchema,
   GetPromptRequestSchema,
   ListPromptsRequestSchema,
+  ListResourceTemplatesRequestSchema,
+  ListResourcesRequestSchema,
   ListToolsRequestSchema,
+  ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 
 import type { BrainConfig } from '../config/index.js'
@@ -95,6 +98,7 @@ import { defaultVaultConfig, vaultConfigFromRoot, type VaultConfig } from '../st
 import { createAuthGate } from './auth.js'
 import { callTool, listTools, type ToolContext } from './tools/index.js'
 import { loadPrompts, renderPrompt } from './prompts.js'
+import { listResourceTemplates, listResources, readResource } from './resources.js'
 
 /**
  * True when an existing brain-core already holds host:port.
@@ -287,7 +291,10 @@ function createMcpServer(
     // `prompts` is declared unconditionally: the library is a directory in the
     // vault, so it can appear between one request and the next, and a client
     // that never saw the capability would not come back to look.
-    { capabilities: { tools: {}, prompts: {} } },
+    // `resources` is declared alongside the rest: the vault gains and loses
+    // notes while the server runs, so a client that never saw the capability
+    // would never come back to look.
+    { capabilities: { tools: {}, prompts: {}, resources: {} } },
   )
 
   mcp.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: listTools(ctx) }))
@@ -305,6 +312,27 @@ function createMcpServer(
       })),
     })),
   }))
+
+  /*
+   * Resources: the way to point at a note instead of describing it.
+   *
+   * Read from disk per request rather than cached. A vault gains notes while
+   * the server runs — from this machine, and from every replica pushing into
+   * it — and a list built at boot would be wrong by lunchtime.
+   */
+  mcp.setRequestHandler(ListResourcesRequestSchema, async () => ({
+    resources: listResources(ctx.vaultRoot),
+  }))
+
+  mcp.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
+    resourceTemplates: listResourceTemplates(),
+  }))
+
+  mcp.setRequestHandler(ReadResourceRequestSchema, async (req) => {
+    const got = readResource(ctx.vaultRoot, req.params.uri)
+    if ('error' in got) throw new Error(got.error)
+    return { contents: [got] }
+  })
 
   mcp.setRequestHandler(GetPromptRequestSchema, async (req) => {
     const name = req.params.name
