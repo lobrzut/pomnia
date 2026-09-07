@@ -279,3 +279,31 @@ export function cleanupSkillsJunkAt(skillsRoot: string): {
 export function shouldSkipSkillsCopyEntry(name: string): boolean {
   return isJunkName(name)
 }
+
+/**
+ * Remove one skill from this vault.
+ *
+ * A `brain/` skill is one file. A `cli/` skill is its directory — SKILL.md plus
+ * whatever the package brought with it — so removing only SKILL.md would leave
+ * a folder that no longer lists as a skill and that nothing can reach to clean
+ * up. Mirrors what the server does for a remote skill, deliberately: the full
+ * app and Mini must not disagree about what deleting a skill means.
+ *
+ * The path is checked against the scan rather than trusted: it has to be a file
+ * this scanner would have listed, which makes an arbitrary path from a window
+ * unable to name anything outside the skills tree.
+ */
+export function deleteLocalSkillAt(
+  skillsRoot: string,
+  filePath: string,
+): { ok: boolean; error?: string } {
+  const known = listLocalSkillsAt(skillsRoot).find((s) => s.path === filePath)
+  if (!known) return { ok: false, error: 'not a listed skill' }
+  try {
+    if (known.kind === 'own') rmSync(known.path, { force: true })
+    else rmSync(known.folderPath, { recursive: true, force: true })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}

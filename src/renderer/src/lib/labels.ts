@@ -552,6 +552,7 @@ export interface UiLabels {
   skillDeleted: (name: string) => string
   promptDeleted: (name: string) => string
   skillsCategorySection: (category: string) => string
+  skillsUncategorised: string
   ingestTitle: string
   ingestLead: string
   ingestPick: string
@@ -1497,6 +1498,7 @@ const PL_LABELS: UiLabels = {
   skillDeleted: (name) => `Usunięto skill: ${name}`,
   promptDeleted: (name) => `Usunięto prompt: ${name}`,
   skillsCategorySection: (category) => `KATEGORIA: ${category.toUpperCase()}`,
+  skillsUncategorised: 'bez kategorii',
   ingestTitle: 'Do Pomnia',
   ingestLead: 'Wrzuć pliki — Pomnia rozpozna, co to jest, i wyśle na serwer.',
   ingestPick: 'Wybierz pliki',
@@ -2504,6 +2506,7 @@ const EN_LABELS: UiLabels = {
   skillDeleted: (name) => `Deleted skill: ${name}`,
   promptDeleted: (name) => `Deleted prompt: ${name}`,
   skillsCategorySection: (category) => `CATEGORY: ${category.toUpperCase()}`,
+  skillsUncategorised: 'uncategorised',
   ingestTitle: 'To Pomnia',
   ingestLead: 'Drop files in — Pomnia works out what they are and sends them to the server.',
   ingestPick: 'Choose files',

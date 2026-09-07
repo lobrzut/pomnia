@@ -12,11 +12,14 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { basename, extname } from 'node:path'
 import {
+  applyOcrToDocument,
   buildExtractedMarkdown,
   extractionPathLabel,
   parseDocument,
+  runOcr,
   suggestOcr,
 } from '@pomnia/doc-parser'
+import { log } from '@core/index.js'
 // Subpath only — full @pomnia/brain-core entry pulls better-sqlite3 into main.
 import { defaultVaultConfig, ensureLibraryDirs } from '@pomnia/brain-core/vault'
 import { libraryDocLogicalPath, Vault } from '@core/vault.js'
@@ -73,8 +76,43 @@ export async function importDocument(
   }
 
   onProgress?.({ phase: 'parse', done: 0, total: 1, detail: baseName })
-  const parsed = await parseDocument(filePath)
+  let parsed = await parseDocument(filePath)
   onProgress?.({ phase: 'parse', done: 1, total: 1, detail: extractionPathLabel(parsed) })
+
+  /*
+   * A scan gets read here, not after somebody notices a suggestion.
+   *
+   * Mini has done this since the day a 147-page book arrived as 3.6 kB of YAML
+   * frontmatter and was counted as one note. The full app kept the older
+   * arrangement — import the scan, store it with no text, index that, and offer
+   * an OCR button the user had to find — so the same book through the same
+   * product became either knowledge or an empty document depending on which
+   * build opened it. The empty one was indexed, and answering.
+   *
+   * The on-demand path in docOcr.ts stays, for a document already in the
+   * library from before this.
+   */
+  if (parsed.meta.sparse && parsed.format === 'pdf') {
+    try {
+      onProgress?.({ phase: 'ocr', done: 0, total: parsed.meta.pageCount, detail: 'tesseract…' })
+      const ocr = await runOcr(filePath, {
+        prefer: 'tesseract',
+        // The whole document. Sampling three pages and indexing the result as
+        // the book is how a memory answers questions it has no business
+        // answering.
+        maxPages: parsed.meta.pageCount,
+        onProgress: (ev) =>
+          onProgress?.({ phase: 'ocr', done: ev.done, total: ev.total, detail: baseName }),
+      })
+      if (ocr.method !== 'none' && ocr.pages.length > 0) {
+        parsed = applyOcrToDocument(parsed, ocr)
+      }
+    } catch (e) {
+      // A failed OCR leaves the sparse document exactly as it was, which is
+      // what the older behaviour produced anyway. It must not lose the import.
+      log.warn('ocr failed during import of', baseName, e)
+    }
+  }
 
   const md = buildExtractedMarkdown(parsed.markdown, {
     source_file: baseName,

@@ -99,6 +99,7 @@ export interface PomniaBridge {
   promptsList(): Promise<PromptsListResult>
   promptsCreate(name: string): Promise<{ ok: true; path: string } | { ok: false; error: string }>
   promptsDelete(name: string): Promise<{ ok: boolean; error?: string }>
+  skillsDelete(filePath: string): Promise<{ ok: boolean; error?: string }>
   skillsReveal(target: string, mode?: 'file' | 'folder'): Promise<{ ok: boolean; error: string | null }>
   /** Open the app install folder (optional AV last-resort paths). */
   revealInstallDir(): Promise<{ ok: boolean; path: string; error: string | null }>
@@ -697,6 +698,9 @@ function mockBridge(): PomniaBridge {
       return { ok: true as const, path: `C:/Vault/prompts/${name}.md` }
     },
     async promptsDelete() {
+      return { ok: true }
+    },
+    async skillsDelete() {
       return { ok: true }
     },
     async skillsList() {

@@ -44,6 +44,7 @@ const bridge = {
   promptsList: () => ipcRenderer.invoke('prompts:list'),
   promptsCreate: (name: string) => ipcRenderer.invoke('prompts:create', name),
   promptsDelete: (name: string) => ipcRenderer.invoke('prompts:delete', name),
+  skillsDelete: (filePath: string) => ipcRenderer.invoke('skills:delete', filePath),
   skillsReveal: (target: string, mode?: 'file' | 'folder') =>
     ipcRenderer.invoke('skills:reveal', target, mode ?? 'file'),
   revealInstallDir: () => ipcRenderer.invoke('reveal:installDir'),

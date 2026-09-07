@@ -783,7 +783,7 @@ export default function Connect() {
         {/* One field above does both jobs now; what is left to say is which
             kind of token is currently in hand, because that decides whether
             the Brain-mode toggles below can reach the server at all. */}
-        {isMini && effectiveTarget === 'remote' && (
+        {effectiveTarget === 'remote' && (
           <div className="mt-2">
             <p className="text-[11px] text-ink-faint">
               {replica?.hasToken ? labels.tokenHaveAdmin : labels.tokenNoAdmin}

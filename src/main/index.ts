@@ -167,6 +167,7 @@ import {
   cleanupSkillsJunkAt,
   listLocalSkillsAt,
   writeSkillsIndexAt,
+  deleteLocalSkillAt,
 } from './skillsScan.js'
 import { createLocalPrompt, deleteLocalPrompt, listLocalPromptsAt } from './promptsScan.js'
 import {
@@ -854,6 +855,21 @@ description:
     } catch (e) {
       return { ok: false, error: (e as Error).message }
     }
+  })
+
+  ipcMain.handle('skills:delete', async (_e, filePath: string) => {
+    if (!vault || !vaultPath) return { ok: false, error: 'no vault' }
+    const r = deleteLocalSkillAt(brainSkillsDir(vaultPath), String(filePath ?? ''))
+    if (r.ok) {
+      // index.json is what agents read; leaving it naming a deleted skill is
+      // the same lie the scan was written to stop.
+      try {
+        writeSkillsIndexAt(brainSkillsDir(vaultPath))
+      } catch (e) {
+        log.warn('skills index not rewritten after delete:', (e as Error).message)
+      }
+    }
+    return r
   })
 
   ipcMain.handle('prompts:delete', async (_e, name: string) => {

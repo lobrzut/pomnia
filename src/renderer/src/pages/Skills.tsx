@@ -19,9 +19,11 @@ import { useStore } from '../store/useStore'
 function SkillRow({
   skill,
   labels,
+  onDelete,
 }: {
   skill: LocalSkillEntry
   labels: ReturnType<typeof uiLabels>
+  onDelete: () => void
 }) {
   return (
     <ListRow
@@ -44,8 +46,32 @@ function SkillRow({
           onClick: () => void api.skillsReveal(skill.folderPath, 'folder'),
         },
       ]}
+      onDelete={onDelete}
+      deleteLabel={labels.rowDelete}
+      confirmLabel={labels.rowDeleteConfirm}
     />
   )
+}
+
+/**
+ * Imported packages, grouped the way they sit on disk.
+ *
+ * There are 1244 of them in the vault this was measured against. One flat run
+ * of 1244 rows is the same wall the MCP listing was: you cannot find anything
+ * in it, and the page has to build every row before it can show you the first.
+ * Eight category lines are something you can aim at.
+ */
+function byCategory(skills: LocalSkillEntry[]): { category: string; skills: LocalSkillEntry[] }[] {
+  const groups = new Map<string, LocalSkillEntry[]>()
+  for (const s of skills) {
+    const key = s.category ?? ''
+    const list = groups.get(key)
+    if (list) list.push(s)
+    else groups.set(key, [s])
+  }
+  return [...groups.entries()]
+    .map(([category, list]) => ({ category, skills: list }))
+    .sort((a, b) => b.skills.length - a.skills.length || a.category.localeCompare(b.category))
 }
 
 export default function Skills() {
@@ -54,9 +80,10 @@ export default function Skills() {
   const [loading, setLoading] = useState(false)
   const [own, setOwn] = useState<LocalSkillEntry[]>([])
   const [imported, setImported] = useState<LocalSkillEntry[]>([])
+  const [openCategory, setOpenCategory] = useState<string | null>(null)
+  const toast = useStore((st) => st.toast)
 
-  useEffect(() => {
-    if (!vault.open) return
+  function reload(): void {
     setLoading(true)
     void api
       .skillsList()
@@ -65,6 +92,21 @@ export default function Skills() {
         setImported(r.imported)
       })
       .finally(() => setLoading(false))
+  }
+
+  async function remove(skill: LocalSkillEntry): Promise<void> {
+    const r = await api.skillsDelete(skill.path)
+    if (!r.ok) {
+      toast({ kind: 'error', title: labels.skillsRemoteReason('failed'), detail: r.error })
+      return
+    }
+    toast({ kind: 'success', title: labels.skillDeleted(skill.name) })
+    reload()
+  }
+
+  useEffect(() => {
+    if (!vault.open) return
+    reload()
   }, [vault.open])
 
   if (!vault.open) {
@@ -107,19 +149,58 @@ export default function Skills() {
               empty={labels.skillsEmptyOwn}
             >
               {own.map((s) => (
-                <SkillRow key={`own:${s.name}`} skill={s} labels={labels} />
+                <SkillRow
+                  key={`own:${s.name}`}
+                  skill={s}
+                  labels={labels}
+                  onDelete={() => void remove(s)}
+                />
               ))}
             </ListSection>
 
-            <ListSection
-              title={labels.skillsSectionImported}
-              count={imported.length}
-              empty={labels.skillsEmptyImported}
-            >
-              {imported.map((s) => (
-                <SkillRow key={`imported:${s.category ?? ''}/${s.name}`} skill={s} labels={labels} />
-              ))}
-            </ListSection>
+            {openCategory === null ? (
+              <ListSection
+                title={labels.skillsSectionImported}
+                count={imported.length}
+                empty={labels.skillsEmptyImported}
+              >
+                {byCategory(imported).map((g) => (
+                  <ListRow
+                    key={g.category || '(flat)'}
+                    title={g.category || labels.skillsUncategorised}
+                    subtitle={labels.skillsCategoryCount(g.skills.length)}
+                    onOpen={() => setOpenCategory(g.category)}
+                  />
+                ))}
+              </ListSection>
+            ) : (
+              <ListSection
+                title={labels.skillsCategorySection(openCategory || labels.skillsUncategorised)}
+                count={imported.filter((s) => (s.category ?? '') === openCategory).length}
+                empty={labels.skillsEmptyImported}
+              >
+                <div className="border-b border-white/5 px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => setOpenCategory(null)}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-iris hover:text-cyan"
+                  >
+                    <ArrowLeft className="h-3 w-3" />
+                    {labels.skillsBackToCategories}
+                  </button>
+                </div>
+                {imported
+                  .filter((s) => (s.category ?? '') === openCategory)
+                  .map((s) => (
+                    <SkillRow
+                      key={`imported:${s.category ?? ''}/${s.name}`}
+                      skill={s}
+                      labels={labels}
+                      onDelete={() => void remove(s)}
+                    />
+                  ))}
+              </ListSection>
+            )}
           </>
         )}
       </div>
