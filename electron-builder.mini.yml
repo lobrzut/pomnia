@@ -20,24 +20,29 @@ appId: ai.pomnia.mini
 productName: PomniaMini
 directories:
   output: release/mini
-# Portable rather than an installer: Mini is the thing you drop on a machine to
-# point its agents at a server that already holds the memory. Asking for an
-# install first is asking for a reason not to bother.
+# A zip, not electron-builder's `portable` target.
 #
-# The target is also passed on the command line (`electron-builder --win
-# portable`) and that is the one that decides. `extends` deep-merges this `win`
-# block into the parent's, and the parent's `target: [nsis]` survives — so the
-# config alone produced an NSIS installer carrying the word "portable" in its
-# filename. Kept here so the file still states the intent.
+# `portable` wraps the app in an unsigned NSIS self-extractor, and on this
+# machine that wrapper does not run: measured over 90 seconds it extracted
+# nothing, started no child, printed nothing and returned no error — the
+# launcher process simply sits there. The same build unpacked runs fine and
+# opens its window, so the app is not the problem; the self-extractor is. An
+# unsigned 127 MB self-extracting binary is exactly what Windows inspects
+# hardest, and the packaging step had already warned "output file is locked for
+# writing (maybe by virus scanner)".
+#
+# A zip has no extractor to be blocked. It is also more honestly portable:
+# unpack it anywhere and run PomniaMini.exe. The target is passed on the command
+# line too, because `extends` deep-merges this `win` block into the parent's and
+# the parent's `target` survives — the first build produced an NSIS installer
+# with "portable" in its filename that way.
 win:
-  target: [portable]
+  target: [zip]
   icon: resources/icon.ico
   executableName: PomniaMini
   publisherName: Pomnia
   artifactName: ${productName}-${version}-portable.${ext}
   requestedExecutionLevel: asInvoker
-portable:
-  artifactName: ${productName}-${version}-portable.${ext}
 # Mini ships no installer, so the update feed the full app emits would describe
 # an artifact nobody can install over.
 publish: null
