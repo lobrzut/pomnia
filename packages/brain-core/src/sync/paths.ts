@@ -25,6 +25,10 @@ export const SYNC_DIRS = [
   'notes',
   'digests',
   'skills',
+  // The prompt library, served over MCP `prompts/list`. Same reasoning as
+  // skills: a prompt that exists on one machine and not the next is a prompt
+  // you will not reach for.
+  'prompts',
   'chats',
   'state',
   // Indexed since 0.1.71, so it has to travel too: a directory that is

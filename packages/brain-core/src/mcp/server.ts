@@ -82,6 +82,8 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import {
   CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 
@@ -91,6 +93,7 @@ import { openDb } from '../storage/db.js'
 import { defaultVaultConfig, vaultConfigFromRoot, type VaultConfig } from '../storage/vault.js'
 import { createAuthGate } from './auth.js'
 import { callTool, listTools, type ToolContext } from './tools/index.js'
+import { loadPrompts, renderPrompt } from './prompts.js'
 
 /**
  * True when an existing brain-core already holds host:port.
@@ -266,10 +269,42 @@ function createMcpServer(
     // call sites recognise a Pomnia server by it, and it moves only once
     // readers that accept both names are actually deployed.
     { name: 'pomnia-core', version: BRAIN_CORE_VERSION },
-    { capabilities: { tools: {} } },
+    // `prompts` is declared unconditionally: the library is a directory in the
+    // vault, so it can appear between one request and the next, and a client
+    // that never saw the capability would not come back to look.
+    { capabilities: { tools: {}, prompts: {} } },
   )
 
   mcp.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: listTools(ctx) }))
+
+  // The prompt library. Read from disk per request rather than cached: editing
+  // a prompt should take effect on the next `/name`, not on the next restart.
+  mcp.setRequestHandler(ListPromptsRequestSchema, async () => ({
+    prompts: loadPrompts(ctx.vaultRoot).map((p) => ({
+      name: p.name,
+      description: p.description,
+      arguments: p.arguments.map((a) => ({
+        name: a.name,
+        description: a.description,
+        required: a.required,
+      })),
+    })),
+  }))
+
+  mcp.setRequestHandler(GetPromptRequestSchema, async (req) => {
+    const name = req.params.name
+    const def = loadPrompts(ctx.vaultRoot).find((p) => p.name === name)
+    if (!def) throw new Error(`unknown prompt: ${name}`)
+    return {
+      description: def.description,
+      messages: [
+        {
+          role: 'user' as const,
+          content: { type: 'text' as const, text: renderPrompt(def, req.params.arguments ?? {}) },
+        },
+      ],
+    }
+  })
 
   mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
     const toolName = req.params.name

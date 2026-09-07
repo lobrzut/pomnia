@@ -171,19 +171,19 @@ export function listTools(
     {
       name: 'list_skills',
       description:
-        "List skills from the active skills root. Pass scope: 'own' (brain/*.md workflows), 'cli' (cli/*/SKILL.md packages), or 'all' (default). Call when choosing how to approach a task that may have a skill — then get_skill by name.",
+        "List skills. With no arguments: the user's own workflow skills in full, plus cli categories with counts. Then narrow with { category } or { query } and load one with get_skill. The cli catalogue is over a thousand entries and is never returned whole.",
       inputSchema: listSkillsSchema,
     },
     {
       name: 'list_cli_skills',
       description:
-        "DEPRECATED alias — prefer list_skills({ scope: 'cli' }). Lists CLI expertise skills (skills/cli/*/SKILL.md).",
+        "DEPRECATED alias — prefer list_skills({ scope: 'cli' }). Summarises the CLI expertise skills by category.",
       inputSchema: listCliSkillsSchema,
     },
     {
       name: 'get_skill',
       description:
-        'Load a skill by name (brain .md or cli SKILL.md). Returns full markdown — follow it for that task. Discover names via list_skills.',
+        'Load a skill by name (brain .md or cli SKILL.md). Accepts category/name when two categories share a name. Returns full markdown — follow it for that task. Discover names via list_skills.',
       inputSchema: getSkillSchema,
     },
     // run_skill / search_code / code_status are deliberately absent here.
