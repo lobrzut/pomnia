@@ -71,6 +71,7 @@ import { collectOverview, createActivityRing, type ActivityRing } from '../admin
 import { isPomniaService } from '../serviceName.js'
 import { collectHealth, redactHealth } from '../health.js'
 import { indexDir, indexFiles } from '../rag/indexer.js'
+import { createReranker } from '../rag/rerank.js'
 import { createDistillJob, parseConversation } from '../distill/index.js'
 import { DEFAULT_DISTILL_MODEL } from '../distill/ollamaChat.js'
 import { renderAdminPage } from './adminPage.js'
@@ -255,6 +256,20 @@ export function getMcpActivitySnapshot(): { last: typeof lastMcpActivity; recent
 }
 
 /** Build a fresh MCP Server wired to shared ToolContext (stateless per-request). */
+/**
+ * `BRAIN_RERANK=on` turns the cross-encoder on.
+ *
+ * Default off, and deliberately not a settings toggle yet: it is a real cost
+ * (~700 ms a search, measured) against a real gain (+7.6 points of recall@5 on
+ * 302 LoCoMo questions), and which way that trades depends on whether this
+ * server answers one person or five agents. Shipping it on by default would
+ * make every existing install slower without asking.
+ */
+function rerankEnabled(): boolean {
+  const v = (process.env.BRAIN_RERANK ?? '').trim().toLowerCase()
+  return v === 'on' || v === '1' || v === 'true'
+}
+
 function createMcpServer(
   ctx: ToolContext,
   onMcpQuery?: (ev: McpQueryEvent) => void,
@@ -477,6 +492,18 @@ export async function createBrainServer(
       ctx = {
         db,
         embedder,
+        /*
+         * One reranker for the process. The model takes seconds to load and
+         * milliseconds to score, so creating it per search would pay the load
+         * on every query; creating it here pays it once, lazily, on the first
+         * search that wants it.
+         *
+         * Off by default. It costs ~700 ms a search on the machine it was
+         * measured on, which is the right trade for +7.6 points of recall on a
+         * desktop and the wrong one for an appliance answering several agents
+         * at once — that call belongs to whoever runs the server, not here.
+         */
+        reranker: rerankEnabled() ? createReranker({ cacheDir: config.dataDir }) : undefined,
         vaultRoot: vault.root,
         userMdPath: vault.userProfilePath,
         skillsRoot: resolveSkillsRoot(vault),

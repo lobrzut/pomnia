@@ -18,6 +18,7 @@ import type { EmbedClient } from '../../rag/embed.js'
 import { indexFiles } from '../../rag/indexer.js'
 
 import { runSearchLibrary, searchLibrarySchema } from './searchLibrary.js'
+import type { Reranker } from '../../rag/rerank.js'
 import { runSaveConversation, saveConversationSchema } from './saveConversation.js'
 import {
   runCheckpointSession,
@@ -56,6 +57,11 @@ export interface ToolDef {
 export interface ToolContext {
   db: Database.Database
   embedder: EmbedClient
+  /**
+   * Cross-encoder that re-orders the shortlist. Created once per server, not
+   * per call — the model load is seconds and the scoring is milliseconds.
+   */
+  reranker?: Reranker
   vaultRoot: string
   userMdPath: string
   /**
@@ -268,7 +274,7 @@ async function dispatchTool(
 
   switch (name) {
     case 'search_library':
-      return runSearchLibrary(args, { db: ctx.db, embedder: ctx.embedder })
+      return runSearchLibrary(args, { db: ctx.db, embedder: ctx.embedder, reranker: ctx.reranker })
     case 'save_conversation': {
       const saved = await runSaveConversation(args, { vaultRoot: ctx.vaultRoot })
       // The write is atomic; the index was not part of that promise. See

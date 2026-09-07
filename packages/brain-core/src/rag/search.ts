@@ -30,6 +30,8 @@ import type { SearchHit } from './types.js'
 import type { EmbedClient } from './embed.js'
 import { vecToBlob } from './vec.js'
 
+import { DEFAULT_CANDIDATES, type Reranker } from './rerank.js'
+
 export type SearchSource = 'all' | 'vault' | 'library'
 
 /** Full boost up to this age, then linear decay to zero at DECAY_END_DAYS. */
@@ -128,6 +130,16 @@ export interface SearchOptions {
   query: string
   topK?: number
   source?: SearchSource
+  /**
+   * Optional second opinion on the ordering.
+   *
+   * When present, the blended score picks the shortlist and the cross-encoder
+   * picks the winners out of it. Absent — or unavailable, which is the same
+   * thing here — the blended order stands and nothing about this call changes.
+   */
+  reranker?: Reranker
+  /** How many rows the reranker is allowed to look at. See DEFAULT_CANDIDATES. */
+  rerankCandidates?: number
 }
 
 /**
@@ -145,8 +157,16 @@ export async function search(
   const topK = opts.topK ?? 5
   const source: SearchSource = opts.source ?? 'all'
 
+  // A reranker can only promote a row that reached it. Widen the candidate set
+  // when one is in play — the whole point is to hand it rows the blended score
+  // put below the cut, and 15 candidates drawn from a pool of 15 is no choice
+  // at all.
+  const wantCandidates = opts.reranker?.available
+    ? Math.max(topK, opts.rerankCandidates ?? DEFAULT_CANDIDATES)
+    : topK
+
   const emb = await embedder.embedOne(opts.query, 'query')
-  const fetchN = Math.max(topK * 3, 12)
+  const fetchN = Math.max(wantCandidates * 2, topK * 3, 12)
 
   const rows = db
     .prepare(
@@ -241,5 +261,12 @@ export async function search(
   })
 
   scored.sort((a, b) => b.hit.score - a.hit.score)
-  return scored.slice(0, topK).map((s) => s.hit)
+  const ordered = scored.map((s) => s.hit)
+  if (!opts.reranker?.available) return ordered.slice(0, topK)
+
+  // `rerank` returns the input order on any failure, so this cannot come back
+  // with fewer or different rows than it was given — only a better order.
+  const shortlist = ordered.slice(0, wantCandidates)
+  const reranked = await opts.reranker.rerank(opts.query, shortlist)
+  return reranked.slice(0, topK)
 }

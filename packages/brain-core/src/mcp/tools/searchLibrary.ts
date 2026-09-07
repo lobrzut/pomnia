@@ -15,6 +15,7 @@ import type { EmbedClient } from '../../rag/embed.js'
 import { search, type SearchSource } from '../../rag/search.js'
 import { classifyGrounding, keywordHits, noteDate, semanticScore, SEM_MEANINGFUL } from '../../rag/grounding.js'
 import { keepLiveSources } from '../../rag/liveSources.js'
+import type { Reranker } from '../../rag/rerank.js'
 
 export const searchLibrarySchema = {
   type: 'object' as const,
@@ -40,6 +41,11 @@ const argsSchema = z.object({
 export interface SearchLibraryDeps {
   db: Database.Database
   embedder: EmbedClient
+  /**
+   * Optional second opinion on the ordering. Absent or unloadable and the
+   * blended score decides, exactly as before — see rag/rerank.ts.
+   */
+  reranker?: Reranker
 }
 
 /**
@@ -56,6 +62,7 @@ export async function runSearchLibrary(
     query,
     topK: top_k,
     source: source as SearchSource,
+    reranker: deps.reranker,
   })
 
   // Before anything is judged: a chunk whose file was deleted is not a weak
