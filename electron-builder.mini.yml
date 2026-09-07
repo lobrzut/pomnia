@@ -20,24 +20,43 @@ appId: ai.pomnia.mini
 productName: PomniaMini
 directories:
   output: release/mini
-# A zip, not electron-builder's `portable` target.
+# Portable and zip, in that order.
 #
-# `portable` wraps the app in an unsigned NSIS self-extractor, and on this
-# machine that wrapper does not run: measured over 90 seconds it extracted
-# nothing, started no child, printed nothing and returned no error — the
-# launcher process simply sits there. The same build unpacked runs fine and
-# opens its window, so the app is not the problem; the self-extractor is. An
-# unsigned 127 MB self-extracting binary is exactly what Windows inspects
-# hardest, and the packaging step had already warned "output file is locked for
-# writing (maybe by virus scanner)".
+# The portable exe was reported as "does not start", and it was measured as
+# hanging: 90 seconds, nothing extracted, no child process, no window, no error.
+# That reading was wrong. Measured again with counters rather than by looking
+# for files, the launcher is working the whole time — CPU climbing 6s → 18s and
+# 716 MB read by the 30-second mark — and the window comes up at about 40
+# seconds. It is not blocked. It is silent, which is indistinguishable from
+# broken when you are the one double-clicking it.
 #
-# A zip has no extractor to be blocked. It is also more honestly portable:
-# unpack it anywhere and run PomniaMini.exe. The target is passed on the command
-# line too, because `extends` deep-merges this `win` block into the parent's and
-# the parent's `target` survives — the first build produced an NSIS installer
-# with "portable" in its filename that way.
+# So: make the wait shorter and make it visible.
+#
+# Measured, because the obvious knobs mostly did nothing:
+#
+#   compression: normal   No effect. For this target `normal` and `maximum`
+#                         both produce 127 MB and both take ~66 s to unpack.
+#   compression: store    Rejected on the numbers. It looked like a fix at
+#                         first — one run came up in 22 s — but that was a warm
+#                         file cache. Three clean runs: 49, 49, 55 s, against
+#                         66-70 s for LZMA. A quarter off the wait, for a file
+#                         5.3x larger (675 MB against 127 MB). Not a trade
+#                         worth making, so the default stands.
+#   unpackDirName         Gives the extraction a readable name in %TEMP%
+#                         instead of a hash. It does *not* make a second launch
+#                         faster — measured at 70 s, the same as the first, so
+#                         the extractor runs every time either way.
+#
+# What the measurements actually say: the portable exe costs about a minute per
+# launch on this machine, every launch, and no packaging option changes that by
+# much — the extractor runs every time. So the zip is the artifact to reach for
+# day to day: unpack it once, and every start after that is an ordinary exe
+# start with no extractor at all. The portable exe stays for the case it is
+# genuinely for — a machine you do not want to leave files on.
+portable:
+  unpackDirName: PomniaMini
 win:
-  target: [zip]
+  target: [portable, zip]
   icon: resources/icon.ico
   executableName: PomniaMini
   publisherName: Pomnia
