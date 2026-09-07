@@ -2403,6 +2403,24 @@ description:
    * because that is the only reason Mini needs one, and handed back for the
    * snippet the page builds.
    */
+  /**
+   * Is the stored admin token still accepted?
+   *
+   * `replica.hasToken` only says one was saved. A token gets rotated, revoked,
+   * or replaced on the server, and Mini went on displaying "admin token in
+   * hand" while every call it made was being refused — which surfaced as
+   * screens that failed for no stated reason. This asks the server.
+   */
+  ipcMain.handle('connect:tokenStatus', async () => {
+    const s = getAppSettings()
+    const url = (s.brainMcpUrl ?? '').trim()
+    const token = (s.replicaToken ?? '').trim()
+    if (!url) return { state: 'no-target' as const, detail: '' }
+    if (!token) return { state: 'missing' as const, detail: '' }
+    const probe = await probeTokenRole({ baseUrl: brainBaseUrl(url), token })
+    return { state: probe.role, detail: probe.detail }
+  })
+
   ipcMain.handle(
     'connect:tokenAdopt',
     async (_e, brainUrl: string, token: string) => {

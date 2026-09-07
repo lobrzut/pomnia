@@ -1,6 +1,6 @@
 {
   "name": "pomnia",
-  "version": "0.1.78",
+  "version": "0.1.80",
   "description": "Pomnia — one encrypted memory your AI agents share. Local-first, MCP-native: encrypted vault, distill pipeline, embedded Brain.",
   "homepage": "https://pomnia.ai",
   "author": {
@@ -50,7 +50,7 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.json",
     "typecheck:brain-core": "npm run typecheck --prefix packages/brain-core",
     "typecheck:doc-parser": "npm run typecheck --prefix packages/doc-parser",
-    "build:mini:win": "npm run build:doc-parser && npm run stage:tessdata && npm run generate:build-info && electron-vite build --mode mini && electron-builder --win --config electron-builder.mini.yml --publish never",
+    "build:mini:win": "npm run build:doc-parser && npm run stage:tessdata && npm run generate:build-info && electron-vite build --mode mini && electron-builder --win portable --config electron-builder.mini.yml --publish never",
     "dev:mini": "npm run generate:build-info && electron-vite dev --mode mini",
     "web:mini": "vite --config vite.web.config.ts --mode mini"
   },

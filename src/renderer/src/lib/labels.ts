@@ -540,6 +540,12 @@ export interface UiLabels {
   promptsOpenFile: string
   promptsOpenFolder: string
   promptsHowItReaches: string
+  tokenStatusChecking: string
+  tokenStatusOk: string
+  tokenStatusRejected: string
+  tokenStatusUnreachable: string
+  tokenStatusMissing: string
+  tokenRecheck: string
   ingestTitle: string
   ingestLead: string
   ingestPick: string
@@ -1473,6 +1479,12 @@ const PL_LABELS: UiLabels = {
   promptsOpenFile: 'Otwórz plik',
   promptsOpenFolder: 'Otwórz katalog',
   promptsHowItReaches: 'Treść {{w klamrach}} to argument. Wymagany bez wartości = błąd, opcjonalny zostaje widoczny.',
+  tokenStatusChecking: 'Sprawdzam token…',
+  tokenStatusOk: 'Serwer przyjmuje token admina.',
+  tokenStatusRejected: 'Serwer odrzuca zapisany token (401/403). Wklej nowy — dopóki tego nie zrobisz, Skille, Prompty i wysyłka nie zadziałają.',
+  tokenStatusUnreachable: 'Nie dostałem odpowiedzi z serwera — nie wiem, czy token jest dobry.',
+  tokenStatusMissing: 'Nie ma zapisanego tokena admina.',
+  tokenRecheck: 'Sprawdź ponownie',
   ingestTitle: 'Do Pomnia',
   ingestLead: 'Wrzuć pliki — Pomnia rozpozna, co to jest, i wyśle na serwer.',
   ingestPick: 'Wybierz pliki',
@@ -2468,6 +2480,12 @@ const EN_LABELS: UiLabels = {
   promptsOpenFile: 'Open file',
   promptsOpenFolder: 'Open folder',
   promptsHowItReaches: 'Anything {{in braces}} is an argument. A required one with no value is an error; an optional one stays visible.',
+  tokenStatusChecking: 'Checking the token…',
+  tokenStatusOk: 'The server accepts the admin token.',
+  tokenStatusRejected: 'The server refuses the stored token (401/403). Paste a new one — until you do, Skills, Prompts and uploads will not work.',
+  tokenStatusUnreachable: 'No answer from the server — cannot tell whether the token is good.',
+  tokenStatusMissing: 'No admin token stored.',
+  tokenRecheck: 'Check again',
   ingestTitle: 'To Pomnia',
   ingestLead: 'Drop files in — Pomnia works out what they are and sends them to the server.',
   ingestPick: 'Choose files',

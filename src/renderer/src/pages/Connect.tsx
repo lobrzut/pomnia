@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle,
   Check,
@@ -203,6 +203,23 @@ export default function Connect() {
   // of the window.
   const [adopting, setAdopting] = useState(false)
   const [showManual, setShowManual] = useState(false)
+  // Whether the stored token still works, as opposed to whether one exists.
+  const [tokenState, setTokenState] = useState<
+    'checking' | 'admin' | 'not-admin' | 'unreachable' | 'missing' | 'no-target'
+  >('checking')
+
+  const checkToken = useCallback(async () => {
+    setTokenState('checking')
+    try {
+      setTokenState((await api.connectTokenStatus()).state)
+    } catch {
+      setTokenState('unreachable')
+    }
+  }, [])
+
+  useEffect(() => {
+    void checkToken()
+  }, [checkToken])
 
   /**
    * One field, one paste, and the server settles what the token is.
@@ -237,6 +254,7 @@ export default function Connect() {
         toast({ kind: 'info', title: labels.tokenAdoptAgent, detail: labels.tokenAdoptAgentDetail })
       }
       await refreshSnippetIfPicked()
+      await checkToken()
     } catch (e) {
       toast({ kind: 'error', title: labels.tokenAdoptFailed, detail: (e as Error).message })
     } finally {
@@ -766,9 +784,43 @@ export default function Connect() {
             kind of token is currently in hand, because that decides whether
             the Brain-mode toggles below can reach the server at all. */}
         {isMini && effectiveTarget === 'remote' && (
-          <p className="mt-2 text-[11px] text-ink-faint">
-            {replica?.hasToken ? labels.tokenHaveAdmin : labels.tokenNoAdmin}
-          </p>
+          <div className="mt-2">
+            <p className="text-[11px] text-ink-faint">
+              {replica?.hasToken ? labels.tokenHaveAdmin : labels.tokenNoAdmin}
+            </p>
+            {/* Saved and accepted are different facts, and only the second one
+                predicts whether anything on the other screens will work. */}
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p
+                className={
+                  tokenState === 'not-admin'
+                    ? 'text-[11px] text-amber'
+                    : 'text-[11px] text-ink-faint'
+                }
+              >
+                {tokenState === 'checking'
+                  ? labels.tokenStatusChecking
+                  : tokenState === 'admin'
+                    ? labels.tokenStatusOk
+                    : tokenState === 'not-admin'
+                      ? labels.tokenStatusRejected
+                      : tokenState === 'missing'
+                        ? labels.tokenStatusMissing
+                        : tokenState === 'no-target'
+                          ? labels.tokenNoAdmin
+                          : labels.tokenStatusUnreachable}
+              </p>
+              {tokenState !== 'checking' && (
+                <button
+                  type="button"
+                  onClick={() => void checkToken()}
+                  className="no-drag text-[11px] font-medium text-iris hover:text-cyan"
+                >
+                  {labels.tokenRecheck}
+                </button>
+              )}
+            </div>
+          </div>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <span className="text-[11px] text-ink-faint">

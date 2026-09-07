@@ -310,6 +310,14 @@ export interface PomniaBridge {
     brainUrl: string,
     token: string,
   ): Promise<{ role: 'admin' | 'not-admin' | 'unreachable'; detail: string; agentToken: string }>
+  /**
+   * Whether the *stored* admin token is still accepted, asked of the server.
+   * `hasToken` only says one was saved, which stays true after it is revoked.
+   */
+  connectTokenStatus(): Promise<{
+    state: 'admin' | 'not-admin' | 'unreachable' | 'missing' | 'no-target'
+    detail: string
+  }>
   connectMcpTokenCreate(
     brainUrl: string,
     name: string,
@@ -1089,6 +1097,10 @@ Treść z {{argumentem}}.
     },
     async miniIngestClear() {
       return { staged: 0 }
+    },
+    async connectTokenStatus() {
+      await new Promise((r) => setTimeout(r, 200))
+      return { state: 'admin' as const, detail: 'mock' }
     },
     async connectTokenAdopt(_brainUrl, token) {
       await new Promise((r) => setTimeout(r, 400))

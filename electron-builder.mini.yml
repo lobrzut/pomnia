@@ -23,6 +23,12 @@ directories:
 # Portable rather than an installer: Mini is the thing you drop on a machine to
 # point its agents at a server that already holds the memory. Asking for an
 # install first is asking for a reason not to bother.
+#
+# The target is also passed on the command line (`electron-builder --win
+# portable`) and that is the one that decides. `extends` deep-merges this `win`
+# block into the parent's, and the parent's `target: [nsis]` survives — so the
+# config alone produced an NSIS installer carrying the word "portable" in its
+# filename. Kept here so the file still states the intent.
 win:
   target: [portable]
   icon: resources/icon.ico

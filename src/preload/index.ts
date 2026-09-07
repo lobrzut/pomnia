@@ -131,6 +131,7 @@ const bridge = {
       | { ok: false; error: string; detail?: string; path?: string }
     >,
   mcpSeenClients: (brainUrl: string, token?: string) => ipcRenderer.invoke('mcp:seenClients', brainUrl, token),
+  connectTokenStatus: () => ipcRenderer.invoke('connect:tokenStatus'),
   skillsRemoteList: () => ipcRenderer.invoke('skills:remoteList'),
   skillsRemoteListIn: (opts: { category?: string; query?: string; offset?: number }) =>
     ipcRenderer.invoke('skills:remoteListIn', opts),
