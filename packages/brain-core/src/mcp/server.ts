@@ -857,7 +857,9 @@ export async function createBrainServer(
           }
 
           if (isAdmin) {
-            const body = await readAdminBody(req).catch(() => undefined)
+            // A skill or a prompt is a document, not a settings patch, so the
+            // 64 kB default would refuse perfectly ordinary saves.
+            const body = await readAdminBody(req, adminBodyLimit(pathOnly)).catch(() => undefined)
             if (body === undefined) {
               sendAdmin(res, { status: 400, body: { error: 'bad_body' } })
               return
@@ -1046,7 +1048,7 @@ export async function createBrainServer(
           return true
         }
 
-        const body = await readAdminBody(req).catch(() => undefined)
+        const body = await readAdminBody(req, adminBodyLimit(path)).catch(() => undefined)
         if (body === undefined) {
           sendAdmin(res, { status: 400, body: { error: 'bad_body' } })
           return true
@@ -1059,6 +1061,13 @@ export async function createBrainServer(
           ),
         )
         return true
+      }
+
+      /** Documents get room; everything else keeps the tight default. */
+      function adminBodyLimit(path: string): number {
+        return path === '/admin/skills/write' || path === '/admin/prompts/write'
+          ? 2 * 1024 * 1024
+          : 64 * 1024
       }
 
       /**
@@ -1098,6 +1107,11 @@ export async function createBrainServer(
             },
           },
           dropSessionsFor: (username) => sessions.destroyUser(username),
+          // Read through ctx, not a captured value: both roots are reassigned
+          // when the vault moves, and a snapshot would keep answering with the
+          // directory the server had at boot.
+          skillsRoot: () => ctx?.skillsRoot ?? config.skillsRoot ?? '',
+          vaultRoot: () => ctx?.vaultRoot ?? config.vaultRoot ?? '',
           overview: () =>
             collectOverview({
               db: ctx?.db ?? null,

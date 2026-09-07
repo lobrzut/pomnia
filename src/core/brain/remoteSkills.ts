@@ -1,79 +1,171 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
 /**
- * Read and change the skills that live on the server, without a vault.
+ * Skills and prompts that live on the server, for a client with no vault.
  *
- * Skills are files in the vault — `skills/brain/*.md` for workflow recipes,
- * `skills/cli/<name>/SKILL.md` for expertise injections — and the full app
- * edits them because it holds the vault. Mini does not, so until now it could
- * neither see them nor touch them.
+ * This used to read `/sync/manifest` and pick the `skills/` rows out of it.
+ * That worked, and against the real vault it cost 59.6 seconds and 2.8 MB,
+ * because a manifest is a sha256 of every file in the vault and all we wanted
+ * was a list of names. It also reported 8044 entries where there are 1259
+ * skills: backups and `.bak` files belong in a replication manifest by design.
  *
- * It does not need to. The replication endpoints are a file API: `/sync/manifest`
- * lists every path with its hash and size, `/sync/fetch` returns one, and
- * `/sync/file` writes one back. That is the same door the import already uses,
- * with the same admin token, and it is the path that carries these files
- * between machines every day anyway.
+ * brain-core 0.1.80 answers the question directly on `/admin/skills` and
+ * `/admin/prompts`, using the same code its MCP tools use, so what Mini shows
+ * and what an agent sees cannot drift apart.
  *
- * There is no `/admin/skills`. brain-core answers 401 to everything under
- * `/admin/` before it matches a route, which is why probing that path looked
- * like a hit and was not.
+ * The path checks below are a copy of the server's. The server's is the one
+ * that matters — it guards the disk — but refusing a bad path here means the
+ * user gets told why instead of watching a request fail.
  */
 
-export interface RemoteSkill {
-  /** Vault-relative path, e.g. `skills/brain/bug-recon.md`. */
+/** Why a call could not be made, or was refused. */
+export type RemoteLibraryError =
+  | 'no-target'
+  | 'no-token'
+  | 'unauthorized'
+  | 'server-too-old'
+  | 'unsafe-path'
+  | 'not-found'
+  | 'failed'
+
+export interface RemoteSkillRow {
+  /** Relative to the skills root: `brain/x.md` or `cli/<category>/<name>/SKILL.md`. */
   path: string
-  /** `brain` = workflow recipe, `cli` = expertise injection, `other` = neither. */
-  kind: 'brain' | 'cli' | 'other'
-  /** What a person would call it: the file stem, or the directory for a CLI skill. */
+  kind: 'own' | 'cli'
   name: string
+  category?: string
+  description?: string
+}
+
+export interface RemoteSkillsSummary {
+  own: RemoteSkillRow[]
+  categories: { category: string; count: number }[]
+  cliCount: number
+}
+
+export interface RemotePrompt {
+  name: string
+  description?: string
+  arguments: { name: string; description?: string; required: boolean }[]
   size: number
-  sha256?: string
 }
 
-interface ManifestEntry {
-  path: string
-  size?: number
-  sha256?: string
+function isBadSegment(seg: string): boolean {
+  return seg === '' || seg === '.' || seg === '..'
 }
 
-/**
- * Name a skill the way its author would.
- *
- * `skills/cli/think-for-me/SKILL.md` is the "think-for-me" skill, not the
- * "SKILL" skill — the directory carries the name and the file never varies.
- */
-export function skillFromPath(path: string, size = 0, sha256?: string): RemoteSkill | null {
-  if (!path.startsWith('skills/')) return null
-  const parts = path.split('/')
-  if (parts[1] === 'brain' && parts.length === 3 && parts[2].endsWith('.md')) {
-    return { path, kind: 'brain', name: parts[2].replace(/\.md$/, ''), size, sha256 }
+/** `brain/<name>.md`, `cli/<name>/SKILL.md`, `cli/<category>/<name>/SKILL.md` — nothing else. */
+export function isSafeSkillRel(rel: string): boolean {
+  if (!rel || rel.includes('\\') || rel.startsWith('/')) return false
+  const parts = rel.split('/')
+  if (parts.some(isBadSegment)) return false
+  if (parts.some((p) => p.startsWith('_') || p.startsWith('.'))) return false
+  if (parts[0] === 'brain') return parts.length === 2 && parts[1].endsWith('.md')
+  if (parts[0] === 'cli') {
+    return (parts.length === 3 || parts.length === 4) && parts[parts.length - 1] === 'SKILL.md'
   }
-  if (parts[1] === 'cli' && parts.length === 4 && parts[3] === 'SKILL.md') {
-    return { path, kind: 'cli', name: parts[2], size, sha256 }
-  }
-  // Anything else under skills/ is still a real file someone put there;
-  // hiding it would make the list disagree with the directory.
-  if (parts.length < 2 || !parts[parts.length - 1]) return null
-  return { path, kind: 'other', name: parts.slice(1).join('/'), size, sha256 }
+  return false
 }
 
-/** Skills in the manifest, named and sorted the way a list wants them. */
-export function skillsFromManifest(entries: unknown): RemoteSkill[] {
-  if (!Array.isArray(entries)) return []
-  const out: RemoteSkill[] = []
-  for (const e of entries as ManifestEntry[]) {
-    if (!e || typeof e.path !== 'string') continue
-    const s = skillFromPath(e.path, typeof e.size === 'number' ? e.size : 0, e.sha256)
-    if (s) out.push(s)
-  }
-  // Grouped by kind, then alphabetical: 772 files in one flat run is a wall.
-  const rank = { brain: 0, cli: 1, other: 2 }
-  return out.sort((a, b) => rank[a.kind] - rank[b.kind] || a.name.localeCompare(b.name))
+/** A prompt is one file in one directory, so its name is one plain segment. */
+export function isSafePromptName(name: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) && !name.endsWith('.md') && !name.includes('..')
 }
 
-/** `skills/…` and nothing above it. A path that escapes is a path that overwrites. */
-export function isSafeSkillPath(path: string): boolean {
-  if (!path.startsWith('skills/')) return false
-  if (path.includes('\\')) return false
-  return !path.split('/').some((p) => p === '..' || p === '.' || p === '')
+/** Where a skill's file sits, given the shape the server reported. */
+export function skillPath(row: { kind: 'own' | 'cli'; name: string; category?: string }): string {
+  if (row.kind === 'own') return `brain/${row.name}.md`
+  return row.category ? `cli/${row.category}/${row.name}/SKILL.md` : `cli/${row.name}/SKILL.md`
+}
+
+interface RawSummary {
+  own?: { skills?: { name?: unknown; description?: unknown }[] }
+  cli?: { count?: unknown; categories?: { category?: unknown; count?: unknown }[] }
+}
+
+/** Read the summary brain-core returns, tolerating a server that answers less than expected. */
+export function summaryFromResponse(raw: unknown): RemoteSkillsSummary {
+  const r = (raw ?? {}) as RawSummary
+  const own: RemoteSkillRow[] = []
+  for (const s of r.own?.skills ?? []) {
+    if (typeof s?.name !== 'string') continue
+    own.push({
+      path: `brain/${s.name}.md`,
+      kind: 'own',
+      name: s.name,
+      description: typeof s.description === 'string' ? s.description : undefined,
+    })
+  }
+  const categories: { category: string; count: number }[] = []
+  for (const c of r.cli?.categories ?? []) {
+    if (typeof c?.category !== 'string') continue
+    categories.push({ category: c.category, count: typeof c.count === 'number' ? c.count : 0 })
+  }
+  return {
+    own: own.sort((a, b) => a.name.localeCompare(b.name)),
+    categories,
+    cliCount: typeof r.cli?.count === 'number' ? r.cli.count : 0,
+  }
+}
+
+interface RawRow {
+  kind?: unknown
+  name?: unknown
+  category?: unknown
+  description?: unknown
+}
+
+/** Read one page of a narrowed listing. */
+export function rowsFromResponse(raw: unknown): {
+  rows: RemoteSkillRow[]
+  total: number
+  nextOffset?: number
+} {
+  const r = (raw ?? {}) as { skills?: RawRow[]; total?: unknown; nextOffset?: unknown }
+  const rows: RemoteSkillRow[] = []
+  for (const s of r.skills ?? []) {
+    if (typeof s?.name !== 'string') continue
+    const kind = s.kind === 'own' ? 'own' : 'cli'
+    const category = typeof s.category === 'string' ? s.category : undefined
+    rows.push({
+      path: skillPath({ kind, name: s.name, category }),
+      kind,
+      name: s.name,
+      category,
+      description: typeof s.description === 'string' ? s.description : undefined,
+    })
+  }
+  return {
+    rows,
+    total: typeof r.total === 'number' ? r.total : rows.length,
+    nextOffset: typeof r.nextOffset === 'number' ? r.nextOffset : undefined,
+  }
+}
+
+/** Read the prompt list, dropping anything that does not carry a usable name. */
+export function promptsFromResponse(raw: unknown): RemotePrompt[] {
+  const r = (raw ?? {}) as { prompts?: unknown[] }
+  const out: RemotePrompt[] = []
+  for (const p of r.prompts ?? []) {
+    const row = p as { name?: unknown; description?: unknown; arguments?: unknown; size?: unknown }
+    if (typeof row?.name !== 'string') continue
+    const args: RemotePrompt['arguments'] = []
+    if (Array.isArray(row.arguments)) {
+      for (const a of row.arguments as { name?: unknown; description?: unknown; required?: unknown }[]) {
+        if (typeof a?.name !== 'string') continue
+        args.push({
+          name: a.name,
+          description: typeof a.description === 'string' ? a.description : undefined,
+          required: a.required === true,
+        })
+      }
+    }
+    out.push({
+      name: row.name,
+      description: typeof row.description === 'string' ? row.description : undefined,
+      arguments: args,
+      size: typeof row.size === 'number' ? row.size : 0,
+    })
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
 }

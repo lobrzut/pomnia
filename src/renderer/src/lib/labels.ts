@@ -516,6 +516,30 @@ export interface UiLabels {
   skillsDirty: string
   skillsSavedHint: string
   skillsRemoteReason: (code: string) => string
+  skillsOwnHeading: string
+  skillsPacksHeading: string
+  skillsCategoryCount: (n: number) => string
+  skillsSearchPlaceholder: string
+  skillsShowing: (shown: number, total: number) => string
+  skillsNoMatch: string
+  skillsBackToCategories: string
+  promptsTitle: string
+  promptsLead: string
+  promptsLeadLocal: string
+  promptsRefresh: string
+  promptsEmpty: string
+  promptsCount: (n: number) => string
+  promptsArgsLabel: string
+  promptsNoArgs: string
+  promptsRequiredMark: string
+  promptsNewName: string
+  promptsCreate: string
+  promptsCreated: (name: string) => string
+  promptsSaved: (name: string) => string
+  promptsNameBad: string
+  promptsOpenFile: string
+  promptsOpenFolder: string
+  promptsHowItReaches: string
   ingestTitle: string
   ingestLead: string
   ingestPick: string
@@ -1416,9 +1440,39 @@ const PL_LABELS: UiLabels = {
       ? 'Brak adresu serwera — uzupełnij w zakładce Connect'
       : code === 'no-token'
         ? 'Potrzebny token admina — token agenta nie ma prawa czytać plików vaultu'
-        : code === 'unsafe-path'
-          ? 'Odrzucona ścieżka — wychodzi poza katalog skilli'
-          : 'Serwer nie odpowiedział',
+        : code === 'unauthorized'
+          ? 'Serwer odrzucił token (401). Został unieważniony, wygasł albo to token agenta, nie admina — wklej nowy w Ustawieniach.'
+          : code === 'server-too-old'
+            ? 'Serwer nie zna tego adresu — potrzebny brain-core 0.1.80 lub nowszy'
+            : code === 'unsafe-path'
+              ? 'Odrzucona ścieżka — wychodzi poza katalog skilli'
+              : code === 'not-found'
+                ? 'Nie ma takiego pliku na serwerze'
+                : 'Serwer nie odpowiedział',
+  skillsOwnHeading: 'Twoje',
+  skillsPacksHeading: 'Pakiety',
+  skillsCategoryCount: (n) => plCount(n, 'skill', 'skille', 'skilli'),
+  skillsSearchPlaceholder: 'Szukaj po nazwie i opisie…',
+  skillsShowing: (shown, total) => `Widać ${shown} z ${total}.`,
+  skillsNoMatch: 'Nic nie pasuje.',
+  skillsBackToCategories: 'Wszystkie kategorie',
+  promptsTitle: 'Prompty',
+  promptsLead: 'Biblioteka na serwerze. Agent widzi je jako komendy — u siebie wpiszesz /nazwa.',
+  promptsLeadLocal: 'Biblioteka w vaulcie: vault/prompts/. Agenci dostają je przez MCP jako komendy /nazwa.',
+  promptsRefresh: 'Odśwież',
+  promptsEmpty: 'Pusto. Dodaj pierwszy prompt — plik .md z opisem i treścią.',
+  promptsCount: (n) => `${plCount(n, 'prompt', 'prompty', 'promptów')} w bibliotece.`,
+  promptsArgsLabel: 'Argumenty:',
+  promptsNoArgs: 'bez argumentów',
+  promptsRequiredMark: 'wymagany',
+  promptsNewName: 'nazwa-nowego-promptu',
+  promptsCreate: 'Dodaj prompt',
+  promptsCreated: (name) => `Utworzono: ${name}`,
+  promptsSaved: (name) => `Zapisano: ${name}`,
+  promptsNameBad: 'Nazwa: litery, cyfry, kropka, myślnik i podkreślenie. Bez ukośników i bez .md.',
+  promptsOpenFile: 'Otwórz plik',
+  promptsOpenFolder: 'Otwórz katalog',
+  promptsHowItReaches: 'Treść {{w klamrach}} to argument. Wymagany bez wartości = błąd, opcjonalny zostaje widoczny.',
   ingestTitle: 'Do Pomnia',
   ingestLead: 'Wrzuć pliki — Pomnia rozpozna, co to jest, i wyśle na serwer.',
   ingestPick: 'Wybierz pliki',
@@ -2381,9 +2435,39 @@ const EN_LABELS: UiLabels = {
       ? 'No server address — fill it in under Connect'
       : code === 'no-token'
         ? 'Needs an admin token — an agent token cannot read vault files'
-        : code === 'unsafe-path'
-          ? 'Path refused — it climbs out of the skills directory'
-          : 'The server did not answer',
+        : code === 'unauthorized'
+          ? 'The server refused the token (401). It was revoked, it expired, or it is an agent token rather than an admin one — paste a new one under Settings.'
+          : code === 'server-too-old'
+            ? 'The server does not know this route — needs brain-core 0.1.80 or newer'
+            : code === 'unsafe-path'
+              ? 'Path refused — it climbs out of the skills directory'
+              : code === 'not-found'
+                ? 'No such file on the server'
+                : 'The server did not answer',
+  skillsOwnHeading: 'Yours',
+  skillsPacksHeading: 'Packages',
+  skillsCategoryCount: (n) => `${n} ${n === 1 ? 'skill' : 'skills'}`,
+  skillsSearchPlaceholder: 'Search name and description…',
+  skillsShowing: (shown, total) => `Showing ${shown} of ${total}.`,
+  skillsNoMatch: 'Nothing matches.',
+  skillsBackToCategories: 'All categories',
+  promptsTitle: 'Prompts',
+  promptsLead: 'The library on the server. Agents see them as commands — you type /name.',
+  promptsLeadLocal: 'The library in this vault: vault/prompts/. Agents get them over MCP as /name commands.',
+  promptsRefresh: 'Refresh',
+  promptsEmpty: 'Empty. Add the first prompt — a .md file with a description and a body.',
+  promptsCount: (n) => `${n} ${n === 1 ? 'prompt' : 'prompts'} in the library.`,
+  promptsArgsLabel: 'Arguments:',
+  promptsNoArgs: 'no arguments',
+  promptsRequiredMark: 'required',
+  promptsNewName: 'name-of-the-new-prompt',
+  promptsCreate: 'Add a prompt',
+  promptsCreated: (name) => `Created: ${name}`,
+  promptsSaved: (name) => `Saved: ${name}`,
+  promptsNameBad: 'Name: letters, digits, dot, dash and underscore. No slashes, no .md.',
+  promptsOpenFile: 'Open file',
+  promptsOpenFolder: 'Open folder',
+  promptsHowItReaches: 'Anything {{in braces}} is an argument. A required one with no value is an error; an optional one stays visible.',
   ingestTitle: 'To Pomnia',
   ingestLead: 'Drop files in — Pomnia works out what they are and sends them to the server.',
   ingestPick: 'Choose files',

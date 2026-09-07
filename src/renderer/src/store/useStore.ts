@@ -45,7 +45,16 @@ function loadDistillChatModel(): string {
   }
 }
 
-export type Route = 'dashboard' | 'browse' | 'import' | 'brain' | 'connect' | 'settings' | 'guide' | 'skills'
+export type Route =
+  | 'dashboard'
+  | 'browse'
+  | 'import'
+  | 'brain'
+  | 'connect'
+  | 'settings'
+  | 'guide'
+  | 'skills'
+  | 'prompts'
 
 /**
  * Connect-tab client visibility override. Default behaviour shows only clients

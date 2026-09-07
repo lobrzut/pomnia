@@ -27,6 +27,8 @@ import ProfilePreview from './pages/ProfilePreview'
 import { isMini, MINI_ROUTES } from './lib/flavour'
 import MiniIngest from './pages/MiniIngest'
 import MiniSkills from './pages/MiniSkills'
+import MiniPrompts from './pages/MiniPrompts'
+import Prompts from './pages/Prompts'
 
 const ALL_PAGES = {
   dashboard: Dashboard,
@@ -41,6 +43,9 @@ const ALL_PAGES = {
   // Mini gets its own: the full Skills page reads the vault, and Mini reaches
   // the same files on the server instead.
   skills: isMini ? MiniSkills : Skills,
+  // Same split as skills: the full app lists the prompts in the vault it
+  // holds, Mini reaches the same files on the server.
+  prompts: isMini ? MiniPrompts : Prompts,
 } as const
 
 /**

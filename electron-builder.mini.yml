@@ -1,0 +1,37 @@
+# Pomnia Desktop Mini — the packaging half of the flavour split.
+#
+# The build was being assembled by hand each time, which is how a release goes
+# out with the wrong `productName` or lands in `release/` on top of the full
+# app's installer. It is a file now.
+#
+# Only the identity changes. Everything about *what* is packed comes from
+# `electron-builder.yml` via `extends`, so a change to the file list reaches
+# both builds and the two cannot drift apart.
+#
+# `appId` and `output` are separate on purpose. Mini and the full app must not
+# share an install, a shortcut, or an output directory — and they already do not
+# share `%APPDATA%`, because MAIN_VITE_POMNIA_FLAVOUR moves userData. Two
+# programs writing one settings file is the failure this whole flavour split
+# exists to avoid.
+#
+# Build with: npm run build:mini:win
+extends: ./electron-builder.yml
+appId: ai.pomnia.mini
+productName: PomniaMini
+directories:
+  output: release/mini
+# Portable rather than an installer: Mini is the thing you drop on a machine to
+# point its agents at a server that already holds the memory. Asking for an
+# install first is asking for a reason not to bother.
+win:
+  target: [portable]
+  icon: resources/icon.ico
+  executableName: PomniaMini
+  publisherName: Pomnia
+  artifactName: ${productName}-${version}-portable.${ext}
+  requestedExecutionLevel: asInvoker
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+# Mini ships no installer, so the update feed the full app emits would describe
+# an artifact nobody can install over.
+publish: null

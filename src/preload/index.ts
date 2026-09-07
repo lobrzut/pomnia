@@ -41,6 +41,8 @@ const bridge = {
   docRemove: (docId: string) => ipcRenderer.invoke('doc:remove', docId),
   brainExport: (id: string, outDir: string) => ipcRenderer.invoke('brain:export', id, outDir),
   skillsList: () => ipcRenderer.invoke('skills:list'),
+  promptsList: () => ipcRenderer.invoke('prompts:list'),
+  promptsCreate: (name: string) => ipcRenderer.invoke('prompts:create', name),
   skillsReveal: (target: string, mode?: 'file' | 'folder') =>
     ipcRenderer.invoke('skills:reveal', target, mode ?? 'file'),
   revealInstallDir: () => ipcRenderer.invoke('reveal:installDir'),
@@ -130,9 +132,15 @@ const bridge = {
     >,
   mcpSeenClients: (brainUrl: string, token?: string) => ipcRenderer.invoke('mcp:seenClients', brainUrl, token),
   skillsRemoteList: () => ipcRenderer.invoke('skills:remoteList'),
+  skillsRemoteListIn: (opts: { category?: string; query?: string; offset?: number }) =>
+    ipcRenderer.invoke('skills:remoteListIn', opts),
   skillsRemoteRead: (path: string) => ipcRenderer.invoke('skills:remoteRead', path),
   skillsRemoteWrite: (path: string, content: string) =>
     ipcRenderer.invoke('skills:remoteWrite', path, content),
+  promptsRemoteList: () => ipcRenderer.invoke('prompts:remoteList'),
+  promptsRemoteRead: (name: string) => ipcRenderer.invoke('prompts:remoteRead', name),
+  promptsRemoteWrite: (name: string, content: string) =>
+    ipcRenderer.invoke('prompts:remoteWrite', name, content),
   miniIngestState: () => ipcRenderer.invoke('mini:ingestState'),
   miniIngestPick: () => ipcRenderer.invoke('mini:ingestPick'),
   miniIngestFiles: (

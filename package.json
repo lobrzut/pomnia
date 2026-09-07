@@ -50,6 +50,7 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.json",
     "typecheck:brain-core": "npm run typecheck --prefix packages/brain-core",
     "typecheck:doc-parser": "npm run typecheck --prefix packages/doc-parser",
+    "build:mini:win": "npm run build:doc-parser && npm run stage:tessdata && npm run generate:build-info && electron-vite build --mode mini && electron-builder --win --config electron-builder.mini.yml --publish never",
     "dev:mini": "npm run generate:build-info && electron-vite dev --mode mini",
     "web:mini": "vite --config vite.web.config.ts --mode mini"
   },

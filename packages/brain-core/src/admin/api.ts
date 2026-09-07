@@ -20,6 +20,15 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
+import {
+  listPrompts,
+  readPrompt,
+  readSkill,
+  writePrompt,
+  writeSkill,
+  type LibraryError,
+} from './library.js'
+import { runListSkills } from '../mcp/tools/skills.js'
 import { COLOR_SCHEMES, isColorScheme, readSettings, validateEmbedModel, validateOllamaUrl, writeSettings } from './settings.js'
 import { createToken, readTokens, revokeToken, summarise } from './tokens.js'
 import {
@@ -86,6 +95,12 @@ export interface AdminDeps {
     }
     cancel(): { cancelled: boolean }
   }
+  /**
+   * Where skills and prompts live. Two roots, not one: skills may sit in a
+   * portable sidecar beside an encrypted vault, prompts always under the vault.
+   */
+  skillsRoot(): string
+  vaultRoot(): string
 }
 
 export interface RuntimeSettings {
@@ -375,7 +390,69 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
     return j(r.started ? 202 : 200, r)
   }
 
+  // ── skills and prompts ──────────────────────────────────────────────────
+  //
+  // POST everywhere, including the reads: the arguments are a filter, and
+  // pathOnly reaches this function with the query string already stripped.
+  if (path === '/admin/skills' && method === 'POST') {
+    const root = deps.skillsRoot()
+    if (!root) return j(503, { error: 'no_skills_root' })
+    return j(200, JSON.parse(runListSkills(req.body, { skillsRoot: root })))
+  }
+
+  if (path === '/admin/skills/read' && method === 'POST') {
+    const root = deps.skillsRoot()
+    if (!root) return j(503, { error: 'no_skills_root' })
+    return libraryResult(readSkill(root, str(req.body, 'path')))
+  }
+
+  if (path === '/admin/skills/write' && method === 'POST') {
+    const root = deps.skillsRoot()
+    if (!root) return j(503, { error: 'no_skills_root' })
+    const rel = str(req.body, 'path')
+    const r = writeSkill(root, rel, str(req.body, 'content'))
+    if (!('error' in r) && !r.unchanged) audit(req.actor, `edited skill ${rel}`)
+    return libraryResult(r)
+  }
+
+  if (path === '/admin/prompts' && method === 'POST') {
+    const root = deps.vaultRoot()
+    if (!root) return j(503, { error: 'no_vault' })
+    return j(200, { prompts: listPrompts(root) })
+  }
+
+  if (path === '/admin/prompts/read' && method === 'POST') {
+    const root = deps.vaultRoot()
+    if (!root) return j(503, { error: 'no_vault' })
+    return libraryResult(readPrompt(root, str(req.body, 'name')))
+  }
+
+  if (path === '/admin/prompts/write' && method === 'POST') {
+    const root = deps.vaultRoot()
+    if (!root) return j(503, { error: 'no_vault' })
+    const name = str(req.body, 'name')
+    const r = writePrompt(root, name, str(req.body, 'content'))
+    if (!('error' in r) && !r.unchanged) {
+      audit(req.actor, `${r.created ? 'created' : 'edited'} prompt ${name}`)
+    }
+    return libraryResult(r)
+  }
+
   return j(404, { error: 'not_found' })
+}
+
+function str(body: unknown, key: string): string {
+  if (!body || typeof body !== 'object') return ''
+  const v = (body as Record<string, unknown>)[key]
+  return typeof v === 'string' ? v : ''
+}
+
+/** A refused path is 400 and a missing file is 404 — the caller acts on each differently. */
+function libraryResult<T extends object>(r: T | LibraryError): AdminResponse {
+  if (!('error' in r)) return j(200, r)
+  const e = r as LibraryError
+  const status = e.error === 'bad-path' ? 400 : e.error === 'not-found' ? 404 : e.error === 'too-large' ? 413 : 500
+  return j(status, e)
 }
 
 /** Read a bounded JSON body; anything larger is refused rather than buffered. */

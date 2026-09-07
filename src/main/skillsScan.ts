@@ -5,9 +5,17 @@
  *
  * Layout: `<skillsRoot>/{brain,cli}/`
  *   - own (brain): `brain/<name>.md`
- *   - imported (cli): `cli/<name>/SKILL.md`
+ *   - imported (cli): `cli/<name>/SKILL.md` or `cli/<category>/<name>/SKILL.md`
  *
- * Skips `*.bak*`, dotfiles, `_backups/`, `__pycache__/`.
+ * The categorised form is not hypothetical: 1244 packages were sorted into
+ * eight folders, and a scanner that reads only the flat form reports zero
+ * imported skills while the directory is full of them. brain-core had the same
+ * blind spot and was patched by hand inside a container, which is how it went
+ * unnoticed on the server for as long as it did.
+ *
+ * Skips `*.bak*`, dotfiles, anything starting with `_` (the vault holds a full
+ * `_backup-cli-before-categorize-…` copy — walking into it would count every
+ * package twice), `__pycache__/`.
  */
 import {
   existsSync,
@@ -26,6 +34,8 @@ export type SkillScopeKind = 'own' | 'imported'
 export interface LocalSkillEntry {
   kind: SkillScopeKind
   name: string
+  /** The `cli/<category>/` folder, when the package sits in one. */
+  category?: string
   description: string
   /** Path to the skill markdown file. */
   path: string
@@ -44,7 +54,7 @@ export interface SkillsCountSplit {
 const JUNK_DIR_NAMES = new Set(['__pycache__', '_backups', 'node_modules', '.git'])
 
 function isJunkName(name: string): boolean {
-  if (!name || name.startsWith('.')) return true
+  if (!name || name.startsWith('.') || name.startsWith('_')) return true
   if (name.includes('.bak')) return true
   if (name.endsWith('.pyc') || name.endsWith('.pyo')) return true
   if (JUNK_DIR_NAMES.has(name)) return true
@@ -125,36 +135,44 @@ export function listLocalSkillsAt(skillsRoot: string): LocalSkillEntry[] {
     }
   }
 
+  // A directory holding SKILL.md is a package; one without, at the top level,
+  // is a category. Two levels and no deeper — a stray tree must not turn a
+  // dashboard count into a filesystem crawl.
   const cli = join(skillsRoot, 'cli')
-  if (existsSync(cli)) {
+  const walkCli = (base: string, depth: number, category?: string): void => {
+    let names: string[]
     try {
-      for (const name of readdirSync(cli)) {
-        if (isJunkName(name)) continue
-        const pack = join(cli, name)
-        let isDir = false
-        try {
-          isDir = statSync(pack).isDirectory()
-        } catch {
-          continue
-        }
-        if (!isDir) continue
-        const file = join(pack, 'SKILL.md')
-        if (!existsSync(file)) continue
+      names = readdirSync(base)
+    } catch {
+      return
+    }
+    for (const name of names) {
+      if (isJunkName(name)) continue
+      const pack = join(base, name)
+      try {
+        if (!statSync(pack).isDirectory()) continue
+      } catch {
+        continue
+      }
+      const file = join(pack, 'SKILL.md')
+      if (existsSync(file)) {
         const meta = skillMeta(file)
         out.push({
           kind: 'imported',
           name,
+          category,
           description: meta.description,
           path: file,
           folderPath: pack,
           sizeBytes: meta.sizeBytes,
           mtimeMs: meta.mtimeMs,
         })
+      } else if (depth < 2) {
+        walkCli(pack, depth + 1, name)
       }
-    } catch {
-      /* ignore */
     }
   }
+  if (existsSync(cli)) walkCli(cli, 1)
 
   return out.sort((a, b) => {
     if (a.kind !== b.kind) return a.kind === 'own' ? -1 : 1

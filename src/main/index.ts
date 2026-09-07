@@ -71,7 +71,15 @@ import { pushRemoteBehaviour } from '@core/brain/remoteBehaviour.js'
 import { pushStagedNotes } from '@core/brain/miniIngest.js'
 import { estimateSeconds, recordUpload } from '@core/brain/uploadEstimate.js'
 import { clearStaging, ingestFiles, stagedCount, stagedStats, stagingRoot } from './miniIngest.js'
-import { listRemoteSkills, readRemoteSkill, writeRemoteSkill } from './remoteSkills.js'
+import {
+  listRemotePrompts,
+  listRemoteSkills,
+  listRemoteSkillsIn,
+  readRemotePrompt,
+  readRemoteSkill,
+  writeRemotePrompt,
+  writeRemoteSkill,
+} from './remoteSkills.js'
 
 /** Mini has no brain of its own, so every target it can have is remote. */
 const IS_MINI = import.meta.env?.MAIN_VITE_POMNIA_FLAVOUR === 'mini'
@@ -157,6 +165,7 @@ import {
   listLocalSkillsAt,
   writeSkillsIndexAt,
 } from './skillsScan.js'
+import { createLocalPrompt, listLocalPromptsAt } from './promptsScan.js'
 import {
   brainProcessFailedMessage,
   missingEmbedModelMessage,
@@ -809,6 +818,38 @@ function registerIpc(): void {
       skillsRoot,
       own: all.filter((s) => s.kind === 'own'),
       imported: all.filter((s) => s.kind === 'imported'),
+    }
+  })
+
+  /*
+   * The prompt library, the local sibling of skills:list. Read-only here plus
+   * one create: editing a prompt means opening the file, the same way a skill
+   * is edited, because these are documents the user owns.
+   */
+  ipcMain.handle('prompts:list', () => {
+    if (!vault || !vaultPath) return { prompts: [], promptsRoot: null }
+    const root = brainVaultRoot(vaultPath)
+    return { promptsRoot: join(root, 'prompts'), prompts: listLocalPromptsAt(root) }
+  })
+
+  ipcMain.handle('prompts:create', async (_e, name: string) => {
+    if (!vault || !vaultPath) return { ok: false, error: 'no vault' }
+    const clean = String(name ?? '').trim()
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(clean) || clean.endsWith('.md')) {
+      return { ok: false, error: 'bad name' }
+    }
+    try {
+      const path = createLocalPrompt(
+        brainVaultRoot(vaultPath),
+        clean,
+        `---
+description: 
+---
+`,
+      )
+      return { ok: true, path }
+    } catch (e) {
+      return { ok: false, error: (e as Error).message }
     }
   })
 
@@ -2207,8 +2248,8 @@ function registerIpc(): void {
    * main-process code; the renderer only ever sees counts and names.
    */
   /*
-   * Skills on the server, read and written over the replication endpoints.
-   * The admin token stays here; the renderer sends a path and gets text.
+   * Skills and prompts on the server. The admin token stays here; the renderer
+   * sends a name or a path and gets text back.
    */
   const skillsAuth = (): { url?: string; token?: string } => {
     const s = getAppSettings()
@@ -2220,6 +2261,22 @@ function registerIpc(): void {
     return listRemoteSkills(a.url, a.token)
   })
 
+  ipcMain.handle(
+    'skills:remoteListIn',
+    async (_e, opts: { category?: string; query?: string; offset?: number }) => {
+      const a = skillsAuth()
+      return listRemoteSkillsIn(
+        {
+          category: opts?.category ? String(opts.category) : undefined,
+          query: opts?.query ? String(opts.query) : undefined,
+          offset: Number(opts?.offset ?? 0) || 0,
+        },
+        a.url,
+        a.token,
+      )
+    },
+  )
+
   ipcMain.handle('skills:remoteRead', async (_e, path: string) => {
     const a = skillsAuth()
     return readRemoteSkill(String(path ?? ''), a.url, a.token)
@@ -2228,6 +2285,21 @@ function registerIpc(): void {
   ipcMain.handle('skills:remoteWrite', async (_e, path: string, content: string) => {
     const a = skillsAuth()
     return writeRemoteSkill(String(path ?? ''), String(content ?? ''), a.url, a.token)
+  })
+
+  ipcMain.handle('prompts:remoteList', async () => {
+    const a = skillsAuth()
+    return listRemotePrompts(a.url, a.token)
+  })
+
+  ipcMain.handle('prompts:remoteRead', async (_e, name: string) => {
+    const a = skillsAuth()
+    return readRemotePrompt(String(name ?? ''), a.url, a.token)
+  })
+
+  ipcMain.handle('prompts:remoteWrite', async (_e, name: string, content: string) => {
+    const a = skillsAuth()
+    return writeRemotePrompt(String(name ?? ''), String(content ?? ''), a.url, a.token)
   })
 
   ipcMain.handle('mini:ingestState', async () => {

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Pomnia
 import { motion } from 'framer-motion'
 import { isMini, MINI_ROUTES } from '../lib/flavour'
-import { BookOpen, BrainCircuit, Import as ImportIcon, LayoutDashboard, Lock, Map, MessagesSquare, Minus, Plug, Settings as Cog, Square, X } from 'lucide-react'
+import { BookOpen, BrainCircuit, Import as ImportIcon, LayoutDashboard, Lock, Map, MessageSquareQuote, MessagesSquare, Minus, Plug, Settings as Cog, Square, X } from 'lucide-react'
 import clsx from 'clsx'
 import { AppLogo } from './AppLogo'
 import { Spinner } from './ui'
@@ -19,6 +19,7 @@ const NAV_ICONS: Record<Route, typeof LayoutDashboard> = {
   settings: Cog,
   guide: Map,
   skills: BookOpen,
+  prompts: MessageSquareQuote,
 }
 
 function navItems(): { id: Route; label: string; icon: typeof LayoutDashboard }[] {
@@ -38,6 +39,7 @@ function navItems(): { id: Route; label: string; icon: typeof LayoutDashboard }[
     // elsewhere, so filtering MINI_ROUTES against this list silently
     // dropped it and Mini's fourth screen was unreachable.
     { id: 'skills', label: L.navSkills, icon: NAV_ICONS.skills },
+    { id: 'prompts', label: L.promptsTitle, icon: NAV_ICONS.prompts },
     { id: 'settings', label: L.navSettings, icon: NAV_ICONS.settings }
   ]
   if (!isMini) return all

@@ -1,95 +1,127 @@
 import { describe, expect, it } from 'vitest'
 
-import { isSafeSkillPath, skillFromPath, skillsFromManifest } from './remoteSkills.js'
+import {
+  isSafePromptName,
+  isSafeSkillRel,
+  promptsFromResponse,
+  rowsFromResponse,
+  skillPath,
+  summaryFromResponse,
+} from './remoteSkills.js'
 
-describe('skillFromPath', () => {
-  it('names a workflow skill by its file', () => {
-    expect(skillFromPath('skills/brain/bug-recon.md', 1767)).toEqual({
-      path: 'skills/brain/bug-recon.md',
-      kind: 'brain',
-      name: 'bug-recon',
-      size: 1767,
-      sha256: undefined,
+/**
+ * These shapes come off the wire from a server that may be older, newer, or
+ * having a bad day. Everything here is about answering with *something* the
+ * window can draw, rather than throwing inside a render.
+ */
+
+describe('isSafeSkillRel', () => {
+  it('accepts the three real shapes', () => {
+    expect(isSafeSkillRel('brain/build-our-way.md')).toBe(true)
+    expect(isSafeSkillRel('cli/think-for-me/SKILL.md')).toBe(true)
+    expect(isSafeSkillRel('cli/cyber-mukul/nmap-recon/SKILL.md')).toBe(true)
+  })
+
+  it('refuses anything that leaves the skills root', () => {
+    for (const bad of [
+      '../USER.md',
+      'brain/../../USER.md',
+      '/etc/passwd',
+      'brain\\x.md',
+      'sessions/note.md',
+      'cli/x/README.md',
+      'cli/a/b/c/SKILL.md',
+      'cli/_backups/x/SKILL.md',
+      '',
+    ]) {
+      expect(isSafeSkillRel(bad), bad).toBe(false)
+    }
+  })
+})
+
+describe('isSafePromptName', () => {
+  it('takes a plain stem and refuses a path', () => {
+    expect(isSafePromptName('zglos-blad')).toBe(true)
+    for (const bad of ['../x', 'a/b', '', '.hidden', 'x.md']) {
+      expect(isSafePromptName(bad), bad).toBe(false)
+    }
+  })
+})
+
+describe('skillPath', () => {
+  it('names the file for each kind', () => {
+    expect(skillPath({ kind: 'own', name: 'x' })).toBe('brain/x.md')
+    expect(skillPath({ kind: 'cli', name: 'x' })).toBe('cli/x/SKILL.md')
+    expect(skillPath({ kind: 'cli', name: 'x', category: 'c' })).toBe('cli/c/x/SKILL.md')
+  })
+})
+
+describe('summaryFromResponse', () => {
+  it('reads own skills and category counts', () => {
+    const s = summaryFromResponse({
+      own: { count: 2, skills: [{ name: 'b', description: 'B' }, { name: 'a' }] },
+      cli: { count: 1244, categories: [{ category: 'cyber-mukul', count: 817 }] },
     })
+    expect(s.own.map((r) => r.name)).toEqual(['a', 'b'])
+    expect(s.own[1].path).toBe('brain/b.md')
+    expect(s.cliCount).toBe(1244)
+    expect(s.categories).toEqual([{ category: 'cyber-mukul', count: 817 }])
   })
 
-  it('names a CLI skill by its directory, not by SKILL.md', () => {
-    // Every one of them is called SKILL.md; the directory is the name.
-    const s = skillFromPath('skills/cli/think-for-me/SKILL.md', 4200)
-    expect(s?.kind).toBe('cli')
-    expect(s?.name).toBe('think-for-me')
-  })
-
-  it('keeps anything else under skills/ rather than hiding it', () => {
-    // A list that silently omits files disagrees with the directory it claims
-    // to show, and the person is the one who put them there.
-    const s = skillFromPath('skills/index.json', 900)
-    expect(s?.kind).toBe('other')
-    expect(s?.name).toBe('index.json')
-  })
-
-  it('ignores paths outside skills/', () => {
-    expect(skillFromPath('distilled/note.md')).toBeNull()
-    expect(skillFromPath('sessions/x.md')).toBeNull()
+  it('survives a server that answers with nothing useful', () => {
+    // Anything but a crash: an empty list is a screen the user can act on.
+    for (const junk of [null, undefined, {}, { own: {} }, { cli: {} }]) {
+      const s = summaryFromResponse(junk)
+      expect(s.own).toEqual([])
+      expect(s.categories).toEqual([])
+      expect(s.cliCount).toBe(0)
+    }
   })
 })
 
-describe('skillsFromManifest', () => {
-  const manifest = [
-    { path: 'distilled/2026-09-01_note.md', size: 10 },
-    { path: 'skills/cli/build-our-way/SKILL.md', size: 20 },
-    { path: 'skills/brain/zebra.md', size: 30 },
-    { path: 'skills/brain/alpha.md', size: 40 },
-    { path: 'skills/index.json', size: 50 },
-  ]
-
-  it('takes only the skills', () => {
-    expect(skillsFromManifest(manifest).map((s) => s.name)).toEqual([
-      'alpha',
-      'zebra',
-      'build-our-way',
-      'index.json',
-    ])
+describe('rowsFromResponse', () => {
+  it('gives every row the path its editor will write back to', () => {
+    const r = rowsFromResponse({
+      total: 2,
+      nextOffset: 100,
+      skills: [
+        { kind: 'cli', name: 'nmap-recon', category: 'cyber-mukul', description: 'd' },
+        { kind: 'own', name: 'build-our-way' },
+      ],
+    })
+    expect(r.rows[0].path).toBe('cli/cyber-mukul/nmap-recon/SKILL.md')
+    expect(r.rows[1].path).toBe('brain/build-our-way.md')
+    expect(r.nextOffset).toBe(100)
   })
 
-  it('groups by kind, then sorts by name', () => {
-    // 772 files in one flat alphabetical run is a wall, not a list.
-    const kinds = skillsFromManifest(manifest).map((s) => s.kind)
-    expect(kinds).toEqual(['brain', 'brain', 'cli', 'other'])
+  it('falls back to the row count when the server omits a total', () => {
+    expect(rowsFromResponse({ skills: [{ kind: 'cli', name: 'x' }] }).total).toBe(1)
   })
 
-  it('survives a manifest that is not a list, or holds rubbish', () => {
-    expect(skillsFromManifest(null)).toEqual([])
-    expect(skillsFromManifest('nope')).toEqual([])
-    expect(skillsFromManifest([null, 42, {}, { path: 5 }])).toEqual([])
-  })
-
-  it('defaults a missing size to zero rather than printing undefined', () => {
-    expect(skillsFromManifest([{ path: 'skills/brain/x.md' }])[0].size).toBe(0)
+  it('drops a row with no usable name rather than rendering a blank one', () => {
+    expect(rowsFromResponse({ skills: [{ kind: 'cli' }, { kind: 'cli', name: 'x' }] }).rows).toHaveLength(1)
   })
 })
 
-describe('isSafeSkillPath', () => {
-  it('accepts a path inside skills/', () => {
-    expect(isSafeSkillPath('skills/brain/x.md')).toBe(true)
-    expect(isSafeSkillPath('skills/cli/y/SKILL.md')).toBe(true)
+describe('promptsFromResponse', () => {
+  it('keeps the argument signature and sorts by name', () => {
+    const p = promptsFromResponse({
+      prompts: [
+        { name: 'zglos-blad', arguments: [{ name: 'objaw', required: true }], size: 480 },
+        { name: 'audyt', description: 'A', arguments: [] },
+      ],
+    })
+    expect(p.map((x) => x.name)).toEqual(['audyt', 'zglos-blad'])
+    expect(p[1].arguments).toEqual([{ name: 'objaw', description: undefined, required: true }])
   })
 
-  it('refuses anything that climbs out', () => {
-    // This value decides what gets overwritten on someone else's machine.
-    expect(isSafeSkillPath('skills/../distilled/note.md')).toBe(false)
-    expect(isSafeSkillPath('skills/./x.md')).toBe(false)
-    expect(isSafeSkillPath('../skills/x.md')).toBe(false)
+  it('treats a missing required flag as optional rather than guessing', () => {
+    const p = promptsFromResponse({ prompts: [{ name: 'x', arguments: [{ name: 'a' }] }] })
+    expect(p[0].arguments[0].required).toBe(false)
   })
 
-  it('refuses paths outside skills/ and backslash paths', () => {
-    expect(isSafeSkillPath('distilled/note.md')).toBe(false)
-    expect(isSafeSkillPath('skills\\brain\\x.md')).toBe(false)
-    expect(isSafeSkillPath('')).toBe(false)
-  })
-
-  it('refuses an empty segment, which resolves to the directory itself', () => {
-    expect(isSafeSkillPath('skills//x.md')).toBe(false)
-    expect(isSafeSkillPath('skills/')).toBe(false)
+  it('survives junk', () => {
+    expect(promptsFromResponse(null)).toEqual([])
+    expect(promptsFromResponse({ prompts: [{}, 'x'] })).toEqual([])
   })
 })

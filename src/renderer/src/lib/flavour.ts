@@ -43,11 +43,13 @@ export const isMini = FLAVOUR === 'mini'
  *
  * `connect` is the reason it exists, and being first makes it the fallback for
  * a route inherited from a full install. `settings` carries the server address
- * and the token. `import` is how material reaches a memory Mini does not hold —
- * it parses here and sends to the server, the only sink it has — and it sits
- * last because it is the occasional errand, not the daily screen.
+ * and the token. `skills` and `prompts` are the two libraries that live on that
+ * server — Mini reaches them over the admin API rather than holding a copy.
+ * `import` is how material reaches a memory Mini does not hold — it parses here
+ * and sends to the server, the only sink it has — and it sits last because it
+ * is the occasional errand, not the daily screen.
  *
  * The sidebar follows this order, rather than the full app's, so the reason
  * Mini exists is at the top of it.
  */
-export const MINI_ROUTES = ['connect', 'settings', 'skills', 'import'] as const
+export const MINI_ROUTES = ['connect', 'settings', 'skills', 'prompts', 'import'] as const

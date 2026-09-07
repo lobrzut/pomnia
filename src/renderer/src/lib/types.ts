@@ -33,11 +33,28 @@ export interface VaultStatus {
 export interface LocalSkillEntry {
   kind: 'own' | 'imported'
   name: string
+  /** The `cli/<category>/` folder, when the package sits in one. */
+  category?: string
   description: string
   path: string
   folderPath: string
   sizeBytes: number
   mtimeMs: number
+}
+
+export interface LocalPromptEntry {
+  name: string
+  description: string
+  arguments: { name: string; required: boolean }[]
+  path: string
+  folderPath: string
+  sizeBytes: number
+  mtimeMs: number
+}
+
+export interface PromptsListResult {
+  promptsRoot: string | null
+  prompts: LocalPromptEntry[]
 }
 
 export interface SkillsListResult {

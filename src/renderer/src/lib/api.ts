@@ -2,6 +2,11 @@
 // Copyright (C) 2026 Pomnia
 import { DEFAULT_HANDSHAKE_PHRASE } from '@core/handshakePhrase'
 import type {
+  RemotePrompt,
+  RemoteSkillRow,
+  RemoteSkillsSummary,
+} from '@core/brain/remoteSkills'
+import type {
   ActivityState,
   LastActivityReplay,
   BackupProgressEvent,
@@ -32,6 +37,7 @@ import type {
   TextHit,
   VaultStatus,
   SkillsListResult,
+  PromptsListResult,
 } from './types'
 
 export type ProfilePreviewStatus = 'ok' | 'vault_locked' | 'brain_down' | 'no_knowledge'
@@ -89,6 +95,9 @@ export interface PomniaBridge {
   docRemove(docId: string): Promise<LibraryDocRemoveResult>
   brainExport(snapshotId: string, outDir: string): Promise<{ count: number; dir: string }>
   skillsList(): Promise<SkillsListResult>
+  /** The prompt library in this vault — the local sibling of skillsList. */
+  promptsList(): Promise<PromptsListResult>
+  promptsCreate(name: string): Promise<{ ok: true; path: string } | { ok: false; error: string }>
   skillsReveal(target: string, mode?: 'file' | 'folder'): Promise<{ ok: boolean; error: string | null }>
   /** Open the app install folder (optional AV last-resort paths). */
   revealInstallDir(): Promise<{ ok: boolean; path: string; error: string | null }>
@@ -245,18 +254,34 @@ export interface PomniaBridge {
     detail?: string
   }>
   /**
-   * Skills that live on the server, over the replication endpoints. The admin
-   * token never leaves main; the renderer sends a path and gets text back.
+   * Skills and prompts that live on the server. The admin token never leaves
+   * main; the renderer sends a name or a path and gets text back.
+   *
+   * The list arrives as a summary — own skills in full, cli as categories with
+   * counts — because the full catalogue is over a thousand entries. Pick a
+   * category or type a query to see the skills themselves.
    */
-  skillsRemoteList(): Promise<
-    | { skills: { path: string; kind: 'brain' | 'cli' | 'other'; name: string; size: number }[] }
-    | { error: string; detail: string }
+  skillsRemoteList(): Promise<RemoteSkillsSummary | { error: string; detail: string }>
+  skillsRemoteListIn(opts: {
+    category?: string
+    query?: string
+    offset?: number
+  }): Promise<
+    { rows: RemoteSkillRow[]; total: number; nextOffset?: number } | { error: string; detail: string }
   >
   skillsRemoteRead(path: string): Promise<{ path: string; content: string } | { error: string; detail: string }>
   skillsRemoteWrite(
     path: string,
     content: string,
   ): Promise<{ path: string; unchanged: boolean } | { error: string; detail: string }>
+  promptsRemoteList(): Promise<{ prompts: RemotePrompt[] } | { error: string; detail: string }>
+  promptsRemoteRead(name: string): Promise<{ name: string; content: string } | { error: string; detail: string }>
+  promptsRemoteWrite(
+    name: string,
+    content: string,
+  ): Promise<
+    { name: string; unchanged: boolean; created: boolean } | { error: string; detail: string }
+  >
   miniIngestState(): Promise<{
     staged: number
     bytes: number
@@ -638,6 +663,28 @@ function mockBridge(): PomniaBridge {
     async brainExport(_id, dir) {
       return { count: 38, dir }
     },
+    async promptsList() {
+      return {
+        promptsRoot: 'C:/Vault/prompts',
+        prompts: [
+          {
+            name: 'zglos-blad',
+            description: 'Zamień luźne objawy w zgłoszenie',
+            arguments: [
+              { name: 'objaw', required: true },
+              { name: 'kiedy', required: false },
+            ],
+            path: 'C:/Vault/prompts/zglos-blad.md',
+            folderPath: 'C:/Vault/prompts',
+            sizeBytes: 480,
+            mtimeMs: Date.now() - 3600e3,
+          },
+        ],
+      }
+    },
+    async promptsCreate(name: string) {
+      return { ok: true as const, path: `C:/Vault/prompts/${name}.md` }
+    },
     async skillsList() {
       return {
         skillsRoot: 'C:/Vault/skills',
@@ -949,11 +996,31 @@ function mockBridge(): PomniaBridge {
     async skillsRemoteList() {
       await new Promise((r) => setTimeout(r, 300))
       return {
-        skills: [
-          { path: 'skills/brain/bug-recon.md', kind: 'brain' as const, name: 'bug-recon', size: 1767 },
-          { path: 'skills/brain/build-our-way.md', kind: 'brain' as const, name: 'build-our-way', size: 10027 },
-          { path: 'skills/cli/think-for-me/SKILL.md', kind: 'cli' as const, name: 'think-for-me', size: 4200 },
+        own: [
+          { path: 'brain/bug-recon.md', kind: 'own' as const, name: 'bug-recon', description: 'Recon przed zgłoszeniem' },
+          { path: 'brain/build-our-way.md', kind: 'own' as const, name: 'build-our-way', description: 'Jak tu budujemy' },
         ],
+        categories: [
+          { category: 'cyber-mukul', count: 817 },
+          { category: 'general', count: 199 },
+          { category: 'trading', count: 84 },
+        ],
+        cliCount: 1100,
+      }
+    },
+    async skillsRemoteListIn(opts) {
+      await new Promise((r) => setTimeout(r, 250))
+      return {
+        rows: [
+          {
+            path: `cli/${opts.category ?? 'general'}/think-for-me/SKILL.md`,
+            kind: 'cli' as const,
+            name: 'think-for-me',
+            category: opts.category,
+            description: 'Przykładowy pakiet ekspertyzy.',
+          },
+        ],
+        total: 1,
       }
     },
     async skillsRemoteRead(path) {
@@ -965,6 +1032,34 @@ Przykładowa treść skilla.` }
     async skillsRemoteWrite(path) {
       await new Promise((r) => setTimeout(r, 400))
       return { path, unchanged: false }
+    },
+    async promptsRemoteList() {
+      await new Promise((r) => setTimeout(r, 250))
+      return {
+        prompts: [
+          {
+            name: 'zglos-blad',
+            description: 'Zamień luźne objawy w zgłoszenie',
+            arguments: [
+              { name: 'objaw', description: 'Co widziałeś', required: true },
+              { name: 'kiedy', required: false },
+            ],
+            size: 480,
+          },
+        ],
+      }
+    },
+    async promptsRemoteRead(name) {
+      await new Promise((r) => setTimeout(r, 200))
+      return { name, content: `---
+description: Przykład
+---
+Treść z {{argumentem}}.
+` }
+    },
+    async promptsRemoteWrite(name) {
+      await new Promise((r) => setTimeout(r, 350))
+      return { name, unchanged: false, created: false }
     },
     async miniIngestState() {
       return { staged: 0, bytes: 0, etaSeconds: null, rateSamples: 0 }
