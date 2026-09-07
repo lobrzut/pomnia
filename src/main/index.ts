@@ -72,6 +72,8 @@ import { pushStagedNotes } from '@core/brain/miniIngest.js'
 import { estimateSeconds, recordUpload } from '@core/brain/uploadEstimate.js'
 import { clearStaging, ingestFiles, stagedCount, stagedStats, stagingRoot } from './miniIngest.js'
 import {
+  deleteRemotePrompt,
+  deleteRemoteSkill,
   listRemotePrompts,
   listRemoteSkills,
   listRemoteSkillsIn,
@@ -165,7 +167,7 @@ import {
   listLocalSkillsAt,
   writeSkillsIndexAt,
 } from './skillsScan.js'
-import { createLocalPrompt, listLocalPromptsAt } from './promptsScan.js'
+import { createLocalPrompt, deleteLocalPrompt, listLocalPromptsAt } from './promptsScan.js'
 import {
   brainProcessFailedMessage,
   missingEmbedModelMessage,
@@ -851,6 +853,11 @@ description:
     } catch (e) {
       return { ok: false, error: (e as Error).message }
     }
+  })
+
+  ipcMain.handle('prompts:delete', async (_e, name: string) => {
+    if (!vault || !vaultPath) return { ok: false, error: 'no vault' }
+    return deleteLocalPrompt(brainVaultRoot(vaultPath), String(name ?? '').trim())
   })
 
   ipcMain.handle('skills:reveal', async (_e, target: string, mode: 'file' | 'folder' = 'file') => {
@@ -2285,6 +2292,16 @@ description:
   ipcMain.handle('skills:remoteWrite', async (_e, path: string, content: string) => {
     const a = skillsAuth()
     return writeRemoteSkill(String(path ?? ''), String(content ?? ''), a.url, a.token)
+  })
+
+  ipcMain.handle('skills:remoteDelete', async (_e, path: string) => {
+    const a = skillsAuth()
+    return deleteRemoteSkill(String(path ?? ''), a.url, a.token)
+  })
+
+  ipcMain.handle('prompts:remoteDelete', async (_e, name: string) => {
+    const a = skillsAuth()
+    return deleteRemotePrompt(String(name ?? ''), a.url, a.token)
   })
 
   ipcMain.handle('prompts:remoteList', async () => {

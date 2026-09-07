@@ -546,6 +546,12 @@ export interface UiLabels {
   tokenStatusUnreachable: string
   tokenStatusMissing: string
   tokenRecheck: string
+  rowDelete: string
+  rowDeleteConfirm: string
+  rowEdit: string
+  skillDeleted: (name: string) => string
+  promptDeleted: (name: string) => string
+  skillsCategorySection: (category: string) => string
   ingestTitle: string
   ingestLead: string
   ingestPick: string
@@ -1485,6 +1491,12 @@ const PL_LABELS: UiLabels = {
   tokenStatusUnreachable: 'Nie dostałem odpowiedzi z serwera — nie wiem, czy token jest dobry.',
   tokenStatusMissing: 'Nie ma zapisanego tokena admina.',
   tokenRecheck: 'Sprawdź ponownie',
+  rowDelete: 'Usuń',
+  rowDeleteConfirm: 'Na pewno?',
+  rowEdit: 'Edytuj',
+  skillDeleted: (name) => `Usunięto skill: ${name}`,
+  promptDeleted: (name) => `Usunięto prompt: ${name}`,
+  skillsCategorySection: (category) => `KATEGORIA: ${category.toUpperCase()}`,
   ingestTitle: 'Do Pomnia',
   ingestLead: 'Wrzuć pliki — Pomnia rozpozna, co to jest, i wyśle na serwer.',
   ingestPick: 'Wybierz pliki',
@@ -2486,6 +2498,12 @@ const EN_LABELS: UiLabels = {
   tokenStatusUnreachable: 'No answer from the server — cannot tell whether the token is good.',
   tokenStatusMissing: 'No admin token stored.',
   tokenRecheck: 'Check again',
+  rowDelete: 'Delete',
+  rowDeleteConfirm: 'Sure?',
+  rowEdit: 'Edit',
+  skillDeleted: (name) => `Deleted skill: ${name}`,
+  promptDeleted: (name) => `Deleted prompt: ${name}`,
+  skillsCategorySection: (category) => `CATEGORY: ${category.toUpperCase()}`,
   ingestTitle: 'To Pomnia',
   ingestLead: 'Drop files in — Pomnia works out what they are and sends them to the server.',
   ingestPick: 'Choose files',

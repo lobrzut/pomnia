@@ -17,56 +17,51 @@ import { useEffect, useState } from 'react'
 import { FileText, FolderOpen, MessageSquareQuote, Plus } from 'lucide-react'
 
 import { Button, GlassCard, Spinner } from '../components/ui'
+import { ListRow, ListSection } from '../components/EntityList'
 import { relativeTime } from '../lib/format'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import type { LocalPromptEntry } from '../lib/types'
 import { useStore } from '../store/useStore'
 
+/** The argument signature, which is the one thing a file browser would not show. */
+function signature(prompt: LocalPromptEntry, labels: ReturnType<typeof uiLabels>): string {
+  if (prompt.arguments.length === 0) return labels.promptsNoArgs
+  return `${labels.promptsArgsLabel} ${prompt.arguments
+    .map((a) => (a.required ? `${a.name}*` : a.name))
+    .join(', ')}`
+}
+
 function PromptRow({
   prompt,
   labels,
+  onDelete,
 }: {
   prompt: LocalPromptEntry
   labels: ReturnType<typeof uiLabels>
+  onDelete: () => void
 }) {
   return (
-    <div className="flex items-start gap-3 border-b border-white/5 px-3 py-2.5 last:border-0">
-      <div className="min-w-0 flex-1">
-        <div className="truncate font-mono text-sm font-semibold text-ink">/{prompt.name}</div>
-        <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-ink-dim">
-          {prompt.description || '—'}
-        </p>
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0 text-[10px] text-ink-faint">
-          <span>
-            {prompt.arguments.length === 0
-              ? labels.promptsNoArgs
-              : `${labels.promptsArgsLabel} ${prompt.arguments
-                  .map((a) => (a.required ? `${a.name}*` : a.name))
-                  .join(', ')}`}
-          </span>
-          <span>{relativeTime(new Date(prompt.mtimeMs).toISOString())}</span>
-        </div>
-      </div>
-      <div className="flex shrink-0 flex-col gap-1">
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-iris hover:bg-white/5 hover:text-cyan"
-          onClick={() => void api.skillsReveal(prompt.path, 'file')}
-        >
-          <FileText className="h-3 w-3" />
-          {labels.promptsOpenFile}
-        </button>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-iris hover:bg-white/5 hover:text-cyan"
-          onClick={() => void api.skillsReveal(prompt.folderPath, 'folder')}
-        >
-          <FolderOpen className="h-3 w-3" />
-          {labels.promptsOpenFolder}
-        </button>
-      </div>
-    </div>
+    <ListRow
+      title={`/${prompt.name}`}
+      subtitle={prompt.description}
+      meta={[signature(prompt, labels), relativeTime(new Date(prompt.mtimeMs).toISOString())]}
+      actions={[
+        {
+          label: labels.promptsOpenFile,
+          icon: FileText,
+          onClick: () => void api.skillsReveal(prompt.path, 'file'),
+        },
+        {
+          label: labels.promptsOpenFolder,
+          icon: FolderOpen,
+          onClick: () => void api.skillsReveal(prompt.folderPath, 'folder'),
+        },
+      ]}
+      onDelete={onDelete}
+      deleteLabel={labels.rowDelete}
+      confirmLabel={labels.rowDeleteConfirm}
+    />
   )
 }
 
@@ -94,6 +89,16 @@ export default function Prompts() {
     if (!vault.open) return
     reload()
   }, [vault.open])
+
+  async function remove(name: string) {
+    const r = await api.promptsDelete(name)
+    if (!r.ok) {
+      toast({ kind: 'error', title: labels.promptsNameBad, detail: r.error })
+      return
+    }
+    toast({ kind: 'success', title: labels.promptDeleted(name) })
+    reload()
+  }
 
   async function create() {
     const name = newName.trim()
@@ -153,24 +158,21 @@ export default function Prompts() {
         <p className="mt-2 text-[11px] text-ink-faint">{labels.promptsHowItReaches}</p>
       </GlassCard>
 
-      <GlassCard className="overflow-hidden">
-        {loading ? (
-          <div className="p-5">
-            <Spinner className="h-4 w-4" />
-          </div>
-        ) : prompts.length === 0 ? (
-          <p className="p-5 text-xs text-ink-faint">{labels.promptsEmpty}</p>
-        ) : (
-          <>
-            <p className="border-b border-white/5 px-3 py-2 text-xs text-ink-dim">
-              {labels.promptsCount(prompts.length)}
-            </p>
-            {prompts.map((p) => (
-              <PromptRow key={p.name} prompt={p} labels={labels} />
-            ))}
-          </>
-        )}
-      </GlassCard>
+      {loading ? (
+        <GlassCard className="p-5">
+          <Spinner className="h-4 w-4" />
+        </GlassCard>
+      ) : (
+        <ListSection
+          title={labels.promptsTitle}
+          count={prompts.length}
+          empty={labels.promptsEmpty}
+        >
+          {prompts.map((p) => (
+            <PromptRow key={p.name} prompt={p} labels={labels} onDelete={() => void remove(p.name)} />
+          ))}
+        </ListSection>
+      )}
 
       {root && <p className="mt-3 truncate font-mono text-[10px] text-ink-faint">{root}</p>}
     </div>

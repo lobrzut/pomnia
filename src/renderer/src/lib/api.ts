@@ -98,6 +98,7 @@ export interface PomniaBridge {
   /** The prompt library in this vault — the local sibling of skillsList. */
   promptsList(): Promise<PromptsListResult>
   promptsCreate(name: string): Promise<{ ok: true; path: string } | { ok: false; error: string }>
+  promptsDelete(name: string): Promise<{ ok: boolean; error?: string }>
   skillsReveal(target: string, mode?: 'file' | 'folder'): Promise<{ ok: boolean; error: string | null }>
   /** Open the app install folder (optional AV last-resort paths). */
   revealInstallDir(): Promise<{ ok: boolean; path: string; error: string | null }>
@@ -274,6 +275,8 @@ export interface PomniaBridge {
     path: string,
     content: string,
   ): Promise<{ path: string; unchanged: boolean } | { error: string; detail: string }>
+  skillsRemoteDelete(path: string): Promise<{ path: string } | { error: string; detail: string }>
+  promptsRemoteDelete(name: string): Promise<{ name: string } | { error: string; detail: string }>
   promptsRemoteList(): Promise<{ prompts: RemotePrompt[] } | { error: string; detail: string }>
   promptsRemoteRead(name: string): Promise<{ name: string; content: string } | { error: string; detail: string }>
   promptsRemoteWrite(
@@ -693,6 +696,9 @@ function mockBridge(): PomniaBridge {
     async promptsCreate(name: string) {
       return { ok: true as const, path: `C:/Vault/prompts/${name}.md` }
     },
+    async promptsDelete() {
+      return { ok: true }
+    },
     async skillsList() {
       return {
         skillsRoot: 'C:/Vault/skills',
@@ -1040,6 +1046,14 @@ Przykładowa treść skilla.` }
     async skillsRemoteWrite(path) {
       await new Promise((r) => setTimeout(r, 400))
       return { path, unchanged: false }
+    },
+    async skillsRemoteDelete(path: string) {
+      await new Promise((r) => setTimeout(r, 250))
+      return { path }
+    },
+    async promptsRemoteDelete(name: string) {
+      await new Promise((r) => setTimeout(r, 250))
+      return { name }
     },
     async promptsRemoteList() {
       await new Promise((r) => setTimeout(r, 250))

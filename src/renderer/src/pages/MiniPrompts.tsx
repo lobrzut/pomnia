@@ -20,6 +20,7 @@ import type { RemotePrompt } from '@core/brain/remoteSkills'
 import { isSafePromptName } from '@core/brain/remoteSkills'
 
 import { Button, GlassCard, Spinner } from '../components/ui'
+import { ListRow, ListSection } from '../components/EntityList'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
@@ -96,6 +97,18 @@ export default function MiniPrompts() {
     }
   }
 
+  async function remove(name: string) {
+    const r = await api.promptsRemoteDelete(name)
+    if ('error' in r) {
+      toast({ kind: 'error', title: labels.skillsRemoteReason(r.error), detail: r.detail })
+      return
+    }
+    toast({ kind: 'success', title: labels.promptDeleted(name) })
+    // Close the editor if it was showing the file that just went away.
+    if (open === name) setOpen(null)
+    void load()
+  }
+
   async function create() {
     const name = newName.trim()
     if (!isSafePromptName(name)) {
@@ -151,12 +164,12 @@ export default function MiniPrompts() {
 
       {open ? (
         <GlassCard className="p-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-ink">/{open}</div>
               <div className="truncate text-[11px] text-ink-faint">{labels.promptsHowItReaches}</div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               <Button variant="soft" onClick={() => setOpen(null)}>
                 {labels.skillsBackToList}
               </Button>
@@ -197,40 +210,39 @@ export default function MiniPrompts() {
             </div>
           </GlassCard>
 
-          <GlassCard className="p-5">
-            {prompts === null ? (
+          {prompts === null ? (
+            <GlassCard className="p-5">
               <Spinner className="h-4 w-4" />
-            ) : prompts.length === 0 ? (
-              <p className="text-xs text-ink-faint">{labels.promptsEmpty}</p>
-            ) : (
-              <>
-                <p className="mb-3 text-xs text-ink-dim">{labels.promptsCount(prompts.length)}</p>
-                <div className="max-h-[58vh] space-y-2 overflow-auto">
-                  {prompts.map((p) => (
-                    <button
-                      key={p.name}
-                      onClick={() => void openPrompt(p.name)}
-                      className="no-drag flex w-full flex-col gap-1 rounded-xl border border-white/8 bg-black/20 px-3 py-2 text-left hover:border-white/16"
-                    >
-                      <div className="truncate font-mono text-sm text-ink">/{p.name}</div>
-                      {p.description && (
-                        <div className="line-clamp-2 text-[11px] leading-snug text-ink-dim">
-                          {p.description}
-                        </div>
-                      )}
-                      <div className="text-[10px] text-ink-faint">
-                        {p.arguments.length === 0
-                          ? labels.promptsNoArgs
-                          : `${labels.promptsArgsLabel} ${p.arguments
-                              .map((a) => (a.required ? `${a.name}*` : a.name))
-                              .join(', ')}`}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </GlassCard>
+            </GlassCard>
+          ) : (
+            <div className="max-h-[58vh] overflow-y-auto">
+              <ListSection
+                title={labels.promptsTitle}
+                count={prompts.length}
+                empty={labels.promptsEmpty}
+              >
+                {prompts.map((p) => (
+                  <ListRow
+                    key={p.name}
+                    title={`/${p.name}`}
+                    subtitle={p.description}
+                    meta={[
+                      p.arguments.length === 0
+                        ? labels.promptsNoArgs
+                        : `${labels.promptsArgsLabel} ${p.arguments
+                            .map((a) => (a.required ? `${a.name}*` : a.name))
+                            .join(', ')}`,
+                    ]}
+                    onOpen={() => void openPrompt(p.name)}
+                    actions={[{ label: labels.rowEdit, onClick: () => void openPrompt(p.name) }]}
+                    onDelete={() => void remove(p.name)}
+                    deleteLabel={labels.rowDelete}
+                    confirmLabel={labels.rowDeleteConfirm}
+                  />
+                ))}
+              </ListSection>
+            </div>
+          )}
         </>
       )}
     </div>

@@ -21,6 +21,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import {
+  deletePrompt,
+  deleteSkill,
   listPrompts,
   readPrompt,
   readSkill,
@@ -415,6 +417,17 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
     return libraryResult(r)
   }
 
+  if (path === '/admin/skills/delete' && method === 'POST') {
+    const root = deps.skillsRoot()
+    if (!root) return j(503, { error: 'no_skills_root' })
+    const rel = str(req.body, 'path')
+    const r = deleteSkill(root, rel)
+    // Audited before the reply: a deletion is the one thing here that leaves no
+    // trace of itself in the vault afterwards.
+    if (!('error' in r)) audit(req.actor, `deleted skill ${rel}`)
+    return libraryResult(r)
+  }
+
   if (path === '/admin/prompts' && method === 'POST') {
     const root = deps.vaultRoot()
     if (!root) return j(503, { error: 'no_vault' })
@@ -435,6 +448,15 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
     if (!('error' in r) && !r.unchanged) {
       audit(req.actor, `${r.created ? 'created' : 'edited'} prompt ${name}`)
     }
+    return libraryResult(r)
+  }
+
+  if (path === '/admin/prompts/delete' && method === 'POST') {
+    const root = deps.vaultRoot()
+    if (!root) return j(503, { error: 'no_vault' })
+    const name = str(req.body, 'name')
+    const r = deletePrompt(root, name)
+    if (!('error' in r)) audit(req.actor, `deleted prompt ${name}`)
     return libraryResult(r)
   }
 

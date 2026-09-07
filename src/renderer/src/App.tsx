@@ -186,7 +186,17 @@ export default function App() {
       <TitleBar />
       <div className="relative z-10 flex min-h-0 flex-1">
         <Sidebar />
-        <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-9 pb-3 pt-3">
+        {/* `min-w-0` is load-bearing. A flex item defaults to `min-width: auto`,
+            which means it refuses to shrink below its own content — so on a
+            narrow window main kept its natural width, pushed past the viewport,
+            and the whole app grew a horizontal scrollbar with the buttons on
+            the right edge cut off. Every page inherited the fault; it looked
+            like several pages were broken.
+
+            The padding scales with the window for the same reason: 72px of
+            side padding is comfortable at 1200px and a quarter of the usable
+            width at 630px, which is what a 150% display scale leaves. */}
+        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-4 pb-3 pt-3 sm:px-6 lg:px-9">
           {/* Absolute stack keeps main height stable while pages crossfade — avoids flex collapse / scroll thrash. */}
           <AnimatePresence initial={false}>
             <motion.div

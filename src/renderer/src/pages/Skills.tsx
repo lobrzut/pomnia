@@ -2,55 +2,49 @@
 // Copyright (C) 2026 Pomnia
 import { useEffect, useState } from 'react'
 import { ArrowLeft, FolderOpen, FileText, Wand2 } from 'lucide-react'
-import { Button, GlassCard, Spinner } from '../components/ui'
+import { Button, Spinner } from '../components/ui'
+import { ListRow, ListSection } from '../components/EntityList'
 import { relativeTime } from '../lib/format'
 import { uiLabels } from '../lib/labels'
 import { api } from '../lib/api'
 import type { LocalSkillEntry } from '../lib/types'
 import { useStore } from '../store/useStore'
 
+/**
+ * This page's row layout is the house standard for "a directory of markdown
+ * the user owns" — Mini's skills and both prompt libraries use the same one,
+ * out of components/EntityList, so they cannot drift into three versions of
+ * the same list.
+ */
 function SkillRow({
   skill,
-  openFileLabel,
-  openFolderLabel,
-  sizeLabel,
+  labels,
 }: {
   skill: LocalSkillEntry
-  openFileLabel: string
-  openFolderLabel: string
-  sizeLabel: string
+  labels: ReturnType<typeof uiLabels>
 }) {
   return (
-    <div className="flex items-start gap-3 border-b border-white/5 px-3 py-2.5 last:border-0">
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-ink">{skill.name}</div>
-        <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-ink-dim">
-          {skill.description || '—'}
-        </p>
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0 text-[10px] text-ink-faint">
-          <span>{sizeLabel}</span>
-          <span>{relativeTime(new Date(skill.mtimeMs).toISOString())}</span>
-        </div>
-      </div>
-      <div className="flex shrink-0 flex-col gap-1">
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-iris hover:bg-white/5 hover:text-cyan"
-          onClick={() => void api.skillsReveal(skill.path, 'file')}
-        >
-          <FileText className="h-3 w-3" />
-          {openFileLabel}
-        </button>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-iris hover:bg-white/5 hover:text-cyan"
-          onClick={() => void api.skillsReveal(skill.folderPath, 'folder')}
-        >
-          <FolderOpen className="h-3 w-3" />
-          {openFolderLabel}
-        </button>
-      </div>
-    </div>
+    <ListRow
+      title={skill.name}
+      subtitle={skill.description}
+      meta={[
+        labels.skillsSize(skill.sizeBytes),
+        skill.category,
+        relativeTime(new Date(skill.mtimeMs).toISOString()),
+      ]}
+      actions={[
+        {
+          label: labels.skillsOpenFile,
+          icon: FileText,
+          onClick: () => void api.skillsReveal(skill.path, 'file'),
+        },
+        {
+          label: labels.skillsOpenFolder,
+          icon: FolderOpen,
+          onClick: () => void api.skillsReveal(skill.folderPath, 'folder'),
+        },
+      ]}
+    />
   )
 }
 
@@ -107,43 +101,25 @@ export default function Skills() {
           </div>
         ) : (
           <>
-            <GlassCard className="overflow-hidden p-0">
-              <div className="border-b border-white/5 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">
-                {labels.skillsSectionOwn} · {own.length}
-              </div>
-              {own.length === 0 ? (
-                <p className="px-3 py-4 text-xs text-ink-dim">{labels.skillsEmptyOwn}</p>
-              ) : (
-                own.map((s) => (
-                  <SkillRow
-                    key={`own:${s.name}`}
-                    skill={s}
-                    openFileLabel={labels.skillsOpenFile}
-                    openFolderLabel={labels.skillsOpenFolder}
-                    sizeLabel={labels.skillsSize(s.sizeBytes)}
-                  />
-                ))
-              )}
-            </GlassCard>
+            <ListSection
+              title={labels.skillsSectionOwn}
+              count={own.length}
+              empty={labels.skillsEmptyOwn}
+            >
+              {own.map((s) => (
+                <SkillRow key={`own:${s.name}`} skill={s} labels={labels} />
+              ))}
+            </ListSection>
 
-            <GlassCard className="overflow-hidden p-0">
-              <div className="border-b border-white/5 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">
-                {labels.skillsSectionImported} · {imported.length}
-              </div>
-              {imported.length === 0 ? (
-                <p className="px-3 py-4 text-xs text-ink-dim">{labels.skillsEmptyImported}</p>
-              ) : (
-                imported.map((s) => (
-                  <SkillRow
-                    key={`imported:${s.name}`}
-                    skill={s}
-                    openFileLabel={labels.skillsOpenFile}
-                    openFolderLabel={labels.skillsOpenFolder}
-                    sizeLabel={labels.skillsSize(s.sizeBytes)}
-                  />
-                ))
-              )}
-            </GlassCard>
+            <ListSection
+              title={labels.skillsSectionImported}
+              count={imported.length}
+              empty={labels.skillsEmptyImported}
+            >
+              {imported.map((s) => (
+                <SkillRow key={`imported:${s.category ?? ''}/${s.name}`} skill={s} labels={labels} />
+              ))}
+            </ListSection>
           </>
         )}
       </div>

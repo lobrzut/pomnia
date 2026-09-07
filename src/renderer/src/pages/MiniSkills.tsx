@@ -20,26 +20,10 @@ import { BookOpen, ChevronLeft, RefreshCw, Save, Search } from 'lucide-react'
 import type { RemoteSkillRow, RemoteSkillsSummary } from '@core/brain/remoteSkills'
 
 import { Button, GlassCard, Spinner } from '../components/ui'
+import { ListRow, ListSection } from '../components/EntityList'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
-
-function SkillButton({ skill, onOpen }: { skill: RemoteSkillRow; onOpen: () => void }) {
-  return (
-    <button
-      onClick={onOpen}
-      className="no-drag flex w-full items-start justify-between gap-3 rounded-xl border border-white/8 bg-black/20 px-3 py-2 text-left hover:border-white/16"
-    >
-      <div className="min-w-0">
-        <div className="truncate text-sm text-ink">{skill.name}</div>
-        <div className="line-clamp-2 text-[11px] leading-snug text-ink-faint">
-          {skill.description || skill.path}
-        </div>
-      </div>
-      {skill.category && <span className="shrink-0 text-[11px] text-ink-faint">{skill.category}</span>}
-    </button>
-  )
-}
 
 export default function MiniSkills() {
   const labels = uiLabels()
@@ -147,8 +131,41 @@ export default function MiniSkills() {
     }
   }
 
+  async function remove(s: RemoteSkillRow) {
+    const r = await api.skillsRemoteDelete(s.path)
+    if ('error' in r) {
+      toast({ kind: 'error', title: labels.skillsRemoteReason(r.error), detail: r.detail })
+      return
+    }
+    toast({ kind: 'success', title: labels.skillDeleted(s.name) })
+    if (open?.path === s.path) setOpen(null)
+    // Either view can be showing this row, so both are refreshed.
+    void loadSummary()
+    if (category || query.trim().length >= 2) {
+      const again = await api.skillsRemoteListIn({
+        category: category ?? undefined,
+        query: query.trim() || undefined,
+      })
+      if (!('error' in again)) setRows({ rows: again.rows, total: again.total })
+    }
+  }
+
   const dirty = open !== null && text !== original
   const narrowed = category !== null || query.trim().length >= 2
+
+  /** Defined here rather than at module scope: it closes over openSkill and remove. */
+  const SkillRow = ({ skill }: { skill: RemoteSkillRow }) => (
+    <ListRow
+      title={skill.name}
+      subtitle={skill.description}
+      meta={[skill.category, skill.path]}
+      onOpen={() => void openSkill(skill)}
+      actions={[{ label: labels.rowEdit, onClick: () => void openSkill(skill) }]}
+      onDelete={() => void remove(skill)}
+      deleteLabel={labels.rowDelete}
+      confirmLabel={labels.rowDeleteConfirm}
+    />
+  )
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -180,12 +197,12 @@ export default function MiniSkills() {
 
       {open ? (
         <GlassCard className="p-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-ink">{open.name}</div>
               <div className="truncate font-mono text-[11px] text-ink-faint">{open.path}</div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               <Button variant="soft" onClick={() => setOpen(null)}>
                 {labels.skillsBackToList}
               </Button>
@@ -229,65 +246,53 @@ export default function MiniSkills() {
           </div>
 
           {narrowed ? (
-            <GlassCard className="p-5">
-              {rows === null ? (
+            rows === null ? (
+              <GlassCard className="p-5">
                 <Spinner className="h-4 w-4" />
-              ) : rows.rows.length === 0 ? (
-                <p className="text-xs text-ink-faint">{labels.skillsNoMatch}</p>
-              ) : (
-                <>
-                  <p className="mb-3 text-xs text-ink-dim">
-                    {labels.skillsShowing(rows.rows.length, rows.total)}
-                  </p>
-                  <div className="max-h-[58vh] space-y-2 overflow-auto">
-                    {rows.rows.map((s) => (
-                      <SkillButton key={s.path} skill={s} onOpen={() => void openSkill(s)} />
-                    ))}
-                  </div>
-                </>
-              )}
-            </GlassCard>
+              </GlassCard>
+            ) : (
+              <div className="max-h-[58vh] overflow-y-auto">
+                <ListSection
+                  title={category ? labels.skillsCategorySection(category) : labels.skillsPacksHeading}
+                  count={rows.total}
+                  empty={labels.skillsNoMatch}
+                >
+                  {rows.rows.map((s) => (
+                    <SkillRow key={s.path} skill={s} />
+                  ))}
+                </ListSection>
+              </div>
+            )
           ) : summary === null ? (
             <GlassCard className="p-5">
               <Spinner className="h-4 w-4" />
             </GlassCard>
           ) : (
-            <>
-              <GlassCard className="mb-4 p-5">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-dim">
-                  {labels.skillsOwnHeading}
-                </p>
-                {summary.own.length === 0 ? (
-                  <p className="text-xs text-ink-faint">{labels.skillsEmpty}</p>
-                ) : (
-                  <div className="space-y-2">
-                    {summary.own.map((s) => (
-                      <SkillButton key={s.path} skill={s} onOpen={() => void openSkill(s)} />
-                    ))}
-                  </div>
-                )}
-              </GlassCard>
+            <div className="space-y-3">
+              <ListSection
+                title={labels.skillsOwnHeading}
+                count={summary.own.length}
+                empty={labels.skillsEmpty}
+              >
+                {summary.own.map((s) => (
+                  <SkillRow key={s.path} skill={s} />
+                ))}
+              </ListSection>
 
-              <GlassCard className="p-5">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-dim">
-                  {labels.skillsPacksHeading} · {labels.skillsCount(summary.cliCount)}
-                </p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {summary.categories.map((c) => (
-                    <button
-                      key={c.category}
-                      onClick={() => setCategory(c.category)}
-                      className="no-drag flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 px-3 py-2 text-left hover:border-white/16"
-                    >
-                      <span className="truncate text-sm text-ink">{c.category}</span>
-                      <span className="shrink-0 text-[11px] text-ink-faint">
-                        {labels.skillsCategoryCount(c.count)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </GlassCard>
-            </>
+              {/* Categories are navigation, not files: no edit, and nothing to
+                  delete — removing a category would mean removing every skill
+                  inside it, which is not a thing to offer behind one button. */}
+              <ListSection title={labels.skillsPacksHeading} count={summary.cliCount}>
+                {summary.categories.map((c) => (
+                  <ListRow
+                    key={c.category}
+                    title={c.category}
+                    subtitle={labels.skillsCategoryCount(c.count)}
+                    onOpen={() => setCategory(c.category)}
+                  />
+                ))}
+              </ListSection>
+            </div>
           )}
         </>
       )}

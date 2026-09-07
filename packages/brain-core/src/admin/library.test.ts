@@ -5,6 +5,8 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  deletePrompt,
+  deleteSkill,
   isSafePromptName,
   isSafeSkillRel,
   listPrompts,
@@ -88,6 +90,54 @@ describe('skills', () => {
   it('will not create a skill that does not exist', () => {
     expect(writeSkill(skills, 'brain/invented.md', 'x')).toMatchObject({ error: 'not-found' })
     expect(existsSync(join(skills, 'brain', 'invented.md'))).toBe(false)
+  })
+})
+
+describe('deleteSkill', () => {
+  it('removes a brain skill file', () => {
+    expect(deleteSkill(skills, 'brain/build-our-way.md')).toMatchObject({ path: 'brain/build-our-way.md' })
+    expect(existsSync(join(skills, 'brain', 'build-our-way.md'))).toBe(false)
+    // The folder the file lived in is shared with every other brain skill.
+    expect(existsSync(join(skills, 'brain'))).toBe(true)
+  })
+
+  it('removes the whole package directory for a cli skill', () => {
+    // A cli skill is its directory. Deleting only SKILL.md would leave a folder
+    // that no longer lists as a skill and that nothing can reach to clean up.
+    writeFileSync(join(skills, 'cli', 'cyber', 'nmap-recon', 'notes.md'), 'extra\n')
+    expect(deleteSkill(skills, 'cli/cyber/nmap-recon/SKILL.md')).toMatchObject({
+      path: 'cli/cyber/nmap-recon/SKILL.md',
+    })
+    expect(existsSync(join(skills, 'cli', 'cyber', 'nmap-recon'))).toBe(false)
+    // The category survives — it holds other packages.
+    expect(existsSync(join(skills, 'cli', 'cyber'))).toBe(true)
+  })
+
+  it('refuses a path that could delete something else', () => {
+    for (const bad of ['../../etc', 'cli/cyber', 'cli', 'brain', 'sessions/a.md', '']) {
+      expect(deleteSkill(skills, bad), bad).toMatchObject({ error: 'bad-path' })
+    }
+    expect(existsSync(join(skills, 'cli', 'cyber'))).toBe(true)
+    expect(existsSync(join(skills, 'brain'))).toBe(true)
+  })
+
+  it('says not-found instead of reporting a success that removed nothing', () => {
+    expect(deleteSkill(skills, 'brain/never-existed.md')).toMatchObject({ error: 'not-found' })
+  })
+})
+
+describe('deletePrompt', () => {
+  it('removes the file', () => {
+    expect(deletePrompt(vault, 'zglos-blad')).toMatchObject({ name: 'zglos-blad' })
+    expect(listPrompts(vault)).toEqual([])
+  })
+
+  it('refuses a name that points outside the library', () => {
+    expect(deletePrompt(vault, '../USER')).toMatchObject({ error: 'bad-path' })
+  })
+
+  it('says not-found for a prompt that is not there', () => {
+    expect(deletePrompt(vault, 'nieistniejacy')).toMatchObject({ error: 'not-found' })
   })
 })
 

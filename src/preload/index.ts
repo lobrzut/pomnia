@@ -43,6 +43,7 @@ const bridge = {
   skillsList: () => ipcRenderer.invoke('skills:list'),
   promptsList: () => ipcRenderer.invoke('prompts:list'),
   promptsCreate: (name: string) => ipcRenderer.invoke('prompts:create', name),
+  promptsDelete: (name: string) => ipcRenderer.invoke('prompts:delete', name),
   skillsReveal: (target: string, mode?: 'file' | 'folder') =>
     ipcRenderer.invoke('skills:reveal', target, mode ?? 'file'),
   revealInstallDir: () => ipcRenderer.invoke('reveal:installDir'),
@@ -139,6 +140,8 @@ const bridge = {
   skillsRemoteWrite: (path: string, content: string) =>
     ipcRenderer.invoke('skills:remoteWrite', path, content),
   promptsRemoteList: () => ipcRenderer.invoke('prompts:remoteList'),
+  skillsRemoteDelete: (path: string) => ipcRenderer.invoke('skills:remoteDelete', path),
+  promptsRemoteDelete: (name: string) => ipcRenderer.invoke('prompts:remoteDelete', name),
   promptsRemoteRead: (name: string) => ipcRenderer.invoke('prompts:remoteRead', name),
   promptsRemoteWrite: (name: string, content: string) =>
     ipcRenderer.invoke('prompts:remoteWrite', name, content),

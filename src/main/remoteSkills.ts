@@ -152,6 +152,22 @@ export async function writeRemoteSkill(
   }
 }
 
+export async function deleteRemoteSkill(
+  path: string,
+  url?: string,
+  token?: string,
+): Promise<LibraryResult<{ path: string }>> {
+  const bad = guard(url, token)
+  if (bad) return bad
+  if (!isSafeSkillRel(path)) return { error: 'unsafe-path', detail: path }
+  try {
+    await post(url!, '/admin/skills/delete', token!.trim(), { path })
+    return { path }
+  } catch (e) {
+    return reason(e)
+  }
+}
+
 export async function listRemotePrompts(
   url?: string,
   token?: string,
@@ -196,6 +212,22 @@ export async function writeRemotePrompt(
       created?: boolean
     }
     return { name, unchanged: r?.unchanged === true, created: r?.created === true }
+  } catch (e) {
+    return reason(e)
+  }
+}
+
+export async function deleteRemotePrompt(
+  name: string,
+  url?: string,
+  token?: string,
+): Promise<LibraryResult<{ name: string }>> {
+  const bad = guard(url, token)
+  if (bad) return bad
+  if (!isSafePromptName(name)) return { error: 'unsafe-path', detail: name }
+  try {
+    await post(url!, '/admin/prompts/delete', token!.trim(), { name })
+    return { name }
   } catch (e) {
     return reason(e)
   }

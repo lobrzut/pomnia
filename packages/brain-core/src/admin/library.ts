@@ -21,8 +21,8 @@
  * normalised — normalising an escape attempt turns it into a successful write
  * somewhere unexpected.
  */
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
 import { loadPrompts, PROMPTS_DIR, type PromptArgument } from '../mcp/prompts.js'
 
@@ -108,6 +108,54 @@ export function writeSkill(
   if (!existsSync(file)) return { error: 'not-found', detail: rel }
   const r = writeText(file, content)
   return 'error' in r ? r : { path: rel, unchanged: r.unchanged }
+}
+
+/**
+ * Remove a skill.
+ *
+ * A `brain/` skill is one file. A `cli/` skill is a *directory* — SKILL.md
+ * plus whatever the package brought with it — so deleting only SKILL.md would
+ * leave a folder that no longer lists as a skill and that nothing can reach or
+ * clean up. The directory goes.
+ *
+ * Guarded twice on purpose: the path passes the same validator as a read, and
+ * then the directory being removed must be the immediate parent of a SKILL.md
+ * under `cli/`. A recursive delete is the one operation here where being
+ * approximately right is not good enough.
+ */
+export function deleteSkill(skillsRoot: string, rel: string): { path: string } | LibraryError {
+  if (!isSafeSkillRel(rel)) return { error: 'bad-path', detail: rel }
+  const file = join(skillsRoot, rel)
+  if (!existsSync(file)) return { error: 'not-found', detail: rel }
+  try {
+    const parts = rel.split('/')
+    if (parts[0] === 'brain') {
+      rmSync(file)
+      return { path: rel }
+    }
+    const dir = dirname(file)
+    // Never the category folder, never `cli/` itself: only the skill's own
+    // directory, which is the one holding the SKILL.md we just validated.
+    if (parts.length < 3 || parts[parts.length - 1] !== 'SKILL.md') {
+      return { error: 'bad-path', detail: rel }
+    }
+    rmSync(dir, { recursive: true, force: true })
+    return { path: rel }
+  } catch (e) {
+    return { error: 'failed', detail: (e as Error).message }
+  }
+}
+
+export function deletePrompt(vaultRoot: string, name: string): { name: string } | LibraryError {
+  if (!isSafePromptName(name)) return { error: 'bad-path', detail: name }
+  const file = join(vaultRoot, PROMPTS_DIR, `${name}.md`)
+  if (!existsSync(file)) return { error: 'not-found', detail: name }
+  try {
+    rmSync(file)
+    return { name }
+  } catch (e) {
+    return { error: 'failed', detail: (e as Error).message }
+  }
 }
 
 export interface PromptSummary {

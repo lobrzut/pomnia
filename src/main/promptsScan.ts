@@ -15,7 +15,7 @@
  * shows up as a missing description, never as a prompt that renders one way
  * here and another way in the agent.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
 export interface LocalPromptEntry {
@@ -146,4 +146,19 @@ export function createLocalPrompt(vaultRoot: string, name: string, content: stri
   const file = join(dir, `${name}.md`)
   if (!existsSync(file)) writeFileSync(file, content, 'utf8')
   return file
+}
+
+/** Remove one prompt. The name is a stem, never a path — same rule as creating. */
+export function deleteLocalPrompt(vaultRoot: string, name: string): { ok: boolean; error?: string } {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name.endsWith('.md')) {
+    return { ok: false, error: 'bad name' }
+  }
+  const file = join(vaultRoot, 'prompts', `${name}.md`)
+  if (!existsSync(file)) return { ok: false, error: 'not found' }
+  try {
+    rmSync(file)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
 }
