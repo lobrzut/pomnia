@@ -28,6 +28,7 @@ import { promises as fs } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
 
 import { atomicWrite } from '../archive/durableWrite.js'
+import { resolveSafeVaultAbs } from '../storage/safeFs.js'
 import { withStoreLock } from '../storage/storeLock.js'
 import { DISTILL_LEDGER_REL, MAX_FILE_BYTES, safeVaultPath, type PathRejection } from './paths.js'
 import { mergeDistillLedgerBytes } from './ledgerMerge.js'
@@ -175,7 +176,7 @@ export type ApplyResult =
   | {
       ok: false
       path: string
-      reason: PathRejection | 'too-large' | 'hash-mismatch' | 'write-failed'
+      reason: PathRejection | 'too-large' | 'hash-mismatch' | 'write-failed' | 'path-escape'
       detail?: string
     }
 
@@ -184,7 +185,7 @@ export type ReadSyncResult =
   | {
       ok: false
       path: string
-      reason: PathRejection | 'not-found' | 'too-large' | 'read-failed'
+      reason: PathRejection | 'not-found' | 'too-large' | 'read-failed' | 'path-escape'
       detail?: string
     }
 
@@ -266,8 +267,17 @@ export async function readSyncFile(opts: {
 }): Promise<ReadSyncResult> {
   const verdict = safeVaultPath(opts.path)
   if (!verdict.ok) return { ok: false, path: opts.path, reason: verdict.reason }
+  const safe = await resolveSafeVaultAbs(opts.vaultRoot, verdict.relative)
+  if (!safe.ok) {
+    return {
+      ok: false,
+      path: verdict.relative,
+      reason: 'path-escape',
+      detail: safe.detail ?? safe.reason,
+    }
+  }
   try {
-    const content = await fs.readFile(join(opts.vaultRoot, verdict.relative))
+    const content = await fs.readFile(safe.abs)
     if (content.length > MAX_FILE_BYTES) {
       return { ok: false, path: verdict.relative, reason: 'too-large' }
     }
@@ -321,14 +331,23 @@ export async function applyFile(opts: {
   return withStoreLock(syncPathLockKey(opts.vaultRoot, verdict.relative), async () => {
     if (verdict.relative === DISTILL_LEDGER_REL) {
       try {
+        const safeLedger = await resolveSafeVaultAbs(opts.vaultRoot, DISTILL_LEDGER_REL)
+        if (!safeLedger.ok) {
+          return {
+            ok: false,
+            path: DISTILL_LEDGER_REL,
+            reason: 'path-escape',
+            detail: safeLedger.detail ?? safeLedger.reason,
+          }
+        }
         let localBuf: Buffer | null = null
         try {
-          localBuf = await fs.readFile(join(opts.vaultRoot, DISTILL_LEDGER_REL))
+          localBuf = await fs.readFile(safeLedger.abs)
         } catch {
           localBuf = null
         }
         const merged = mergeDistillLedgerBytes(localBuf, opts.content)
-        await writeAtomic(join(opts.vaultRoot, DISTILL_LEDGER_REL), merged)
+        await writeAtomic(safeLedger.abs, merged)
         return {
           ok: true,
           path: DISTILL_LEDGER_REL,
@@ -346,7 +365,16 @@ export async function applyFile(opts: {
       }
     }
 
-    const abs = join(opts.vaultRoot, verdict.relative)
+    const safe = await resolveSafeVaultAbs(opts.vaultRoot, verdict.relative)
+    if (!safe.ok) {
+      return {
+        ok: false,
+        path: verdict.relative,
+        reason: 'path-escape',
+        detail: safe.detail ?? safe.reason,
+      }
+    }
+    const abs = safe.abs
     try {
       // Conflict / free-name decisions happen under the lock so two writers
       // cannot pick the same suffix or rename over the same `.sync-tmp`.
@@ -380,7 +408,16 @@ export async function applyFile(opts: {
             detail: `conflict path refused: ${altVerdict.reason}`,
           }
         }
-        await writeAtomic(join(opts.vaultRoot, alt), opts.content)
+        const safeAlt = await resolveSafeVaultAbs(opts.vaultRoot, alt)
+        if (!safeAlt.ok) {
+          return {
+            ok: false,
+            path: verdict.relative,
+            reason: 'path-escape',
+            detail: safeAlt.detail ?? safeAlt.reason,
+          }
+        }
+        await writeAtomic(safeAlt.abs, opts.content)
         return {
           ok: true,
           path: alt,

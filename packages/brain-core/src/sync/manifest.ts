@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 
+import { resolveSafeVaultAbs } from '../storage/safeFs.js'
 import { MAX_FILE_BYTES, SYNC_DIRS, SYNC_ROOT_FILES } from './paths.js'
 import type { ManifestEntry } from './receive.js'
 
@@ -39,9 +40,14 @@ export async function buildSyncManifest(vaultRoot: string): Promise<BuildManifes
   const consider = async (abs: string, rel: string): Promise<void> => {
     if (!ALLOWED_EXT.test(rel)) return
     if (MACHINE_STATE_RELS.has(rel)) return
+    const safe = await resolveSafeVaultAbs(vaultRoot, rel)
+    if (!safe.ok) {
+      skipped.push({ path: rel, reason: safe.detail ?? safe.reason })
+      return
+    }
     let stat
     try {
-      stat = await fs.stat(abs)
+      stat = await fs.stat(safe.abs)
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
         skipped.push({ path: rel, reason: (e as Error).message })
@@ -57,7 +63,7 @@ export async function buildSyncManifest(vaultRoot: string): Promise<BuildManifes
     }
     try {
       // Read one file, hash, discard body — do not accumulate content.
-      const body = await fs.readFile(abs)
+      const body = await fs.readFile(safe.abs)
       entries.push({ path: rel, sha256: sha256(body), size: stat.size })
     } catch (e) {
       skipped.push({ path: rel, reason: (e as Error).message })
@@ -65,14 +71,31 @@ export async function buildSyncManifest(vaultRoot: string): Promise<BuildManifes
   }
 
   const walk = async (dirRel: string): Promise<void> => {
+    const safeDir = await resolveSafeVaultAbs(vaultRoot, dirRel)
+    if (!safeDir.ok) {
+      skipped.push({ path: dirRel, reason: safeDir.detail ?? safeDir.reason })
+      return
+    }
     let items
     try {
-      items = await fs.readdir(join(vaultRoot, dirRel), { withFileTypes: true })
+      items = await fs.readdir(safeDir.abs, { withFileTypes: true })
     } catch {
       return
     }
     for (const it of items) {
       const rel = `${dirRel}/${it.name}`
+      // Do not follow a directory symlink/junction out of the vault.
+      if (it.isSymbolicLink()) {
+        const safe = await resolveSafeVaultAbs(vaultRoot, rel)
+        if (!safe.ok) {
+          skipped.push({ path: rel, reason: safe.detail ?? safe.reason })
+          continue
+        }
+        const st = await fs.stat(safe.abs).catch(() => null)
+        if (st?.isDirectory()) await walk(rel)
+        else await consider(safe.abs, rel)
+        continue
+      }
       if (it.isDirectory()) await walk(rel)
       else await consider(join(vaultRoot, rel), rel)
     }
