@@ -99,6 +99,7 @@ import { createAuthGate } from './auth.js'
 import { callTool, listTools, type ToolContext } from './tools/index.js'
 import { loadPrompts, renderPrompt } from './prompts.js'
 import { listResourceTemplates, listResources, readResource } from './resources.js'
+import { VaultFreshness } from './vaultFreshness.js'
 
 /**
  * True when an existing brain-core already holds host:port.
@@ -331,6 +332,10 @@ function createMcpServer(
   mcp.setRequestHandler(ReadResourceRequestSchema, async (req) => {
     const got = readResource(ctx.vaultRoot, req.params.uri)
     if ('error' in got) throw new Error(got.error)
+    // Remember what we handed out and its hash, so a later tool call can warn
+    // the reader if this note changes underneath them.
+    const label = req.params.uri.replace(/^pomnia:\/\//, '')
+    ctx.freshness?.served_(label, got.text)
     return { contents: [got] }
   })
 
@@ -532,6 +537,9 @@ export async function createBrainServer(
          * at once — that call belongs to whoever runs the server, not here.
          */
         reranker: rerankEnabled() ? createReranker({ cacheDir: config.dataDir }) : undefined,
+        // One tracker for the process; see vaultFreshness.ts. Cheap and always
+        // on — it only speaks when a note it served has actually changed.
+        freshness: new VaultFreshness(),
         vaultRoot: vault.root,
         userMdPath: vault.userProfilePath,
         skillsRoot: resolveSkillsRoot(vault),

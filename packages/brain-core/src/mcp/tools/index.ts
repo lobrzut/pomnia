@@ -19,6 +19,9 @@ import { indexFiles } from '../../rag/indexer.js'
 
 import { runSearchLibrary, searchLibrarySchema } from './searchLibrary.js'
 import type { Reranker } from '../../rag/rerank.js'
+import { VaultFreshness, freshnessReminder, hashContent } from '../vaultFreshness.js'
+import { readFileSync as readFileForFreshness, existsSync as existsForFreshness } from 'node:fs'
+import { join as joinForFreshness } from 'node:path'
 import { runSaveConversation, saveConversationSchema } from './saveConversation.js'
 import {
   runCheckpointSession,
@@ -62,6 +65,12 @@ export interface ToolContext {
    * per call — the model load is seconds and the scoring is milliseconds.
    */
   reranker?: Reranker
+  /**
+   * Tracks the hash of each note the server hands out, so a later tool call can
+   * carry "that changed under you" when another agent or a replica rewrote it.
+   * One per server. See vaultFreshness.ts for what it can and cannot see.
+   */
+  freshness?: VaultFreshness
   vaultRoot: string
   userMdPath: string
   /**
@@ -249,7 +258,45 @@ export async function callTool(
     autoCheckpointEnabled: ctx.autoCheckpointEnabled !== false,
   })
   unsavedState = decision.next
-  return decision.reminder ? out + decision.reminder : out
+  let result = decision.reminder ? out + decision.reminder : out
+
+  // Did a note this agent read change underneath it? Checked here because this
+  // is the one place every tool call passes through. The tracker knows which
+  // notes it served; we hash their current on-disk form and let it compare.
+  if (ctx.freshness) {
+    const hashes = currentNoteHashes(ctx.vaultRoot, ctx.freshness.trackedLabels())
+    const notice = freshnessReminder(ctx.freshness.check(hashes))
+    if (notice) result += notice
+  }
+  return result
+}
+
+/**
+ * Current on-disk hash of each tracked note. A resource label like
+ * `sprawa/rustyrat-CIT8` maps back to `<vault>/sprawy/rustyrat-CIT8.md`; a
+ * label already ending in `.md` is a vault-relative path. A file that has gone
+ * away is simply skipped — its absence is not a change worth interrupting for.
+ */
+function currentNoteHashes(vaultRoot: string, labels: string[]): Map<string, string> {
+  const out = new Map<string, string>()
+  const areas: Record<string, string> = { sprawa: 'sprawy', sesja: 'sessions' }
+  for (const label of labels) {
+    let rel: string | null = null
+    const slash = label.indexOf('/')
+    if (slash > 0 && areas[label.slice(0, slash)]) {
+      rel = joinForFreshness(areas[label.slice(0, slash)], `${label.slice(slash + 1)}.md`)
+    } else if (label.endsWith('.md')) {
+      rel = label
+    }
+    if (!rel) continue
+    try {
+      const abs = joinForFreshness(vaultRoot, rel)
+      if (existsForFreshness(abs)) out.set(label, hashContent(readFileForFreshness(abs, 'utf8')))
+    } catch {
+      /* unreadable: skip, not a change */
+    }
+  }
+  return out
 }
 
 /** Process-wide; the reminder is a fact about the vault, not about a session. */
