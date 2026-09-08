@@ -9,7 +9,7 @@
  */
 
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { basename, extname } from 'node:path'
 import {
   applyOcrToDocument,
@@ -18,6 +18,8 @@ import {
   parseDocument,
   runOcr,
   suggestOcr,
+  ZIP_EXPANSION_LIMITS,
+  ZipExpansionError,
 } from '@pomnia/doc-parser'
 import { log } from '@core/index.js'
 // Subpath only — full @pomnia/brain-core entry pulls better-sqlite3 into main.
@@ -44,6 +46,13 @@ export async function importDocument(
   const dataDir = brainCoreDataDir()
   const vaultCfg = defaultVaultConfig(dataDir)
   ensureLibraryDirs(vaultCfg)
+
+  const st = statSync(filePath)
+  if (st.size > ZIP_EXPANSION_LIMITS.maxCompressedBytes) {
+    throw new ZipExpansionError(
+      `Document is too large (${st.size} bytes; limit ${ZIP_EXPANSION_LIMITS.maxCompressedBytes}).`,
+    )
+  }
 
   const raw = readFileSync(filePath)
   const contentSha = createHash('sha256').update(raw).digest('hex')
@@ -76,6 +85,7 @@ export async function importDocument(
   }
 
   onProgress?.({ phase: 'parse', done: 0, total: 1, detail: baseName })
+  // Parse before any vault write — ZipExpansionError / parse failures leave zero blobs.
   let parsed = await parseDocument(filePath)
   onProgress?.({ phase: 'parse', done: 1, total: 1, detail: extractionPathLabel(parsed) })
 

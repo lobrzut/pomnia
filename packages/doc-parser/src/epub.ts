@@ -3,8 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join, posix } from 'node:path'
 
-import { unzipSync } from 'fflate'
-
+import { unzipBounded } from './safeUnzip.js'
 import type { ParsedDocument, ParsedPage } from './types.js'
 
 function decodeXmlEntities(text: string): string {
@@ -76,7 +75,7 @@ function resolveZipPath(basePath: string, href: string): string {
  */
 export function parseEpub(filePath: string): ParsedDocument {
   const raw = readFileSync(filePath)
-  const files = unzipSync(new Uint8Array(raw)) as Record<string, Uint8Array>
+  const files = unzipBounded(new Uint8Array(raw)) as Record<string, Uint8Array>
 
   const containerXml = readZipText(files, 'META-INF/container.xml')
   const opfPath = containerRootPath(containerXml)

@@ -10,6 +10,12 @@
 export { parsePdf } from './pdf.js'
 export { parseDocx } from './docx.js'
 export { parseEpub, htmlToText } from './epub.js'
+export {
+  unzipBounded,
+  ZipExpansionError,
+  ZIP_EXPANSION_LIMITS,
+} from './safeUnzip.js'
+export type { ZipExpansionLimits } from './safeUnzip.js'
 export { parseText } from './text.js'
 export { parseDocument, extractionPathLabel } from './router.js'
 export { buildExtractedMarkdown } from './frontmatter.js'

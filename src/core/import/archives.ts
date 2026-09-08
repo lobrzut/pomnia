@@ -18,7 +18,13 @@
 import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import { strFromU8, unzipSync } from 'fflate'
+import { strFromU8 } from 'fflate'
+import {
+  unzipBounded,
+  ZipExpansionError,
+  ZIP_EXPANSION_LIMITS,
+  type ZipExpansionLimits,
+} from '../../../packages/doc-parser/src/safeUnzip.js'
 import type { Conversation, Message, Role, SourceId } from '../model.js'
 import { sanitizeUnicode } from '../brain/distill.js'
 
@@ -443,12 +449,31 @@ function zipJsonEntries(names: string[]): string[] {
 }
 
 /** Parse a single file's bytes (zip / json / jsonl / md) into conversations. */
-export function parseExportBuffer(buf: Uint8Array, filename: string): ImportResult {
+export function parseExportBuffer(
+  buf: Uint8Array,
+  filename: string,
+  limits?: ZipExpansionLimits,
+): ImportResult {
   const conversations: Conversation[] = []
   const isZip = buf.length > 1 && buf[0] === 0x50 && buf[1] === 0x4b // "PK"
 
   if (isZip) {
-    const files = unzipSync(buf)
+    const maxCompressed = limits?.maxCompressedBytes ?? ZIP_EXPANSION_LIMITS.maxCompressedBytes
+    if (buf.byteLength > maxCompressed) {
+      throw new ZipExpansionError(
+        `Export archive is too large (${buf.byteLength} bytes; limit ${maxCompressed}).`,
+      )
+    }
+    // Inflate only conversation-looking entries; still enforce expansion caps.
+    const files = unzipBounded(buf, {
+      ...limits,
+      filter: (file) => {
+        if (limits?.filter && !limits.filter(file)) return false
+        const base = file.name.replace(/^.*[/\\]/, '').toLowerCase()
+        if (SKIP_ZIP_BASENAMES.has(base)) return false
+        return /\.jsonl?$/i.test(file.name)
+      },
+    })
     const names = zipJsonEntries(Object.keys(files))
     for (const n of names) {
       const text = strFromU8(files[n])
@@ -460,7 +485,8 @@ export function parseExportBuffer(buf: Uint8Array, filename: string): ImportResu
         } else {
           conversations.push(...routeJson(JSON.parse(text), detectName))
         }
-      } catch {
+      } catch (e) {
+        if (e instanceof ZipExpansionError) throw e
         /* skip malformed entry */
       }
     }
@@ -495,6 +521,12 @@ export function parseExportBuffer(buf: Uint8Array, filename: string): ImportResu
 
 /** Read and parse a single export file from disk. */
 export async function parseExportFile(file: string): Promise<ImportResult> {
+  const st = await fs.stat(file)
+  if (st.size > ZIP_EXPANSION_LIMITS.maxCompressedBytes) {
+    throw new ZipExpansionError(
+      `Export file is too large (${st.size} bytes; limit ${ZIP_EXPANSION_LIMITS.maxCompressedBytes}).`,
+    )
+  }
   const buf = await fs.readFile(file)
   return parseExportBuffer(new Uint8Array(buf), path.basename(file))
 }
