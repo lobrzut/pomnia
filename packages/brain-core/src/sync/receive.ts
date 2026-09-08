@@ -27,6 +27,8 @@ import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
 
+import { atomicWrite } from '../archive/durableWrite.js'
+import { withStoreLock } from '../storage/storeLock.js'
 import { DISTILL_LEDGER_REL, MAX_FILE_BYTES, safeVaultPath, type PathRejection } from './paths.js'
 import { mergeDistillLedgerBytes } from './ledgerMerge.js'
 
@@ -248,10 +250,13 @@ async function recordedConflictPath(
 }
 
 async function writeAtomic(abs: string, content: Buffer): Promise<void> {
-  await fs.mkdir(dirname(abs), { recursive: true })
-  const tmp = `${abs}.sync-tmp`
-  await fs.writeFile(tmp, content)
-  await fs.rename(tmp, abs)
+  // Unique tmp + fsync — concurrent writers must not share `${abs}.sync-tmp`.
+  await atomicWrite(abs, content)
+}
+
+/** One lock per logical vault path so conflict checks and renames stay serial. */
+function syncPathLockKey(vaultRoot: string, relative: string): string {
+  return join(vaultRoot, relative)
 }
 
 /** Read one synced file for pull (`/sync/fetch`). Validates path first. */
@@ -313,76 +318,80 @@ export async function applyFile(opts: {
     }
   }
 
-  if (verdict.relative === DISTILL_LEDGER_REL) {
-    try {
-      let localBuf: Buffer | null = null
+  return withStoreLock(syncPathLockKey(opts.vaultRoot, verdict.relative), async () => {
+    if (verdict.relative === DISTILL_LEDGER_REL) {
       try {
-        localBuf = await fs.readFile(join(opts.vaultRoot, DISTILL_LEDGER_REL))
-      } catch {
-        localBuf = null
-      }
-      const merged = mergeDistillLedgerBytes(localBuf, opts.content)
-      await writeAtomic(join(opts.vaultRoot, DISTILL_LEDGER_REL), merged)
-      return {
-        ok: true,
-        path: DISTILL_LEDGER_REL,
-        bytes: merged.length,
-        ledgerMerged: true,
-        unchanged: localBuf !== null && sha256(localBuf) === sha256(merged),
-      }
-    } catch (e) {
-      return {
-        ok: false,
-        path: DISTILL_LEDGER_REL,
-        reason: 'write-failed',
-        detail: (e as Error).message,
-      }
-    }
-  }
-
-  const abs = join(opts.vaultRoot, verdict.relative)
-  try {
-    const existingHash = await hashFile(abs)
-    if (existingHash === actual) {
-      return { ok: true, path: verdict.relative, bytes: opts.content.length, unchanged: true }
-    }
-    // Not a conflict when the only disagreement is CR. See sameIgnoringLineEndings.
-    if (existingHash !== null && (await sameIgnoringLineEndings(abs, opts.content))) {
-      return { ok: true, path: verdict.relative, bytes: opts.content.length, unchanged: true }
-    }
-    if (existingHash !== null) {
-      // Already on record? Then this is the same disagreement, not a new one.
-      const recorded = await recordedConflictPath(opts.vaultRoot, verdict.relative, opts.content)
-      if (recorded !== null) {
+        let localBuf: Buffer | null = null
+        try {
+          localBuf = await fs.readFile(join(opts.vaultRoot, DISTILL_LEDGER_REL))
+        } catch {
+          localBuf = null
+        }
+        const merged = mergeDistillLedgerBytes(localBuf, opts.content)
+        await writeAtomic(join(opts.vaultRoot, DISTILL_LEDGER_REL), merged)
         return {
           ok: true,
-          path: recorded,
-          bytes: opts.content.length,
-          unchanged: true,
-          conflict: { kept: verdict.relative, wrote: recorded },
+          path: DISTILL_LEDGER_REL,
+          bytes: merged.length,
+          ledgerMerged: true,
+          unchanged: localBuf !== null && sha256(localBuf) === sha256(merged),
         }
-      }
-      const alt = await conflictSuffixPath(opts.vaultRoot, verdict.relative)
-      const altVerdict = safeVaultPath(alt)
-      if (!altVerdict.ok) {
+      } catch (e) {
         return {
           ok: false,
-          path: verdict.relative,
+          path: DISTILL_LEDGER_REL,
           reason: 'write-failed',
-          detail: `conflict path refused: ${altVerdict.reason}`,
+          detail: (e as Error).message,
         }
       }
-      await writeAtomic(join(opts.vaultRoot, alt), opts.content)
-      return {
-        ok: true,
-        path: alt,
-        bytes: opts.content.length,
-        conflict: { kept: verdict.relative, wrote: alt },
-      }
     }
-    await writeAtomic(abs, opts.content)
-    return { ok: true, path: verdict.relative, bytes: opts.content.length }
-  } catch (e) {
-    return { ok: false, path: verdict.relative, reason: 'write-failed', detail: (e as Error).message }
-  }
+
+    const abs = join(opts.vaultRoot, verdict.relative)
+    try {
+      // Conflict / free-name decisions happen under the lock so two writers
+      // cannot pick the same suffix or rename over the same `.sync-tmp`.
+      const existingHash = await hashFile(abs)
+      if (existingHash === actual) {
+        return { ok: true, path: verdict.relative, bytes: opts.content.length, unchanged: true }
+      }
+      // Not a conflict when the only disagreement is CR. See sameIgnoringLineEndings.
+      if (existingHash !== null && (await sameIgnoringLineEndings(abs, opts.content))) {
+        return { ok: true, path: verdict.relative, bytes: opts.content.length, unchanged: true }
+      }
+      if (existingHash !== null) {
+        // Already on record? Then this is the same disagreement, not a new one.
+        const recorded = await recordedConflictPath(opts.vaultRoot, verdict.relative, opts.content)
+        if (recorded !== null) {
+          return {
+            ok: true,
+            path: recorded,
+            bytes: opts.content.length,
+            unchanged: true,
+            conflict: { kept: verdict.relative, wrote: recorded },
+          }
+        }
+        const alt = await conflictSuffixPath(opts.vaultRoot, verdict.relative)
+        const altVerdict = safeVaultPath(alt)
+        if (!altVerdict.ok) {
+          return {
+            ok: false,
+            path: verdict.relative,
+            reason: 'write-failed',
+            detail: `conflict path refused: ${altVerdict.reason}`,
+          }
+        }
+        await writeAtomic(join(opts.vaultRoot, alt), opts.content)
+        return {
+          ok: true,
+          path: alt,
+          bytes: opts.content.length,
+          conflict: { kept: verdict.relative, wrote: alt },
+        }
+      }
+      await writeAtomic(abs, opts.content)
+      return { ok: true, path: verdict.relative, bytes: opts.content.length }
+    } catch (e) {
+      return { ok: false, path: verdict.relative, reason: 'write-failed', detail: (e as Error).message }
+    }
+  })
 }

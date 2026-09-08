@@ -188,6 +188,38 @@ describe('applyFile', () => {
     })
     expect(r).toMatchObject({ ok: true, unchanged: true, path: 'sessions/x.md' })
   })
+
+  it('keeps every parallel distinct payload (F04)', async () => {
+    await put('notes/same.md', 'base')
+    const incoming = Array.from({ length: 10 }, (_, i) => Buffer.from(`unique-content-${i}`))
+    const results = await Promise.all(
+      incoming.map((content) =>
+        applyFile({ vaultRoot: root, path: 'notes/same.md', content, sha256: sha256(content) }),
+      ),
+    )
+    expect(results.every((r) => r.ok)).toBe(true)
+    const names = (await import('node:fs/promises').then((m) => m.readdir(join(root, 'notes')))).filter((p) =>
+      p.endsWith('.md'),
+    )
+    const contents = await Promise.all(names.map((p) => readFile(join(root, 'notes', p), 'utf8')))
+    // base kept + 10 unique conflict copies (or fewer if some matched base — they don't)
+    expect(new Set(contents).size).toBe(11)
+    expect(names.length).toBe(11)
+  })
+
+  it('treats identical parallel uploads as idempotent (F04)', async () => {
+    const body = Buffer.from('same-bytes')
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        applyFile({ vaultRoot: root, path: 'notes/once.md', content: body, sha256: sha256(body) }),
+      ),
+    )
+    expect(results.every((r) => r.ok)).toBe(true)
+    const names = (await import('node:fs/promises').then((m) => m.readdir(join(root, 'notes')))).filter((p) =>
+      p.endsWith('.md'),
+    )
+    expect(names).toEqual(['once.md'])
+  })
 })
 
 describe('distill-ledger set-union on apply', () => {
@@ -217,6 +249,25 @@ describe('distill-ledger set-union on apply', () => {
     expect(r).toMatchObject({ ok: true, ledgerMerged: true })
     const parsed = JSON.parse(await readFile(join(root, 'state/distill-ledger.json'), 'utf8'))
     expect(Object.keys(parsed.owners.default.processed).sort()).toEqual(['aaa', 'bbb', 'ccc'])
+  })
+
+  it('keeps the union of parallel ledger merges (F04)', async () => {
+    await put('state/distill-ledger.json', ledger(['seed']))
+    const payloads = Array.from({ length: 8 }, (_, i) => Buffer.from(ledger([`id-${i}`]), 'utf8'))
+    const results = await Promise.all(
+      payloads.map((content) =>
+        applyFile({
+          vaultRoot: root,
+          path: 'state/distill-ledger.json',
+          content,
+          sha256: sha256(content),
+        }),
+      ),
+    )
+    expect(results.every((r) => r.ok)).toBe(true)
+    const parsed = JSON.parse(await readFile(join(root, 'state/distill-ledger.json'), 'utf8'))
+    const ids = Object.keys(parsed.owners.default.processed).sort()
+    expect(ids).toEqual(['id-0', 'id-1', 'id-2', 'id-3', 'id-4', 'id-5', 'id-6', 'id-7', 'seed'])
   })
 })
 
