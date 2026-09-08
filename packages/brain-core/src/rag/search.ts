@@ -31,6 +31,7 @@ import type { EmbedClient } from './embed.js'
 import { vecToBlob } from './vec.js'
 
 import { DEFAULT_CANDIDATES, type Reranker } from './rerank.js'
+import { extractAnchors, filterByAnchors } from './anchors.js'
 
 export type SearchSource = 'all' | 'vault' | 'library'
 
@@ -140,6 +141,12 @@ export interface SearchOptions {
   reranker?: Reranker
   /** How many rows the reranker is allowed to look at. See DEFAULT_CANDIDATES. */
   rerankCandidates?: number
+  /**
+   * Exact-name filtering, on unless switched off. See rag/anchors.ts — a query
+   * naming a file, a constant or a version filters on it rather than hoping
+   * similarity noticed.
+   */
+  anchors?: boolean
 }
 
 /**
@@ -261,7 +268,35 @@ export async function search(
   })
 
   scored.sort((a, b) => b.hit.score - a.hit.score)
-  const ordered = scored.map((s) => s.hit)
+  let ordered: SearchHit[] = scored.map((s) => s.hit)
+
+  /*
+   * Exact names filter before anything else ranks.
+   *
+   * "what changed in src/main/docImport.ts" is not a question about meaning,
+   * and a chunk that does not contain that file is not a slightly worse answer
+   * to it. Similarity cannot express that, and the keyword lane cannot either:
+   * splitTerms would already have broken the path into four weak words.
+   *
+   * Runs before the reranker on purpose — the cross-encoder is the expensive
+   * step and there is no reason to spend it scoring rows an exact name has
+   * already ruled out. `filterByAnchors` never returns nothing, so this cannot
+   * turn a poor answer into no answer.
+   */
+  const anchors = opts.anchors === false ? [] : extractAnchors(opts.query)
+  if (anchors.length > 0) {
+    const filtered = filterByAnchors(ordered, anchors)
+    ordered = filtered.kept
+    if (filtered.applied.length > 0) {
+      // Say which names were used, so a filtered search is legible rather than
+      // mysteriously narrow.
+      const names = filtered.applied.map((a) => a.text)
+      for (const hit of ordered) {
+        hit.meta = { ...(hit.meta ?? {}), anchors: names }
+      }
+    }
+  }
+
   if (!opts.reranker?.available) return ordered.slice(0, topK)
 
   // `rerank` returns the input order on any failure, so this cannot come back

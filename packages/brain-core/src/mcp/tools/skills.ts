@@ -149,7 +149,21 @@ function listBrain(skillsRoot: string): SkillMeta[] {
   return out.sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/** A skill nested deeper than this is a tree we decline to crawl. */
+/**
+ * A skill nested deeper than this is a tree we decline to crawl.
+ *
+ * The depth cap also does a second job by accident, and it is worth naming
+ * before someone raises it. A skill directory is a *package boundary*: once
+ * SKILL.md is found, anything below it — test fixtures, examples, vendored
+ * material — is supporting data, not another skill. Stopping at two levels
+ * happens to enforce that today because the vault is exactly two deep. Raise
+ * this number without also stopping the descent at the first SKILL.md and a
+ * package carrying its own fixtures starts registering them as skills.
+ *
+ * (Same rule DeerFlow states explicitly for its own skill loader. Checked
+ * against this vault: 1244 packages, zero SKILL.md deeper than level two, so
+ * nothing is affected today.)
+ */
 const CLI_MAX_DEPTH = 2
 
 /**
