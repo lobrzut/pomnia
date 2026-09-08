@@ -386,7 +386,12 @@ onParentMessage((msg: ParentMsg) => {
       break
     case 'set-vault-root':
       if (config) config.vaultRoot = msg.path
-      server?.setVaultRoot(msg.path)
+      void server?.setVaultRoot(msg.path).catch((err) => {
+        send({
+          type: 'error',
+          message: err instanceof Error ? err.message : String(err),
+        })
+      })
       break
     case 'set-handshake':
       if (config) {

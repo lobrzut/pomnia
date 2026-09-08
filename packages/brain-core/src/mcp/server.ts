@@ -208,8 +208,12 @@ export interface BrainServer {
   readonly adopted: boolean
   /** Update skills root at runtime (e.g. vault opened after brain start). */
   setSkillsRoot(path: string): void
-  /** Update knowledge vault root at runtime (USER.md / distilled / sessions). */
-  setVaultRoot(path: string): void
+  /**
+   * Point knowledge vault at a new root and re-resolve ownership.
+   * Async: verifies the path, reads the marker, then swaps context so a
+   * foreign vault cannot inherit the previous root's writable bit.
+   */
+  setVaultRoot(path: string): Promise<void>
   /** Update Handshake proof phrase for MCP tool descriptions / profile preamble. */
   setHandshake(opts: { phrase: string; enabled: boolean }): void
   /** Update auto-checkpoint setting (Settings → autoCheckpointEnabled). */
@@ -461,12 +465,62 @@ export async function createBrainServer(
       if (ctx) ctx.skillsRoot = path
     },
 
-    setVaultRoot(path: string) {
-      config.vaultRoot = path
-      const vault = vaultConfigFromRoot(path)
+    async setVaultRoot(path: string) {
+      const next = path.trim()
+      if (!next) throw new Error('vault root path is empty')
+      const vault = vaultConfigFromRoot(next)
+
+      // Hold writes at the ownership layer while we verify the new root — do
+      // not mutate ctx yet, so in-flight tool calls that already closed over
+      // the previous ToolContext object keep writing to the old tree.
+      const presence = checkVaultPresence(vault.root, config.dataDir)
+      if (!presence.ok) throw new Error(presence.message)
+
+      const me = await localWriterIdentity(
+        config.dataDir,
+        config.instanceLabel ?? config.authoritativeVaultHint ?? hostname(),
+      )
+      const ownership = await resolveVaultOwnership({
+        vaultRoot: vault.root,
+        me,
+        forceReadOnly: config.readOnly === true,
+      })
+
+      config.vaultRoot = next
+      vaultOwnership = ownership
+      writeStamp(config.dataDir, vault.root, presence.notes || countVaultNotes(vault.root))
+
       if (ctx) {
-        ctx.vaultRoot = vault.root
-        ctx.userMdPath = vault.userProfilePath
+        // Replace the context object — do not mutate fields on the previous
+        // one. Per-request MCP servers hold the object they were given; an
+        // in-flight writer must not suddenly retarget mid-call.
+        ctx = {
+          ...ctx,
+          vaultRoot: vault.root,
+          userMdPath: vault.userProfilePath,
+          skillsRoot: resolveSkillsRoot(vault),
+          readOnly: !ownership.writable,
+          authoritativeVaultHint: ownership.owner
+            ? describeOwner(ownership.owner)
+            : config.authoritativeVaultHint,
+          freshness: new VaultFreshness(),
+          usage: new UsageSignal(vault.root),
+        }
+      }
+
+      if (ownership.writable) {
+        console.error(
+          `[pomnia-core] vault root switched to ${vault.root} — writes ${ownership.reason === 'claimed' ? 'claimed' : 'enabled'} for ${describeOwner(me)}`,
+        )
+      } else {
+        const heldBy = ownership.owner ? describeOwner(ownership.owner) : null
+        const why =
+          ownership.reason === 'corrupt-marker'
+            ? `marker unreadable (${ownership.detail})`
+            : ownership.reason === 'read-only-flag'
+              ? '--read-only'
+              : `held by ${heldBy ?? 'unknown'}`
+        console.error(`[pomnia-core] vault root switched to ${vault.root} — READ-ONLY (${why})`)
       }
     },
 
@@ -571,12 +625,14 @@ export async function createBrainServer(
         const heldBy = ownership.owner
           ? describeOwner(ownership.owner)
           : config.authoritativeVaultHint
+        const why =
+          ownership.reason === 'read-only-flag'
+            ? `--read-only${heldBy ? `; vault held by ${heldBy}` : ''}`
+            : ownership.reason === 'corrupt-marker'
+              ? `ownership marker unreadable (${ownership.detail}) — refuse writes until an admin claims`
+              : `vault held by ${heldBy ?? 'unknown'}`
         console.error(
-          `[pomnia-core] READ-ONLY — save_conversation and checkpoint_session will refuse (` +
-            (ownership.reason === 'read-only-flag'
-              ? `--read-only${heldBy ? `; vault held by ${heldBy}` : ''}`
-              : `vault held by ${heldBy ?? 'unknown'}`) +
-            ')',
+          `[pomnia-core] READ-ONLY — save_conversation and checkpoint_session will refuse (${why})`,
         )
       }
 
