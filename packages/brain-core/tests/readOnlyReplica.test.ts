@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
-import { listTools, readOnlyRefusal } from '../src/mcp/tools/index.js'
+import { afterEach, describe, expect, it } from 'vitest'
+
+import { callTool, listTools, readOnlyRefusal } from '../src/mcp/tools/index.js'
 
 /**
  * Why a replica must refuse instead of accepting:
@@ -65,5 +69,48 @@ describe('read-only replica', () => {
   it('read-only overrides autoCheckpointEnabled', () => {
     const d = desc({ readOnly: true, autoCheckpointEnabled: true }, 'checkpoint_session')
     expect(d).toContain('READ-ONLY')
+  })
+})
+
+/**
+ * Catalog text is not enough — the audit probe called the dispatcher and the
+ * profile grew a byte. Gate must refuse before runMemory touches disk (F05).
+ */
+describe('read-only memory dispatcher (F05)', () => {
+  let dir = ''
+  let profile = ''
+
+  afterEach(() => {
+    if (dir) rmSync(dir, { recursive: true, force: true })
+    dir = ''
+  })
+
+  it('add/replace/remove leave USER.md bytes unchanged and still allow reads', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'pomnia-f05-'))
+    profile = join(dir, 'USER.md')
+    const initial = '# fixture\n\n§ PROFIL\n· keep me\n'
+    writeFileSync(profile, initial, 'utf8')
+
+    const ctx = {
+      readOnly: true as const,
+      userMdPath: profile,
+      vaultRoot: dir,
+      autoCheckpointEnabled: false,
+      authoritativeVaultHint: 'desktop fixture',
+    }
+
+    for (const args of [
+      { action: 'add', category: 'user', content: 'Fixture preference: concise prose.' },
+      { action: 'replace', category: 'user', content: 'replace must not land', match: 'keep' },
+      { action: 'remove', category: 'user', match: 'keep' },
+    ]) {
+      const out = await callTool('memory', args, ctx)
+      expect(out).toContain('Nothing was written')
+      expect(readFileSync(profile, 'utf8')).toBe(initial)
+    }
+
+    const profileText = await callTool('get_user_profile', {}, ctx)
+    expect(profileText).toContain('keep me')
+    expect(readFileSync(profile, 'utf8')).toBe(initial)
   })
 })
