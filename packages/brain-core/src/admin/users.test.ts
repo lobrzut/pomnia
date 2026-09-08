@@ -11,12 +11,14 @@ import {
   deleteUser,
   hashPassword,
   readUsers,
+  resetAuthKdfCounters,
   summariseUser,
   touchLogin,
   usersPath,
   validatePassword,
   validateUsername,
   verifyPassword,
+  verifyPasswordCalls,
 } from './users.js'
 
 let dir: string
@@ -134,6 +136,17 @@ describe('authenticate', () => {
   it('rejects a wrong password and an unknown user alike', async () => {
     expect((await authenticate(dir, 'helluk', 'nope')).ok).toBe(false)
     expect((await authenticate(dir, 'ghost', GOOD)).ok).toBe(false)
+  })
+
+  it('costs exactly one verifyPassword for both unknown and known users (F16)', async () => {
+    resetAuthKdfCounters()
+    await authenticate(dir, 'ghost', GOOD)
+    const unknownCalls = verifyPasswordCalls
+    resetAuthKdfCounters()
+    await authenticate(dir, 'helluk', 'nope')
+    const wrongCalls = verifyPasswordCalls
+    expect(unknownCalls).toBe(1)
+    expect(wrongCalls).toBe(1)
   })
 
   /**

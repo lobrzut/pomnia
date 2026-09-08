@@ -41,6 +41,32 @@ const scryptAsync = promisify(scrypt) as (
 const SCRYPT = { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }
 const KEYLEN = 32
 
+/**
+ * One prepared dummy hash for missing-user logins. Hashing a fresh decoy on
+ * every miss made unknown usernames cost two scrypts and existing ones one —
+ * a timing oracle (audit F16). Verify once against this constant instead.
+ */
+let dummyPasswordHash: string | undefined
+let dummyPasswordHashPromise: Promise<string> | undefined
+
+async function dummyHash(): Promise<string> {
+  if (dummyPasswordHash) return dummyPasswordHash
+  if (!dummyPasswordHashPromise) {
+    dummyPasswordHashPromise = hashPassword('decoy-for-constant-time').then((h) => {
+      dummyPasswordHash = h
+      return h
+    })
+  }
+  return dummyPasswordHashPromise
+}
+
+/** Test seam — count verifyPassword calls without timing the wall clock. */
+export let verifyPasswordCalls = 0
+/** Test seam — reset counters between cases. */
+export function resetAuthKdfCounters(): void {
+  verifyPasswordCalls = 0
+}
+
 export interface StoredUser {
   username: string
   /** `scrypt$N$r$p$salt$hash`, all base64url. Self-describing so the cost can
@@ -76,6 +102,7 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  verifyPasswordCalls++
   const parts = (stored ?? '').split('$')
   if (parts.length !== 6 || parts[0] !== 'scrypt') return false
   const [, n, r, p, saltB64, hashB64] = parts
@@ -289,7 +316,8 @@ export async function authenticate(
 ): Promise<LoginResult> {
   const users = await readUsersOrEmpty(dataDir)
   const user = users.find((u) => u.username === (username ?? '').trim().toLowerCase())
-  const stored = user?.password ?? (await hashPassword('decoy-for-constant-time'))
+  // Exactly one verify for both paths — never hashPassword on the miss path.
+  const stored = user?.password ?? (await dummyHash())
   const ok = await verifyPassword(password ?? '', stored)
   if (!ok || !user) return { ok: false }
   return { ok: true, user }
