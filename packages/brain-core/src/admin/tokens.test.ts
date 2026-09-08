@@ -168,9 +168,9 @@ describe('readTokens', () => {
     expect((await readTokens(file))[0].role).toBe('agent')
   })
 
-  it('does not accept a role it does not know', async () => {
+  it('refuses a role it does not know instead of rewriting it', async () => {
     await writeFile(file, JSON.stringify([{ name: 'x', token: 'btk_x', role: 'root' }]), 'utf8')
-    expect((await readTokens(file))[0].role).toBe('agent')
+    await expect(readTokens(file)).rejects.toThrow(/unknown role/)
   })
 })
 
@@ -179,5 +179,29 @@ describe('validateTokenName', () => {
     for (const n of ['laptop', 'claude-code', 'CI runner 2', 'ops@home']) {
       expect(validateTokenName(n).ok, n).toBe(true)
     }
+  })
+})
+
+describe('concurrent createToken (F03)', () => {
+  it('keeps every parallel create — no lost updates', async () => {
+    await createToken(file, { name: 'base', role: 'admin' })
+    const results = await Promise.all(
+      Array.from({ length: 12 }, (_, i) => createToken(file, { name: `fixture-${i}`, role: 'agent' })),
+    )
+    expect(results.every((r) => r.ok)).toBe(true)
+    expect(await readTokens(file)).toHaveLength(13)
+  })
+
+  it('revoke still sticks when touch races it', async () => {
+    await createToken(file, { name: 'keep', role: 'admin' })
+    await createToken(file, { name: 'gone', role: 'agent' })
+    const touches = Array.from({ length: 20 }, () => touchToken(file, 'gone'))
+    const [revoked] = await Promise.all([revokeToken(file, 'gone'), ...touches])
+    expect(revoked.ok).toBe(true)
+    const names = (await readTokens(file)).map((t) => t.name)
+    expect(names).toEqual(['keep'])
+    // Further telemetry must not resurrect the revoked token.
+    await touchToken(file, 'gone')
+    expect((await readTokens(file)).map((t) => t.name)).toEqual(['keep'])
   })
 })

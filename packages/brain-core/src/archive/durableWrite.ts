@@ -8,30 +8,36 @@
  * (manifest.cvb came back full-length, all zeros). The `.prev` spare is the
  * other half: open() can fall back when the primary is unreadable.
  *
- * One implementation for vault + archive. Do not invent a second writer.
+ * One implementation for vault + archive + credential stores. Do not invent a
+ * second writer. Unique tmp names so concurrent writers never share `.tmp`.
  */
 
 import { randomBytes } from 'node:crypto'
-import { closeSync, fsyncSync, openSync, renameSync, writeSync } from 'node:fs'
+import {
+  closeSync,
+  copyFileSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  renameSync,
+  writeSync,
+} from 'node:fs'
 import { promises as fs } from 'node:fs'
 import { dirname } from 'node:path'
 
-/**
- * Write so the published name never points at bytes that are still in cache.
- */
-export async function atomicWrite(file: string, data: Buffer): Promise<void> {
-  await fs.mkdir(dirname(file), { recursive: true })
-  const tmp = `${file}.${randomBytes(6).toString('hex')}.tmp`
-  const fd = openSync(tmp, 'w')
+export type DurableWriteOpts = {
+  /** File mode at creation. Credentials use 0o600 so they are never briefly world-readable. */
+  mode?: number
+  onPrevCopyError?: (err: Error) => void
+}
+
+function uniqueTmp(file: string): string {
+  return `${file}.${randomBytes(6).toString('hex')}.tmp`
+}
+
+function fsyncDir(dir: string): void {
   try {
-    writeSync(fd, data)
-    fsyncSync(fd)
-  } finally {
-    closeSync(fd)
-  }
-  renameSync(tmp, file)
-  try {
-    const dh = openSync(dirname(file), 'r')
+    const dh = openSync(dir, 'r')
     try {
       fsyncSync(dh)
     } finally {
@@ -40,6 +46,38 @@ export async function atomicWrite(file: string, data: Buffer): Promise<void> {
   } catch {
     // Windows / some network FS refuse directory sync; file sync already ran.
   }
+}
+
+/**
+ * Write so the published name never points at bytes that are still in cache.
+ */
+export async function atomicWrite(file: string, data: Buffer, opts?: { mode?: number }): Promise<void> {
+  await fs.mkdir(dirname(file), { recursive: true })
+  const tmp = uniqueTmp(file)
+  const fd = openSync(tmp, 'w', opts?.mode)
+  try {
+    writeSync(fd, data)
+    fsyncSync(fd)
+  } finally {
+    closeSync(fd)
+  }
+  renameSync(tmp, file)
+  fsyncDir(dirname(file))
+}
+
+/** Sync counterpart for call sites that cannot await (panel library editor). */
+export function atomicWriteSync(file: string, data: Buffer, opts?: { mode?: number }): void {
+  mkdirSync(dirname(file), { recursive: true })
+  const tmp = uniqueTmp(file)
+  const fd = openSync(tmp, 'w', opts?.mode)
+  try {
+    writeSync(fd, data)
+    fsyncSync(fd)
+  } finally {
+    closeSync(fd)
+  }
+  renameSync(tmp, file)
+  fsyncDir(dirname(file))
 }
 
 /**
@@ -54,7 +92,7 @@ export async function atomicWrite(file: string, data: Buffer): Promise<void> {
 export async function writeFileKeepingPrev(
   file: string,
   data: Buffer,
-  opts?: { onPrevCopyError?: (err: Error) => void },
+  opts?: DurableWriteOpts,
 ): Promise<void> {
   try {
     await fs.copyFile(file, `${file}.prev`)
@@ -63,7 +101,18 @@ export async function writeFileKeepingPrev(
       opts?.onPrevCopyError?.(e as Error)
     }
   }
-  await atomicWrite(file, data)
+  await atomicWrite(file, data, { mode: opts?.mode })
+}
+
+export function writeFileKeepingPrevSync(file: string, data: Buffer, opts?: DurableWriteOpts): void {
+  try {
+    copyFileSync(file, `${file}.prev`)
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+      opts?.onPrevCopyError?.(e as Error)
+    }
+  }
+  atomicWriteSync(file, data, { mode: opts?.mode })
 }
 
 /**

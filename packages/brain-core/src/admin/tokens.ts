@@ -22,7 +22,9 @@ import { randomBytes } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { dirname } from 'node:path'
 
+import { writeFileKeepingPrev } from '../archive/durableWrite.js'
 import type { TokenRole } from '../mcp/auth.js'
+import { withStoreLock } from '../storage/storeLock.js'
 
 export interface StoredToken {
   name: string
@@ -84,24 +86,54 @@ export function summarise(t: StoredToken): TokenSummary {
  * Callers that only read should use readTokensOrEmpty and fail closed.
  */
 export async function readTokens(file: string): Promise<StoredToken[]> {
+  let raw: string
   try {
-    const parsed = JSON.parse((await fs.readFile(file, 'utf8')).replace(/^﻿/, '')) as unknown
-    if (!Array.isArray(parsed)) return []
-    return parsed
-      .filter((e): e is StoredToken => !!e && typeof e === 'object' && typeof (e as StoredToken).token === 'string')
-      .map((e) => ({
-        name: typeof e.name === 'string' ? e.name : '?',
-        token: e.token,
-        role: e.role === 'admin' ? 'admin' : 'agent',
-        created: typeof e.created === 'string' ? e.created : new Date().toISOString(),
-        ...(typeof e.lastUsed === 'string' ? { lastUsed: e.lastUsed } : {}),
-      }))
+    raw = (await fs.readFile(file, 'utf8')).replace(/^﻿/, '')
   } catch (e) {
     // A store that is not there yet is empty. Anything else — an I/O error,
     // a truncated file, a permission change — is an unknown, and the two must
     // not look alike to a caller that is about to write.
     if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') return []
     throw e
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (e) {
+    throw new Error(`token store is not valid JSON: ${(e as Error).message}`)
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error('token store must be a JSON array')
+  }
+  return parsed.map((entry, i) => parseStoredToken(entry, i))
+}
+
+function parseStoredToken(entry: unknown, index: number): StoredToken {
+  if (!entry || typeof entry !== 'object') {
+    throw new Error(`token store[${index}] is not an object`)
+  }
+  const e = entry as Partial<StoredToken>
+  if (typeof e.token !== 'string' || !e.token) {
+    throw new Error(`token store[${index}] missing token`)
+  }
+  if (e.role !== undefined && e.role !== 'admin' && e.role !== 'agent') {
+    throw new Error(`token store[${index}] has unknown role`)
+  }
+  if (e.name !== undefined && typeof e.name !== 'string') {
+    throw new Error(`token store[${index}] has invalid name`)
+  }
+  if (e.created !== undefined && typeof e.created !== 'string') {
+    throw new Error(`token store[${index}] has invalid created`)
+  }
+  if (e.lastUsed !== undefined && typeof e.lastUsed !== 'string') {
+    throw new Error(`token store[${index}] has invalid lastUsed`)
+  }
+  return {
+    name: typeof e.name === 'string' ? e.name : '?',
+    token: e.token,
+    role: e.role === 'admin' ? 'admin' : 'agent',
+    created: typeof e.created === 'string' ? e.created : new Date().toISOString(),
+    ...(typeof e.lastUsed === 'string' ? { lastUsed: e.lastUsed } : {}),
   }
 }
 
@@ -122,11 +154,11 @@ export async function readTokensOrEmpty(file: string): Promise<StoredToken[]> {
 
 async function writeTokens(file: string, tokens: StoredToken[]): Promise<void> {
   await fs.mkdir(dirname(file), { recursive: true })
-  const tmp = `${file}.tmp`
-  // 0600 at creation, not chmod after: a token file that is world-readable for
-  // even a moment has been readable for long enough.
-  await fs.writeFile(tmp, `${JSON.stringify(tokens, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
-  await fs.rename(tmp, file)
+  // 0600 at creation: a token file that is world-readable for even a moment
+  // has been readable for long enough. Unique tmp + fsync via durableWrite.
+  await writeFileKeepingPrev(file, Buffer.from(`${JSON.stringify(tokens, null, 2)}\n`, 'utf8'), {
+    mode: 0o600,
+  })
 }
 
 export type CreateResult =
@@ -140,20 +172,22 @@ export async function createToken(
   const name = validateTokenName(opts.name)
   if (!name.ok) return { ok: false, detail: name.detail }
 
-  const tokens = await readTokens(file)
-  if (tokens.some((t) => t.name.toLowerCase() === name.name.toLowerCase())) {
-    // Two entries with one name makes revocation ambiguous, which is the
-    // moment you least want ambiguity.
-    return { ok: false, detail: `Token o nazwie „${name.name}" już istnieje.` }
-  }
-  const entry: StoredToken = {
-    name: name.name,
-    token: mintToken(),
-    role: opts.role === 'admin' ? 'admin' : 'agent',
-    created: new Date().toISOString(),
-  }
-  await writeTokens(file, [...tokens, entry])
-  return { ok: true, token: entry.token, summary: summarise(entry) }
+  return withStoreLock(file, async () => {
+    const tokens = await readTokens(file)
+    if (tokens.some((t) => t.name.toLowerCase() === name.name.toLowerCase())) {
+      // Two entries with one name makes revocation ambiguous, which is the
+      // moment you least want ambiguity.
+      return { ok: false, detail: `Token o nazwie „${name.name}" już istnieje.` }
+    }
+    const entry: StoredToken = {
+      name: name.name,
+      token: mintToken(),
+      role: opts.role === 'admin' ? 'admin' : 'agent',
+      created: new Date().toISOString(),
+    }
+    await writeTokens(file, [...tokens, entry])
+    return { ok: true, token: entry.token, summary: summarise(entry) }
+  })
 }
 
 export type RevokeResult = { ok: true; name: string } | { ok: false; detail: string }
@@ -163,34 +197,42 @@ export type RevokeResult = { ok: true; name: string } | { ok: false; detail: str
  * a credential to destroy it, and the panel never has it to paste.
  */
 export async function revokeToken(file: string, name: string): Promise<RevokeResult> {
-  const tokens = await readTokens(file)
-  const target = tokens.find((t) => t.name === name)
-  if (!target) return { ok: false, detail: `Nie ma tokena o nazwie „${name}".` }
+  return withStoreLock(file, async () => {
+    const tokens = await readTokens(file)
+    const target = tokens.find((t) => t.name === name)
+    if (!target) return { ok: false, detail: `Nie ma tokena o nazwie „${name}".` }
 
-  if (target.role === 'admin' && tokens.filter((t) => t.role === 'admin').length === 1) {
-    // Locking yourself out of your own server is recoverable only over SSH.
-    // Refusing costs one extra step; not refusing costs an evening.
-    return {
-      ok: false,
-      detail: 'To ostatni token administratora — najpierw utwórz drugi, potem odbierz ten.',
+    if (target.role === 'admin' && tokens.filter((t) => t.role === 'admin').length === 1) {
+      // Locking yourself out of your own server is recoverable only over SSH.
+      // Refusing costs one extra step; not refusing costs an evening.
+      return {
+        ok: false,
+        detail: 'To ostatni token administratora — najpierw utwórz drugi, potem odbierz ten.',
+      }
     }
-  }
-  await writeTokens(
-    file,
-    tokens.filter((t) => t.name !== name),
-  )
-  return { ok: true, name }
+    await writeTokens(
+      file,
+      tokens.filter((t) => t.name !== name),
+    )
+    return { ok: true, name }
+  })
 }
 
 /** Record that a token was seen. Best-effort: a failed write must not deny access. */
 export async function touchToken(file: string, name: string): Promise<void> {
-  const tokens = await readTokens(file)
-  const t = tokens.find((x) => x.name === name)
-  if (!t) return
-  const now = new Date().toISOString()
-  // Once a minute is plenty. Rewriting the file on every request would make
-  // the auth gate's mtime cache useless and re-read tokens constantly.
-  if (t.lastUsed && Date.parse(now) - Date.parse(t.lastUsed) < 60_000) return
-  t.lastUsed = now
-  await writeTokens(file, tokens)
+  try {
+    await withStoreLock(file, async () => {
+      const tokens = await readTokens(file)
+      const t = tokens.find((x) => x.name === name)
+      if (!t) return
+      const now = new Date().toISOString()
+      // Once a minute is plenty. Rewriting the file on every request would make
+      // the auth gate's mtime cache useless and re-read tokens constantly.
+      if (t.lastUsed && Date.parse(now) - Date.parse(t.lastUsed) < 60_000) return
+      t.lastUsed = now
+      await writeTokens(file, tokens)
+    })
+  } catch {
+    // Telemetry must not deny access, nor resurrect a corrupt store.
+  }
 }
