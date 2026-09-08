@@ -23,7 +23,7 @@ Summary of system behaviour — **without** key-file paths or internal vault bin
 |------|-----------|
 | **Passphrase** | Never written to disk. Lost passphrase = vault unrecoverable. |
 | **Encryption** | AES-256-GCM (authenticated). Key derived with scrypt (N=2^17 — matches Settings UI). Applies to vault **blobs**. |
-| **Lock** | On lock, the key is cleared from main-process memory; encrypted blobs stay encrypted on disk. |
+| **Lock** | On lock, the open `Vault` instance is closed: further crypto throws, and the derived key **Buffer is overwritten with zeros** (`fill(0)`). Encrypted blobs stay encrypted on disk. See honesty note below. |
 | **UI isolation** | The renderer (React) has **no** direct vault filesystem access. All operations go through IPC to the main process. |
 | **Import** | Gated entry — format validation and normalization before write. No raw dump of arbitrary files into the vault. |
 | **Export** | No silent exfiltration. Data leaves the vault only on **explicit user action**: backup, Brain export, deploy pipeline. |
@@ -77,8 +77,26 @@ This file does not prescribe a production hostname or LAN IP — those belong in
 
 ---
 
+## 7. Lock and key material — honesty limits (F13)
+
+What lock **does**:
+
+- Marks the `Vault` object closed so later read/write/decrypt on that instance fail.
+- Overwrites the scrypt-derived key `Buffer` with zeros before the main process drops its reference.
+- Leaves encrypted on-disk blobs unchanged.
+
+What lock **cannot** promise in a JavaScript / V8 / Electron process:
+
+- **No guaranteed wipe of all RAM copies.** The runtime may have copied Buffer backing stores; GC does not securely erase freed pages; OS swap or crash dumps can retain prior contents.
+- **In-flight operations** that already hold the open `Vault` may still run until they next touch crypto — after `lock()` they fail rather than decrypt with a live key. Callers must not keep “stale open” references for new work after UI lock.
+- **Passphrase strings** used only during unlock are ordinary JS strings (immutable); they are not zeroed. Prefer short-lived locals and avoid logging them.
+
+Treat lock as **best-effort clearing of the live key Buffer + hard reject of a closed Vault**, not as a hardware HSM or guaranteed memory erasure.
+
+---
+
 ## Scope
 
 This file does not replace an organisational security policy or an audit report. Updates to the publication model or technical guarantees should be reflected here before each major production cut.
 
-*Last updated: 2026-09-08 — HTTP transport honesty (F12) + trusted-proxy Secure cookies (F02).*
+*Last updated: 2026-09-08 — vault lock key wipe honesty (F13); HTTP transport (F12); trusted-proxy cookies (F02).*

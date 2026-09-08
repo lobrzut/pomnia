@@ -1024,6 +1024,8 @@ description:
   })
 
   ipcMain.handle('vault:lock', () => {
+    // Zero the derived key before dropping the reference (F13).
+    if (vault) vault.lock()
     vault = null
     vaultPath = null
     // Stop using portable path; keep AppData backup intact (no wipe).

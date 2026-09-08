@@ -86,6 +86,8 @@ export function libraryDocLogicalPath(vaultDir: string, docId: string): string {
 }
 
 export class Vault {
+  private closed = false
+
   private constructor(
     readonly dir: string,
     private header: VaultHeader,
@@ -93,6 +95,33 @@ export class Vault {
     private manifest: VaultManifest,
     private library: LibraryManifest
   ) {}
+
+  /**
+   * Refuse crypto after lock. Callers that kept a Vault reference must not
+   * decrypt or write once the UI has locked.
+   */
+  private assertOpen(): void {
+    if (this.closed) throw new Error('Vault is locked')
+  }
+
+  /** Whether {@link lock} has already cleared the key. */
+  isLocked(): boolean {
+    return this.closed
+  }
+
+  /**
+   * Close this vault instance: mark closed, then overwrite the derived key
+   * buffer with zeros. Idempotent.
+   *
+   * Does not guarantee that every JS/GC copy of key material is gone — see
+   * SECURITY.md. It does guarantee that this object's key Buffer is zeroed and
+   * that further methods on this instance throw.
+   */
+  lock(): void {
+    if (this.closed) return
+    this.closed = true
+    this.key.fill(0)
+  }
 
   private get manifestPath(): string {
     return path.join(this.dir, 'manifest.cvb')
@@ -238,10 +267,12 @@ export class Vault {
   }
 
   getManifest(): VaultManifest {
+    this.assertOpen()
     return this.manifest
   }
 
   getSnapshotMeta(id: string): Snapshot | undefined {
+    this.assertOpen()
     return this.manifest.snapshots.find((s) => s.id === id)
   }
 
@@ -260,6 +291,7 @@ export class Vault {
    * a second copy costs 40 KB.
    */
   private async saveManifest(): Promise<void> {
+    this.assertOpen()
     await writeFileKeepingPrev(
       this.manifestPath,
       encryptJSON(this.key, this.manifest),
@@ -272,22 +304,27 @@ export class Vault {
   }
 
   private async saveLibrary(): Promise<void> {
+    this.assertOpen()
     await atomicWrite(this.libraryPath, encryptJSON(this.key, this.library))
   }
 
   getLibraryManifest(): LibraryManifest {
+    this.assertOpen()
     return this.library
   }
 
   getLibraryDocument(id: string): LibraryDocument | undefined {
+    this.assertOpen()
     return this.library.documents.find((d) => d.id === id)
   }
 
   getPendingIndexDocuments(): LibraryDocument[] {
+    this.assertOpen()
     return this.library.documents.filter((d) => d.pendingIndex)
   }
 
   async setLibraryDocPendingIndex(id: string, pending: boolean): Promise<void> {
+    this.assertOpen()
     const doc = this.getLibraryDocument(id)
     if (!doc) throw new Error(`Library document not found: ${id}`)
     doc.pendingIndex = pending
@@ -297,6 +334,7 @@ export class Vault {
   }
 
   async markLibraryDocIndexed(id: string): Promise<void> {
+    this.assertOpen()
     const doc = this.getLibraryDocument(id)
     if (!doc) throw new Error(`Library document not found: ${id}`)
     doc.pendingIndex = false
@@ -310,6 +348,7 @@ export class Vault {
     source: Buffer,
     extractedMd: Buffer
   ): Promise<LibraryDocument> {
+    this.assertOpen()
     const { sha256: sourceBlobSha, bytes: sourceBytes } = await this.writeBlob(source)
     const { sha256: extractedBlobSha, bytes: extractedBytes } = await this.writeBlob(extractedMd)
     const entry: LibraryDocument = {
@@ -328,12 +367,14 @@ export class Vault {
   }
 
   async readLibrarySource(docId: string): Promise<Buffer> {
+    this.assertOpen()
     const doc = this.getLibraryDocument(docId)
     if (!doc) throw new Error(`Library document not found: ${docId}`)
     return this.readBlob(doc.sourceBlobSha)
   }
 
   async readLibraryExtracted(docId: string): Promise<Buffer> {
+    this.assertOpen()
     const doc = this.getLibraryDocument(docId)
     if (!doc) throw new Error(`Library document not found: ${docId}`)
     return this.readBlob(doc.extractedBlobSha)
@@ -349,6 +390,7 @@ export class Vault {
     removedBlobs: string[]
     keptBlobs: string[]
   }> {
+    this.assertOpen()
     const doc = this.getLibraryDocument(docId)
     if (!doc) throw new Error(`Library document not found: ${docId}`)
 
@@ -381,6 +423,7 @@ export class Vault {
   }
 
   async writeBlob(data: Buffer): Promise<{ sha256: string; bytes: number }> {
+    this.assertOpen()
     const sha = sha256(data)
     const p = this.blobPath(sha)
     // Content-addressed → if it exists, it's identical. Dedup for free.
@@ -393,6 +436,7 @@ export class Vault {
   }
 
   async readBlob(sha: string): Promise<Buffer> {
+    this.assertOpen()
     return decrypt(this.key, await fs.readFile(this.blobPath(sha)))
   }
 
@@ -402,6 +446,7 @@ export class Vault {
     conversations: Conversation[],
     files: FileSource[]
   ): Promise<Snapshot> {
+    this.assertOpen()
     const captured: CaptureItem[] = []
     let totalBytes = 0
     let skipped = 0
@@ -434,6 +479,7 @@ export class Vault {
         log.warn('backup skipped (locked/unreadable):', f.item.relPath, (e as Error).message)
       }
     }
+    this.assertOpen()
     const payload: SnapshotPayload = { conversations, files: captured }
     await atomicWrite(this.snapshotPath(meta.id), encryptJSON(this.key, payload))
 
@@ -454,11 +500,13 @@ export class Vault {
   }
 
   async getSnapshotPayload(id: string): Promise<SnapshotPayload> {
+    this.assertOpen()
     return decryptJSON<SnapshotPayload>(this.key, await fs.readFile(this.snapshotPath(id)))
   }
 
   /** Remove a snapshot and garbage-collect blobs no longer referenced anywhere. */
   async removeSnapshot(id: string): Promise<void> {
+    this.assertOpen()
     const payload = await this.getSnapshotPayload(id).catch(() => null)
     this.manifest.snapshots = this.manifest.snapshots.filter((s) => s.id !== id)
     await fs.rm(this.snapshotPath(id), { force: true })
@@ -477,6 +525,7 @@ export class Vault {
 
   /** Verify every blob referenced by every snapshot decrypts and matches its hash. */
   async verify(): Promise<{ ok: boolean; checked: number; errors: string[] }> {
+    this.assertOpen()
     const errors: string[] = []
     let checked = 0
     for (const s of this.manifest.snapshots) {
