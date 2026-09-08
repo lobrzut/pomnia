@@ -13,9 +13,11 @@
  *
  *   session cookie  HttpOnly, so script cannot read it and an XSS anywhere on
  *                   this origin cannot steal the session. SameSite=Strict and
- *                   scoped to /admin. Secure only over HTTPS — setting it on a
- *                   plain-HTTP LAN would make the browser drop it and the panel
- *                   would look broken with no explanation.
+ *                   scoped to /admin. Secure only when the request is treated
+ *                   as HTTPS (socket TLS or trusted-proxy X-Forwarded-Proto) —
+ *                   setting it on plain HTTP would make the browser drop it.
+ *                   Remote plain HTTP is warned in the UI (audit F12); loopback
+ *                   HTTP remains an explicit local transport.
  *   csrf token      returned in the login response *body*, never in a cookie,
  *                   echoed in a header on every mutation. SameSite already
  *                   stops the cross-site POST; this also covers the
@@ -78,6 +80,8 @@ ${BRAND_HEAD_LINKS}
   main{width:100%;max-width:46rem}
   .top{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem}
   .who{margin-left:auto;font-size:.8rem;color:var(--ink-faint);font-family:var(--mono)}
+  #plain-http-warn{margin-bottom:1rem}
+  #plain-http-warn strong{display:block;margin-bottom:.25rem}
   .card{border:1px solid var(--border);background:var(--panel);backdrop-filter:blur(14px);
     border-radius:20px;padding:1.5rem;margin-bottom:1rem}
   h2{margin:0 0 .35rem;font-size:1rem;font-weight:700}
@@ -174,6 +178,11 @@ ${brandSkyHtml()}
   <div class="top">
     ${brandWordmarkHtml('h1')}
     <span class="who" id="who"></span>
+  </div>
+
+  <div id="plain-http-warn" class="msg warn hidden" role="alert" hidden>
+    <strong data-i18n="plainHttpWarnTitle">Niezabezpieczony HTTP</strong>
+    <span data-i18n="plainHttpWarnBody">Hasło i tokeny idą jawnym tekstem na tym adresie. Preferuj HTTPS (proxy) albo WireGuard, albo otwórz panel z localhost.</span>
   </div>
 
   <!-- ── login ──────────────────────────────────────────────────────────── -->
@@ -411,10 +420,27 @@ ${brandSkyHtml()}
   const $ = (id) => document.getElementById(id)
   const text = (el, s) => { el.textContent = s }
 
+  /** Local transport policy (F12): loopback HTTP is fine; remote plain HTTP is not. */
+  function hostIsLoopback(h) {
+    let x = String(h || '').toLowerCase()
+    if (x.charAt(0) === '[' && x.charAt(x.length - 1) === ']') x = x.slice(1, -1)
+    return x === 'localhost' || x === '127.0.0.1' || x === '::1'
+  }
+  function paintPlainHttpWarn() {
+    const el = $('plain-http-warn')
+    if (!el) return
+    const bad = location.protocol === 'http:' && !hostIsLoopback(location.hostname)
+    el.hidden = !bad
+    el.classList.toggle('hidden', !bad)
+  }
+
   const I18N = {
     pl: {
       loginTitle: 'Logowanie',
       loginLead: 'Konto zakłada administrator serwera.',
+      plainHttpWarnTitle: 'Niezabezpieczony HTTP',
+      plainHttpWarnBody:
+        'Hasło i tokeny idą jawnym tekstem na tym adresie. Preferuj HTTPS (proxy) albo WireGuard, albo otwórz panel z localhost.',
       loginUser: 'Login', loginPass: 'Hasło', loginBtn: 'Zaloguj', logout: 'Wyloguj',
       tabDash: 'Pulpit', tabStatus: 'Stan', tabEngine: 'Silnik', tabDistill: 'Destylacja', tabClients: 'Klienci',
       tabUsers: 'Konta', tabBehaviour: 'Zachowanie', tabSettings: 'Ustawienia', tabVault: 'Sejf',
@@ -505,6 +531,9 @@ ${brandSkyHtml()}
     en: {
       loginTitle: 'Sign in',
       loginLead: 'Accounts are created by the server administrator.',
+      plainHttpWarnTitle: 'Unencrypted HTTP',
+      plainHttpWarnBody:
+        'Passwords and tokens travel in cleartext on this address. Prefer HTTPS (proxy) or WireGuard, or open the panel from localhost.',
       loginUser: 'Username', loginPass: 'Password', loginBtn: 'Sign in', logout: 'Sign out',
       tabDash: 'Dashboard', tabStatus: 'Status', tabEngine: 'Engine', tabDistill: 'Distill', tabClients: 'Clients',
       tabUsers: 'Accounts', tabBehaviour: 'Behaviour', tabSettings: 'Settings', tabVault: 'Vault',
@@ -1377,6 +1406,7 @@ ${brandSkyHtml()}
     applyDensity(localStorage.getItem('pomnia-ui-density') || 'comfortable')
   } catch (e) { applyDensity('comfortable') }
   applyLocale(locale)
+  paintPlainHttpWarn()
   void restore()
 })()
 </script>

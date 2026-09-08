@@ -630,6 +630,8 @@ export interface UiLabels {
   connectTokenRequiredMini: string
   connectTokenRequired: string
   connectOpenDashboard: string
+  /** Shown when remote Brain URL is plain HTTP off loopback (F12). */
+  connectPlainHttpWarn: string
   connectPartialTitle: string
   connectPartialDetail: string
   connectPartialFix: string
@@ -1586,6 +1588,8 @@ const PL_LABELS: UiLabels = {
   connectTokenRequiredMini: 'Bez tokena MCP nie zadziała.',
   connectTokenRequired: 'Bez tokena remote MCP zwykle nie zadziała — wklej lub utwórz poniżej.',
   connectOpenDashboard: 'Otwórz dashboard tokenów',
+  connectPlainHttpWarn:
+    'Ten adres Brain to zwykły HTTP poza localhost — hasło i token Bearer idą jawnym tekstem. Preferuj HTTPS (proxy) albo WireGuard.',
   connectPartialTitle: 'Niepełny mcp.json — brak vault/library',
   connectPartialDetail:
     'Jeden serwer `pomnia` → /mcp to komplet. Skopiuj świeży snippet poniżej.',
@@ -2927,6 +2931,8 @@ const EN_LABELS: UiLabels = {
   connectTokenRequiredMini: 'MCP will not work without a token.',
   connectTokenRequired: 'Remote MCP usually will not work without a token — paste or create one below.',
   connectOpenDashboard: 'Open the token dashboard',
+  connectPlainHttpWarn:
+    'This Brain URL is plain HTTP off localhost — passwords and bearer tokens travel in cleartext. Prefer HTTPS (proxy) or WireGuard.',
   connectPartialTitle: 'Incomplete mcp.json — vault/library missing',
   connectPartialDetail:
     'One `pomnia` server → /mcp is the whole configuration. Copy a fresh snippet below.',

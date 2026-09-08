@@ -41,10 +41,13 @@ describe('the panel script', () => {
     const script = inlineScript()
     // Every id the script reaches for must exist in the markup, and every
     // button the markup declares must be reachable from the script.
-    for (const id of ['login-form', 'logout', 'adduser', 'save-behaviour', 'save-engine', 'probe-ollama', 'add', 'claim', 'claim-hint', 'refresh', 'dash-refresh', 'tiles', 'vault-banner', 'sync-checks', 'sync-conflicts', 'distill-start', 'distill-dry', 'nav-distill']) {
+    for (const id of ['login-form', 'logout', 'adduser', 'save-behaviour', 'save-engine', 'probe-ollama', 'add', 'claim', 'claim-hint', 'refresh', 'dash-refresh', 'tiles', 'vault-banner', 'sync-checks', 'sync-conflicts', 'distill-start', 'distill-dry', 'nav-distill', 'plain-http-warn']) {
       expect(page, `markup is missing #${id}`).toContain(`id="${id}"`)
       expect(script, `script never touches #${id}`).toContain(`'${id}'`)
     }
+    expect(script).toContain('paintPlainHttpWarn')
+    expect(script).toContain("location.protocol === 'http:'")
+    expect(page).toContain('plainHttpWarnTitle')
     expect(script).toContain('/admin/health')
     expect(page).toContain('/status')
     // Claim CTA starts hidden — only paintClaim('ready') unhides it.

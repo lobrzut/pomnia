@@ -27,6 +27,7 @@ import {
 } from '@core/brain/snippet'
 import { identifyEngine } from '@core/brain/engine'
 import { brainBaseUrl, canEditBrainUrl, resolveBrainTarget } from '@core/brain/brainTarget'
+import { isInsecureRemoteHttpUrl } from '@core/brain/transportPolicy'
 import { isMini } from '../lib/flavour'
 import { formatClientVersion } from '../lib/clientVersion'
 import { buildAgentSetupPrompt, buildGenericSnippet } from '@core/brain/genericSnippet'
@@ -486,6 +487,8 @@ export default function Connect() {
   const hiddenCount = CLIENT_ORDER.length - visibleClients.length
   const connectedCount = visibleClients.filter((id) => clients.find((c) => c.id === id)?.state === 'wired').length
   const dashboardUrl = effectiveTarget === 'remote' && brainUrl ? brainBaseUrl(brainUrl) : ''
+  const plainRemoteHttp =
+    effectiveTarget === 'remote' && isInsecureRemoteHttpUrl(brainUrl)
   const partialClients = clients.filter((c) => c.state === 'partial' && isVisible(c.id))
   // The same three shapes the prompt tells an agent to choose between,
   // for the person who would rather open the file themselves. Mini removed
@@ -779,6 +782,13 @@ export default function Connect() {
             </>
           )}
         </div>
+
+        {plainRemoteHttp && (
+          <p className="mt-2 flex items-start gap-2 text-[11px] text-amber" role="alert">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>{labels.connectPlainHttpWarn}</span>
+          </p>
+        )}
 
         {/* One field above does both jobs now; what is left to say is which
             kind of token is currently in hand, because that decides whether

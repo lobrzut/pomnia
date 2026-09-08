@@ -281,10 +281,19 @@ likelier event.
 
 The unit binds `0.0.0.0`. On a LAN that is the point. Beyond one:
 
-- Terminate TLS in front of it (Caddy, nginx). brain-core speaks plain HTTP by
-  design and does not manage certificates.
-- Forward `X-Forwarded-Proto` so the status page prints `https://` URLs.
+- Terminate TLS in front of it (Caddy, nginx) or reach it only over WireGuard.
+  brain-core speaks plain HTTP by design and does not manage certificates.
+- Set `BRAIN_TRUSTED_PROXIES` to the proxy's immediate peer address(es) so
+  `X-Forwarded-For` / `X-Forwarded-Proto` are honoured for rate limits and
+  `Secure` session cookies. Without that list, forwarded headers are ignored
+  (spoof-safe default).
+- Forward `X-Forwarded-Proto` from the trusted proxy so the panel prints
+  `https://` URLs and sets `Secure` on the session cookie.
 - Do not open 7865 to the internet directly.
+- Loopback HTTP (`127.0.0.1` / `localhost`) is an explicit local transport —
+  fine for embedded Desktop and same-machine MCP. Plain HTTP to a remote host
+  is allowed by the server (no forced redirect) but the panel and Desktop warn
+  before you type a password or bearer token.
 
 ## When something is wrong
 

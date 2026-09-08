@@ -63,8 +63,22 @@ The client bundles **embedded Brain** (`brain-core` / MCP `:7862`) in Desktop. A
 
 ---
 
+## 6. Brain-MCP HTTP transport (honesty)
+
+brain-core listens on **plain HTTP**. TLS termination and network exposure are **operator** concerns (reverse proxy, WireGuard, firewall) — the process does not force an HTTPS redirect.
+
+| Case | Policy |
+|------|--------|
+| **Loopback** (`127.0.0.1` / `localhost` / `::1`) | Supported local transport (embedded Desktop MCP, same-machine clients). |
+| **Remote plain HTTP** | Server still answers; **UI warns** before password / bearer entry. Secrets travel in cleartext. |
+| **HTTPS via proxy** | Set `BRAIN_TRUSTED_PROXIES` to the proxy peer; forward `X-Forwarded-Proto`. Session cookies get `Secure` only when the request is treated as HTTPS (`requestIsHttps`). Untrusted peers cannot spoof proto/XFF. |
+
+This file does not prescribe a production hostname or LAN IP — those belong in the operator's deploy notes, not in product defaults.
+
+---
+
 ## Scope
 
 This file does not replace an organisational security policy or an audit report. Updates to the publication model or technical guarantees should be reflected here before each major production cut.
 
-*Last updated: 2026-08-07 — public EN trust doc + plaintext sidecar honesty (aligned with START-HERE / landing privacy).*
+*Last updated: 2026-09-08 — HTTP transport honesty (F12) + trusted-proxy Secure cookies (F02).*

@@ -147,10 +147,11 @@ export function readCookie(header: string | undefined, name: string): string | u
 }
 
 /**
- * `Secure` only over HTTPS: setting it on a plain-HTTP LAN deployment would
- * make the browser drop the cookie and the panel would look broken with no
- * explanation. The README says to terminate TLS in front; this follows what
- * actually happened rather than what was recommended.
+ * `Secure` only when the request is treated as HTTPS (`requestIsHttps` +
+ * trusted proxies, audit F02/F12). Setting Secure on plain HTTP makes the
+ * browser drop the cookie. Loopback HTTP stays a supported local transport;
+ * remote operators terminate TLS or use WireGuard — the panel warns on
+ * insecure remote HTTP instead of inventing a redirect.
  */
 export function sessionCookie(sid: string, secure: boolean): string {
   const parts = [
