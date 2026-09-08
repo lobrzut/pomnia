@@ -147,10 +147,13 @@ jobs:
             gh release upload "$TAG" "${ASSETS[@]}" --clobber
             echo "Attached brain-core tarball to existing $TAG"
           else
+            # Draft only — an incomplete tag must not become releases/latest
+            # (F10). promote-release / the verify job undrafts when complete.
             gh release create "$TAG" "${ASSETS[@]}" \
               --title "Pomnia ${TAG#v}" \
-              --notes "Self-hosted server tarball (pomnia-brain-core-*-linux-x64.tar.gz). Requires Node 22 (packed better-sqlite3 ABI). Linux desktop AppImage/deb may follow from the parallel pack job."
-            echo "Created published release $TAG with brain-core tarball (needed for releases/latest + curl|sh)"
+              --notes "Self-hosted server tarball (pomnia-brain-core-*-linux-x64.tar.gz). Requires Node 22 (packed better-sqlite3 ABI). Linux desktop AppImage/deb may follow from the parallel pack job." \
+              --draft
+            echo "Created DRAFT release $TAG with brain-core tarball (promote when complete)"
           fi
 
   build-linux:
@@ -318,20 +321,19 @@ jobs:
             gh release upload "$TAG" "${ASSETS[@]}" --clobber
             echo "Attached Linux assets to existing $TAG"
           else
-            # Published, not a draft: curl|sh reads the tarball off releases/latest,
-            # and a draft is not latest. The cost is that this tag becomes latest
-            # with no Windows installer on it until publish:release adds one —
-            # which is exactly what happened to v0.1.61–v0.1.63. The
-            # verify-release-complete job below is what makes that loud.
+            # Draft only (F10). Publishing Linux-only as latest broke Windows CTAs
+            # on v0.1.61–v0.1.63. Incomplete tags stay drafts; promote-release
+            # undrafts after check-release-complete passes.
             gh release create "$TAG" "${ASSETS[@]}" \
               --title "Pomnia ${TAG#v}" \
-              --notes "Linux desktop app (AppImage/deb, unsigned) and the self-hosted server tarball (pomnia-brain-core-*-linux-x64.tar.gz). Windows installer may follow via publish:release."
-            echo "Created published release $TAG with Linux assets (needed for releases/latest + curl|sh)"
+              --notes "Linux desktop app (AppImage/deb, unsigned) and the self-hosted server tarball (pomnia-brain-core-*-linux-x64.tar.gz). Windows installer may follow via publish:release." \
+              --draft
+            echo "Created DRAFT release $TAG with Linux assets (promote when complete)"
           fi
 
-  # A green Linux release says nothing about what a Windows visitor gets, because
-  # the site's CTA and this workflow point at the same URL from opposite ends.
-  # Fail the run rather than leave that to whoever clicks the button next.
+  # A green Linux pack says nothing about what a Windows visitor gets. Check the
+  # tag (including drafts), then undraft only when every platform is present —
+  # never make an incomplete tag into releases/latest (F10).
   verify-release-complete:
     runs-on: ubuntu-latest
     needs: [pack-brain-core, build-linux]
@@ -339,7 +341,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Every platform reachable from releases/latest
+      - name: Every platform present on this tag (version-bound)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/check-release-complete.mjs --tag "${GITHUB_REF_NAME}"
+        run: npx tsx scripts/check-release-complete.mjs --tag "${GITHUB_REF_NAME}"
+      - name: Promote draft to latest only when complete
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx tsx scripts/promote-release.mjs --tag "${GITHUB_REF_NAME}"

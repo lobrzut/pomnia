@@ -8,6 +8,9 @@ embeds — same code, different entry point (`dist/daemon.js` instead of a fork)
 Download the server tarball from
 [releases](https://github.com/lobrzut/pomnia/releases/latest) — it is built on
 Linux with its native modules already compiled, so there is nothing to build.
+If `releases/latest` is missing the tarball (or its `.sha256`), bootstrap stops;
+that is a broken public release, not an install-script bug — see
+[LINUX-BUILD.md](../../../docs/LINUX-BUILD.md) (draft → complete → promote).
 
 One shot (POSIX `sh`, so `| sh` is dash-safe on Debian). Resolves
 `pomnia-brain-core-*-linux-x64.tar.gz` from `releases/latest`, checks sha256
