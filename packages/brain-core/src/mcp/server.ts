@@ -95,7 +95,9 @@ import type { BrainConfig } from '../config/index.js'
 import { embedClientFromConfig } from '../rag/embed.js'
 import { openDb } from '../storage/db.js'
 import { defaultVaultConfig, vaultConfigFromRoot, type VaultConfig } from '../storage/vault.js'
-import { createAuthGate } from './auth.js'
+import { createAuthGate, isLoopbackHost } from './auth.js'
+import { clientAddress, requestIsHttps } from './clientAddress.js'
+import { checkLoopbackRequestBoundary } from './requestBoundary.js'
 import { callTool, listTools, type ToolContext } from './tools/index.js'
 import { loadPrompts, renderPrompt } from './prompts.js'
 import { listResourceTemplates, listResources, readResource } from './resources.js'
@@ -640,7 +642,11 @@ export async function createBrainServer(
         host: config.host,
         tokensFile: config.auth.tokensFile,
         maxFailsPerMinute: config.auth.maxFailsPerMinute,
+        trustedProxies: config.auth.trustedProxies,
       })
+      const trustedProxies = config.auth.trustedProxies ?? []
+      /** MCP JSON-RPC body cap while streaming — never Buffer.concat unbounded (F14). */
+      const MAX_MCP_BODY_BYTES = MAX_FILE_BYTES * 2
       if (gate.required) {
         const n = await gate.tokenCount()
         console.error(
@@ -652,6 +658,23 @@ export async function createBrainServer(
 
       http = createServer((req: IncomingMessage, res: ServerResponse) => {
         const pathOnly = req.url?.split('?')[0] ?? ''
+        // Loopback bind alone is not a trust boundary — require a local Host
+        // (and Origin when present) before any admin/MCP/sync handler (F01).
+        if (isLoopbackHost(config.host)) {
+          const boundary = checkLoopbackRequestBoundary(req)
+          if (!boundary.ok) {
+            res.statusCode = 403
+            res.setHeader('content-type', 'application/json')
+            res.end(
+              JSON.stringify({
+                error: 'forbidden',
+                reason: boundary.reason,
+                hint: 'Host/Origin must target this loopback listener',
+              }),
+            )
+            return
+          }
+        }
         // Brand icons from pomnia-landing (embedded). Same assets as pomnia.ai.
         if (pathOnly === '/favicon.ico') {
           res.statusCode = 200
@@ -796,7 +819,7 @@ export async function createBrainServer(
           pathOnly === '/admin/'
         ) {
           const host = req.headers.host ?? `${config.host}:${config.port}`
-          const proto = String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0].trim()
+          const proto = requestIsHttps(req, trustedProxies) ? 'https' : 'http'
           res.statusCode = 200
           res.setHeader('content-type', 'text/html; charset=utf-8')
           res.setHeader(
@@ -817,7 +840,7 @@ export async function createBrainServer(
             .catch(() => ({}) as Awaited<ReturnType<typeof readSettings>>)
             .then((saved) => {
               res.end(
-                renderAdminPage(`${proto === 'https' ? 'https' : 'http'}://${host}`, {
+                renderAdminPage(`${proto}://${host}`, {
                   distillFeature: config.distillEnabled !== false,
                   colorScheme: saved.colorScheme,
                 }),
@@ -830,7 +853,7 @@ export async function createBrainServer(
         // 404 (see below), and a prefix match would swallow them.
         if (pathOnly === '/status' || pathOnly === '/status/') {
           const host = req.headers.host ?? `${config.host}:${config.port}`
-          const proto = String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0].trim()
+          const proto = requestIsHttps(req, trustedProxies) ? 'https' : 'http'
           void (async () => {
             const health = await collectHealth({
               db: ctx?.db ?? null,
@@ -870,7 +893,7 @@ export async function createBrainServer(
               renderStatusPage({
                 version: BRAIN_CORE_VERSION,
                 authRequired: gate.required,
-                origin: `${proto === 'https' ? 'https' : 'http'}://${host}`,
+                origin: `${proto}://${host}`,
                 state: health.status,
                 writable: health.writable,
                 vaultOwner: health.vaultOwner,
@@ -1075,12 +1098,8 @@ export async function createBrainServer(
         req: IncomingMessage,
         res: ServerResponse,
       ): Promise<boolean> {
-        const isHttps = String(req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() === 'https'
-        const clientKey = (): string => {
-          const fwd = req.headers['x-forwarded-for']
-          const first = Array.isArray(fwd) ? fwd[0] : fwd?.split(',')[0]
-          return (first?.trim() || req.socket.remoteAddress || 'unknown').toLowerCase()
-        }
+        const isHttps = requestIsHttps(req, trustedProxies)
+        const clientKey = (): string => clientAddress(req, trustedProxies)
 
         if (path === '/admin/login') {
           if (req.method !== 'POST') {
@@ -1100,6 +1119,10 @@ export async function createBrainServer(
             })
             return true
           }
+          // Reserve the attempt before the KDF so parallel guesses cannot all
+          // slip under the limit while authenticate is still hashing (F02).
+          win.push(t)
+          loginFails.set(key, win)
 
           const body = (await readAdminBody(req).catch(() => null)) as {
             username?: unknown
@@ -1111,8 +1134,6 @@ export async function createBrainServer(
             String(body?.password ?? ''),
           )
           if (!r.ok || r.user.role !== 'admin') {
-            win.push(t)
-            loginFails.set(key, win)
             console.error(`[pomnia-core] failed panel login from ${key}`)
             // One message for both cases: naming which half was wrong turns a
             // login form into an account enumerator.
@@ -1649,7 +1670,23 @@ export async function createBrainServer(
           let parsedBody: unknown
           if (req.method === 'POST') {
             const chunks: Buffer[] = []
-            for await (const c of req) chunks.push(c as Buffer)
+            let total = 0
+            for await (const c of req) {
+              total += (c as Buffer).length
+              if (total > MAX_MCP_BODY_BYTES) {
+                res.statusCode = 413
+                res.setHeader('content-type', 'application/json')
+                res.end(
+                  JSON.stringify({
+                    error: 'payload_too_large',
+                    detail: `MCP body exceeds ${MAX_MCP_BODY_BYTES} bytes`,
+                  }),
+                )
+                req.destroy()
+                return
+              }
+              chunks.push(c as Buffer)
+            }
             const raw = Buffer.concat(chunks).toString('utf8')
             try {
               parsedBody = JSON.parse(raw)
