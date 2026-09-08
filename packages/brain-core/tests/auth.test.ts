@@ -113,6 +113,25 @@ describe('auth gate', () => {
     expect(await g.check(req('Bearer nope', '10.0.0.2'))).toMatchObject({ reason: 'bad_token' })
   })
 
+  it('does not let a forged X-Forwarded-For reset the budget (F02)', async () => {
+    writeTokens(['x', 'btk_good'])
+    const g = createAuthGate({
+      host: '0.0.0.0',
+      tokensFile,
+      maxFailsPerMinute: 2,
+      trustedProxies: [],
+    })
+    const spoof = (xff: string): IncomingMessage =>
+      ({
+        headers: { authorization: 'Bearer nope', 'x-forwarded-for': xff },
+        socket: { remoteAddress: '10.0.0.5' },
+      }) as unknown as IncomingMessage
+    await g.check(spoof('1.1.1.1'))
+    await g.check(spoof('2.2.2.2'))
+    // Third attempt from the same socket must be limited even though XFF changed.
+    expect(await g.check(spoof('3.3.3.3'))).toMatchObject({ reason: 'rate_limited' })
+  })
+
   it('picks up a token added after start, without a restart', async () => {
     writeTokens(['old', 'btk_old'])
     let clock = 1_000_000

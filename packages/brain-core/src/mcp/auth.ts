@@ -22,6 +22,8 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import type { IncomingMessage } from 'node:http'
 
+import { clientAddress } from './clientAddress.js'
+
 /**
  * What a token is allowed to do.
  *
@@ -92,6 +94,11 @@ export interface AuthGateOptions {
   host: string
   tokensFile: string
   maxFailsPerMinute: number
+  /**
+   * Peers allowed to set X-Forwarded-For. Empty (default) means always use
+   * socket.remoteAddress — a client cannot reset its own rate-limit budget.
+   */
+  trustedProxies?: readonly string[]
   /** Test seam. */
   now?: () => number
 }
@@ -99,6 +106,7 @@ export interface AuthGateOptions {
 export function createAuthGate(opts: AuthGateOptions): AuthGate {
   const now = opts.now ?? Date.now
   const required = !isLoopbackHost(opts.host)
+  const trustedProxies = opts.trustedProxies ?? []
 
   let cached: TokenEntry[] = []
   let cachedMtimeMs = -1
@@ -146,9 +154,7 @@ export function createAuthGate(opts: AuthGateOptions): AuthGate {
   const fails = new Map<string, number[]>()
 
   function clientKey(req: IncomingMessage): string {
-    const fwd = req.headers['x-forwarded-for']
-    const first = Array.isArray(fwd) ? fwd[0] : fwd?.split(',')[0]
-    return (first?.trim() || req.socket.remoteAddress || 'unknown').toLowerCase()
+    return clientAddress(req, trustedProxies)
   }
 
   function rateLimited(key: string): number {

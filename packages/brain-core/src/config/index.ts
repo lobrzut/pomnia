@@ -124,6 +124,11 @@ export interface BrainConfig {
     tokensFile: string
     /** Rate limit for failed bearer auth attempts (per IP, sliding window). */
     maxFailsPerMinute: number
+    /**
+     * Socket peers allowed to set X-Forwarded-*. Empty = never trust forwarded
+     * headers (audit F02). Env: BRAIN_TRUSTED_PROXIES=ip,ip.
+     */
+    trustedProxies: string[]
   }
 }
 
@@ -152,6 +157,7 @@ export function defaultConfig(): BrainConfig {
     auth: {
       tokensFile: join(dataDir, 'mcp-tokens.json'),
       maxFailsPerMinute: 20,
+      trustedProxies: [],
     },
   }
 }
@@ -239,6 +245,11 @@ export async function loadConfig(
   if (env.BRAIN_DISTILL_MODEL) cfg.distillModel = env.BRAIN_DISTILL_MODEL
   // Alias used in older docs / Continuum-era notes.
   if (!env.BRAIN_DISTILL_MODEL && env.BRAIN_CHAT_MODEL) cfg.distillModel = env.BRAIN_CHAT_MODEL
+  if (env.BRAIN_TRUSTED_PROXIES) {
+    cfg.auth.trustedProxies = env.BRAIN_TRUSTED_PROXIES.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
 
   // CLI overrides (simple, no getopt dependency)
   const dataDirBefore = cfg.dataDir
