@@ -54,3 +54,4 @@ scripts/gen-logo-refines.py
 
 # Local landing workspace (not Desktop product publish root)
 landing/
+.audit/

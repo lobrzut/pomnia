@@ -21,12 +21,14 @@ describe('read-only replica', () => {
     expect(names({ readOnly: true })).toEqual(names())
   })
 
-  it('marks both write tools as disabled in their descriptions', () => {
+  it('marks every write tool as disabled in its description', () => {
     const ctx = { readOnly: true, authoritativeVaultHint: 'C:\\Vault on the desktop' }
-    for (const tool of ['save_conversation', 'checkpoint_session']) {
+    // memory belongs here: it writes USER.md, and a replica accepting a profile
+    // edit the next sync deletes is exactly the silent fork this guards (F05).
+    for (const tool of ['save_conversation', 'checkpoint_session', 'memory']) {
       const d = desc(ctx, tool)
-      expect(d).toContain('READ-ONLY')
-      expect(d).toContain('C:\\Vault on the desktop')
+      expect(d, tool).toContain('READ-ONLY')
+      expect(d, tool).toContain('C:\\Vault on the desktop')
     }
   })
 

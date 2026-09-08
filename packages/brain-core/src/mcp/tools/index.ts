@@ -12,7 +12,7 @@
 
 import type Database from 'better-sqlite3'
 import { readFileSync } from 'node:fs'
-import { afterCall, freshState, type UnsavedState } from '../unsavedWork.js'
+import { afterCall, freshState, isWritingTool, type UnsavedState } from '../unsavedWork.js'
 import { indexAfterWrite, indexOutcomeNote } from '../indexAfterWrite.js'
 import type { EmbedClient } from '../../rag/embed.js'
 import { indexFiles } from '../../rag/indexer.js'
@@ -20,6 +20,7 @@ import { indexFiles } from '../../rag/indexer.js'
 import { runSearchLibrary, searchLibrarySchema } from './searchLibrary.js'
 import type { Reranker } from '../../rag/rerank.js'
 import { VaultFreshness, freshnessReminder, hashContent } from '../vaultFreshness.js'
+import { UsageSignal } from '../../rag/usageSignal.js'
 import { readFileSync as readFileForFreshness, existsSync as existsForFreshness } from 'node:fs'
 import { join as joinForFreshness } from 'node:path'
 import { runSaveConversation, saveConversationSchema } from './saveConversation.js'
@@ -71,6 +72,12 @@ export interface ToolContext {
    * One per server. See vaultFreshness.ts for what it can and cannot see.
    */
   freshness?: VaultFreshness
+  /**
+   * Records which searches were followed by a save — the one relevance signal
+   * only Pomnia can see. Append-only; not used for ranking yet. See
+   * rag/usageSignal.ts for why recording is kept separate from ranking.
+   */
+  usage?: UsageSignal
   vaultRoot: string
   userMdPath: string
   /**
@@ -179,7 +186,8 @@ export function listTools(
     {
       name: 'memory',
       description:
-        'Add/replace/remove entries in vault/USER.md. ONLY durable identity patterns the user confirmed (decision / threat / irritant / tempo-ownership / agent tone). Refuse version changelogs (0.1.x), ship notes, installer paths, Pine/trading noise, one-off build fixes. § PROFIL = person; § TECH = durable product/stack identity — NOT release notes. Session dumps → save_conversation; mid-session milestones → checkpoint_session. Operational agent brief → vault/AGENTS.md. Prefer replace/compress near 2200. Categories: user, tech, comm, income.',
+        'Add/replace/remove entries in vault/USER.md. ONLY durable identity patterns the user confirmed (decision / threat / irritant / tempo-ownership / agent tone). Refuse version changelogs (0.1.x), ship notes, installer paths, Pine/trading noise, one-off build fixes. § PROFIL = person; § TECH = durable product/stack identity — NOT release notes. Session dumps → save_conversation; mid-session milestones → checkpoint_session. Operational agent brief → vault/AGENTS.md. Prefer replace/compress near 2200. Categories: user, tech, comm, income.' +
+        roNote,
       inputSchema: memorySchema,
     },
     {
@@ -315,13 +323,20 @@ async function dispatchTool(
   // Enforce at the call site too, not only in the catalog: a client caches the
   // tool list, so an agent that connected before the flag was set would still
   // try to write. Refusing loudly beats accepting a note the next sync deletes.
-  if (ctx.readOnly === true && (name === 'save_conversation' || name === 'checkpoint_session')) {
+  // Every tool that writes to the vault, from one source of truth. This gate
+  // missed `memory`, which writes USER.md — so a read-only replica accepted a
+  // profile edit the next sync would delete (audit F05). isWritingTool is that
+  // set; the two lists must not drift apart.
+  if (ctx.readOnly === true && isWritingTool(name)) {
     return readOnlyRefusal(ctx.authoritativeVaultHint)
   }
 
   switch (name) {
-    case 'search_library':
+    case 'search_library': {
+      const q = args && typeof args === 'object' ? (args as { query?: unknown }).query : undefined
+      if (typeof q === 'string') ctx.usage?.searched(q)
       return runSearchLibrary(args, { db: ctx.db, embedder: ctx.embedder, reranker: ctx.reranker })
+    }
     case 'save_conversation': {
       const saved = await runSaveConversation(args, { vaultRoot: ctx.vaultRoot })
       // The write is atomic; the index was not part of that promise. See
@@ -332,6 +347,7 @@ async function dispatchTool(
           { path: saved.path, text: readFileSync(saved.path, 'utf8') },
         ]),
       )
+      ctx.usage?.saved(saved.path, 'save_conversation')
       return `${saved.text}\n\n${indexOutcomeNote(outcome)}`
     }
     case 'checkpoint_session': {
@@ -347,6 +363,7 @@ async function dispatchTool(
             { path: written, text: readFileSync(written, 'utf8') },
           ]),
         )
+        ctx.usage?.saved(written, 'checkpoint_session')
         return `${ckpt.text}\n\n${indexOutcomeNote(outcome)}`
       }
       return ckpt.text
@@ -370,8 +387,11 @@ async function dispatchTool(
         settingsBlock
       )
     }
-    case 'memory':
-      return runMemory(args, { userMdPath: ctx.userMdPath })
+    case 'memory': {
+      const r = runMemory(args, { userMdPath: ctx.userMdPath })
+      ctx.usage?.saved(ctx.userMdPath, 'memory')
+      return r
+    }
     case 'library_status': {
       const status = await runLibraryStatus(args, { db: ctx.db })
       if (ctx.handshakeEnabled === false) return status

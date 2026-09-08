@@ -100,6 +100,7 @@ import { callTool, listTools, type ToolContext } from './tools/index.js'
 import { loadPrompts, renderPrompt } from './prompts.js'
 import { listResourceTemplates, listResources, readResource } from './resources.js'
 import { VaultFreshness } from './vaultFreshness.js'
+import { UsageSignal } from '../rag/usageSignal.js'
 
 /**
  * True when an existing brain-core already holds host:port.
@@ -540,6 +541,9 @@ export async function createBrainServer(
         // One tracker for the process; see vaultFreshness.ts. Cheap and always
         // on — it only speaks when a note it served has actually changed.
         freshness: new VaultFreshness(),
+        // Records search->save pairs to state/usage-signal.jsonl. Append-only,
+        // not yet used for ranking -- see rag/usageSignal.ts.
+        usage: new UsageSignal(vault.root),
         vaultRoot: vault.root,
         userMdPath: vault.userProfilePath,
         skillsRoot: resolveSkillsRoot(vault),
