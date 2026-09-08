@@ -80,7 +80,7 @@ console.log(`\n✔ uploaded Windows assets to ${tag}`)
 // because nobody checked the second thing. Inherit stdio so a failure names the
 // missing assets here rather than sending someone off to re-run the check.
 try {
-  execFileSync('node', [join(root, 'scripts', 'check-release-complete.mjs'), '--tag', tag], {
+  execFileSync('npx', ['tsx', join(root, 'scripts', 'check-release-complete.mjs'), '--tag', tag], {
     cwd: root,
     stdio: 'inherit',
   })
