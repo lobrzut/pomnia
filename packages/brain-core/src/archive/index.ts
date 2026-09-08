@@ -12,7 +12,7 @@ export {
 } from './paths.js'
 export type { ArchivePathRejection, ArchivePathVerdict } from './paths.js'
 
-export { atomicWrite, writeFileKeepingPrev, readFileWithPrevFallback } from './durableWrite.js'
+export { atomicWrite, atomicWriteSync, writeFileKeepingPrev, writeFileKeepingPrevSync, readFileWithPrevFallback } from './durableWrite.js'
 
 export {
   sha256,

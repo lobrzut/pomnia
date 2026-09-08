@@ -21,8 +21,10 @@
  * normalised — normalising an escape attempt turns it into a successful write
  * somewhere unexpected.
  */
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+
+import { writeFileKeepingPrevSync } from '../archive/durableWrite.js'
 
 import { loadPrompts, PROMPTS_DIR, type PromptArgument } from '../mcp/prompts.js'
 
@@ -84,7 +86,7 @@ function writeText(file: string, content: string): { unchanged: boolean } | Libr
   }
   try {
     if (existsSync(file) && readFileSync(file, 'utf8') === content) return { unchanged: true }
-    writeFileSync(file, content, 'utf8')
+    writeFileKeepingPrevSync(file, Buffer.from(content, 'utf8'))
     return { unchanged: false }
   } catch (e) {
     return { error: 'failed', detail: (e as Error).message }

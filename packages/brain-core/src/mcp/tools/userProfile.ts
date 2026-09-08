@@ -16,8 +16,10 @@
  * `replace`/`remove` are substring-scoped and single-shot.
  */
 
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+
+import { writeFileKeepingPrevSync } from '../../archive/durableWrite.js'
 import { z } from 'zod'
 
 export const USER_MAX = 2200
@@ -84,11 +86,9 @@ function readProfile(path: string): string {
   return readFileSync(path, 'utf-8')
 }
 
-/** Atomic write via `.tmp` + rename. Matches Python impl. */
+/** Durable write via fsync + `.prev` spare (same path as vault/archive). */
 function writeProfile(path: string, content: string): void {
-  const tmp = path + '.tmp'
-  writeFileSync(tmp, content, 'utf-8')
-  renameSync(tmp, path)
+  writeFileKeepingPrevSync(path, Buffer.from(content, 'utf-8'))
 }
 
 function agentsMdHint(userMdPath: string): string {
