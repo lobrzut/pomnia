@@ -26,6 +26,8 @@ import { hostname } from 'node:os'
 import { dirname, join } from 'node:path'
 import { promises as fs } from 'node:fs'
 
+import { writeFileKeepingPrev } from '../archive/durableWrite.js'
+
 export const VAULT_OWNER_SCHEMA = 1
 
 export interface VaultWriter {
@@ -49,6 +51,12 @@ export type OwnershipVerdict =
   | { writable: true; reason: 'claimed' | 'owner' | 'forced'; owner: VaultWriter }
   | { writable: false; reason: 'held-by-other'; owner: VaultWriter }
   | { writable: false; reason: 'read-only-flag'; owner: VaultWriter | null }
+  | {
+      writable: false
+      reason: 'corrupt-marker'
+      owner: null
+      detail: string
+    }
 
 export function vaultOwnerPath(vaultRoot: string): string {
   return join(vaultRoot, 'state', 'vault-writer.json')
@@ -59,28 +67,48 @@ function isWriter(v: unknown): v is VaultWriter {
   return !!w && typeof w.id === 'string' && !!w.id && typeof w.label === 'string' && typeof w.host === 'string'
 }
 
-export function parseVaultOwner(raw: string): VaultOwnerFile | null {
-  try {
-    const o = JSON.parse(raw) as Partial<VaultOwnerFile>
-    if (!isWriter(o.writer)) return null
-    return {
-      schemaVersion: typeof o.schemaVersion === 'number' ? o.schemaVersion : VAULT_OWNER_SCHEMA,
-      writer: o.writer,
-      since: typeof o.since === 'string' ? o.since : new Date().toISOString(),
-      lastSeen: typeof o.lastSeen === 'string' ? o.lastSeen : new Date().toISOString(),
-    }
-  } catch {
-    return null
+export class VaultOwnerCorruptError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'VaultOwnerCorruptError'
   }
 }
 
+/**
+ * Parse a marker body. Throws VaultOwnerCorruptError on bad JSON/schema —
+ * never returns null for garbage (null used to mean "unclaimed").
+ */
+export function parseVaultOwner(raw: string): VaultOwnerFile {
+  let o: Partial<VaultOwnerFile>
+  try {
+    o = JSON.parse(raw) as Partial<VaultOwnerFile>
+  } catch (e) {
+    throw new VaultOwnerCorruptError(`vault-writer.json is not valid JSON: ${(e as Error).message}`)
+  }
+  if (!isWriter(o.writer)) {
+    throw new VaultOwnerCorruptError('vault-writer.json has no usable writer identity')
+  }
+  return {
+    schemaVersion: typeof o.schemaVersion === 'number' ? o.schemaVersion : VAULT_OWNER_SCHEMA,
+    writer: o.writer,
+    since: typeof o.since === 'string' ? o.since : new Date().toISOString(),
+    lastSeen: typeof o.lastSeen === 'string' ? o.lastSeen : new Date().toISOString(),
+  }
+}
+
+/**
+ * Read the marker. `null` means the file is absent (unclaimed). Corruption and
+ * I/O errors throw — they must not be mistaken for an empty vault.
+ */
 export async function readVaultOwner(vaultRoot: string): Promise<VaultOwnerFile | null> {
   try {
     return parseVaultOwner(await fs.readFile(vaultOwnerPath(vaultRoot), 'utf8'))
   } catch (e) {
-    // A vault we cannot read the marker from is not a vault we may assume is
-    // ours. Only "there is no marker" means unclaimed.
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
+    if (e instanceof VaultOwnerCorruptError) throw e
+    if (e instanceof SyntaxError) {
+      throw new VaultOwnerCorruptError(`vault-writer.json is not valid JSON: ${e.message}`)
+    }
     throw e
   }
 }
@@ -88,9 +116,7 @@ export async function readVaultOwner(vaultRoot: string): Promise<VaultOwnerFile 
 async function writeVaultOwner(vaultRoot: string, file: VaultOwnerFile): Promise<void> {
   const p = vaultOwnerPath(vaultRoot)
   await fs.mkdir(dirname(p), { recursive: true })
-  const tmp = `${p}.tmp`
-  await fs.writeFile(tmp, `${JSON.stringify(file, null, 2)}\n`, 'utf8')
-  await fs.rename(tmp, p)
+  await writeFileKeepingPrev(p, Buffer.from(`${JSON.stringify(file, null, 2)}\n`, 'utf8'))
 }
 
 /**
@@ -122,7 +148,17 @@ export async function resolveVaultOwnership(opts: {
   me: VaultWriter
   forceReadOnly?: boolean
 }): Promise<OwnershipVerdict> {
-  const existing = await readVaultOwner(opts.vaultRoot)
+  let existing: VaultOwnerFile | null
+  try {
+    existing = await readVaultOwner(opts.vaultRoot)
+  } catch (e) {
+    if (e instanceof VaultOwnerCorruptError) {
+      // A broken marker is not a free vault. Refuse writes and leave the bytes
+      // alone — admin claimVault is the deliberate repair path.
+      return { writable: false, reason: 'corrupt-marker', owner: null, detail: e.message }
+    }
+    throw e
+  }
   if (opts.forceReadOnly) {
     return { writable: false, reason: 'read-only-flag', owner: existing?.writer ?? null }
   }
@@ -154,7 +190,13 @@ export async function claimVault(opts: {
   vaultRoot: string
   me: VaultWriter
 }): Promise<{ previous: VaultWriter | null; owner: VaultWriter }> {
-  const existing = await readVaultOwner(opts.vaultRoot)
+  let previous: VaultWriter | null = null
+  try {
+    previous = (await readVaultOwner(opts.vaultRoot))?.writer ?? null
+  } catch (e) {
+    if (!(e instanceof VaultOwnerCorruptError)) throw e
+    // Explicit claim is the repair path for a corrupt marker.
+  }
   const now = new Date().toISOString()
   await writeVaultOwner(opts.vaultRoot, {
     schemaVersion: VAULT_OWNER_SCHEMA,
@@ -162,7 +204,7 @@ export async function claimVault(opts: {
     since: now,
     lastSeen: now,
   })
-  return { previous: existing?.writer ?? null, owner: opts.me }
+  return { previous, owner: opts.me }
 }
 
 /** Human sentence for refusals and logs. */

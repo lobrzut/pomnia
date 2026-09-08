@@ -77,14 +77,18 @@ describe('resolveVaultOwnership', () => {
   })
 
   /** Unreadable is not the same as unclaimed — guessing here loses data. */
-  it('refuses to treat a corrupt marker as an empty vault', async () => {
+  it('refuses writes on a corrupt marker and leaves the bytes untouched (F07)', async () => {
     await resolveVaultOwnership({ vaultRoot: root, me: desktop })
-    await writeFile(vaultOwnerPath(root), '{ this is not json', 'utf8')
+    const broken = '{ this is not json'
+    await writeFile(vaultOwnerPath(root), broken, 'utf8')
     const v = await resolveVaultOwnership({ vaultRoot: root, me: server })
-    // Garbage parses to null, which reads as unclaimed — acceptable only
-    // because a *takeover* is what the user would have to do anyway. What must
-    // not happen is silently continuing to believe someone else holds it.
-    expect(v.writable).toBe(true)
+    expect(v).toMatchObject({ writable: false, reason: 'corrupt-marker', owner: null })
+    expect(await readFile(vaultOwnerPath(root), 'utf8')).toBe(broken)
+  })
+
+  it('still claims when the marker file is genuinely absent', async () => {
+    const v = await resolveVaultOwnership({ vaultRoot: root, me: desktop })
+    expect(v).toMatchObject({ writable: true, reason: 'claimed' })
   })
 
   it('propagates a marker that exists but cannot be read', async () => {
