@@ -204,3 +204,34 @@ describe('touchLogin', () => {
     expect((await readUsers(dir))[0].lastLogin).toBeTruthy()
   })
 })
+
+describe('corrupt users.json must not be overwritten (F08)', () => {
+  it('refuses createUser on invalid JSON and leaves the file intact', async () => {
+    const broken = '{broken-existing-users'
+    await writeFile(usersPath(dir), broken, 'utf8')
+    await expect(
+      createUser(dir, { username: 'fixture', password: GOOD, role: 'admin' }),
+    ).rejects.toThrow()
+    expect(await import('node:fs').then((m) => m.promises.readFile(usersPath(dir), 'utf8'))).toBe(broken)
+  })
+
+  it('refuses a non-array store', async () => {
+    await writeFile(usersPath(dir), JSON.stringify({ username: 'x' }), 'utf8')
+    await expect(readUsers(dir)).rejects.toThrow(/array/)
+    await expect(createUser(dir, { username: 'a1', password: GOOD, role: 'admin' })).rejects.toThrow()
+  })
+
+  it('refuses a store with a bad record instead of dropping it', async () => {
+    await writeFile(
+      usersPath(dir),
+      JSON.stringify([{ username: 'ok', password: 'scrypt$1$1$1$a$b' }, { username: 'bad' }]),
+      'utf8',
+    )
+    await expect(readUsers(dir)).rejects.toThrow(/password/)
+  })
+
+  it('treats a missing file as empty so first create works', async () => {
+    expect(await readUsers(dir)).toEqual([])
+    expect((await createUser(dir, { username: 'a1', password: GOOD, role: 'admin' })).ok).toBe(true)
+  })
+})
