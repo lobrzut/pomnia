@@ -61,7 +61,7 @@ describe('Vault.lock (F13)', () => {
           label: 'test',
           strategy: 'snapshot',
           root: dir,
-          os: 'windows',
+          os: 'win32',
         },
         note: 'mid-lock',
         stats: { conversations: 0, messages: 0, files: 0, bytes: 0 },
@@ -73,8 +73,6 @@ describe('Vault.lock (F13)', () => {
           item: {
             relPath: 'slow.txt',
             absRoot: dir,
-            bytes: 0,
-            sha256: '',
           },
           read: async () => {
             await gate

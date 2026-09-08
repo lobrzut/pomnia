@@ -140,6 +140,11 @@ import {
   showProfilePreview,
 } from './profilePreview.js'
 import { buildProfilePreview, saveProfileUserMd } from './profilePreviewContent.js'
+import {
+  assertTrustedIpcSender,
+  attachRendererNavigationGuards,
+  setIpcMainWebContents,
+} from './ipcGuard.js'
 import { activity, type ActivityUpdate } from './activity.js'
 import {
   getLastActivityReplay,
@@ -707,11 +712,16 @@ function createWindow(): void {
     webPreferences: {
       // electron-vite emits the preload as ESM (index.mjs) — must match exactly,
       // otherwise the bridge never loads and the renderer falls back to its mock.
+      // sandbox:false is intentional: ESM preload does not load under sandbox
+      // without a separate CJS bridge (F20 — do not enable sandbox:true blindly).
       preload: join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
       sandbox: false
     }
   })
+
+  setIpcMainWebContents(win.webContents)
+  attachRendererNavigationGuards(win.webContents, (msg) => log.warn(msg))
 
   win.on('ready-to-show', () => win?.show())
   win.on('focus', () => setMcpActivityWindowFocused(true))
@@ -773,6 +783,19 @@ function createWindow(): void {
 
 /* ── IPC ───────────────────────────────────────────────────────────────── */
 function registerIpc(): void {
+  const trustedHandle = (channel: string, listener: (...args: any[]) => any): void => {
+    ipcMain.handle(channel, (event, ...args) => {
+      assertTrustedIpcSender(event, channel)
+      return listener(event, ...args)
+    })
+  }
+  const trustedOn = (channel: string, listener: (...args: any[]) => void): void => {
+    ipcMain.on(channel, (event, ...args) => {
+      assertTrustedIpcSender(event, channel)
+      listener(event, ...args)
+    })
+  }
+
   activity.wire(
     (channel, payload) => {
       const send = (wc: WebContents) => {
@@ -785,17 +808,17 @@ function registerIpc(): void {
     },
     () => refreshTrayMenu(win, requestQuit),
   )
-  ipcMain.handle('activity:get', () => activity.get())
-  ipcMain.handle('activity:lastReplay', () => getLastActivityReplay())
-  ipcMain.handle('mcpActivity:watch', (_e, active: boolean) => {
+  trustedHandle('activity:get', () => activity.get())
+  trustedHandle('activity:lastReplay', () => getLastActivityReplay())
+  trustedHandle('mcpActivity:watch', (_e, active: boolean) => {
     if (active) startMcpActivityPoll(emitMcpQueryActivity)
     else stopMcpActivityPoll()
     return { ok: true }
   })
 
-  ipcMain.handle('scan', () => detectAll())
+  trustedHandle('scan', () => detectAll())
 
-  ipcMain.handle('vault:status', () => ({
+  trustedHandle('vault:status', () => ({
     open: !!vault,
     path: vaultPath ?? undefined,
     name: vault?.getManifest().name,
@@ -807,7 +830,7 @@ function registerIpc(): void {
     knowledgePath: vault ? brainVaultRoot(vaultPath) : undefined,
   }))
 
-  ipcMain.handle('skills:list', () => {
+  trustedHandle('skills:list', () => {
     if (!vault || !vaultPath) return { own: [], imported: [], skillsRoot: null }
     const skillsRoot = brainSkillsDir(vaultPath)
     try {
@@ -830,13 +853,13 @@ function registerIpc(): void {
    * one create: editing a prompt means opening the file, the same way a skill
    * is edited, because these are documents the user owns.
    */
-  ipcMain.handle('prompts:list', () => {
+  trustedHandle('prompts:list', () => {
     if (!vault || !vaultPath) return { prompts: [], promptsRoot: null }
     const root = brainVaultRoot(vaultPath)
     return { promptsRoot: join(root, 'prompts'), prompts: listLocalPromptsAt(root) }
   })
 
-  ipcMain.handle('prompts:create', async (_e, name: string) => {
+  trustedHandle('prompts:create', async (_e, name: string) => {
     if (!vault || !vaultPath) return { ok: false, error: 'no vault' }
     const clean = String(name ?? '').trim()
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(clean) || clean.endsWith('.md')) {
@@ -857,7 +880,7 @@ description:
     }
   })
 
-  ipcMain.handle('skills:delete', async (_e, filePath: string) => {
+  trustedHandle('skills:delete', async (_e, filePath: string) => {
     if (!vault || !vaultPath) return { ok: false, error: 'no vault' }
     const r = deleteLocalSkillAt(brainSkillsDir(vaultPath), String(filePath ?? ''))
     if (r.ok) {
@@ -872,12 +895,12 @@ description:
     return r
   })
 
-  ipcMain.handle('prompts:delete', async (_e, name: string) => {
+  trustedHandle('prompts:delete', async (_e, name: string) => {
     if (!vault || !vaultPath) return { ok: false, error: 'no vault' }
     return deleteLocalPrompt(brainVaultRoot(vaultPath), String(name ?? '').trim())
   })
 
-  ipcMain.handle('skills:reveal', async (_e, target: string, mode: 'file' | 'folder' = 'file') => {
+  trustedHandle('skills:reveal', async (_e, target: string, mode: 'file' | 'folder' = 'file') => {
     if (!target || typeof target !== 'string') return { ok: false, error: 'missing path' }
     if (mode === 'folder') {
       // showItemInFolder selects the file in Explorer; openPath opens the folder itself.
@@ -888,7 +911,7 @@ description:
     return { ok: !err, error: err || null }
   })
 
-  ipcMain.handle('vault:pickDir', async () => {
+  trustedHandle('vault:pickDir', async () => {
     const r = await dialog.showOpenDialog(win!, {
       title: 'Select vault folder',
       properties: ['openDirectory', 'createDirectory', 'promptToCreate']
@@ -896,7 +919,7 @@ description:
     return r.canceled ? null : r.filePaths[0]
   })
 
-  ipcMain.handle('pick:file', async () => {
+  trustedHandle('pick:file', async () => {
     const r = await dialog.showOpenDialog(win!, {
       title: 'Select export archive',
       properties: ['openFile'],
@@ -905,7 +928,7 @@ description:
     return r.canceled ? null : r.filePaths[0]
   })
 
-  ipcMain.handle('pick:docFile', async () => {
+  trustedHandle('pick:docFile', async () => {
     const r = await dialog.showOpenDialog(win!, {
       title: 'Select document',
       properties: ['openFile'],
@@ -914,7 +937,7 @@ description:
     return r.canceled ? null : r.filePaths[0]
   })
 
-  ipcMain.handle('doc:import', async (_e, filePath?: string, ollamaUrl?: string) => {
+  trustedHandle('doc:import', async (_e, filePath?: string, ollamaUrl?: string) => {
     const v = requireVault()
     const url = resolveOllamaUrl(ollamaUrl)
     const p =
@@ -937,7 +960,7 @@ description:
     }
   })
 
-  ipcMain.handle('doc:list', () => {
+  trustedHandle('doc:list', () => {
     const v = requireVault()
     return v.getLibraryManifest().documents.map((d) => ({
       id: d.id,
@@ -952,13 +975,13 @@ description:
     }))
   })
 
-  ipcMain.handle('doc:remove', async (_e, docId: string) => {
+  trustedHandle('doc:remove', async (_e, docId: string) => {
     const v = requireVault()
     if (!docId || typeof docId !== 'string') throw new Error('docId required')
     return removeLibraryDocumentWithIndex(v, vaultPath!, docId)
   })
 
-  ipcMain.handle('doc:ocr', async (_e, docId: string, ollamaUrl?: string) => {
+  trustedHandle('doc:ocr', async (_e, docId: string, ollamaUrl?: string) => {
     const v = requireVault()
     const url = resolveOllamaUrl(ollamaUrl)
     try {
@@ -968,7 +991,7 @@ description:
     }
   })
 
-  ipcMain.handle('vault:create', async (_e, path: string, name: string, pass: string) => {
+  trustedHandle('vault:create', async (_e, path: string, name: string, pass: string) => {
     vault = await Vault.create(path, name, pass)
     vaultPath = path
     setOpenEncryptedVaultPath(path)
@@ -995,7 +1018,7 @@ description:
     }
   })
 
-  ipcMain.handle('vault:open', async (_e, path: string, pass: string) => {
+  trustedHandle('vault:open', async (_e, path: string, pass: string) => {
     vault = await Vault.open(path, pass)
     vaultPath = path
     setOpenEncryptedVaultPath(path)
@@ -1023,7 +1046,7 @@ description:
     }
   })
 
-  ipcMain.handle('vault:lock', () => {
+  trustedHandle('vault:lock', () => {
     // Zero the derived key before dropping the reference (F13).
     if (vault) vault.lock()
     vault = null
@@ -1036,18 +1059,18 @@ description:
     }
   })
 
-  ipcMain.handle('snapshots:list', () => requireVault().getManifest().snapshots)
+  trustedHandle('snapshots:list', () => requireVault().getManifest().snapshots)
 
-  ipcMain.handle('backup', async (_e, sources: SourceId[], note?: string) => {
+  trustedHandle('backup', async (_e, sources: SourceId[], note?: string) => {
     const opts: BackupOptions = { sources, note }
     return runBackup(requireVault(), opts, (p) => safeSendMain('backup:progress', p))
   })
 
-  ipcMain.handle('verify', () => requireVault().verify())
+  trustedHandle('verify', () => requireVault().verify())
 
 
   // Aggregate conversations across every snapshot (dedup by id, newest wins). No GPU.
-  ipcMain.handle('vault:conversations', async () => {
+  trustedHandle('vault:conversations', async () => {
     const v = requireVault()
     const seen = new Map<string, { id: string; source: string; title: string; messages: number; updatedAt?: string; project?: string; snapshotId: string }>()
     for (const s of v.getManifest().snapshots) {
@@ -1062,13 +1085,13 @@ description:
     return [...seen.values()].sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
   })
 
-  ipcMain.handle('vault:conversation', async (_e, snapshotId: string, id: string) => {
+  trustedHandle('vault:conversation', async (_e, snapshotId: string, id: string) => {
     const p = await requireVault().getSnapshotPayload(snapshotId)
     return p.conversations.find((c) => c.id === id) ?? null
   })
 
   // Plain substring full-text search across all captured conversations. No GPU.
-  ipcMain.handle('vault:searchText', async (_e, query: string) => {
+  trustedHandle('vault:searchText', async (_e, query: string) => {
     const v = requireVault()
     const q = query.toLowerCase().trim()
     if (!q) return []
@@ -1097,7 +1120,7 @@ description:
     return hits.sort((a, b) => b.matches - a.matches).slice(0, 60)
   })
 
-  ipcMain.handle('brain:export', async (_e, id: string, outDir: string) => {
+  trustedHandle('brain:export', async (_e, id: string, outDir: string) => {
     const { conversations } = await requireVault().getSnapshotPayload(id)
     const files = await exportConversationsToDir(conversations, outDir)
     return { count: files.length, dir: outDir }
@@ -1120,7 +1143,7 @@ description:
     return existingFingerprints
   }
 
-  ipcMain.handle('import:preview', async (_e, p: string) => {
+  trustedHandle('import:preview', async (_e, p: string) => {
     requireVault()
     const { conversations } = await parseExportPath(p)
     const existingFingerprints = await buildImportFingerprints()
@@ -1146,7 +1169,7 @@ description:
     }
   })
 
-  ipcMain.handle('import:toVault', async (_e, p: string) => {
+  trustedHandle('import:toVault', async (_e, p: string) => {
     const v = requireVault()
     const { conversations } = await parseExportPath(p)
     if (!conversations.length) {
@@ -1193,7 +1216,7 @@ description:
     return { sealed, added, updated, skipped, sources }
   })
 
-  ipcMain.handle('reveal:installDir', async () => {
+  trustedHandle('reveal:installDir', async () => {
     // Packaged: …/Programs/Pomnia/Pomnia.exe — optional last-resort AV path browse.
     const dir = app.isPackaged ? dirname(process.execPath) : app.getAppPath()
     const err = await shell.openPath(dir)
@@ -1201,7 +1224,7 @@ description:
   })
 
   // ── Brain pipeline (host-side distill + pre-index → deploy) ──
-  ipcMain.handle('brain:status', async (_e, url?: string) => {
+  trustedHandle('brain:status', async (_e, url?: string) => {
     const { configured } = await resolveOllamaTransport(url)
     const o = ollamaFor(url)
     const reachable = await o.reachable()
@@ -1212,7 +1235,7 @@ description:
   // One pull at a time — Ollama serializes downloads anyway, and a single
   // AbortController keeps cancel semantics trivial.
   let pullAbort: AbortController | null = null
-  ipcMain.handle('ollama:pull', async (_e, model: string, url?: string) => {
+  trustedHandle('ollama:pull', async (_e, model: string, url?: string) => {
     if (pullAbort) throw new Error('another pull is already running')
     await resolveOllamaTransport(url)
     const o = ollamaFor(url)
@@ -1229,12 +1252,12 @@ description:
       pullAbort = null
     }
   })
-  ipcMain.handle('ollama:pullCancel', () => {
+  trustedHandle('ollama:pullCancel', () => {
     pullAbort?.abort()
     return { ok: true }
   })
 
-  ipcMain.handle(
+  trustedHandle(
     'brain:run',
     async (
       _e,
@@ -1403,7 +1426,7 @@ description:
     }
   )
 
-  ipcMain.handle('brain:runCancel', () => {
+  trustedHandle('brain:runCancel', () => {
     brainRunAbort?.abort()
     return { ok: true }
   })
@@ -1435,7 +1458,7 @@ description:
    * started rotting with the next saved conversation and never said so.
    */
   /** What the panel shows about replication: where, whether automatic, and how it went. */
-  ipcMain.handle('vault:replicaState', () => {
+  trustedHandle('vault:replicaState', () => {
     const s = getAppSettings()
     return {
       url: s.replicaUrl ?? '',
@@ -1445,7 +1468,7 @@ description:
     }
   })
 
-  ipcMain.handle(
+  trustedHandle(
     'vault:replicaConfig',
     async (_e, patch: { url?: string; token?: string; autoSync?: boolean }) => {
       const next: Parameters<typeof setAppSettings>[0] = {}
@@ -1467,7 +1490,7 @@ description:
     },
   )
 
-  ipcMain.handle('vault:syncToReplica', async (_e, target: string, token?: string) => {
+  trustedHandle('vault:syncToReplica', async (_e, target: string, token?: string) => {
     if (!vaultPath) throw new Error(m().vaultNotOpen)
     const url = (target ?? '').trim()
     if (!url) throw new Error(m().replicaNoTarget)
@@ -1615,7 +1638,7 @@ description:
    * work. "Up to date, checked just now" is the answer people are looking for,
    * and it has to be askable.
    */
-  ipcMain.handle('app:updateCheck', async () => {
+  trustedHandle('app:updateCheck', async () => {
     const current = app.getVersion()
     const r = await describeUpdate(current)
     if (r.state === 'unreachable') log.warn('manual update check failed:', r.detail)
@@ -1623,14 +1646,14 @@ description:
   })
 
   /** Live vault + XDG/AppData paths for Settings honesty (Linux self-hosted). */
-  ipcMain.handle('app:openUserData', async () => {
+  trustedHandle('app:openUserData', async () => {
     const dir = app.getPath('userData')
     await fs.mkdir(dir, { recursive: true })
     await shell.openPath(dir)
     return dir
   })
 
-  ipcMain.handle('app:openBrainData', async () => {
+  trustedHandle('app:openBrainData', async () => {
     const dir = brainCoreDataDir()
     await fs.mkdir(dir, { recursive: true })
     await shell.openPath(dir)
@@ -1641,7 +1664,7 @@ description:
    * Where vault / Brain data actually live on this machine.
    * Linux must not inherit Windows AppData copy — XDG + ~/Vault honesty.
    */
-  ipcMain.handle('app:dataLocations', () =>
+  trustedHandle('app:dataLocations', () =>
     buildDataLocationsSnapshot({
       userDataDir: app.getPath('userData'),
       vaultPath,
@@ -1650,8 +1673,8 @@ description:
     }),
   )
 
-  ipcMain.handle('brainCore:status', () => brainCore.status())
-  ipcMain.handle('brainCore:start', async (_e, ollamaUrl?: string) => {
+  trustedHandle('brainCore:status', () => brainCore.status())
+  trustedHandle('brainCore:start', async (_e, ollamaUrl?: string) => {
     const { configured, transport } = await resolveOllamaTransport(ollamaUrl)
     activity.update({ kind: 'brain-start', phase: 'start', detail: m().checkingOllama })
     const probe = await probeOllama(configured)
@@ -1686,14 +1709,14 @@ description:
       activity.idle(['brain-start', 'doc-import', 'indexing'])
     }
   })
-  ipcMain.handle('brainCore:stop', async () => {
+  trustedHandle('brainCore:stop', async () => {
     activity.idle(['indexing', 'brain-start', 'doc-import'])
     const s = await brainCore.stop()
     await setAppSettings({ embeddedBrainAutoStart: false })
     refreshTrayMenu(win, requestQuit)
     return s
   })
-  ipcMain.handle('brainCore:reindex', async () => {
+  trustedHandle('brainCore:reindex', async () => {
     activity.update({ kind: 'indexing', phase: 'reindex' })
     try {
       const root = brainVaultRoot()
@@ -1710,14 +1733,14 @@ description:
       activity.idle('indexing')
     }
   })
-  ipcMain.handle('brainCore:cancelIndex', () => {
+  trustedHandle('brainCore:cancelIndex', () => {
     // The awaiting reindex settles on the child's own 'reindex aborted' reply,
     // so there is nothing to unwind here.
     brainCore.cancelIndexing()
     return brainCore.status()
   })
-  ipcMain.handle('vault:health', async () => runVaultHealthCheck({ silentOk: true }))
-  ipcMain.handle('doctor:run', async (_e, opts?: { distillModel?: string; ollamaUrl?: string }) => {
+  trustedHandle('vault:health', async () => runVaultHealthCheck({ silentOk: true }))
+  trustedHandle('doctor:run', async (_e, opts?: { distillModel?: string; ollamaUrl?: string }) => {
     const settings = getAppSettings()
     const brainTarget = settings.brainTarget ?? 'embedded'
     const remoteUrl = settings.brainMcpUrl?.trim()
@@ -1752,18 +1775,18 @@ description:
       brainTarget,
     })
   })
-  ipcMain.handle('app:settings', () => getAppSettings())
-  ipcMain.handle('app:version', () => ({
+  trustedHandle('app:settings', () => getAppSettings())
+  trustedHandle('app:version', () => ({
     version: app.getVersion(),
     identity: formatBuildIdentity(),
   }))
-  ipcMain.handle('app:openLogs', async () => {
+  trustedHandle('app:openLogs', async () => {
     const dir = join(app.getPath('userData'), 'logs')
     await fs.mkdir(dir, { recursive: true })
     await shell.openPath(dir)
     return dir
   })
-  ipcMain.handle(
+  trustedHandle(
     'app:settings:set',
     async (
       _e,
@@ -1858,28 +1881,28 @@ description:
     },
   )
 
-  ipcMain.handle('floating-monitor:hide', () => {
+  trustedHandle('floating-monitor:hide', () => {
     hideFloatingMonitor()
     return { visible: false }
   })
-  ipcMain.handle('floating-monitor:open-main', () => {
+  trustedHandle('floating-monitor:open-main', () => {
     openMainOnGuide()
     return { ok: true }
   })
-  ipcMain.handle('floating-monitor:get-always-on-top', () => ({
+  trustedHandle('floating-monitor:get-always-on-top', () => ({
     alwaysOnTop: isFloatingAlwaysOnTop(),
   }))
-  ipcMain.handle('floating-monitor:set-always-on-top', async (_e, on: boolean) => {
+  trustedHandle('floating-monitor:set-always-on-top', async (_e, on: boolean) => {
     const alwaysOnTop = await setFloatingAlwaysOnTop(!!on)
     return { alwaysOnTop }
   })
 
-  ipcMain.handle('profile-preview:hide', () => {
+  trustedHandle('profile-preview:hide', () => {
     hideProfilePreview()
     refreshTrayMenu(win, requestQuit)
     return { visible: false }
   })
-  ipcMain.handle('profile-preview:load', async (e) => {
+  trustedHandle('profile-preview:load', async (e) => {
     return buildProfilePreview({
       brainIndexFile: brainIndexFile(),
       onProgress: (phase, pct) => {
@@ -1893,7 +1916,7 @@ description:
       },
     })
   })
-  ipcMain.handle('profile-preview:save', async (_e, content: unknown) => {
+  trustedHandle('profile-preview:save', async (_e, content: unknown) => {
     const text = typeof content === 'string' ? content : ''
     const result = await saveProfileUserMd(text)
     const en = getAppSettings().uiLocale === 'en'
@@ -1956,7 +1979,7 @@ description:
 
   // Honest pipeline state: how many chats exist in the tools right now vs how
   // many the ledger has seen. Reads live sources, so it reflects deletions too.
-  ipcMain.handle('brain:state', async () => {
+  trustedHandle('brain:state', async () => {
     const os = currentOS()
     const home = homeDir()
     const l = await readLedger()
@@ -2019,35 +2042,35 @@ description:
     }
   })
 
-  ipcMain.handle('distilled:quarantineList', async () => {
+  trustedHandle('distilled:quarantineList', async () => {
     requireVault()
     return listQuarantineNotes()
   })
-  ipcMain.handle('distilled:quarantineRead', async (_e, bucket: QuarantineBucket, name: string) => {
+  trustedHandle('distilled:quarantineRead', async (_e, bucket: QuarantineBucket, name: string) => {
     requireVault()
     return { content: await readQuarantineNote(bucket, name) }
   })
-  ipcMain.handle('distilled:quarantinePromote', async (_e, bucket: QuarantineBucket, name: string) => {
+  trustedHandle('distilled:quarantinePromote', async (_e, bucket: QuarantineBucket, name: string) => {
     requireVault()
     return promoteQuarantineNote(bucket, name)
   })
-  ipcMain.handle('distilled:quarantineDelete', async (_e, bucket: QuarantineBucket, name: string) => {
+  trustedHandle('distilled:quarantineDelete', async (_e, bucket: QuarantineBucket, name: string) => {
     requireVault()
     return deleteQuarantineNote(bucket, name)
   })
-  ipcMain.handle('distilled:quarantineDeleteReview', async (_e, names: string[]) => {
+  trustedHandle('distilled:quarantineDeleteReview', async (_e, names: string[]) => {
     requireVault()
     if (!Array.isArray(names)) throw new Error('names required')
     return deleteQuarantineReviewNotes(names)
   })
 
-  ipcMain.handle('brain:search', async (_e, query: string, url?: string) => {
+  trustedHandle('brain:search', async (_e, query: string, url?: string) => {
     await resolveOllamaTransport(url)
     const idx = await loadIndex(brainIndexFile())
     return searchIndex(idx, query, ollamaFor(url), 8)
   })
 
-  ipcMain.handle(
+  trustedHandle(
     'brain:deploy',
     async (
       _e,
@@ -2097,7 +2120,7 @@ description:
   )
 
   // ── Connect to Brain (live probe + rewrite Pomnia-managed MCP block) ──
-  ipcMain.handle('connect:status', async (_e, brainUrl?: string, token?: string, target?: 'embedded' | 'remote') => {
+  trustedHandle('connect:status', async (_e, brainUrl?: string, token?: string, target?: 'embedded' | 'remote') => {
     const saved = getAppSettings()
     // Mini is always remote. Reading the stored target here is the same defect
     // as the frozen address field, and this is its worst home: Mini would take
@@ -2172,7 +2195,7 @@ description:
     return { clients, brain }
   })
 
-  ipcMain.handle(
+  trustedHandle(
     'connect:snippet',
     (
       _e,
@@ -2192,7 +2215,7 @@ description:
   )
 
   /** One-click: write Brain Mode rule (with current Handshake phrase) to the client rules path. */
-  ipcMain.handle('connect:write-brief', async (_e, clientId: ClientId) => {
+  trustedHandle('connect:write-brief', async (_e, clientId: ClientId) => {
     const snippet = buildSnippet(
       clientId,
       'http://127.0.0.1:7862',
@@ -2283,12 +2306,12 @@ description:
     return { url: s.brainMcpUrl, token: s.replicaToken }
   }
 
-  ipcMain.handle('skills:remoteList', async () => {
+  trustedHandle('skills:remoteList', async () => {
     const a = skillsAuth()
     return listRemoteSkills(a.url, a.token)
   })
 
-  ipcMain.handle(
+  trustedHandle(
     'skills:remoteListIn',
     async (_e, opts: { category?: string; query?: string; offset?: number }) => {
       const a = skillsAuth()
@@ -2304,42 +2327,42 @@ description:
     },
   )
 
-  ipcMain.handle('skills:remoteRead', async (_e, path: string) => {
+  trustedHandle('skills:remoteRead', async (_e, path: string) => {
     const a = skillsAuth()
     return readRemoteSkill(String(path ?? ''), a.url, a.token)
   })
 
-  ipcMain.handle('skills:remoteWrite', async (_e, path: string, content: string) => {
+  trustedHandle('skills:remoteWrite', async (_e, path: string, content: string) => {
     const a = skillsAuth()
     return writeRemoteSkill(String(path ?? ''), String(content ?? ''), a.url, a.token)
   })
 
-  ipcMain.handle('skills:remoteDelete', async (_e, path: string) => {
+  trustedHandle('skills:remoteDelete', async (_e, path: string) => {
     const a = skillsAuth()
     return deleteRemoteSkill(String(path ?? ''), a.url, a.token)
   })
 
-  ipcMain.handle('prompts:remoteDelete', async (_e, name: string) => {
+  trustedHandle('prompts:remoteDelete', async (_e, name: string) => {
     const a = skillsAuth()
     return deleteRemotePrompt(String(name ?? ''), a.url, a.token)
   })
 
-  ipcMain.handle('prompts:remoteList', async () => {
+  trustedHandle('prompts:remoteList', async () => {
     const a = skillsAuth()
     return listRemotePrompts(a.url, a.token)
   })
 
-  ipcMain.handle('prompts:remoteRead', async (_e, name: string) => {
+  trustedHandle('prompts:remoteRead', async (_e, name: string) => {
     const a = skillsAuth()
     return readRemotePrompt(String(name ?? ''), a.url, a.token)
   })
 
-  ipcMain.handle('prompts:remoteWrite', async (_e, name: string, content: string) => {
+  trustedHandle('prompts:remoteWrite', async (_e, name: string, content: string) => {
     const a = skillsAuth()
     return writeRemotePrompt(String(name ?? ''), String(content ?? ''), a.url, a.token)
   })
 
-  ipcMain.handle('mini:ingestState', async () => {
+  trustedHandle('mini:ingestState', async () => {
     const st = await stagedStats(app.getPath('userData'))
     const rate = getAppSettings().uploadRate ?? null
     return {
@@ -2352,7 +2375,7 @@ description:
     }
   })
 
-  ipcMain.handle('mini:ingestPick', async () => {
+  trustedHandle('mini:ingestPick', async () => {
     const r = await dialog.showOpenDialog(win!, {
       properties: ['openFile', 'multiSelections'],
       filters: [
@@ -2364,7 +2387,7 @@ description:
     return r.canceled ? [] : r.filePaths
   })
 
-  ipcMain.handle(
+  trustedHandle(
     'mini:ingestFiles',
     async (
       _e,
@@ -2384,7 +2407,7 @@ description:
       }),
   )
 
-  ipcMain.handle('mini:ingestPush', async () => {
+  trustedHandle('mini:ingestPush', async () => {
     const s = getAppSettings()
     const userData = app.getPath('userData')
     const started = Date.now()
@@ -2406,12 +2429,12 @@ description:
     return r
   })
 
-  ipcMain.handle('mini:ingestClear', async () => {
+  trustedHandle('mini:ingestClear', async () => {
     await clearStaging(app.getPath('userData'))
     return { staged: 0 }
   })
 
-  ipcMain.handle('mcp:seenClients', async (_e, brainUrl: string, token?: string) => {
+  trustedHandle('mcp:seenClients', async (_e, brainUrl: string, token?: string) => {
     const base = (brainUrl || '').trim().replace(/\/+$/, '').replace(/\/(admin|mcp|status)$/i, '')
     if (!base) return { supported: false, clients: [] }
     try {
@@ -2448,7 +2471,7 @@ description:
    * hand" while every call it made was being refused — which surfaced as
    * screens that failed for no stated reason. This asks the server.
    */
-  ipcMain.handle('connect:tokenStatus', async () => {
+  trustedHandle('connect:tokenStatus', async () => {
     const s = getAppSettings()
     const url = (s.brainMcpUrl ?? '').trim()
     const token = (s.replicaToken ?? '').trim()
@@ -2458,7 +2481,7 @@ description:
     return { state: probe.role, detail: probe.detail }
   })
 
-  ipcMain.handle(
+  trustedHandle(
     'connect:tokenAdopt',
     async (_e, brainUrl: string, token: string) => {
       const base = brainBaseUrl(brainUrl)
@@ -2497,7 +2520,7 @@ description:
     },
   )
 
-  ipcMain.handle(
+  trustedHandle(
     'connect:mcpTokenCreate',
     (_e, brainUrl: string, name: string, adminToken?: string) =>
       // Fall back to the stored admin token, which never leaves main. The
@@ -2508,7 +2531,7 @@ description:
       }),
   )
 
-  ipcMain.on('win:minimize', () => {
+  trustedOn('win:minimize', () => {
     if (shouldHideOnMinimize()) {
       win?.hide()
       maybeShowFloatingOnHide(!!vault)
@@ -2517,8 +2540,8 @@ description:
       maybeShowFloatingOnHide(!!vault)
     }
   })
-  ipcMain.on('win:maximize', () => (win?.isMaximized() ? win.unmaximize() : win?.maximize()))
-  ipcMain.on('win:close', () => win?.close())
+  trustedOn('win:maximize', () => (win?.isMaximized() ? win.unmaximize() : win?.maximize()))
+  trustedOn('win:close', () => win?.close())
 }
 
 /**

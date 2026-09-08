@@ -8,6 +8,11 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { BrowserWindow, screen, type BrowserWindow as BW } from 'electron'
+import {
+  attachRendererNavigationGuards,
+  setIpcProfileWebContents,
+} from './ipcGuard.js'
+import { log } from '@core/index.js'
 
 const WIDTH = 380
 const HEIGHT = 440
@@ -64,6 +69,7 @@ export function isProfilePreviewVisible(): boolean {
 
 export function destroyProfilePreview(): void {
   if (profileWin && !profileWin.isDestroyed()) profileWin.destroy()
+  setIpcProfileWebContents(null)
   profileWin = null
 }
 
@@ -101,11 +107,15 @@ export async function showProfilePreview(): Promise<void> {
     ...(iconPath ? { icon: iconPath } : {}),
     backgroundColor: '#00000000',
     webPreferences: {
+      // sandbox:false — see main createWindow / F20 (ESM preload).
       preload: join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
       sandbox: false,
     },
   })
+
+  setIpcProfileWebContents(profileWin.webContents)
+  attachRendererNavigationGuards(profileWin.webContents, (msg) => log.warn(msg))
 
   profileWin.setAlwaysOnTop(true, 'floating')
   loadProfileUrl(profileWin)
@@ -119,6 +129,7 @@ export async function showProfilePreview(): Promise<void> {
     if (profileWin && !profileWin.isDestroyed() && !profileWin.isVisible()) reveal()
   })
   profileWin.on('closed', () => {
+    setIpcProfileWebContents(null)
     profileWin = null
   })
 }

@@ -24,7 +24,7 @@ Summary of system behaviour — **without** key-file paths or internal vault bin
 | **Passphrase** | Never written to disk. Lost passphrase = vault unrecoverable. |
 | **Encryption** | AES-256-GCM (authenticated). Key derived with scrypt (N=2^17 — matches Settings UI). Applies to vault **blobs**. |
 | **Lock** | On lock, the open `Vault` instance is closed: further crypto throws, and the derived key **Buffer is overwritten with zeros** (`fill(0)`). Encrypted blobs stay encrypted on disk. See honesty note below. |
-| **UI isolation** | The renderer (React) has **no** direct vault filesystem access. All operations go through IPC to the main process. |
+| **UI isolation** | The renderer (React) has **no** direct vault filesystem access. All operations go through IPC to the main process. Invoke handlers require a registered Pomnia window and a trusted renderer URL; unexpected `will-navigate` / `will-frame-navigate` targets are blocked. `sandbox` remains **false** while preload is ESM (electron-vite) — enabling it without a CJS preload bridge breaks the API. |
 | **Import** | Gated entry — format validation and normalization before write. No raw dump of arbitrary files into the vault. |
 | **Export** | No silent exfiltration. Data leaves the vault only on **explicit user action**: backup, Brain export, deploy pipeline. |
 

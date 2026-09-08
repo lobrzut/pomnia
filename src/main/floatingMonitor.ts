@@ -8,6 +8,11 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { BrowserWindow, screen, type WebContents } from 'electron'
 import { getAppSettings, setAppSettings } from './appSettings.js'
+import {
+  attachRendererNavigationGuards,
+  setIpcFloatingWebContents,
+} from './ipcGuard.js'
+import { log } from '@core/index.js'
 
 /** Compact PiP strip: header + Vault → library → MCP; matches FlowDiagram pip layout. */
 const WIDTH = 300
@@ -130,11 +135,15 @@ export async function showFloatingMonitor(opts?: { force?: boolean }): Promise<v
     ...(iconPath ? { icon: iconPath } : {}),
     backgroundColor: '#00000000',
     webPreferences: {
+      // sandbox:false — see main createWindow / F20 (ESM preload).
       preload: join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
       sandbox: false,
     },
   })
+
+  setIpcFloatingWebContents(floatingWin.webContents)
+  attachRendererNavigationGuards(floatingWin.webContents, (msg) => log.warn(msg))
 
   if (pinned) floatingWin.setAlwaysOnTop(true, 'floating')
   attachMoveSnap(floatingWin)
@@ -142,6 +151,7 @@ export async function showFloatingMonitor(opts?: { force?: boolean }): Promise<v
 
   floatingWin.once('ready-to-show', () => floatingWin?.show())
   floatingWin.on('closed', () => {
+    setIpcFloatingWebContents(null)
     floatingWin = null
   })
 }

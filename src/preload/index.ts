@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
+/**
+ * Preload bridge — contextIsolation on, sandbox off (ESM preload; see ipcGuard / F20).
+ * Renderer talks only through this API; main asserts trusted window + URL on invoke.
+ */
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 
 const bridge = {
