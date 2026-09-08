@@ -131,6 +131,10 @@ describe('cookies', () => {
     expect(readCookie('malformed', SESSION_COOKIE)).toBeUndefined()
   })
 
+  it('treats a malformed percent-escape as missing, not a throw (F17)', () => {
+    expect(readCookie(`${SESSION_COOKIE}=%ZZ`, SESSION_COOKIE)).toBeUndefined()
+  })
+
   it('does not match a cookie whose name merely ends the same', () => {
     expect(readCookie(`x_${SESSION_COOKIE}=evil`, SESSION_COOKIE)).toBeUndefined()
   })

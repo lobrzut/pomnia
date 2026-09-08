@@ -133,7 +133,15 @@ export function readCookie(header: string | undefined, name: string): string | u
   for (const part of header.split(';')) {
     const eq = part.indexOf('=')
     if (eq < 0) continue
-    if (part.slice(0, eq).trim() === name) return decodeURIComponent(part.slice(eq + 1).trim())
+    if (part.slice(0, eq).trim() !== name) continue
+    const raw = part.slice(eq + 1).trim()
+    // Session ids are base64url from us; a hostile `%ZZ` must not 500 the
+    // process (audit F17). Treat decode failure as "no cookie".
+    try {
+      return decodeURIComponent(raw)
+    } catch {
+      return undefined
+    }
   }
   return undefined
 }
