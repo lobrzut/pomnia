@@ -160,10 +160,14 @@ if (!wantPublish) {
 }
 
 try {
-  execFileSync('npx', ['tsx', join(root, 'scripts', 'promote-release.mjs'), '--tag', tag], {
-    cwd: root,
-    stdio: 'inherit',
-  })
+  execFileSync(
+    process.execPath,
+    ['--import', 'tsx', join(root, 'scripts', 'promote-release.mjs'), '--tag', tag],
+    {
+      cwd: root,
+      stdio: 'inherit',
+    },
+  )
 } catch {
   die(
     `${tag} stays a draft — not every platform is on the release yet.\n` +
