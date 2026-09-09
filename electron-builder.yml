@@ -30,9 +30,24 @@ files:
   # onnxruntime-node -- every platform it supports, including the two this build
   # can never load. The desktop has no code path that selects that backend, and
   # the import is dynamic, so excluding it costs nothing and saves ~175 MB.
+  #
+  # onnxruntime-web was missed by that list and kept shipping: 74 MB of WASM in
+  # every build, four variants of one runtime (jsep 25, asyncify 23, jspi 14,
+  # plain 13 MB) of which exactly one could ever load. Measured before removing
+  # it: no reference in out/main, out/preload or out/renderer; both imports, in
+  # rag/embed.js and rag/rerank.js, are dynamic; and the shipped
+  # resources/brain-core carries its own node_modules holding neither
+  # transformers nor onnx, so Node resolution from there never reaches
+  # app.asar.unpacked. The backend was already unreachable — this stops paying
+  # to carry it.
+  #
+  # If the embedded Brain ever has to embed without Ollama, the fix is to stage
+  # transformers into resources/brain-core, not to restore these: they were
+  # never on a path it could load from.
   - "!**/node_modules/@huggingface/**"
   - "!**/node_modules/onnxruntime-node/**"
   - "!**/node_modules/onnxruntime-common/**"
+  - "!**/node_modules/onnxruntime-web/**"
   # npm workspaces → junction/symlink; electron-builder skips them unless copied explicitly.
   # Main should bundle doc-parser + mammoth/unpdf/bluebird (electron.vite.config).
   # Safety net: still ship those packages into asar if any bare import remains.

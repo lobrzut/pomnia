@@ -20,6 +20,31 @@ appId: ai.pomnia.mini
 productName: PomniaMini
 directories:
   output: release/mini
+# KNOWN: Mini still ships resources/brain-core, and cannot drop it here.
+#
+# Mini has no embedded Brain — MINI_ROUTES is connect/settings/skills/prompts/
+# import with no Brain screen, and the main process forces brainTarget 'remote'
+# when IS_MINI — yet it packs 25 MB of one, because the base config stages
+# build/brain-core-runtime-v2 into resources/brain-core and `extends` reaches it.
+#
+# Declaring a shorter `extraResources` here does NOT help: electron-builder's
+# `extends` **concatenates** arrays rather than replacing them. Tried, measured,
+# reverted — the override only added duplicate tessdata and tray-icon entries
+# while brain-core still arrived from the base.
+#
+# It is also not reproducible: `build:mini:win` never runs `stage:brain-core`, so
+# what lands in the package is whatever a previous desktop build left in build/ —
+# current after one, absent on a clean machine, stale from an older version in
+# between. Deleting build/brain-core-runtime-v2 before packing does produce a
+# Mini without it, which is how this was confirmed, but "the source happens not
+# to exist" is the same non-determinism wearing a different hat.
+#
+# The real fix is to move the brain-core entry out of the shared base into a
+# desktop-only config. That is five coordinated edits — base, a new desktop
+# config, build:win / pack:mac / build:linux, and release-mac.yml, which calls
+# `npx electron-builder --mac` with no --config and would otherwise silently
+# ship a desktop with no embedded Brain. Not worth doing blind on a machine that
+# cannot build macOS to check.
 # Portable and zip, in that order.
 #
 # The portable exe was reported as "does not start", and it was measured as
