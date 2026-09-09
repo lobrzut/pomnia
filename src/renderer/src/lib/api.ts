@@ -100,6 +100,19 @@ export interface PomniaBridge {
   promptsCreate(name: string): Promise<{ ok: true; path: string } | { ok: false; error: string }>
   promptsDelete(name: string): Promise<{ ok: boolean; error?: string }>
   /**
+   * Read and save a skill or a prompt in the app — the local twin of Mini's
+   * `skillsRemoteRead` / `skillsRemoteWrite`. Both writers save only over a
+   * file that already exists; creating has its own door.
+   */
+  skillsRead(
+    filePath: string,
+  ): Promise<{ ok: true; text: string; path: string } | { ok: false; error: string }>
+  skillsWrite(filePath: string, text: string): Promise<{ ok: boolean; error?: string }>
+  promptsRead(
+    name: string,
+  ): Promise<{ ok: true; text: string; path: string } | { ok: false; error: string }>
+  promptsWrite(name: string, text: string): Promise<{ ok: boolean; error?: string }>
+  /**
    * Turn a document into one skill under `cli/<category>/<slug>/`. Refuses
    * rather than overwriting an existing skill. See main/bookSkillBuild.ts.
    */
@@ -431,6 +444,8 @@ export interface PomniaBridge {
 
 /* ── Mock bridge for browser preview (no Electron) ──────────────────────── */
 const mockPullListeners = new Set<(e: OllamaPullEvent) => void>()
+/** Edits made in the preview, keyed by path, so a save is visibly a save. */
+const mockEdits = new Map<string, string>()
 let mockPullCancelled = false
 let mockHandshakePhrase = DEFAULT_HANDSHAKE_PHRASE
 let mockHandshakeEnabled = true
@@ -724,6 +739,31 @@ function mockBridge(): PomniaBridge {
       return { ok: true as const, path: `C:/Vault/prompts/${name}.md` }
     },
     async promptsDelete() {
+      return { ok: true }
+    },
+    /*
+      The mock keeps edits in memory so the editor can actually be exercised in
+      the browser preview: open, change, save, reopen, and the change is still
+      there. A mock that always returns the same text would make the save look
+      like it worked without ever showing that it did.
+    */
+    async skillsRead(filePath: string) {
+      const text =
+        mockEdits.get(filePath) ??
+        `---\nname: ${filePath.split('/').pop()?.replace(/\.md$/, '')}\ndescription: "Mock skill for the browser preview"\n---\n\nTreść skilla.\n`
+      return { ok: true as const, text, path: filePath }
+    },
+    async skillsWrite(filePath: string, text: string) {
+      mockEdits.set(filePath, text)
+      return { ok: true }
+    },
+    async promptsRead(name: string) {
+      const path = `C:/Vault/prompts/${name}.md`
+      const text = mockEdits.get(path) ?? `---\ndescription: Mock prompt\n---\n\nTreść prompta.\n`
+      return { ok: true as const, text, path }
+    },
+    async promptsWrite(name: string, text: string) {
+      mockEdits.set(`C:/Vault/prompts/${name}.md`, text)
       return { ok: true }
     },
     async skillsPickBook() {

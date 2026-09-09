@@ -513,6 +513,9 @@ export interface UiLabels {
   skillsKind: (kind: 'brain' | 'cli' | 'other') => string
   skillsBackToList: string
   skillsSave: string
+  /** Mini writes to a server, the full app writes to the vault on this disk. */
+  skillsSaveLocal: string
+  skillsSaveFailed: string
   skillsSaved: (name: string) => string
   skillsSavedUnchanged: string
   skillsSavedDetail: string
@@ -1014,6 +1017,7 @@ export interface UiLabels {
   bookSkillLead: string
   bookSkillPick: string
   bookSkillCategory: string
+  bookSkillCategoryHint: string
   bookSkillRunning: (phase: string, done: number, total: number) => string
   bookSkillDone: (slug: string, chapters: number) => string
   bookSkillFailed: string
@@ -1460,6 +1464,8 @@ const PL_LABELS: UiLabels = {
   skillsKind: (kind) => (kind === 'brain' ? 'workflow' : kind === 'cli' ? 'ekspertyza' : 'plik'),
   skillsBackToList: 'Wróć do listy',
   skillsSave: 'Zapisz na serwer',
+  skillsSaveLocal: 'Zapisz w vaulcie',
+  skillsSaveFailed: 'Nie udało się zapisać',
   skillsSaved: (name) => `Zapisano: ${name}`,
   skillsSavedUnchanged: 'Bez zmian — treść była identyczna',
   skillsSavedDetail: 'Agenci zobaczą to przy następnym odczycie.',
@@ -2009,7 +2015,9 @@ const PL_LABELS: UiLabels = {
   bookSkillLead:
     'Jedna książka = jeden skill: indeks zawsze wczytany, rozdziały czytane pojedynczo. Nie nadpisuje istniejących.',
   bookSkillPick: 'Wybierz książkę',
-  bookSkillCategory: 'kategoria',
+  bookSkillCategory: 'Kategoria',
+  bookSkillCategoryHint:
+    'Szufladka na liście skilli — folder skills/cli/<kategoria>/. Wpisz co chcesz, np. bug-bounty, mikrotik, ksiazki. Nie zmienia treści skilla.',
   bookSkillRunning: (phase, done, total) =>
     total > 0 ? `${phase} ${done}/${total}` : phase,
   bookSkillDone: (slug, chapters) => `Gotowe: ${slug} (${chapters} rozdz.)`,
@@ -2484,6 +2492,8 @@ const EN_LABELS: UiLabels = {
   skillsKind: (kind) => (kind === 'brain' ? 'workflow' : kind === 'cli' ? 'expertise' : 'file'),
   skillsBackToList: 'Back to the list',
   skillsSave: 'Save to the server',
+  skillsSaveLocal: 'Save to the vault',
+  skillsSaveFailed: 'Could not save',
   skillsSaved: (name) => `Saved: ${name}`,
   skillsSavedUnchanged: 'Unchanged — the content was identical',
   skillsSavedDetail: 'Agents will see it on their next read.',
@@ -2795,7 +2805,9 @@ const EN_LABELS: UiLabels = {
   bookSkillLead:
     'One book, one skill: the index is always loaded, chapters are read one at a time. Never overwrites an existing skill.',
   bookSkillPick: 'Choose a book',
-  bookSkillCategory: 'category',
+  bookSkillCategory: 'Category',
+  bookSkillCategoryHint:
+    'A drawer in the skills list — the folder skills/cli/<category>/. Anything you like: bug-bounty, mikrotik, books. It does not change the skill itself.',
   bookSkillRunning: (phase, done, total) => (total > 0 ? `${phase} ${done}/${total}` : phase),
   bookSkillDone: (slug, chapters) => `Done: ${slug} (${chapters} chapters)`,
   bookSkillFailed: 'Could not build the skill',

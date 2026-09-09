@@ -29,6 +29,8 @@ import {
 } from 'node:fs'
 import { basename, join } from 'node:path'
 
+import { writeFileKeepingPrevSync } from '../../packages/brain-core/src/archive/durableWrite.js'
+
 export type SkillScopeKind = 'own' | 'imported'
 
 export interface LocalSkillEntry {
@@ -302,6 +304,74 @@ export function deleteLocalSkillAt(
   try {
     if (known.kind === 'own') rmSync(known.path, { force: true })
     else rmSync(known.folderPath, { recursive: true, force: true })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * The largest skill file the window is allowed to load or store.
+ *
+ * A skill is an instruction sheet — the official guidance caps SKILL.md at 500
+ * lines. This ceiling is far above that on purpose: it is not a style rule, it
+ * is there so a stray path or a runaway generator cannot make the renderer
+ * hold a hundred megabytes of text in a textarea.
+ */
+export const MAX_SKILL_BYTES = 512 * 1024
+
+/**
+ * Read one skill for editing in the app.
+ *
+ * Editing used to mean "open the file in whatever the OS opens .md with",
+ * which is fine on a machine you own and useless the moment the skill lives
+ * behind a server — so Mini grew an in-app editor and the full app did not.
+ * Two apps, two answers to the same question. This is the desktop half of
+ * closing that gap.
+ *
+ * The path is checked the same way deleting checks it: it has to be a file
+ * this scanner would have listed. That is what stops a path from a window
+ * naming something outside the skills tree — no separate containment check to
+ * get subtly wrong, and no way for the two to disagree.
+ */
+export function readLocalSkillAt(
+  skillsRoot: string,
+  filePath: string,
+): { ok: true; text: string; path: string } | { ok: false; error: string } {
+  const known = listLocalSkillsAt(skillsRoot).find((s) => s.path === filePath)
+  if (!known) return { ok: false, error: 'not a listed skill' }
+  try {
+    const size = statSync(known.path).size
+    if (size > MAX_SKILL_BYTES) return { ok: false, error: 'file too large' }
+    return { ok: true, text: readFileSync(known.path, 'utf8'), path: known.path }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * Store an edited skill.
+ *
+ * Only over a file the scan already lists: this saves, it never creates. A
+ * client that can conjure a skill by mistyping a path can litter the tree that
+ * agents read from, and creating is a different act with different guarantees
+ * (that is what the book builder's staged directory is for).
+ *
+ * The write keeps a `.prev` and lands atomically, so a crash mid-save leaves
+ * either the old skill or the new one — never a half-written instruction sheet
+ * that an agent will happily follow.
+ */
+export function writeLocalSkillAt(
+  skillsRoot: string,
+  filePath: string,
+  text: string,
+): { ok: boolean; error?: string } {
+  const known = listLocalSkillsAt(skillsRoot).find((s) => s.path === filePath)
+  if (!known) return { ok: false, error: 'not a listed skill' }
+  const data = Buffer.from(String(text ?? ''), 'utf8')
+  if (data.byteLength > MAX_SKILL_BYTES) return { ok: false, error: 'file too large' }
+  try {
+    writeFileKeepingPrevSync(known.path, data)
     return { ok: true }
   } catch (e) {
     return { ok: false, error: (e as Error).message }

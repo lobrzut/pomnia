@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ChevronDown, ChevronRight, Cpu, Download, FileUp, Send, Trash2, UploadCloud } from 'lucide-react'
 
 import { Button, GlassCard, Input, Spinner, Toggle } from '../components/ui'
+import { BookSkillCard } from '../components/BookSkillCard'
 import { Hint } from '../components/Hint'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
@@ -295,6 +296,10 @@ export default function MiniIngest() {
         </>
         )}
       </GlassCard>
+
+      {/* A book is an import like any other file here — it just comes out as a
+          skill rather than as notes. */}
+      <BookSkillCard remote />
 
       {/* The handlers live on a wrapper: GlassCard takes no DOM props, and
           giving it a pass-through just for this would widen its surface for

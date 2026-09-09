@@ -58,6 +58,11 @@ const bridge = {
     return () => ipcRenderer.removeListener('skills:fromBookProgress', h)
   },
   promptsDelete: (name: string) => ipcRenderer.invoke('prompts:delete', name),
+  skillsRead: (filePath: string) => ipcRenderer.invoke('skills:read', filePath),
+  skillsWrite: (filePath: string, text: string) =>
+    ipcRenderer.invoke('skills:write', filePath, text),
+  promptsRead: (name: string) => ipcRenderer.invoke('prompts:read', name),
+  promptsWrite: (name: string, text: string) => ipcRenderer.invoke('prompts:write', name, text),
   skillsDelete: (filePath: string) => ipcRenderer.invoke('skills:delete', filePath),
   skillsReveal: (target: string, mode?: 'file' | 'folder') =>
     ipcRenderer.invoke('skills:reveal', target, mode ?? 'file'),

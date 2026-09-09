@@ -14,13 +14,14 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { MessageSquareQuote, Plus, RefreshCw, Save } from 'lucide-react'
+import { MessageSquareQuote, Plus, RefreshCw } from 'lucide-react'
 
 import type { RemotePrompt } from '@core/brain/remoteSkills'
 import { isSafePromptName } from '@core/brain/remoteSkills'
 
 import { Button, GlassCard, Spinner } from '../components/ui'
 import { ListRow, ListSection } from '../components/EntityList'
+import { MarkdownEditor } from '../components/MarkdownEditor'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
@@ -163,32 +164,16 @@ export default function MiniPrompts() {
       )}
 
       {open ? (
-        <GlassCard className="p-5">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-ink">/{open}</div>
-              <div className="truncate text-[11px] text-ink-faint">{labels.promptsHowItReaches}</div>
-            </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <Button variant="soft" onClick={() => setOpen(null)}>
-                {labels.skillsBackToList}
-              </Button>
-              <Button onClick={() => void save()} disabled={saving || !dirty}>
-                {saving ? <Spinner className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
-                {labels.skillsSave}
-              </Button>
-            </div>
-          </div>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            spellCheck={false}
-            className="no-drag h-[46vh] w-full resize-y rounded-xl border border-white/10 bg-black/30 p-3 font-mono text-[12px] leading-relaxed text-ink"
-          />
-          <p className="mt-2 text-[11px] text-ink-faint">
-            {dirty ? labels.skillsDirty : labels.skillsSavedHint}
-          </p>
-        </GlassCard>
+        <MarkdownEditor
+          title={`/${open}`}
+          subtitle={labels.promptsHowItReaches}
+          text={text}
+          onChange={setText}
+          onClose={() => setOpen(null)}
+          onSave={() => void save()}
+          saving={saving}
+          dirty={dirty}
+        />
       ) : (
         <>
           <GlassCard className="mb-4 p-5">

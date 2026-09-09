@@ -14,10 +14,12 @@
  */
 
 import { useEffect, useState } from 'react'
-import { FileText, FolderOpen, MessageSquareQuote, Plus } from 'lucide-react'
+import { FileText, FolderOpen, MessageSquareQuote, Pencil, Plus } from 'lucide-react'
 
 import { Button, GlassCard, Spinner } from '../components/ui'
 import { ListRow, ListSection } from '../components/EntityList'
+import { MarkdownEditor } from '../components/MarkdownEditor'
+import { useEditableFile } from '../lib/useEditableFile'
 import { relativeTime } from '../lib/format'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
@@ -35,10 +37,12 @@ function signature(prompt: LocalPromptEntry, labels: ReturnType<typeof uiLabels>
 function PromptRow({
   prompt,
   labels,
+  onEdit,
   onDelete,
 }: {
   prompt: LocalPromptEntry
   labels: ReturnType<typeof uiLabels>
+  onEdit: () => void
   onDelete: () => void
 }) {
   return (
@@ -48,6 +52,8 @@ function PromptRow({
       meta={[signature(prompt, labels), relativeTime(new Date(prompt.mtimeMs).toISOString())]}
       copyText={`/${prompt.name}`}
       actions={[
+        // Editing first: it is the one thing you cannot do anywhere else.
+        { label: labels.rowEdit, icon: Pencil, onClick: onEdit },
         {
           label: labels.promptsOpenFile,
           icon: FileText,
@@ -74,6 +80,13 @@ export default function Prompts() {
   const [prompts, setPrompts] = useState<LocalPromptEntry[]>([])
   const [root, setRoot] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
+  const editor = useEditableFile<LocalPromptEntry>({
+    read: (p) => api.promptsRead(p.name),
+    write: (p, text) => api.promptsWrite(p.name, text),
+    name: (p) => p.name,
+    // Description and argument list both come from the frontmatter that changed.
+    onSaved: () => reload(),
+  })
 
   function reload() {
     setLoading(true)
@@ -98,10 +111,11 @@ export default function Prompts() {
       return
     }
     toast({ kind: 'success', title: labels.promptDeleted(name) })
+    editor.closeIf((e) => e.name === name)
     reload()
   }
 
-  async function create() {
+  async function create(): Promise<void> {
     const name = newName.trim()
     const r = await api.promptsCreate(name)
     if (!r.ok) {
@@ -111,9 +125,18 @@ export default function Prompts() {
     setNewName('')
     toast({ kind: 'success', title: labels.promptsCreated(name) })
     reload()
-    // The file is empty apart from its frontmatter, so the only useful next
-    // step is writing it — open it where the user actually writes.
-    void api.skillsReveal(r.path, 'file')
+    // A new prompt is empty apart from its frontmatter, so the only useful next
+    // step is writing it. That used to mean handing the file to the OS; now
+    // that the editor is in the app, land in it.
+    void editor.open({
+      name,
+      description: '',
+      arguments: [],
+      path: r.path,
+      folderPath: root ?? '',
+      sizeBytes: 0,
+      mtimeMs: Date.now(),
+    })
   }
 
   if (!vault.open) {
@@ -139,6 +162,20 @@ export default function Prompts() {
         </div>
       </div>
 
+      {editor.editing ? (
+        <MarkdownEditor
+          title={`/${editor.editing.name}`}
+          subtitle={editor.editing.path}
+          text={editor.text}
+          onChange={editor.setText}
+          onClose={editor.close}
+          onSave={() => void editor.save()}
+          saveLabel={labels.skillsSaveLocal}
+          saving={editor.saving}
+          dirty={editor.dirty}
+        />
+      ) : (
+      <>
       <GlassCard className="mb-4 p-4">
         <div className="flex items-center gap-2">
           <input
@@ -170,12 +207,20 @@ export default function Prompts() {
           empty={labels.promptsEmpty}
         >
           {prompts.map((p) => (
-            <PromptRow key={p.name} prompt={p} labels={labels} onDelete={() => void remove(p.name)} />
+            <PromptRow
+              key={p.name}
+              prompt={p}
+              labels={labels}
+              onEdit={() => void editor.open(p)}
+              onDelete={() => void remove(p.name)}
+            />
           ))}
         </ListSection>
       )}
 
       {root && <p className="mt-3 truncate font-mono text-[10px] text-ink-faint">{root}</p>}
+      </>
+      )}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle2, FileText, FileUp, Import as ImportIcon, Trash2, Upload } from 'lucide-react'
 import { Badge, Button, GlassCard, SourceTile, Spinner } from '../components/ui'
+import { BookSkillCard } from '../components/BookSkillCard'
 import { humanBytes, sourceMeta } from '../lib/format'
 import { pathFromDroppedFile } from '../lib/dropFile'
 import { uiLabels } from '../lib/labels'
@@ -529,6 +530,11 @@ export default function Import() {
           </Button>
         </div>
       </div>
+
+      {/* The other way a book can come in: as one skill rather than as notes.
+          It belongs beside the document dropzone, not on the Skills page,
+          which is a list of what already exists. */}
+      {vault.open && <BookSkillCard />}
 
       {docResult && !docResult.skipped && (
         <motion.div initial={{ y: 8 }} animate={{ y: 0 }}>

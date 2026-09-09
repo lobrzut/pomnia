@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
-import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, BookUp, FolderOpen, FileText, Wand2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowLeft, FolderOpen, FileText, Pencil, Wand2 } from 'lucide-react'
 import { Button, GlassCard, Spinner } from '../components/ui'
 import { ListRow, ListSection } from '../components/EntityList'
+import { MarkdownEditor } from '../components/MarkdownEditor'
+import { useEditableFile } from '../lib/useEditableFile'
 import { relativeTime } from '../lib/format'
 import { uiLabels } from '../lib/labels'
 import { api } from '../lib/api'
@@ -19,10 +21,12 @@ import { useStore } from '../store/useStore'
 function SkillRow({
   skill,
   labels,
+  onEdit,
   onDelete,
 }: {
   skill: LocalSkillEntry
   labels: ReturnType<typeof uiLabels>
+  onEdit: () => void
   onDelete: () => void
 }) {
   return (
@@ -36,6 +40,9 @@ function SkillRow({
       ]}
       copyText={skill.name}
       actions={[
+        // Editing first: it is the one thing you cannot do anywhere else.
+        // Revealing the file stays, for anyone who prefers their own editor.
+        { label: labels.rowEdit, icon: Pencil, onClick: onEdit },
         {
           label: labels.skillsOpenFile,
           icon: FileText,
@@ -81,12 +88,15 @@ export default function Skills() {
   const [loading, setLoading] = useState(false)
   const [own, setOwn] = useState<LocalSkillEntry[]>([])
   const [imported, setImported] = useState<LocalSkillEntry[]>([])
-  const [category, setCategory] = useState('general')
-  const [busy, setBusy] = useState(false)
-  const [progress, setProgress] = useState<string | null>(null)
-  const unsub = useRef<(() => void) | null>(null)
   const [openCategory, setOpenCategory] = useState<string | null>(null)
   const toast = useStore((st) => st.toast)
+  const editor = useEditableFile<LocalSkillEntry>({
+    read: (s) => api.skillsRead(s.path),
+    write: (s, text) => api.skillsWrite(s.path, text),
+    name: (s) => s.name,
+    // The description shown in the list comes from the file that just changed.
+    onSaved: () => reload(),
+  })
 
   function reload(): void {
     setLoading(true)
@@ -106,6 +116,7 @@ export default function Skills() {
       return
     }
     toast({ kind: 'success', title: labels.skillDeleted(skill.name) })
+    editor.closeIf((e) => e.path === skill.path)
     reload()
   }
 
@@ -113,36 +124,6 @@ export default function Skills() {
     if (!vault.open) return
     reload()
   }, [vault.open])
-
-  async function makeSkillFromBook() {
-    const file = await api.skillsPickBook()
-    if (!file) return
-    setBusy(true)
-    setProgress(null)
-    // Progress arrives on a channel; drop the listener whatever happens, or a
-    // second run would report twice.
-    unsub.current = api.onSkillsFromBookProgress((p) =>
-      setProgress(labels.bookSkillRunning(p.phase, p.done ?? 0, p.total ?? 0)),
-    )
-    try {
-      const r = await api.skillsFromBook(file, category.trim() || 'general')
-      if (!r.ok) {
-        toast({ kind: 'error', title: labels.bookSkillFailed, detail: r.error })
-        return
-      }
-      toast({
-        kind: 'success',
-        title: labels.bookSkillDone(r.slug, r.chapters),
-        detail: r.warnings.length > 0 ? r.warnings.join(' · ') : r.path,
-      })
-      reload()
-    } finally {
-      unsub.current?.()
-      unsub.current = null
-      setBusy(false)
-      setProgress(null)
-    }
-  }
 
   if (!vault.open) {
     return (
@@ -171,30 +152,23 @@ export default function Skills() {
         <p className="mt-1 max-w-2xl text-xs leading-relaxed text-ink-dim">{labels.skillsPageLead}</p>
       </div>
 
-      {/* A book becomes one skill, never one per chapter — the index is what
-          stays loaded and the chapters are read one at a time. */}
-      <GlassCard className="mb-3 shrink-0 p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-ink">{labels.bookSkillTitle}</div>
-            <p className="mt-0.5 text-[11px] leading-snug text-ink-dim">{labels.bookSkillLead}</p>
-          </div>
-          <input
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder={labels.bookSkillCategory}
-            spellCheck={false}
-            disabled={busy}
-            className="no-drag w-36 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 font-mono text-xs text-ink placeholder:text-ink-faint"
+      {/* Making a skill from a book moved to Import: it is an act of bringing
+          something in, and this page lists what is already here. */}
+      {editor.editing ? (
+        <div className="min-h-0 flex-1 overflow-y-auto pb-2">
+          <MarkdownEditor
+            title={editor.editing.name}
+            subtitle={editor.editing.path}
+            text={editor.text}
+            onChange={editor.setText}
+            onClose={editor.close}
+            onSave={() => void editor.save()}
+            saveLabel={labels.skillsSaveLocal}
+            saving={editor.saving}
+            dirty={editor.dirty}
           />
-          <Button onClick={() => void makeSkillFromBook()} disabled={busy}>
-            {busy ? <Spinner className="h-3.5 w-3.5" /> : <BookUp className="h-3.5 w-3.5" />}
-            {labels.bookSkillPick}
-          </Button>
         </div>
-        <p className="mt-2 text-[10px] text-ink-faint">{progress ?? labels.bookSkillNote}</p>
-      </GlassCard>
-
+      ) : (
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pb-2">
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-12 text-ink-dim">
@@ -212,6 +186,7 @@ export default function Skills() {
                   key={`own:${s.name}`}
                   skill={s}
                   labels={labels}
+                  onEdit={() => void editor.open(s)}
                   onDelete={() => void remove(s)}
                 />
               ))}
@@ -255,6 +230,7 @@ export default function Skills() {
                       key={`imported:${s.category ?? ''}/${s.name}`}
                       skill={s}
                       labels={labels}
+                      onEdit={() => void editor.open(s)}
                       onDelete={() => void remove(s)}
                     />
                   ))}
@@ -263,6 +239,7 @@ export default function Skills() {
           </>
         )}
       </div>
+      )}
 
       <div className="mt-2 shrink-0">
         <Button variant="soft" onClick={() => setRoute('dashboard')} className="!px-2.5 !py-1.5 !text-xs">

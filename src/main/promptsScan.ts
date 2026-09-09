@@ -18,6 +18,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
+import { writeFileKeepingPrevSync } from '../../packages/brain-core/src/archive/durableWrite.js'
+
 export interface LocalPromptEntry {
   name: string
   description: string
@@ -157,6 +159,66 @@ export function deleteLocalPrompt(vaultRoot: string, name: string): { ok: boolea
   if (!existsSync(file)) return { ok: false, error: 'not found' }
   try {
     rmSync(file)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+/** Same ceiling as a skill: generous for a document, not for a runaway file. */
+export const MAX_PROMPT_BYTES = 512 * 1024
+
+/**
+ * Read one prompt for editing in the app.
+ *
+ * Addressed by name, never by path — the same rule creating and deleting
+ * already follow. A stem that matches `[A-Za-z0-9][A-Za-z0-9._-]{0,63}` cannot
+ * contain a separator or a `..`, so there is nothing for a traversal to hold
+ * on to and no need for a second containment check that could drift from the
+ * first.
+ */
+export function readLocalPrompt(
+  vaultRoot: string,
+  name: string,
+): { ok: true; text: string; path: string } | { ok: false; error: string } {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name.endsWith('.md')) {
+    return { ok: false, error: 'bad name' }
+  }
+  const file = join(vaultRoot, 'prompts', `${name}.md`)
+  if (!existsSync(file)) return { ok: false, error: 'not found' }
+  try {
+    if (statSync(file).size > MAX_PROMPT_BYTES) return { ok: false, error: 'file too large' }
+    return { ok: true, text: readFileSync(file, 'utf8'), path: file }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * Store an edited prompt.
+ *
+ * Refuses a name that does not already exist: creating goes through
+ * `createLocalPrompt`, which is a deliberate act with its own button. Saving
+ * something that was never created would let a typo in the editor quietly
+ * spawn a second prompt beside the one being edited.
+ *
+ * Keeps a `.prev` and lands atomically. A prompt is served to an agent the
+ * moment it is on disk, so a half-written one is worse than an old one.
+ */
+export function writeLocalPrompt(
+  vaultRoot: string,
+  name: string,
+  text: string,
+): { ok: boolean; error?: string } {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name.endsWith('.md')) {
+    return { ok: false, error: 'bad name' }
+  }
+  const file = join(vaultRoot, 'prompts', `${name}.md`)
+  if (!existsSync(file)) return { ok: false, error: 'not found' }
+  const data = Buffer.from(String(text ?? ''), 'utf8')
+  if (data.byteLength > MAX_PROMPT_BYTES) return { ok: false, error: 'file too large' }
+  try {
+    writeFileKeepingPrevSync(file, data)
     return { ok: true }
   } catch (e) {
     return { ok: false, error: (e as Error).message }

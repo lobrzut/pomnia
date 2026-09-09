@@ -174,8 +174,16 @@ import {
   listLocalSkillsAt,
   writeSkillsIndexAt,
   deleteLocalSkillAt,
+  readLocalSkillAt,
+  writeLocalSkillAt,
 } from './skillsScan.js'
-import { createLocalPrompt, deleteLocalPrompt, listLocalPromptsAt } from './promptsScan.js'
+import {
+  createLocalPrompt,
+  deleteLocalPrompt,
+  listLocalPromptsAt,
+  readLocalPrompt,
+  writeLocalPrompt,
+} from './promptsScan.js'
 import { buildBookSkill, composeBookSkill, type BookSkillProgress } from './bookSkillBuild.js'
 import {
   brainProcessFailedMessage,
@@ -851,11 +859,6 @@ function registerIpc(): void {
   })
 
   /*
-   * The prompt library, the local sibling of skills:list. Read-only here plus
-   * one create: editing a prompt means opening the file, the same way a skill
-   * is edited, because these are documents the user owns.
-   */
-  /*
    * A book becomes one skill. Additive on purpose: import still does exactly
    * what it did, and this is a second thing you can ask of the same file.
    * Goes through trustedHandle like everything else — a new channel that
@@ -912,6 +915,12 @@ function registerIpc(): void {
     },
   )
 
+  /*
+   * The prompt library, the local sibling of skills:list. List, create, read,
+   * save and delete — the same set Mini has, so "edit a prompt" means one
+   * thing in both builds. Opening the file in the OS editor stays available
+   * (skills:reveal) for anyone who wants their own editor.
+   */
   trustedHandle('prompts:list', () => {
     if (!vault || !vaultPath) return { prompts: [], promptsRoot: null }
     const root = brainVaultRoot(vaultPath)
@@ -937,6 +946,49 @@ description:
     } catch (e) {
       return { ok: false, error: (e as Error).message }
     }
+  })
+
+  /*
+   * Reading and saving a skill or a prompt in the app.
+   *
+   * The comment above prompts:list used to say editing means opening the file,
+   * "the same way a skill is edited". That was true of the desktop and never
+   * true of Mini, which has no vault to open a file from and grew its own
+   * editor — so the same act had two different answers depending on which
+   * build you happened to be running. These four channels give the desktop the
+   * same in-app editor, over its own vault.
+   *
+   * Saving only, never creating: both writers refuse a target the scan does
+   * not already list. Creating stays where it was, behind its own button.
+   */
+  trustedHandle('skills:read', (_e, filePath: string) => {
+    if (!vault || !vaultPath) return { ok: false, error: 'no vault' }
+    return readLocalSkillAt(brainSkillsDir(vaultPath), String(filePath ?? ''))
+  })
+
+  trustedHandle('skills:write', (_e, filePath: string, text: string) => {
+    if (!vault || !vaultPath) return { ok: false, error: 'no vault' }
+    const r = writeLocalSkillAt(brainSkillsDir(vaultPath), String(filePath ?? ''), String(text ?? ''))
+    if (r.ok) {
+      // index.json is what agents read. An edited description that never
+      // reaches it is the same stale-index lie the scan was written to stop.
+      try {
+        writeSkillsIndexAt(brainSkillsDir(vaultPath))
+      } catch (e) {
+        log.warn('skills index not rewritten after edit:', (e as Error).message)
+      }
+    }
+    return r
+  })
+
+  trustedHandle('prompts:read', (_e, name: string) => {
+    if (!vault || !vaultPath) return { ok: false, error: 'no vault' }
+    return readLocalPrompt(brainVaultRoot(vaultPath), String(name ?? '').trim())
+  })
+
+  trustedHandle('prompts:write', (_e, name: string, text: string) => {
+    if (!vault || !vaultPath) return { ok: false, error: 'no vault' }
+    return writeLocalPrompt(brainVaultRoot(vaultPath), String(name ?? '').trim(), String(text ?? ''))
   })
 
   trustedHandle('skills:delete', async (_e, filePath: string) => {
