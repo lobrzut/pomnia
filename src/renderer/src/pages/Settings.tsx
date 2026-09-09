@@ -6,6 +6,7 @@ import {
   isValidHandshakePhraseSetting,
 } from '@core/handshakePhrase'
 import { Button, Field, GlassCard, Input, Spinner, Toggle } from '../components/ui'
+import { Hint } from '../components/Hint'
 import { ClientIcon } from '../components/ClientIcon'
 import { api, isMock } from '../lib/api'
 import { humanBytes, relativeTime } from '../lib/format'
@@ -469,18 +470,18 @@ export default function Settings() {
             </Button>
           </div>
         </div>
-        {isLinux ? (
-          <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">{labels.updateLinuxHint}</p>
-        ) : null}
+        {isLinux ? <Hint className="mt-3" text={labels.updateLinuxHint} /> : null}
       </GlassCard>
 
       <GlassCard className="mb-4 p-5">
+        {/*
+          This card is a list of paths. Every sentence explaining a path now
+          sits on the path it explains, so the paths are what you see.
+        */}
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
           <HardDrive className="h-4 w-4 text-mint" /> {labels.dataLocationsTitle}
+          <Hint text={isMini ? labels.dataLocationsLeadMini : labels.dataLocationsLead} />
         </div>
-        <p className="mb-3 text-xs text-ink-dim">
-          {isMini ? labels.dataLocationsLeadMini : labels.dataLocationsLead}
-        </p>
         {dataLoc ? (
           <div className="space-y-2.5 text-xs">
             <div>
@@ -497,28 +498,28 @@ export default function Settings() {
             {!isMini && (
               <>
                 <div>
-                  <div className="text-ink-faint">{labels.dataLocationsIndex}</div>
+                  <div className="flex items-center gap-1.5 text-ink-faint">
+                    {labels.dataLocationsIndex}
+                    <Hint text={labels.dataLocationsPlaintext} />
+                  </div>
                   <div className="mt-0.5 break-all font-mono text-[11px] text-ink">
                     {dataLoc.libraryDbPath}
                   </div>
                 </div>
                 <div>
-                  <div className="text-ink-faint">{labels.dataLocationsVault}</div>
+                  <div className="flex items-center gap-1.5 text-ink-faint">
+                    {labels.dataLocationsVault}
+                    <Hint text={labels.dataLocationsOwnership} />
+                  </div>
                   <div className="mt-0.5 break-all font-mono text-[11px] text-ink">
                     {dataLoc.vaultPath ?? labels.dataLocationsVaultLocked}
                   </div>
                 </div>
               </>
             )}
-            <p className="text-[11px] text-ink-faint">{labels.dataLocationsInstallForm(dataLoc.installForm)}</p>
-            {!isMini && (
-              <>
-                <p className="text-[11px] leading-relaxed text-ink-dim">{labels.dataLocationsPlaintext}</p>
-                <p className="text-[11px] leading-relaxed text-ink-dim">{labels.dataLocationsOwnership}</p>
-              </>
-            )}
-            <p className="text-[11px] leading-relaxed text-ink-faint">
-              {isMini ? labels.dataLocationsWipeMini : labels.dataLocationsWipe}
+            <p className="flex items-center gap-1.5 text-[11px] text-ink-faint">
+              {labels.dataLocationsInstallForm(dataLoc.installForm)}
+              <Hint text={isMini ? labels.dataLocationsWipeMini : labels.dataLocationsWipe} />
             </p>
             {!isMock && (
               <div className="flex flex-wrap gap-2 pt-1">
@@ -567,9 +568,9 @@ export default function Settings() {
       {!isMini && (
       <GlassCard className="mb-4 p-5">
         <div className="mb-1 flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-ink">{labels.simpleMode}</div>
-            <p className="mt-1 text-xs text-ink-dim">{labels.simpleModeHint}</p>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="text-sm font-semibold text-ink">{labels.simpleMode}</span>
+            <Hint text={labels.simpleModeHint} />
           </div>
           <Toggle
             checked={simpleMode}
@@ -583,8 +584,8 @@ export default function Settings() {
       <GlassCard className="mb-4 p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
           <Languages className="h-4 w-4 text-mint" /> {labels.uiLocale}
+          <Hint text={labels.uiLocaleHint} />
         </div>
-        <p className="mb-3 text-xs text-ink-dim">{labels.uiLocaleHint}</p>
         <div
           className="flex flex-wrap gap-1 rounded-xl border border-line bg-abyss/60 p-1"
           role="radiogroup"
@@ -615,8 +616,8 @@ export default function Settings() {
       <GlassCard className="mb-4 p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
           <Palette className="h-4 w-4 text-mint" /> {labels.colorScheme}
+          <Hint text={labels.colorSchemeHint} />
         </div>
-        <p className="mb-3 text-xs text-ink-dim">{labels.colorSchemeHint}</p>
         <div
           className="flex flex-wrap gap-1 rounded-xl border border-line bg-abyss/60 p-1"
           role="radiogroup"
@@ -650,30 +651,30 @@ export default function Settings() {
         </div>
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-medium text-ink">{labels.openAtLogin}</div>
-              <p className="mt-1 text-xs text-ink-dim">{labels.openAtLoginHint}</p>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="text-sm font-medium text-ink">{labels.openAtLogin}</span>
+              <Hint text={labels.openAtLoginHint} />
             </div>
             <Toggle checked={openAtLogin} onChange={setOpenAtLogin} aria-label={labels.openAtLogin} />
           </div>
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-medium text-ink">{labels.closeToTray}</div>
-              <p className="mt-1 text-xs text-ink-dim">{labels.closeToTrayHint}</p>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="text-sm font-medium text-ink">{labels.closeToTray}</span>
+              <Hint text={labels.closeToTrayHint} />
             </div>
             <Toggle checked={closeToTray} onChange={setCloseToTray} aria-label={labels.closeToTray} />
           </div>
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-medium text-ink">{labels.minimizeToTray}</div>
-              <p className="mt-1 text-xs text-ink-dim">{labels.minimizeToTrayHint}</p>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="text-sm font-medium text-ink">{labels.minimizeToTray}</span>
+              <Hint text={labels.minimizeToTrayHint} />
             </div>
             <Toggle checked={minimizeToTray} onChange={setMinimizeToTray} aria-label={labels.minimizeToTray} />
           </div>
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-medium text-ink">{labels.floatingMonitorOnMinimize}</div>
-              <p className="mt-1 text-xs text-ink-dim">{labels.floatingMonitorOnMinimizeHint}</p>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="text-sm font-medium text-ink">{labels.floatingMonitorOnMinimize}</span>
+              <Hint text={labels.floatingMonitorOnMinimizeHint} />
             </div>
             <Toggle
               checked={floatingMonitorOnMinimize}
@@ -693,12 +694,12 @@ export default function Settings() {
       <GlassCard className="mb-4 p-5">
         <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
           <Handshake className="h-4 w-4 text-mint" /> {labels.agentBehaviourTitle}
+          <Hint text={labels.agentBehaviourLead} />
         </div>
-        <p className="mb-4 text-xs leading-relaxed text-ink-dim">{labels.agentBehaviourLead}</p>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-medium text-ink">{labels.handshakeEnabled}</div>
-            <p className="mt-1 text-xs text-ink-dim">{labels.handshakeEnabledHint}</p>
+        <div className="mb-4 mt-3 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="text-sm font-medium text-ink">{labels.handshakeEnabled}</span>
+            <Hint text={labels.handshakeEnabledHint} />
           </div>
           <Toggle
             checked={handshakeEnabled}
@@ -706,8 +707,10 @@ export default function Settings() {
             aria-label={labels.handshakeEnabled}
           />
         </div>
-        <div className="mb-1 text-sm font-medium text-ink">{labels.handshakePhrase}</div>
-        <p className="mb-3 text-xs text-ink-dim">{labels.handshakePhraseHint}</p>
+        <div className="mb-2 flex min-w-0 items-center gap-1.5 text-sm font-medium text-ink">
+          <span>{labels.handshakePhrase}</span>
+          <Hint text={labels.handshakePhraseHint} />
+        </div>
         <div className="flex flex-wrap items-start gap-2">
           <div className="min-w-0 flex-1">
             <Input
@@ -737,18 +740,20 @@ export default function Settings() {
             {phraseSaving ? <Spinner className="h-4 w-4" /> : null}
             {labels.handshakePhraseSave}
           </Button>
+          {/* The "now go restart the session" note belongs to the save, not to
+              the panel — it is only true once you have pressed the button. */}
+          <Hint className="mt-2.5" text={labels.handshakeRefreshHint} />
         </div>
         {phraseError ? <p className="mt-2 text-xs text-rose-300/90">{phraseError}</p> : null}
-        <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">{labels.handshakeRefreshHint}</p>
 
         <div className="my-4 h-px bg-white/8" />
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
           <Brain className="h-4 w-4 text-mint" /> {labels.autoCheckpoint}
         </div>
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-medium text-ink">{labels.autoCheckpointEnabled}</div>
-            <p className="mt-1 text-xs text-ink-dim">{labels.autoCheckpointEnabledHint}</p>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="text-sm font-medium text-ink">{labels.autoCheckpointEnabled}</span>
+            <Hint text={labels.autoCheckpointEnabledHint} />
           </div>
           <Toggle
             checked={autoCheckpointEnabled}
@@ -832,10 +837,10 @@ export default function Settings() {
       */}
       {!isMini && (
       <GlassCard className="mb-4 p-5">
-        <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
           <Plug className="h-4 w-4 text-cyan" /> {labels.mcpClients}
+          <Hint text={labels.mcpClientsLead} />
         </div>
-        <p className="mb-3 text-xs text-ink-dim">{labels.mcpClientsLead}</p>
         {/* The switch itself lives in Connect, but Settings is where people
             look for it — asked outright whether going server-side meant
             reinstalling. Say what is running and where to change it. */}
@@ -952,10 +957,12 @@ export default function Settings() {
         <GlassCard className="mb-4 p-5">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
             <Shield className="h-4 w-4 text-mint" /> {labels.antivirusTitle}
+            {/* Why we are not signed yet is background; what to click when the
+                warning is on screen is why anyone opens this card. */}
+            <Hint text={labels.antivirusSigningNote} />
           </div>
           <p className="mb-2 text-xs text-ink-dim">{labels.antivirusLead}</p>
           <p className="mb-3 text-xs text-ink-dim">{labels.antivirusWhy}</p>
-          <p className="mb-3 text-[11px] leading-relaxed text-ink-dim">{labels.antivirusSigningNote}</p>
           {!isMock && (
             <Button
               type="button"

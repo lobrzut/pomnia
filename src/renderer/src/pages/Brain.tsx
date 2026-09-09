@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { Badge, Button, GlassCard, Input, ProgressBar, Spinner } from '../components/ui'
+import { Hint } from '../components/Hint'
 import { relativeTime, sourceMeta } from '../lib/format'
 import { api } from '../lib/api'
 import { VRAM_PROFILES, PROFILE_EMBED_MODEL, PROFILE_EMBED_SIZE } from '@core/brain/profiles'
@@ -802,10 +803,12 @@ export default function Brain() {
           </div>
         </div>
 
+        {/* This branch used to hard-code an English sentence in a Polish app —
+            the local case simply had no label. It has one now. */}
         <p className="mb-3 text-xs text-ink-faint">
           {isRemoteTarget || !ollamaLooksLocal
             ? labels.brainOllamaDistillLead
-            : 'Pick the profile matching your GPU — it sets which model distills your chats. Missing models can be pulled right here.'}
+            : labels.brainOllamaProfileLead}
         </p>
 
         {showOllamaInstallGate && (
@@ -1004,9 +1007,7 @@ export default function Brain() {
             )}
           </div>
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-          {labels.brainEmbeddedProcessHint}
-        </p>
+        <Hint className="mt-2" text={labels.brainEmbeddedProcessHint} />
       </GlassCard>
       )}
 

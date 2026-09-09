@@ -23,6 +23,7 @@ import clsx from 'clsx'
 import { AppLogo } from '../components/AppLogo'
 import { Button, Field, Input, ProgressBar, Spinner } from '../components/ui'
 import { ErrorBoundary } from '../components/ErrorBoundary'
+import { Hint } from '../components/Hint'
 import { GuideOverlay } from '../components/GuideMap'
 import { ClientIcon } from '../components/ClientIcon'
 import { api } from '../lib/api'
@@ -330,7 +331,12 @@ function VaultStep({ onDone, onBack }: { onDone: () => void; onBack: () => void 
   }
 
   return (
-    <StepCard icon={ShieldCheck} title={labels.onboardingVaultTitle} lead={labels.onboardingVaultLead}>
+    <StepCard
+      icon={ShieldCheck}
+      title={labels.onboardingVaultTitle}
+      lead={labels.onboardingVaultLead}
+      leadHint={labels.onboardingVaultLeadHint}
+    >
       <div className="mb-4 flex rounded-xl border border-white/10 bg-black/20 p-1">
         {(['create', 'unlock'] as const).map((m) => (
           <button
@@ -635,7 +641,12 @@ function EngineStep({
   }
 
   return (
-    <StepCard icon={Cpu} title={labels.onboardingEngineTitle} lead={labels.onboardingEngineLead}>
+    <StepCard
+      icon={Cpu}
+      title={labels.onboardingEngineTitle}
+      lead={labels.onboardingEngineLead}
+      leadHint={labels.onboardingEngineLeadHint}
+    >
       <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <button
           type="button"
@@ -795,11 +806,7 @@ function EngineStep({
           </div>
         ))}
 
-      {mode === 'remote' && (
-        <p className="text-[11px] leading-relaxed text-ink-faint">
-          {labels.onboardingEngineRemoteOllamaOptional}
-        </p>
-      )}
+      {mode === 'remote' && <Hint text={labels.onboardingEngineRemoteOllamaOptional} />}
 
       <StepNav onBack={onBack} onSkip={onSkip} skipLabel={labels.onboardingEngineSkip}>
         <Button onClick={continueWithMode} disabled={!canContinue}>
@@ -1098,11 +1105,14 @@ function StepCard({
   icon: Icon,
   title,
   lead,
+  leadHint,
   children
 }: {
   icon: typeof Cpu
   title: string
   lead: string
+  /** The part of the lead that only matters once — kept behind a mark. */
+  leadHint?: string
   children: React.ReactNode
 }) {
   return (
@@ -1111,9 +1121,12 @@ function StepCard({
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl accent-grad ring-glow">
           <Icon className="h-[22px] w-[22px] text-white" />
         </div>
-        <div>
+        <div className="min-w-0">
           <h2 className="text-lg font-bold tracking-tight text-ink">{title}</h2>
-          <p className="mt-0.5 text-[13px] leading-relaxed text-ink-dim">{lead}</p>
+          <p className="mt-0.5 flex items-center gap-1.5 text-[13px] leading-relaxed text-ink-dim">
+            <span>{lead}</span>
+            {leadHint && <Hint text={leadHint} />}
+          </p>
         </div>
       </div>
       {children}

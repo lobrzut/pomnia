@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ChevronDown, ChevronRight, Cpu, Download, FileUp, Send, Trash2, UploadCloud } from 'lucide-react'
 
 import { Button, GlassCard, Input, Spinner, Toggle } from '../components/ui'
+import { Hint } from '../components/Hint'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
@@ -275,9 +276,9 @@ export default function MiniIngest() {
           which is the exception rather than the setting.
         */}
         <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
-          <div>
-            <div className="text-[13px] text-ink">{labels.ingestOcr}</div>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-ink-faint">{labels.ingestOcrHint}</p>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="text-[13px] text-ink">{labels.ingestOcr}</span>
+            <Hint text={labels.ingestOcrHint} />
           </div>
           <label className="flex shrink-0 items-center gap-2 text-[11px] text-ink-faint">
             {labels.ingestOcrLimit}

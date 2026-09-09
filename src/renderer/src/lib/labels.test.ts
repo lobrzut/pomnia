@@ -127,8 +127,16 @@ describe('uiLabels', () => {
     expect(labels.dashboardStatDocsPending(1)).toBe('1 czeka na indeks')
     expect(labels.brainAttachExport).toContain('Dołącz eksport')
     expect(labels.importChatConfirmGenericWarn).toContain('Nie rozpoznano formatu')
-    expect(labels.onboardingEngineLead).toMatch(/Zdalnie|search\/MCP/)
-    expect(labels.onboardingEngineLead).toMatch(/Ollama/)
+    // The engine step used to open with 176 characters of prose. The choice it
+    // asks for now stands alone; the local-vs-remote detail moved behind the
+    // mark, so the pair is asserted together — the lead must stay short, and
+    // the explanation must not have been lost on the way.
+    expect(labels.onboardingEngineLead.length).toBeLessThan(80)
+    expect(labels.onboardingEngineLead).toMatch(/serwerze/)
+    expect(labels.onboardingEngineLeadHint).toMatch(/Zdalnie|search\/MCP/)
+    expect(labels.onboardingEngineLeadHint).toMatch(/Ollama/)
+    expect(labels.onboardingVaultLead.length).toBeLessThan(90)
+    expect(labels.onboardingVaultLeadHint).toMatch(/Vault/)
     expect(labels.onboardingEngineRemoteOllamaOptional).toMatch(/destylac/i)
     expect(labels.onboardingEnginePullBtn).toMatch(/Pobierz|Pomni/)
     expect(labels.onboardingEngineCancelPull).toBe('Anuluj')
@@ -211,6 +219,48 @@ describe('uiLabels', () => {
     expect(labels.dataLocationsTitle).toBe('Gdzie leżą dane')
     expect(labels.linuxUnsignedTitle).toMatch(/Linux/)
     expect(labels.openAtLogin).not.toMatch(/Windows/i)
+  })
+
+  /*
+    A language leak is silent. Nothing throws, nothing looks broken in a diff —
+    the reader simply gets the wrong language, and only they find out.
+
+    I caused one: scanning this file for English text, I found eight English
+    strings and rewrote them in Polish, without noticing that the file holds
+    two tables and that a plain-string `replace` takes the FIRST match. Those
+    eight were the English table. The Polish already said the same thing. So
+    the "fix" swapped a leak that did not exist for one that did, pointing the
+    other way, and shipped it into a release build.
+
+    Diacritics are not proof of Polish and their absence is not proof of
+    English, so both directions need a second signal: Polish letters on the
+    English side, English function words with no Polish letters on the Polish
+    side. Short strings ("OK", "Import", a product name) are legitimately the
+    same in both and are skipped.
+  */
+  it('keeps each table in its own language', () => {
+    const polishLetters = /[ąćęłńóśżź]/i
+    const englishWords =
+      /\b(the|your|this|that|with|from|which|when|needs?|does|only|still|here|what|where|until|before|after|every|each|into|and)\b/i
+
+    const strings = (labels: Record<string, unknown>): [string, string][] =>
+      Object.entries(labels).filter(
+        (e): e is [string, string] => typeof e[1] === 'string' && e[1].length >= 25,
+      )
+
+    setUiLocaleCache('pl')
+    invalidateUiLabelsCache()
+    const pl = strings(uiLabels() as unknown as Record<string, unknown>).filter(
+      ([, v]) => !polishLetters.test(v) && englishWords.test(v),
+    )
+    expect(pl).toEqual([])
+
+    setUiLocaleCache('en')
+    invalidateUiLabelsCache()
+    const en = strings(uiLabels() as unknown as Record<string, unknown>).filter(([, v]) =>
+      polishLetters.test(v),
+    )
+    expect(en).toEqual([])
   })
 })
 

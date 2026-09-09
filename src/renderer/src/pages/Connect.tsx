@@ -20,6 +20,7 @@ import {
   X
 } from 'lucide-react'
 import { Badge, Button, Field, GlassCard, Input, Spinner, Toggle } from '../components/ui'
+import { Hint } from '../components/Hint'
 import { ClientIcon, CLIENT_BRAND } from '../components/ClientIcon'
 import {
   EMBEDDED_BRAIN_DEFAULT_URL,
@@ -1157,6 +1158,10 @@ export default function Connect() {
                         )}
                         {snippet.brief ? labels.agentBrainModeBriefCopy : labels.agentBrainModeRuleCopy}
                       </Button>
+                      {/* The longest standing paragraph in the app (295 chars)
+                          — per-client restart trivia that only matters after
+                          you have written the rule. It belongs to the buttons. */}
+                      <Hint className="mt-2.5" text={labels.agentBrainModeRefreshHint} />
                     </div>
                   </div>
                   {snippet.brief ? (
@@ -1174,9 +1179,6 @@ export default function Connect() {
                   ) : (
                     <p className="mb-2 text-[11px] text-ink-dim">{labels.agentBrainModeNoPath}</p>
                   )}
-                  <p className="mb-2 text-[11px] leading-relaxed text-ink-faint">
-                    {labels.agentBrainModeRefreshHint}
-                  </p>
                   <pre className="max-h-40 overflow-auto rounded-lg border border-white/8 bg-black/40 p-3 text-[11px] leading-relaxed text-ink-dim">
                     {snippet.brief?.content ?? snippet.agentRuleMarkdown}
                   </pre>

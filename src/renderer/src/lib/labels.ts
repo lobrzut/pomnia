@@ -159,6 +159,7 @@ export interface UiLabels {
   /** Advanced Ollama card when Master is remote — distill endpoint, not install gate. */
   brainOllamaDistillTitle: string
   brainOllamaDistillLead: string
+  brainOllamaProfileLead: string
   brainOllamaDistillOfflineHint: string
   brainDistillSelectedHint: (model: string, profile: string) => string
   brainAttachExport: string
@@ -208,6 +209,7 @@ export interface UiLabels {
   onboardingValueRecallText: string
   onboardingVaultTitle: string
   onboardingVaultLead: string
+  onboardingVaultLeadHint: string
   onboardingVaultCreateTab: string
   onboardingVaultOpenTab: string
   onboardingVaultNewFolder: string
@@ -229,6 +231,7 @@ export interface UiLabels {
   onboardingBackupNow: string
   onboardingEngineTitle: string
   onboardingEngineLead: string
+  onboardingEngineLeadHint: string
   onboardingEngineLocal: string
   onboardingEngineLocalHint: (url: string) => string
   onboardingEngineRemote: string
@@ -1116,8 +1119,9 @@ const PL_LABELS: UiLabels = {
   onboardingValueRecallTitle: 'Przywołuj',
   onboardingValueRecallText: 'Oddaj kontekst dowolnemu AI przez MCP — agenci, którzy Cię pamiętają.',
   onboardingVaultTitle: 'Utwórz vault',
-  onboardingVaultLead:
-    'Jeden folder vaultu trzyma wszystko (np. C:\\Vault lub ~/Vault — nazwa dowolna, też *.pomnia). Wybierz lokalizację i hasło, którego nie zgubisz. Przenośność = skopiuj cały ten folder → Otwórz vault → hasło.',
+  onboardingVaultLead: 'Wybierz miejsce i hasło. Hasła nie da się odzyskać.',
+  onboardingVaultLeadHint:
+    'Jeden folder trzyma wszystko — np. C:\\Vault albo ~/Vault, nazwa dowolna. Przenosisz go tak: skopiuj cały folder, potem Otwórz vault i podaj hasło.',
   onboardingVaultCreateTab: 'Nowy vault',
   onboardingVaultOpenTab: 'Mam już folder',
   onboardingVaultNewFolder: 'Nowy folder vaultu',
@@ -1141,8 +1145,9 @@ const PL_LABELS: UiLabels = {
   onboardingBackupSkip: 'Pomiń — backup później z Dashboardu',
   onboardingBackupNow: 'Backup teraz',
   onboardingEngineTitle: 'Jak ma działać Brain?',
-  onboardingEngineLead:
-    'Lokalnie: wbudowana wyszukiwarka + Ollama na tym PC (embed + destylacja). Zdalnie (np. Pomnia na Linuxie): search/MCP na serwerze — lokalna instalacja Ollama nie jest wymagana.',
+  onboardingEngineLead: 'Gdzie ma liczyć wyszukiwarka: na tym komputerze czy na serwerze.',
+  onboardingEngineLeadHint:
+    'Lokalnie: wbudowana wyszukiwarka + Ollama na tym PC (embed i destylacja). Zdalnie (np. Pomnia na Linuxie): search/MCP na serwerze, lokalna Ollama niepotrzebna.',
   onboardingEngineLocal: 'Lokalnie (embedded)',
   onboardingEngineLocalHint: (url) => `Jeden .exe, MCP na ${url} — bez zdalnego serwera, bez tokena.`,
   onboardingEngineRemote: 'Zdalny master',
@@ -1355,6 +1360,7 @@ const PL_LABELS: UiLabels = {
   brainOllamaDistillTitle: 'Ollama do destylacji',
   brainOllamaDistillLead:
     'Zdalny Brain obsługuje search/MCP. Tu ustawiasz URL Ollama tylko pod destylację — domyślnie ten sam host co Master :11434. Bez lokalnej instalacji, dopóki nie destylujesz.',
+  brainOllamaProfileLead: 'Profil pod Twoje GPU — wybiera model destylacji. Brakujące pobierzesz tutaj.',
   brainOllamaDistillOfflineHint:
     'Brak Ollama pod tym URL — search nadal działa przez zdalny Brain. Przed destylacją wskaż Ollama na serwerze (:11434) albo lokalną.',
   brainEmbeddedProcessHint:
@@ -1439,12 +1445,12 @@ const PL_LABELS: UiLabels = {
     (unchanged ? `, ${unchanged} bez zmian` : '') +
     (failed ? `, ${plCount(failed, 'nieudana', 'nieudane', 'nieudanych')}` : '') +
     '. Serwer nic nie skasował.',
-  ingestOcrLimit: 'ogranicz do:',
+  ingestOcrLimit: 'stron:',
   ingestOcrProgress: (done, total, file) =>
     `OCR ${done}/${total} str. — ${file} (ok. 4 s na stronę)`,
   ingestOcr: 'Skany czytane przez OCR',
   ingestOcrHint:
-    'PDF bez warstwy tekstowej inaczej nie da nic, więc dzieje się to samo. Cały dokument, ok. 4 s na stronę. Strony-obrazki są odrzucane.',
+    'Skan nie ma warstwy tekstowej, więc bez OCR nie da nic. Czytany jest cały dokument, ok. 4 s na stronę; strony bez tekstu są odrzucane. 0 = bez limitu.',
   skillsTitle: 'Skille',
   skillsLead: 'Te, które leżą na serwerze. Podgląd i edycja — bez vaultu na tej maszynie.',
   skillsRefresh: 'Odśwież',
@@ -2138,8 +2144,9 @@ const EN_LABELS: UiLabels = {
   onboardingValueRecallTitle: 'Recall',
   onboardingValueRecallText: 'Hand context to any AI via MCP — agents that remember you.',
   onboardingVaultTitle: 'Create a vault',
-  onboardingVaultLead:
-    'One vault folder holds everything (e.g. C:\\Vault or ~/Vault — any name, including *.pomnia). Pick a location and a passphrase you won’t lose. Portability = copy that whole folder → Open vault → passphrase.',
+  onboardingVaultLead: 'Pick a location and a passphrase. A lost passphrase cannot be recovered.',
+  onboardingVaultLeadHint:
+    'One folder holds everything — e.g. C:\\Vault or ~/Vault, any name. To move it: copy the whole folder, then Open vault and enter the passphrase.',
   onboardingVaultCreateTab: 'New vault',
   onboardingVaultOpenTab: 'I already have a folder',
   onboardingVaultNewFolder: 'New vault folder',
@@ -2163,8 +2170,9 @@ const EN_LABELS: UiLabels = {
   onboardingBackupSkip: 'Skip — backup later from Dashboard',
   onboardingBackupNow: 'Backup now',
   onboardingEngineTitle: 'How will Brain run?',
-  onboardingEngineLead:
-    'Local: embedded search + Ollama on this PC (embed + distill). Remote (e.g. Pomnia on Linux): search/MCP on the server — no local Ollama install required for search.',
+  onboardingEngineLead: 'Where search should run: on this computer, or on a server.',
+  onboardingEngineLeadHint:
+    'Local: embedded search + Ollama on this PC (embed and distill). Remote (e.g. Pomnia on Linux): search/MCP on the server, no local Ollama needed.',
   onboardingEngineLocal: 'Local embedded',
   onboardingEngineLocalHint: (url) => `One .exe, MCP on ${url} — no remote server, no token.`,
   onboardingEngineRemote: 'Remote master',
@@ -2376,6 +2384,7 @@ const EN_LABELS: UiLabels = {
   brainOllamaDistillTitle: 'Ollama for distill',
   brainOllamaDistillLead:
     'Remote Brain owns search/MCP. Set an Ollama URL here only for distill — default is the same Master host :11434. No local install until you distill.',
+  brainOllamaProfileLead: 'A profile for your GPU — it picks the distill model. Missing ones pull from here.',
   brainOllamaDistillOfflineHint:
     'No Ollama at this URL — search still works via remote Brain. Before distill, point at server Ollama (:11434) or a local one.',
   brainEmbeddedProcessHint:
@@ -2459,12 +2468,12 @@ const EN_LABELS: UiLabels = {
     (unchanged ? `, ${unchanged} unchanged` : '') +
     (failed ? `, ${failed} failed` : '') +
     '. The server deleted nothing.',
-  ingestOcrLimit: 'cap at:',
+  ingestOcrLimit: 'pages:',
   ingestOcrProgress: (done, total, file) =>
     `OCR ${done}/${total} pages — ${file} (about 4 s per page)`,
   ingestOcr: 'Scans are read with OCR',
   ingestOcrHint:
-    'A PDF with no text layer yields nothing otherwise, so this just happens. Whole document, about 4 s per page. Picture pages are dropped.',
+    'A scan has no text layer, so without OCR it yields nothing. The whole document is read, about 4 s per page; pages with no text are dropped. 0 means no cap.',
   skillsTitle: 'Skills',
   skillsLead: 'The ones on the server. Read and edit them — no vault on this machine.',
   skillsRefresh: 'Refresh',
