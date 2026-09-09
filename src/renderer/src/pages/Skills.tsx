@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 Pomnia
-import { useEffect, useState } from 'react'
-import { ArrowLeft, FolderOpen, FileText, Wand2 } from 'lucide-react'
-import { Button, Spinner } from '../components/ui'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowLeft, BookUp, FolderOpen, FileText, Wand2 } from 'lucide-react'
+import { Button, GlassCard, Spinner } from '../components/ui'
 import { ListRow, ListSection } from '../components/EntityList'
 import { relativeTime } from '../lib/format'
 import { uiLabels } from '../lib/labels'
@@ -80,6 +80,10 @@ export default function Skills() {
   const [loading, setLoading] = useState(false)
   const [own, setOwn] = useState<LocalSkillEntry[]>([])
   const [imported, setImported] = useState<LocalSkillEntry[]>([])
+  const [category, setCategory] = useState('general')
+  const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState<string | null>(null)
+  const unsub = useRef<(() => void) | null>(null)
   const [openCategory, setOpenCategory] = useState<string | null>(null)
   const toast = useStore((st) => st.toast)
 
@@ -109,6 +113,36 @@ export default function Skills() {
     reload()
   }, [vault.open])
 
+  async function makeSkillFromBook() {
+    const file = await api.skillsPickBook()
+    if (!file) return
+    setBusy(true)
+    setProgress(null)
+    // Progress arrives on a channel; drop the listener whatever happens, or a
+    // second run would report twice.
+    unsub.current = api.onSkillsFromBookProgress((p) =>
+      setProgress(labels.bookSkillRunning(p.phase, p.done ?? 0, p.total ?? 0)),
+    )
+    try {
+      const r = await api.skillsFromBook(file, category.trim() || 'general')
+      if (!r.ok) {
+        toast({ kind: 'error', title: labels.bookSkillFailed, detail: r.error })
+        return
+      }
+      toast({
+        kind: 'success',
+        title: labels.bookSkillDone(r.slug, r.chapters),
+        detail: r.warnings.length > 0 ? r.warnings.join(' · ') : r.path,
+      })
+      reload()
+    } finally {
+      unsub.current?.()
+      unsub.current = null
+      setBusy(false)
+      setProgress(null)
+    }
+  }
+
   if (!vault.open) {
     return (
       <div className="mx-auto mt-24 max-w-md text-center">
@@ -135,6 +169,30 @@ export default function Skills() {
         <h1 className="text-xl font-bold tracking-tight text-grad">{labels.skillsPageTitle}</h1>
         <p className="mt-1 max-w-2xl text-xs leading-relaxed text-ink-dim">{labels.skillsPageLead}</p>
       </div>
+
+      {/* A book becomes one skill, never one per chapter — the index is what
+          stays loaded and the chapters are read one at a time. */}
+      <GlassCard className="mb-3 shrink-0 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold text-ink">{labels.bookSkillTitle}</div>
+            <p className="mt-0.5 text-[11px] leading-snug text-ink-dim">{labels.bookSkillLead}</p>
+          </div>
+          <input
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder={labels.bookSkillCategory}
+            spellCheck={false}
+            disabled={busy}
+            className="no-drag w-36 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 font-mono text-xs text-ink placeholder:text-ink-faint"
+          />
+          <Button onClick={() => void makeSkillFromBook()} disabled={busy}>
+            {busy ? <Spinner className="h-3.5 w-3.5" /> : <BookUp className="h-3.5 w-3.5" />}
+            {labels.bookSkillPick}
+          </Button>
+        </div>
+        <p className="mt-2 text-[10px] text-ink-faint">{progress ?? labels.bookSkillNote}</p>
+      </GlassCard>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pb-2">
         {loading ? (

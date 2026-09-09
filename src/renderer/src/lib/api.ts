@@ -99,6 +99,23 @@ export interface PomniaBridge {
   promptsList(): Promise<PromptsListResult>
   promptsCreate(name: string): Promise<{ ok: true; path: string } | { ok: false; error: string }>
   promptsDelete(name: string): Promise<{ ok: boolean; error?: string }>
+  /**
+   * Turn a document into one skill under `cli/<category>/<slug>/`. Refuses
+   * rather than overwriting an existing skill. See main/bookSkillBuild.ts.
+   */
+  skillsPickBook(): Promise<string | null>
+  skillsFromBook(
+    filePath: string,
+    category?: string,
+    slug?: string,
+  ): Promise<
+    | { ok: true; slug: string; path: string; chapters: number; warnings: string[] }
+    | { ok: false; error: string }
+  >
+  /** Fires while a book is being turned into a skill; returns an unsubscribe. */
+  onSkillsFromBookProgress(
+    cb: (p: { phase: string; done?: number; total?: number; detail?: string }) => void,
+  ): () => void
   skillsDelete(filePath: string): Promise<{ ok: boolean; error?: string }>
   skillsReveal(target: string, mode?: 'file' | 'folder'): Promise<{ ok: boolean; error: string | null }>
   /** Open the app install folder (optional AV last-resort paths). */
@@ -699,6 +716,22 @@ function mockBridge(): PomniaBridge {
     },
     async promptsDelete() {
       return { ok: true }
+    },
+    async skillsPickBook() {
+      return 'C:/ksiazki/MikroTik RouterOS.pdf'
+    },
+    async skillsFromBook(_filePath: string, category?: string) {
+      await new Promise((r) => setTimeout(r, 600))
+      return {
+        ok: true as const,
+        slug: 'mikrotik-routing',
+        path: `cli/${category ?? 'general'}/mikrotik-routing`,
+        chapters: 12,
+        warnings: [],
+      }
+    },
+    onSkillsFromBookProgress() {
+      return () => {}
     },
     async skillsDelete() {
       return { ok: true }

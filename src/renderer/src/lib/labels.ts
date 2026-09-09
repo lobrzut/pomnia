@@ -1006,6 +1006,14 @@ export interface UiLabels {
   skillsEmptyOwn: string
   skillsEmptyImported: string
   skillsBack: string
+  bookSkillTitle: string
+  bookSkillLead: string
+  bookSkillPick: string
+  bookSkillCategory: string
+  bookSkillRunning: (phase: string, done: number, total: number) => string
+  bookSkillDone: (slug: string, chapters: number) => string
+  bookSkillFailed: string
+  bookSkillNote: string
   skillsSize: (bytes: number) => string
   dashboardSourcesHeading: string
   dashboardSelectAll: string
@@ -1989,6 +1997,16 @@ const PL_LABELS: UiLabels = {
   skillsPageTitle: 'Skills',
   skillsPageLead:
     'Skille to instrukcje, po które agent sięga sam przez `get_skill`. Nie są częścią wyszukiwania — to gotowe procedury, nie wiedza.',
+  bookSkillTitle: 'Zrób skill z książki',
+  bookSkillLead:
+    'Jedna książka = jeden skill: indeks zawsze wczytany, rozdziały czytane pojedynczo. Nie nadpisuje istniejących.',
+  bookSkillPick: 'Wybierz książkę',
+  bookSkillCategory: 'kategoria',
+  bookSkillRunning: (phase, done, total) =>
+    total > 0 ? `${phase} ${done}/${total}` : phase,
+  bookSkillDone: (slug, chapters) => `Gotowe: ${slug} (${chapters} rozdz.)`,
+  bookSkillFailed: 'Nie udało się zbudować skilla',
+  bookSkillNote: 'Destylacja idzie przez Twoją Ollamę i przy grubej książce trwa kilka minut.',
   skillsSectionOwn: 'Własne (brain/)',
   skillsSectionImported: 'Zaimportowane (cli/)',
   skillsOpenFile: 'Otwórz plik',
@@ -2761,6 +2779,15 @@ const EN_LABELS: UiLabels = {
   skillsPageTitle: 'Skills',
   skillsPageLead:
     'Skills are procedures the agent loads itself via `get_skill`. They are not part of search — ready-made workflows, not knowledge.',
+  bookSkillTitle: 'Make a skill from a book',
+  bookSkillLead:
+    'One book, one skill: the index is always loaded, chapters are read one at a time. Never overwrites an existing skill.',
+  bookSkillPick: 'Choose a book',
+  bookSkillCategory: 'category',
+  bookSkillRunning: (phase, done, total) => (total > 0 ? `${phase} ${done}/${total}` : phase),
+  bookSkillDone: (slug, chapters) => `Done: ${slug} (${chapters} chapters)`,
+  bookSkillFailed: 'Could not build the skill',
+  bookSkillNote: 'Distilling runs through your Ollama and takes minutes on a thick book.',
   skillsSectionOwn: 'Own (brain/)',
   skillsSectionImported: 'Imported (cli/)',
   skillsOpenFile: 'Open file',

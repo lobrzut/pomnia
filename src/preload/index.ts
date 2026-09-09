@@ -47,6 +47,14 @@ const bridge = {
   skillsList: () => ipcRenderer.invoke('skills:list'),
   promptsList: () => ipcRenderer.invoke('prompts:list'),
   promptsCreate: (name: string) => ipcRenderer.invoke('prompts:create', name),
+  skillsPickBook: () => ipcRenderer.invoke('skills:pickBook'),
+  skillsFromBook: (filePath: string, category?: string, slug?: string) =>
+    ipcRenderer.invoke('skills:fromBook', filePath, category, slug),
+  onSkillsFromBookProgress: (cb: (p: unknown) => void) => {
+    const h = (_e: unknown, p: unknown): void => cb(p)
+    ipcRenderer.on('skills:fromBookProgress', h)
+    return () => ipcRenderer.removeListener('skills:fromBookProgress', h)
+  },
   promptsDelete: (name: string) => ipcRenderer.invoke('prompts:delete', name),
   skillsDelete: (filePath: string) => ipcRenderer.invoke('skills:delete', filePath),
   skillsReveal: (target: string, mode?: 'file' | 'folder') =>

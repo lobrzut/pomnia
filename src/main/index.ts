@@ -175,6 +175,7 @@ import {
   deleteLocalSkillAt,
 } from './skillsScan.js'
 import { createLocalPrompt, deleteLocalPrompt, listLocalPromptsAt } from './promptsScan.js'
+import { buildBookSkill, type BookSkillProgress } from './bookSkillBuild.js'
 import {
   brainProcessFailedMessage,
   missingEmbedModelMessage,
@@ -853,6 +854,28 @@ function registerIpc(): void {
    * one create: editing a prompt means opening the file, the same way a skill
    * is edited, because these are documents the user owns.
    */
+  /*
+   * A book becomes one skill. Additive on purpose: import still does exactly
+   * what it did, and this is a second thing you can ask of the same file.
+   * Goes through trustedHandle like everything else — a new channel that
+   * skipped the sender guard would quietly undo it.
+   */
+  trustedHandle(
+    'skills:fromBook',
+    async (e: Electron.IpcMainInvokeEvent, filePath: string, category?: string, slug?: string) => {
+      if (!vault || !vaultPath) return { ok: false, error: 'no vault' }
+      const st = getAppSettings()
+      return buildBookSkill({
+        filePath: String(filePath ?? ''),
+        category: category ? String(category) : undefined,
+        slug: slug ? String(slug) : undefined,
+        skillsRoot: brainSkillsDir(vaultPath),
+        ollamaUrl: st.ollamaUrl,
+        onProgress: (p: BookSkillProgress) => e.sender.send('skills:fromBookProgress', p),
+      })
+    },
+  )
+
   trustedHandle('prompts:list', () => {
     if (!vault || !vaultPath) return { prompts: [], promptsRoot: null }
     const root = brainVaultRoot(vaultPath)
@@ -2373,6 +2396,16 @@ description:
       etaSeconds: estimateSeconds(st.bytes, rate),
       rateSamples: rate?.samples ?? 0,
     }
+  })
+
+  trustedHandle('skills:pickBook', async () => {
+    const r = await dialog.showOpenDialog(win!, {
+      properties: ['openFile'],
+      // Books only — this path builds a skill, not an import, and a chat export
+      // has no chapters to index.
+      filters: [{ name: 'Ksiazka', extensions: ['pdf', 'epub', 'docx', 'md', 'txt'] }],
+    })
+    return r.canceled ? null : r.filePaths[0]
   })
 
   trustedHandle('mini:ingestPick', async () => {
