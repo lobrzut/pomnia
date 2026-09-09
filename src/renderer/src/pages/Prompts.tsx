@@ -46,6 +46,7 @@ function PromptRow({
       title={`/${prompt.name}`}
       subtitle={prompt.description}
       meta={[signature(prompt, labels), relativeTime(new Date(prompt.mtimeMs).toISOString())]}
+      copyText={`/${prompt.name}`}
       actions={[
         {
           label: labels.promptsOpenFile,

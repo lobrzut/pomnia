@@ -552,6 +552,7 @@ export interface UiLabels {
   rowDelete: string
   rowDeleteConfirm: string
   rowEdit: string
+  rowCopyName: string
   skillDeleted: (name: string) => string
   promptDeleted: (name: string) => string
   skillsCategorySection: (category: string) => string
@@ -1511,6 +1512,7 @@ const PL_LABELS: UiLabels = {
   rowDelete: 'Usuń',
   rowDeleteConfirm: 'Na pewno?',
   rowEdit: 'Edytuj',
+  rowCopyName: 'Kliknij, żeby skopiować nazwę',
   skillDeleted: (name) => `Usunięto skill: ${name}`,
   promptDeleted: (name) => `Usunięto prompt: ${name}`,
   skillsCategorySection: (category) => `KATEGORIA: ${category.toUpperCase()}`,
@@ -2534,6 +2536,7 @@ const EN_LABELS: UiLabels = {
   rowDelete: 'Delete',
   rowDeleteConfirm: 'Sure?',
   rowEdit: 'Edit',
+  rowCopyName: 'Click to copy the name',
   skillDeleted: (name) => `Deleted skill: ${name}`,
   promptDeleted: (name) => `Deleted prompt: ${name}`,
   skillsCategorySection: (category) => `CATEGORY: ${category.toUpperCase()}`,

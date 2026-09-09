@@ -34,6 +34,7 @@ function SkillRow({
         skill.category,
         relativeTime(new Date(skill.mtimeMs).toISOString()),
       ]}
+      copyText={skill.name}
       actions={[
         {
           label: labels.skillsOpenFile,

@@ -191,7 +191,7 @@ export default function MiniSkills() {
       title={skill.name}
       subtitle={skill.description}
       meta={[skill.category, skill.path]}
-      onOpen={() => void openSkill(skill)}
+      copyText={skill.name}
       actions={[{ label: labels.rowEdit, onClick: () => void openSkill(skill) }]}
       onDelete={() => void remove(skill)}
       deleteLabel={labels.rowDelete}

@@ -233,7 +233,7 @@ export default function MiniPrompts() {
                             .map((a) => (a.required ? `${a.name}*` : a.name))
                             .join(', ')}`,
                     ]}
-                    onOpen={() => void openPrompt(p.name)}
+                    copyText={`/${p.name}`}
                     actions={[{ label: labels.rowEdit, onClick: () => void openPrompt(p.name) }]}
                     onDelete={() => void remove(p.name)}
                     deleteLabel={labels.rowDelete}

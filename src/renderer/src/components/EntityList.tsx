@@ -13,16 +13,26 @@
  * file you can see, whose name you just read, is ceremony — but a single click
  * that removes something with no undo is a trap. The row arms, says so, and
  * disarms itself after a few seconds if you walk away.
+ *
+ * Clicking the row itself copies the name. A prompt is invoked by typing its
+ * name into a chat window, so the name is what the reader came for; opening an
+ * editor was the wrong default for a click that lands on the title, and the
+ * editor already has its own button on the right.
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Check, Copy, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 
 import { GlassCard } from './ui'
+import { uiLabels } from '../lib/labels'
+import { useStore } from '../store/useStore'
 
 /** How long an armed delete stays armed before it forgets. */
 const ARM_TIMEOUT_MS = 4000
+
+/** How long the row says it copied before going quiet again. */
+const COPIED_MS = 1600
 
 export function ListSection({
   title,
@@ -60,6 +70,7 @@ export function ListRow({
   meta,
   actions,
   onOpen,
+  copyText,
   onDelete,
   deleteLabel,
   confirmLabel,
@@ -71,12 +82,44 @@ export function ListRow({
   actions?: RowAction[]
   /** Makes the whole row activate; keep it the same as the primary action. */
   onOpen?: () => void
+  /**
+   * What a click on the row puts on the clipboard. Takes precedence over
+   * `onOpen`, because the two would fight over the same click.
+   */
+  copyText?: string
   onDelete?: () => void
   deleteLabel?: string
   confirmLabel?: string
 }) {
+  const labels = uiLabels()
+  const toast = useStore((s) => s.toast)
   const [armed, setArmed] = useState(false)
+  const [copied, setCopied] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(
+    () => () => {
+      if (copyTimer.current) clearTimeout(copyTimer.current)
+    },
+    [],
+  )
+
+  async function copy(): Promise<void> {
+    if (!copyText) return
+    // A rejected clipboard write must not look like a successful one — the
+    // reader would go and paste something stale into a chat window.
+    try {
+      await navigator.clipboard.writeText(copyText)
+    } catch (e) {
+      toast({ kind: 'error', title: labels.copyFailed, detail: (e as Error).message })
+      return
+    }
+    setCopied(true)
+    if (copyTimer.current) clearTimeout(copyTimer.current)
+    copyTimer.current = setTimeout(() => setCopied(false), COPIED_MS)
+    toast({ kind: 'success', title: labels.copied, detail: copyText })
+  }
 
   useEffect(() => {
     if (!armed) return
@@ -87,17 +130,29 @@ export function ListRow({
   }, [armed])
 
   const facts = (meta ?? []).filter((m): m is string => Boolean(m))
+  const activate = copyText ? () => void copy() : onOpen
 
   return (
     <div
       className={clsx(
-        'flex items-start gap-3 border-b border-white/5 px-3 py-2.5 last:border-0',
-        onOpen && 'cursor-pointer hover:bg-white/[0.03]',
+        'group flex items-start gap-3 border-b border-white/5 px-3 py-2.5 last:border-0',
+        activate && 'cursor-pointer hover:bg-white/[0.03]',
       )}
-      onClick={onOpen ? () => onOpen() : undefined}
+      onClick={activate ? () => activate() : undefined}
+      title={copyText ? labels.rowCopyName : undefined}
     >
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-ink">{title}</div>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-sm font-semibold text-ink">{title}</span>
+          {copyText &&
+            (copied ? (
+              <Check className="h-3 w-3 shrink-0 text-mint" />
+            ) : (
+              // Only on hover: the mark is a reminder of what the click does,
+              // not a decoration every row has to carry.
+              <Copy className="h-3 w-3 shrink-0 text-ink-faint opacity-0 transition-opacity group-hover:opacity-100" />
+            ))}
+        </div>
         <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-ink-dim">{subtitle || '—'}</p>
         {facts.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0 text-[10px] text-ink-faint">
