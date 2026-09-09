@@ -152,6 +152,33 @@ export async function writeRemoteSkill(
   }
 }
 
+/**
+ * Create a whole skill on the server in one call.
+ *
+ * Mini holds no vault, so a book it turned into a skill has nowhere local to
+ * live. The write door refuses to create by design; this is the separate door
+ * that may, and the server refuses rather than merging into an existing skill.
+ */
+export async function createRemoteSkill(
+  dir: string,
+  files: { path: string; content: string }[],
+  url?: string,
+  token?: string,
+): Promise<LibraryResult<{ path: string; files: number }>> {
+  const bad = guard(url, token)
+  if (bad) return bad
+  if (!isSafeSkillRel(`${dir}/SKILL.md`)) return { error: 'unsafe-path', detail: dir }
+  try {
+    const r = (await post(url!, '/admin/skills/create', token!.trim(), { dir, files }, 120_000)) as {
+      path?: string
+      files?: number
+    }
+    return { path: r?.path ?? dir, files: r?.files ?? files.length }
+  } catch (e) {
+    return reason(e)
+  }
+}
+
 export async function deleteRemoteSkill(
   path: string,
   url?: string,

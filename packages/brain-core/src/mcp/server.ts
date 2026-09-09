@@ -1209,6 +1209,9 @@ export async function createBrainServer(
 
       /** Documents get room; everything else keeps the tight default. */
       function adminBodyLimit(path: string): number {
+        // A whole book package is many files at once, so it gets more room than
+        // a single-document save.
+        if (path === '/admin/skills/create') return 16 * 1024 * 1024
         return path === '/admin/skills/write' || path === '/admin/prompts/write'
           ? 2 * 1024 * 1024
           : 64 * 1024

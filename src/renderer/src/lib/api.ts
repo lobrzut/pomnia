@@ -104,6 +104,15 @@ export interface PomniaBridge {
    * rather than overwriting an existing skill. See main/bookSkillBuild.ts.
    */
   skillsPickBook(): Promise<string | null>
+  /** Mini's path: compose locally, then create the skill on the server. */
+  skillsFromBookRemote(
+    filePath: string,
+    category?: string,
+    slug?: string,
+  ): Promise<
+    | { ok: true; slug: string; path: string; chapters: number; warnings: string[] }
+    | { ok: false; error: string }
+  >
   skillsFromBook(
     filePath: string,
     category?: string,
@@ -719,6 +728,16 @@ function mockBridge(): PomniaBridge {
     },
     async skillsPickBook() {
       return 'C:/ksiazki/MikroTik RouterOS.pdf'
+    },
+    async skillsFromBookRemote(_filePath: string, category?: string) {
+      await new Promise((r) => setTimeout(r, 600))
+      return {
+        ok: true as const,
+        slug: 'mikrotik-routing',
+        path: `cli/${category ?? 'general'}/mikrotik-routing`,
+        chapters: 12,
+        warnings: [],
+      }
     },
     async skillsFromBook(_filePath: string, category?: string) {
       await new Promise((r) => setTimeout(r, 600))

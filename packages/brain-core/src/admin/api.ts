@@ -21,6 +21,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import {
+  createSkillPackage,
   deletePrompt,
   deleteSkill,
   listPrompts,
@@ -414,6 +415,22 @@ export async function handleAdmin(req: AdminRequest, deps: AdminDeps): Promise<A
     const rel = str(req.body, 'path')
     const r = writeSkill(root, rel, str(req.body, 'content'))
     if (!('error' in r) && !r.unchanged) audit(req.actor, `edited skill ${rel}`)
+    return libraryResult(r)
+  }
+
+  if (path === '/admin/skills/create' && method === 'POST') {
+    const root = deps.skillsRoot()
+    if (!root) return j(503, { error: 'no_skills_root' })
+    const dir = str(req.body, 'dir')
+    const raw = (req.body as { files?: unknown } | null)?.files
+    const files = Array.isArray(raw)
+      ? raw
+          .map((f) => f as { path?: unknown; content?: unknown })
+          .filter((f) => typeof f?.path === 'string' && typeof f?.content === 'string')
+          .map((f) => ({ path: f.path as string, content: f.content as string }))
+      : []
+    const r = createSkillPackage(root, dir, files)
+    if (!('error' in r)) audit(req.actor, `created skill ${dir} (${r.files} files)`)
     return libraryResult(r)
   }
 

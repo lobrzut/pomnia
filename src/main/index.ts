@@ -72,6 +72,7 @@ import { pushStagedNotes } from '@core/brain/miniIngest.js'
 import { estimateSeconds, recordUpload } from '@core/brain/uploadEstimate.js'
 import { clearStaging, ingestFiles, stagedCount, stagedStats, stagingRoot } from './miniIngest.js'
 import {
+  createRemoteSkill,
   deleteRemotePrompt,
   deleteRemoteSkill,
   listRemotePrompts,
@@ -175,7 +176,7 @@ import {
   deleteLocalSkillAt,
 } from './skillsScan.js'
 import { createLocalPrompt, deleteLocalPrompt, listLocalPromptsAt } from './promptsScan.js'
-import { buildBookSkill, type BookSkillProgress } from './bookSkillBuild.js'
+import { buildBookSkill, composeBookSkill, type BookSkillProgress } from './bookSkillBuild.js'
 import {
   brainProcessFailedMessage,
   missingEmbedModelMessage,
@@ -873,6 +874,41 @@ function registerIpc(): void {
         ollamaUrl: st.ollamaUrl,
         onProgress: (p: BookSkillProgress) => e.sender.send('skills:fromBookProgress', p),
       })
+    },
+  )
+
+  /*
+   * Mini's half. It holds no vault, so the same pipeline runs locally and the
+   * result is posted to the server — the composing step is shared, so a book
+   * yields the same skill whichever app opened it.
+   */
+  trustedHandle(
+    'skills:fromBookRemote',
+    async (e: Electron.IpcMainInvokeEvent, filePath: string, category?: string, slug?: string) => {
+      const st = getAppSettings()
+      const composed = await composeBookSkill({
+        filePath: String(filePath ?? ''),
+        category: category ? String(category) : undefined,
+        slug: slug ? String(slug) : undefined,
+        ollamaUrl: st.ollamaUrl,
+        onProgress: (p: BookSkillProgress) => e.sender.send('skills:fromBookProgress', p),
+      })
+      if (!composed.ok) return composed
+      e.sender.send('skills:fromBookProgress', { phase: 'writing', total: composed.files.length })
+      const r = await createRemoteSkill(
+        `cli/${composed.category}/${composed.slug}`,
+        composed.files,
+        st.brainMcpUrl,
+        st.replicaToken,
+      )
+      if ('error' in r) return { ok: false as const, error: `${r.error}: ${r.detail}` }
+      return {
+        ok: true as const,
+        slug: composed.slug,
+        path: r.path,
+        chapters: composed.files.filter((f) => f.path.startsWith('chapters/')).length,
+        warnings: composed.warnings,
+      }
     },
   )
 

@@ -143,10 +143,31 @@ async function distilWhole(
   return { mentalModels, glossary, patterns, cheatsheet }
 }
 
-export async function buildBookSkill(opts: BookSkillOptions): Promise<BookSkillResult> {
+export interface ComposeOptions {
+  filePath: string
+  category?: string
+  slug?: string
+  ollamaUrl?: string
+  model?: string
+  onProgress?: (p: BookSkillProgress) => void
+  signal?: AbortSignal
+}
+
+export type ComposeResult =
+  | { ok: true; slug: string; category: string; files: { path: string; content: string }[]; warnings: string[] }
+  | { ok: false; error: string }
+
+/**
+ * Everything up to the point of placement: parse, split, distil, assemble.
+ *
+ * Shared by the desktop, which writes into its own vault, and by Mini, which
+ * has no vault and posts the same bytes to the server. Splitting here rather
+ * than duplicating means a book yields the same skill either way — the two
+ * apps cannot drift into producing different shapes from one file.
+ */
+export async function composeBookSkill(opts: ComposeOptions): Promise<ComposeResult> {
   const category = opts.category?.trim() || 'general'
   if (!isSafeCategory(category)) return { ok: false, error: `bad category: ${category}` }
-  if (!opts.skillsRoot) return { ok: false, error: 'no skills root — open a vault first' }
 
   const report = (p: BookSkillProgress): void => opts.onProgress?.(p)
 
@@ -182,12 +203,6 @@ export async function buildBookSkill(opts: BookSkillOptions): Promise<BookSkillR
 
   const title = opts.slug?.trim() || basenameNoExt(opts.filePath)
   const slug = slugFromTitle(opts.slug?.trim() || title)
-  const target = join(opts.skillsRoot, 'cli', category, slug)
-  // Checked before spending minutes on a model: refusing early is kinder than
-  // refusing after the work.
-  if (existsSync(target)) {
-    return { ok: false, error: `skill already exists: cli/${category}/${slug} — rename or remove it first` }
-  }
 
   // 3. Distil.
   const ollama = new Ollama({
@@ -215,18 +230,40 @@ export async function buildBookSkill(opts: BookSkillOptions): Promise<BookSkillR
     ...prose,
   })
 
-  report({ phase: 'writing', total: pkg.files.length })
+  return { ok: true, slug, category, files: pkg.files, warnings: pkg.warnings }
+}
+
+/** Desktop: compose, then place it in this machine's vault. */
+export async function buildBookSkill(opts: BookSkillOptions): Promise<BookSkillResult> {
+  if (!opts.skillsRoot) return { ok: false, error: 'no skills root — open a vault first' }
+
+  const category = opts.category?.trim() || 'general'
+  const probeSlug = slugFromTitle(opts.slug?.trim() || basenameNoExt(opts.filePath))
+  // Checked before spending minutes on a model: refusing early is kinder than
+  // refusing after the work. Re-checked under the rename below.
+  if (existsSync(join(opts.skillsRoot, 'cli', category, probeSlug))) {
+    return {
+      ok: false,
+      error: `skill already exists: cli/${category}/${probeSlug} — rename or remove it first`,
+    }
+  }
+
+  const composed = await composeBookSkill(opts)
+  if (!composed.ok) return composed
+
+  const target = join(opts.skillsRoot, 'cli', composed.category, composed.slug)
+  opts.onProgress?.({ phase: 'writing', total: composed.files.length })
   const staging = mkdtempSync(join(tmpdir(), 'pomnia-skill-'))
   try {
-    for (const f of pkg.files) {
+    for (const f of composed.files) {
       const abs = join(staging, f.path)
       mkdirSync(dirname(abs), { recursive: true })
       writeFileSync(abs, f.content, 'utf8')
     }
     mkdirSync(dirname(target), { recursive: true })
-    // Re-check under the rename: minutes have passed since the first check.
     if (existsSync(target)) {
-      return { ok: false, error: `skill appeared while building: cli/${category}/${slug}` }
+      rmSync(staging, { recursive: true, force: true })
+      return { ok: false, error: `skill appeared while building: cli/${composed.category}/${composed.slug}` }
     }
     renameSync(staging, target)
   } catch (e) {
@@ -236,10 +273,10 @@ export async function buildBookSkill(opts: BookSkillOptions): Promise<BookSkillR
 
   return {
     ok: true,
-    slug,
-    path: `cli/${category}/${slug}`,
-    chapters: pkg.files.filter((f) => f.path.startsWith('chapters/')).length,
-    warnings: pkg.warnings,
+    slug: composed.slug,
+    path: `cli/${composed.category}/${composed.slug}`,
+    chapters: composed.files.filter((f) => f.path.startsWith('chapters/')).length,
+    warnings: composed.warnings,
   }
 }
 

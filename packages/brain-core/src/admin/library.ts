@@ -21,7 +21,7 @@
  * normalised — normalising an escape attempt turns it into a successful write
  * somewhere unexpected.
  */
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 import { writeFileKeepingPrevSync } from '../archive/durableWrite.js'
@@ -110,6 +110,77 @@ export function writeSkill(
   if (!existsSync(file)) return { error: 'not-found', detail: rel }
   const r = writeText(file, content)
   return 'error' in r ? r : { path: rel, unchanged: r.unchanged }
+}
+
+export interface SkillPackageFile {
+  /** Relative to the skill directory: `SKILL.md`, `chapters/ch01-x.md`. */
+  path: string
+  content: string
+}
+
+/**
+ * Create a whole skill at once, or refuse.
+ *
+ * `writeSkill` deliberately edits only what exists, because a client that can
+ * conjure a skill by typo is a client that can litter the tree an agent reads
+ * from. Building a skill from a book is the one case that legitimately needs
+ * creation, so it gets its own door with the guarantees the editing door does
+ * not need:
+ *
+ *   - refuses when the directory already exists rather than merging into it —
+ *     a re-import must not half-replace a skill someone has since edited;
+ *   - stages every file and renames the directory into place, so a failure
+ *     halfway leaves nothing rather than a skill whose SKILL.md indexes
+ *     chapters that were never written.
+ */
+export function createSkillPackage(
+  skillsRoot: string,
+  dirRel: string,
+  files: SkillPackageFile[],
+): { path: string; files: number } | LibraryError {
+  // The directory must be a legal skill location: cli/<name> or
+  // cli/<category>/<name>. Reuse the file validator by testing its SKILL.md.
+  if (!isSafeSkillRel(`${dirRel}/SKILL.md`)) return { error: 'bad-path', detail: dirRel }
+  if (files.length === 0) return { error: 'bad-path', detail: 'no files' }
+  if (!files.some((f) => f.path === 'SKILL.md')) {
+    return { error: 'bad-path', detail: 'a skill package must contain SKILL.md' }
+  }
+  for (const f of files) {
+    // Each member stays inside the package and one level deep.
+    const parts = f.path.split('/')
+    if (
+      f.path.includes('\\') ||
+      parts.length > 2 ||
+      parts.some((seg) => isBadSegment(seg) || seg.startsWith('_') || seg.startsWith('.'))
+    ) {
+      return { error: 'bad-path', detail: f.path }
+    }
+    if (Buffer.byteLength(f.content, 'utf8') > MAX_BODY_BYTES) {
+      return { error: 'too-large', detail: f.path }
+    }
+  }
+
+  const target = join(skillsRoot, dirRel)
+  if (existsSync(target)) return { error: 'bad-path', detail: `already exists: ${dirRel}` }
+
+  const staging = `${target}.incoming-${Date.now().toString(36)}`
+  try {
+    for (const f of files) {
+      const abs = join(staging, f.path)
+      mkdirSync(dirname(abs), { recursive: true })
+      writeFileKeepingPrevSync(abs, Buffer.from(f.content, 'utf8'))
+    }
+    mkdirSync(dirname(target), { recursive: true })
+    if (existsSync(target)) {
+      rmSync(staging, { recursive: true, force: true })
+      return { error: 'bad-path', detail: `already exists: ${dirRel}` }
+    }
+    renameSync(staging, target)
+    return { path: dirRel, files: files.length }
+  } catch (e) {
+    rmSync(staging, { recursive: true, force: true })
+    return { error: 'failed', detail: (e as Error).message }
+  }
 }
 
 /**

@@ -1,10 +1,11 @@
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  createSkillPackage,
   deletePrompt,
   deleteSkill,
   isSafePromptName,
@@ -90,6 +91,58 @@ describe('skills', () => {
   it('will not create a skill that does not exist', () => {
     expect(writeSkill(skills, 'brain/invented.md', 'x')).toMatchObject({ error: 'not-found' })
     expect(existsSync(join(skills, 'brain', 'invented.md'))).toBe(false)
+  })
+})
+
+describe('createSkillPackage — the one door that may create', () => {
+  const pkg = [
+    { path: 'SKILL.md', content: '---\nname: x\ndescription: d\n---\n# X\n' },
+    { path: 'chapters/ch01-a.md', content: '# A\n' },
+  ]
+
+  it('writes a whole package at once', () => {
+    const r = createSkillPackage(skills, 'cli/ksiazki/nowa', pkg)
+    expect(r).toMatchObject({ path: 'cli/ksiazki/nowa', files: 2 })
+    expect(readFileSync(join(skills, 'cli', 'ksiazki', 'nowa', 'SKILL.md'), 'utf8')).toContain('name: x')
+    expect(existsSync(join(skills, 'cli', 'ksiazki', 'nowa', 'chapters', 'ch01-a.md'))).toBe(true)
+  })
+
+  it('refuses rather than merging into an existing skill', () => {
+    // A re-import must not half-replace a skill someone has since edited.
+    createSkillPackage(skills, 'cli/ksiazki/nowa', pkg)
+    const again = createSkillPackage(skills, 'cli/ksiazki/nowa', pkg)
+    expect(again).toMatchObject({ error: 'bad-path' })
+    expect((again as { detail: string }).detail).toContain('already exists')
+  })
+
+  it('insists on a SKILL.md — a package without one is not a skill', () => {
+    expect(createSkillPackage(skills, 'cli/ksiazki/bez', [{ path: 'chapters/a.md', content: 'x' }]))
+      .toMatchObject({ error: 'bad-path' })
+    expect(existsSync(join(skills, 'cli', 'ksiazki', 'bez'))).toBe(false)
+  })
+
+  it('leaves nothing behind when a member is rejected', () => {
+    const bad = [...pkg, { path: '../../escape.md', content: 'x' }]
+    expect(createSkillPackage(skills, 'cli/ksiazki/czesc', bad)).toMatchObject({ error: 'bad-path' })
+    expect(existsSync(join(skills, 'cli', 'ksiazki', 'czesc'))).toBe(false)
+  })
+
+  it('refuses a member nested more than one level', () => {
+    const deep = [...pkg, { path: 'a/b/c.md', content: 'x' }]
+    expect(createSkillPackage(skills, 'cli/ksiazki/gleboko', deep)).toMatchObject({ error: 'bad-path' })
+  })
+
+  it('refuses a directory that is not a legal skill location', () => {
+    for (const dir of ['sessions/x', 'cli', 'brain/x', 'cli/a/b/c', '../out']) {
+      expect(createSkillPackage(skills, dir, pkg), dir).toMatchObject({ error: 'bad-path' })
+    }
+  })
+
+  it('leaves no staging directory when it refuses', () => {
+    createSkillPackage(skills, 'cli/ksiazki/x', pkg)
+    createSkillPackage(skills, 'cli/ksiazki/x', pkg)
+    const left = readdirSync(join(skills, 'cli', 'ksiazki')).filter((n) => n.includes('.incoming-'))
+    expect(left).toEqual([])
   })
 })
 

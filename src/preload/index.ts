@@ -48,6 +48,8 @@ const bridge = {
   promptsList: () => ipcRenderer.invoke('prompts:list'),
   promptsCreate: (name: string) => ipcRenderer.invoke('prompts:create', name),
   skillsPickBook: () => ipcRenderer.invoke('skills:pickBook'),
+  skillsFromBookRemote: (filePath: string, category?: string, slug?: string) =>
+    ipcRenderer.invoke('skills:fromBookRemote', filePath, category, slug),
   skillsFromBook: (filePath: string, category?: string, slug?: string) =>
     ipcRenderer.invoke('skills:fromBook', filePath, category, slug),
   onSkillsFromBookProgress: (cb: (p: unknown) => void) => {

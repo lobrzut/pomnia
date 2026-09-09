@@ -55,6 +55,7 @@
     "pack:mini:portable": "electron-builder --win portable --config electron-builder.mini.yml --publish never",
     "pack:mini:zip": "electron-builder --win zip --config electron-builder.mini.yml --publish never",
     "dev:mini": "npm run generate:build-info && electron-vite dev --mode mini",
+    "web": "vite --config vite.web.config.ts",
     "web:mini": "vite --config vite.web.config.ts --mode mini"
   },
   "dependencies": {

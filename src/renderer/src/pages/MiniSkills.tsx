@@ -14,8 +14,8 @@
  * It now asks `/admin/skills`, which answers the question actually being asked.
  */
 
-import { useCallback, useEffect, useState } from 'react'
-import { BookOpen, ChevronLeft, RefreshCw, Save, Search } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { BookOpen, BookUp, ChevronLeft, RefreshCw, Save, Search } from 'lucide-react'
 
 import type { RemoteSkillRow, RemoteSkillsSummary } from '@core/brain/remoteSkills'
 
@@ -40,6 +40,10 @@ export default function MiniSkills() {
   const [original, setOriginal] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [bookCategory, setBookCategory] = useState('general')
+  const [bookBusy, setBookBusy] = useState(false)
+  const [bookProgress, setBookProgress] = useState<string | null>(null)
+  const bookUnsub = useRef<(() => void) | null>(null)
 
   const loadSummary = useCallback(async () => {
     setLoading(true)
@@ -150,6 +154,34 @@ export default function MiniSkills() {
     }
   }
 
+  async function makeSkillFromBook() {
+    const file = await api.skillsPickBook()
+    if (!file) return
+    setBookBusy(true)
+    setBookProgress(null)
+    bookUnsub.current = api.onSkillsFromBookProgress((p) =>
+      setBookProgress(labels.bookSkillRunning(p.phase, p.done ?? 0, p.total ?? 0)),
+    )
+    try {
+      const r = await api.skillsFromBookRemote(file, bookCategory.trim() || 'general')
+      if (!r.ok) {
+        toast({ kind: 'error', title: labels.bookSkillFailed, detail: r.error })
+        return
+      }
+      toast({
+        kind: 'success',
+        title: labels.bookSkillDone(r.slug, r.chapters),
+        detail: r.warnings.length > 0 ? r.warnings.join(' · ') : r.path,
+      })
+      void loadSummary()
+    } finally {
+      bookUnsub.current?.()
+      bookUnsub.current = null
+      setBookBusy(false)
+      setBookProgress(null)
+    }
+  }
+
   const dirty = open !== null && text !== original
   const narrowed = category !== null || query.trim().length >= 2
 
@@ -226,6 +258,29 @@ export default function MiniSkills() {
         </GlassCard>
       ) : (
         <>
+          {/* One book, one skill — composed here, created on the server. */}
+          <GlassCard className="mb-4 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-ink">{labels.bookSkillTitle}</div>
+                <p className="mt-0.5 text-[11px] leading-snug text-ink-dim">{labels.bookSkillLead}</p>
+              </div>
+              <input
+                value={bookCategory}
+                onChange={(e) => setBookCategory(e.target.value)}
+                placeholder={labels.bookSkillCategory}
+                spellCheck={false}
+                disabled={bookBusy}
+                className="no-drag w-32 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 font-mono text-xs text-ink placeholder:text-ink-faint"
+              />
+              <Button onClick={() => void makeSkillFromBook()} disabled={bookBusy}>
+                {bookBusy ? <Spinner className="h-3.5 w-3.5" /> : <BookUp className="h-3.5 w-3.5" />}
+                {labels.bookSkillPick}
+              </Button>
+            </div>
+            <p className="mt-2 text-[10px] text-ink-faint">{bookProgress ?? labels.bookSkillNote}</p>
+          </GlassCard>
+
           <div className="mb-4 flex items-center gap-2">
             {category && (
               <Button variant="soft" onClick={() => setCategory(null)}>
