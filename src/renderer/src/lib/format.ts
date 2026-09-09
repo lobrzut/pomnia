@@ -45,6 +45,12 @@ export interface SourceMeta {
 export const SOURCE_META: Record<string, SourceMeta> = {
   'claude-code': { label: 'Claude Code', color: '#d97757', glyph: 'CC' },
   'claude-desktop': { label: 'Claude Desktop', color: '#d97757', glyph: 'C' },
+  // 'Cx', because CC, C and Co are already Claude Code, Claude Desktop and
+  // Continue. The mint is OpenAI's older one, a step away from ChatGPT's deeper
+  // green so the two read as related without being mistaken for each other.
+  // SOURCE_META falls back to 'generic' for unknown ids, so a source missing
+  // from this table typechecks and then shows up grey and unnamed.
+  codex: { label: 'Codex', color: '#74aa9c', glyph: 'Cx' },
   cursor: { label: 'Cursor', color: '#22d3ee', glyph: 'Cu' },
   antigravity: { label: 'Antigravity', color: '#4285f4', glyph: 'Ag' },
   vscode: { label: 'VS Code', color: '#3b9eff', glyph: 'VS' },

@@ -17,6 +17,7 @@ export type OS = 'win32' | 'darwin' | 'linux'
 export type SourceId =
   | 'claude-code'
   | 'claude-desktop'
+  | 'codex'
   | 'cursor'
   | 'antigravity'
   | 'vscode'

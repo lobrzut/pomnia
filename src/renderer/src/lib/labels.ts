@@ -2040,7 +2040,7 @@ const PL_LABELS: UiLabels = {
   dashboardDeselectAll: 'Odznacz wszystkie',
   dashboardNoSourcesTitle: 'Brak wykrytych narzędzi AI na tej maszynie.',
   dashboardNoSourcesDetail:
-    'Pomnia szuka Claude Code, Cursor, Claude Desktop, Antigravity i VS Code. Zainstaluj, porozmawiaj, potem Rescan — albo Import.',
+    'Pomnia szuka Claude Code, Codex, Cursora, Claude Desktop, Antigravity i VS Code. Zainstaluj, porozmawiaj, potem Rescan — albo Import.',
   dashboardSourcesSelected: (n) =>
     n === 1 ? '1 źródło zaznaczone' : `${n} źródeł zaznaczonych`,
   dashboardReadyVault: (name) => `Gotowe — backup do „${name}”`,
@@ -2829,7 +2829,7 @@ const EN_LABELS: UiLabels = {
   dashboardDeselectAll: 'Deselect all',
   dashboardNoSourcesTitle: 'No AI tools detected on this machine.',
   dashboardNoSourcesDetail:
-    'Pomnia looks for Claude Code, Cursor, Claude Desktop, Antigravity, and VS Code. Install, chat, then Rescan — or Import.',
+    'Pomnia looks for Claude Code, Codex, Cursor, Claude Desktop, Antigravity, and VS Code. Install, chat, then Rescan — or Import.',
   dashboardSourcesSelected: (n) => (n === 1 ? '1 source selected' : `${n} sources selected`),
   dashboardReadyVault: (name) => `Ready — backup to “${name}”`,
   dashboardOpenVaultHint: 'Open a vault to enable backup',

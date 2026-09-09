@@ -68,6 +68,31 @@ export const SOURCES: SourceDescriptor[] = [
     notes: ['Project dir names encode the working directory path', 'JSONL transcripts per session']
   },
   {
+    id: 'codex',
+    label: 'Codex',
+    strategy: 'hybrid',
+    root: (os, home) => join(os, home, '.codex'),
+    /*
+      `~/.codex` holds `auth.json`, and that is the reason this descriptor is a
+      whitelist rather than a blacklist. `exclude` is dropped entirely when a
+      backup runs with `skipCaches: false`, so anything guarded only by an
+      exclude can still be swept up; `keepTop` is applied unconditionally. A
+      credential must never depend on an option the user is free to turn off,
+      so it is kept out by omission from the list below, not by a rule that can
+      lapse.
+
+      `plugins` is left out for a different reason: 427 MB of downloadable
+      packages that say nothing about the user's work.
+    */
+    keepTop: ['sessions', 'skills', 'config.toml', 'AGENTS.md'],
+    exclude: ['cache', 'logs', 'browser', 'computer-use', '.tmp', '.sandbox', '.sandbox-bin', '.sandbox-secrets'],
+    pathSensitive: ['config.toml', 'sessions'],
+    notes: [
+      'Rollout transcripts: sessions/<yyyy>/<mm>/<dd>/rollout-<iso>-<uuid>.jsonl',
+      'auth.json is deliberately outside keepTop — it holds credentials'
+    ]
+  },
+  {
     id: 'claude-desktop',
     label: 'Claude Desktop',
     strategy: 'snapshot',
