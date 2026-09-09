@@ -49,11 +49,27 @@ console.log(`tag     ${view.tagName}`)
 console.log(`draft   ${view.isDraft}`)
 console.log(`pre     ${view.isPrerelease}`)
 
+/*
+  Run the checker in this process's own runtime rather than through `npx`.
+
+  `execFileSync('npx', …)` is ENOENT on Windows — npx is a `.cmd` shim, not an
+  executable — so the gate did not fail, it never ran. The catch then reported
+  a complete release as incomplete, which is the failure that hides a working
+  release behind a scary message and invites someone to undraft by hand. Same
+  binary that is already running this script, no shell, no PATH lookup.
+*/
 try {
-  execFileSync('npx', ['tsx', join(root, 'scripts', 'check-release-complete.mjs'), '--tag', tag], {
-    cwd: root,
-    stdio: 'inherit',
-  })
+  execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      join(root, 'scripts', 'check-release-complete.mjs'),
+      '--tag',
+      tag,
+    ],
+    { cwd: root, stdio: 'inherit' },
+  )
 } catch {
   die(`${tag} is incomplete — leave it as a draft and attach the missing assets first`)
 }
