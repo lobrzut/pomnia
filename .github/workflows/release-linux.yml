@@ -176,6 +176,15 @@ jobs:
       - name: Install Linux pack tools
         timeout-minutes: 8
         run: |
+          # The runner image ships Google's Chrome apt repo, and `apt-get update`
+          # exits 100 when that repo's index is mid-rotation: "Failed to fetch
+          # dl.google.com/linux/chrome-stable ... Hash Sum mismatch". That took
+          # the Linux release for 0.1.85 down twice, on two separate runs, over a
+          # repository this job has no use for — nothing installed below comes
+          # from Chrome. Dropping the source is the fix; `|| true` would also
+          # hide a real failure to reach Ubuntu's own archives.
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list \
+                     /etc/apt/sources.list.d/google-chrome*.sources
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential \
