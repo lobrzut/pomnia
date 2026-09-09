@@ -468,9 +468,11 @@ export default function Settings() {
               {checkingUpdate ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
               {labels.updateCheckNow}
             </Button>
+            {/* Beside the button, not under the card: a mark on its own, with
+                no text next to it, is a question with nothing to attach to. */}
+            {isLinux ? <Hint className="mt-2.5" text={labels.updateLinuxHint} /> : null}
           </div>
         </div>
-        {isLinux ? <Hint className="mt-3" text={labels.updateLinuxHint} /> : null}
       </GlassCard>
 
       <GlassCard className="mb-4 p-5">
