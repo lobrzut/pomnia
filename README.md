@@ -4,11 +4,14 @@
 
 **One encrypted memory your AI agents share** — conversations from every assistant, distilled on your own hardware, recalled over MCP. Local-first: nothing depends on a vendor's cloud.
 
-Pomnia Desktop (Windows / macOS) collects chats from assistants (Claude Code, Cursor, Claude Desktop, Antigravity, VS Code, Continue) **and** imports from exports (Claude.ai, ChatGPT, Gemini, Grok) plus documents (PDF, DOCX, EPUB) into one vault — with search (**Chats**), distill via Ollama, and Brain on `127.0.0.1:7862`.
+Pomnia Desktop (Windows / macOS / Linux) collects chats from assistants (Claude Code, Codex, Cursor, Claude Desktop, Antigravity, VS Code, Continue) **and** imports from exports (Claude.ai, ChatGPT, Gemini, Grok) plus documents (PDF, DOCX, EPUB) into one vault — with search (**Chats**), distill via Ollama, and Brain on `127.0.0.1:7862`.
 
-I have run this on my own machines for six months, every working day — 2415 distilled
-notes and 3735 indexed chunks at the time of writing. It went public about seven weeks
-ago. That is a real test and a narrow one, and the docs say which parts are which.
+**Pomnia Mini** ships alongside it in every release: the same app with no vault of its own, talking to a Brain server you already run. It has Connect, Settings, Skills, Prompts and an ingest screen, and it is the build to reach for on a machine you do not want to leave a vault on. Take the `.zip` — the portable `.exe` unpacks itself to `%TEMP%` on every launch, measured at about 70 seconds each time.
+
+I have run this on my own machines every working day since early 2026, and the vault
+behind this sentence holds 7269 indexed files across 8102 chunks as of 2026-09-10.
+It went public in July 2026. That is a real test and a narrow one — one person, one
+set of habits — and the docs say which parts are which.
 
 > **Desktop app** — version in [`package.json`](package.json). Windows installer: **only** via `npm run release:win` (see below). Start: [docs/START-HERE.md](docs/START-HERE.md).  
 > **Repo:** [github.com/lobrzut/pomnia](https://github.com/lobrzut/pomnia) · **Site:** [pomnia.ai](https://pomnia.ai)
@@ -69,6 +72,14 @@ src/renderer/        UI: React + Tailwind + Framer Motion
 
 **In the app:** encrypted vault, adapter backup, ZIP/JSON + PDF/DOCX/EPUB import, embedded brain-core (MCP `:7862`), distill via Ollama, **How it works** / **Connect** tabs, tray + diagnostics in Settings.
 
+### Skills and prompts
+
+Both are directories of markdown you own — `vault/skills/` and `vault/prompts/` — and the app lists, edits and deletes them in place. The difference is who reaches for them: an agent pulls a **skill** mid-task through `get_skill`, while a **prompt** is served over MCP `prompts/list` and appears to you as `/name` in your client. Clicking a row copies its name, so a prompt is one paste away from a chat window.
+
+Skills are deliberately **not** in the search index — `search_library` covers `distilled/`, `sessions/`, `library/` and `sprawy/`. A skill missing from search results is not a bug; ask for it by name.
+
+**A book becomes one skill** (Import, or Mini's *Do Pomnia*): the index stays loaded and chapters are read one at a time, never one skill per chapter. It refuses rather than overwriting an existing skill.
+
 ### Session continuation (MCP)
 
 MCP client key is **`pomnia`**. Agent phrases: *check Pomnia* / *save to Pomnia* (PL: *sprawdź w Pomnia* / *zapisz do Pomnia*).
@@ -127,7 +138,7 @@ npm run pack:mac     # DMG / macOS app
 
 Use **`npm ci`** on a fresh clone (installs from the lockfile; does not rewrite it). Prefer `npm ci` over `npm install` so `package-lock.json` stays the source of truth across machines and npm versions.
 
-Build identity (Settings → Security, and `pomnia --version`): `0.1.45 · 7ff41c7 · 2026-07-30 01:12` — dirty tree at generate time appends `+dirty` to the sha.
+Build identity (Settings → Security, and `pomnia --version`) reads `<version> · <git sha> · <timestamp>`, e.g. `0.1.85 · d547af5 · 2026-09-09 17:55`. A dirty tree at generate time appends `+dirty` to the sha, so a build made from uncommitted work says so.
 
 ### Windows: never run vitest from a UNC path
 
