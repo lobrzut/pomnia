@@ -252,6 +252,12 @@ export interface UiLabels {
   vaultReplicaAction: string
   vaultReplicaFailed: string
   vaultReplicaUrl: string
+  vaultReplicaToken: string
+  vaultReplicaTokenHint: string
+  vaultReplicaTokenSaved: string
+  vaultReplicaTokenSaveAction: string
+  vaultReplicaTokenClearAction: string
+  vaultReplicaTokenCleared: string
   vaultReplicaAuto: string
   vaultReplicaAutoHint: string
   vaultReplicaTokenOwn: string
@@ -1175,6 +1181,13 @@ const PL_LABELS: UiLabels = {
   vaultReplicaAction: 'Zsynchronizuj z serwerem',
   vaultReplicaFailed: 'Replikacja nieudana',
   vaultReplicaUrl: 'Adres repliki',
+  vaultReplicaToken: 'Token repliki',
+  vaultReplicaTokenHint:
+    'Musi mieć rolę admin — token agenta przeczyta manifest i odbije się przy wysyłce. Wystawisz go w panelu Brain pod adresem serwera. Pole pokazuje tylko, czy token jest zapisany; wartości nie odczytamy z powrotem.',
+  vaultReplicaTokenSaved: 'Token repliki zapisany',
+  vaultReplicaTokenSaveAction: 'Zapisz token',
+  vaultReplicaTokenClearAction: 'Usuń',
+  vaultReplicaTokenCleared: 'Token repliki usunięty',
   vaultReplicaAuto: 'Wysyłaj automatycznie po destylacji',
   vaultReplicaAutoHint:
     'Nieudana próba nie zniknie po cichu — wynik jest zawsze zapisany i widoczny niżej.',
@@ -2205,6 +2218,13 @@ const EN_LABELS: UiLabels = {
   vaultReplicaAction: 'Sync with the server',
   vaultReplicaFailed: 'Replication failed',
   vaultReplicaUrl: 'Replica address',
+  vaultReplicaToken: 'Replica token',
+  vaultReplicaTokenHint:
+    'Needs the admin role — an agent token reads the manifest and then fails on the push. Issue one in the Brain panel at the server address. This field only shows whether a token is stored; the value is never read back.',
+  vaultReplicaTokenSaved: 'Replica token saved',
+  vaultReplicaTokenSaveAction: 'Save token',
+  vaultReplicaTokenClearAction: 'Clear',
+  vaultReplicaTokenCleared: 'Replica token cleared',
   vaultReplicaAuto: 'Push automatically after distillation',
   vaultReplicaAutoHint: 'A failed attempt is recorded and shown below — it never disappears quietly.',
   vaultReplicaTokenOwn: 'Push uses its own replica token.',

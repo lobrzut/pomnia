@@ -193,6 +193,8 @@ export default function Connect() {
     autoSync: boolean
     last: { at: string; ok: boolean; uploaded: number; unchanged: number; failed: number; error?: string } | null
   } | null>(null)
+  /** Held only until it is stored; the panel never reads a token back. */
+  const [replicaTokenDraft, setReplicaTokenDraft] = useState('')
 
   // Pomnia's own liveness probe is not an agent and has read nothing, so it
   // does not belong in a list of agents that used the memory. Filtered on the
@@ -474,6 +476,31 @@ export default function Connect() {
     try {
       await api.vaultReplicaConfig({ url })
       setReplica(await api.vaultReplicaState())
+    } catch (e) {
+      toast({ kind: 'error', title: labels.vaultReplicaFailed, detail: (e as Error).message })
+    }
+  }
+
+  /**
+   * Store a new replica token.
+   *
+   * Until this existed the panel could say a token was set and offer no way to
+   * replace it, which is worse than having no token at all: main prefers the
+   * stored `replicaToken` over anything the renderer passes, so once the stored
+   * one was revoked server-side every sync failed with 401 and nothing the user
+   * could reach would change it. Pasting a fresh token elsewhere did not help —
+   * the dead one still won.
+   */
+  async function saveReplicaToken(token: string) {
+    const next = token.trim()
+    try {
+      await api.vaultReplicaConfig({ token: next })
+      setReplica(await api.vaultReplicaState())
+      setReplicaTokenDraft('')
+      toast({
+        kind: 'success',
+        title: next ? labels.vaultReplicaTokenSaved : labels.vaultReplicaTokenCleared,
+      })
     } catch (e) {
       toast({ kind: 'error', title: labels.vaultReplicaFailed, detail: (e as Error).message })
     }
@@ -1255,6 +1282,39 @@ export default function Connect() {
               onBlur={(e) => void saveReplicaUrl(e.target.value)}
               placeholder="https://brain.example.com"
             />
+          </Field>
+
+          {/* The field that was missing. Without it the panel could report a
+              token and offer no way to change it, so a revoked one was a dead
+              end: main prefers the stored token over anything else, and every
+              sync answered 401 with nothing on screen able to fix it. */}
+          <Field label={labels.vaultReplicaToken}>
+            <div className="flex flex-wrap items-start gap-2">
+              <Input
+                className="min-w-0 flex-1"
+                type="password"
+                value={replicaTokenDraft}
+                onChange={(e) => setReplicaTokenDraft(e.target.value)}
+                placeholder={replica?.hasToken ? '••••••••' : 'pomnia_admin_…'}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <Button
+                variant="soft"
+                onClick={() => void saveReplicaToken(replicaTokenDraft)}
+                disabled={replicaTokenDraft.trim() === ''}
+              >
+                {labels.vaultReplicaTokenSaveAction}
+              </Button>
+              {replica?.hasToken && (
+                <Button variant="soft" onClick={() => void saveReplicaToken('')}>
+                  {labels.vaultReplicaTokenClearAction}
+                </Button>
+              )}
+            </div>
+            <p className="mt-1.5 text-[11px] leading-snug text-ink-faint">
+              {labels.vaultReplicaTokenHint}
+            </p>
           </Field>
 
           <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
