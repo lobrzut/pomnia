@@ -1,6 +1,6 @@
 {
   "name": "@pomnia/brain-core",
-  "version": "0.1.88",
+  "version": "0.1.89",
   "private": true,
   "description": "Brain-in-Node: MCP server + RAG for Pomnia desktop and standalone deploy. Successor to the Python brain.",
   "type": "module",
