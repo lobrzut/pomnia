@@ -792,6 +792,27 @@ function createWindow(): void {
 }
 
 /* ── IPC ───────────────────────────────────────────────────────────────── */
+/**
+ * The one token this app uses to talk to a Brain server.
+ *
+ * There were two: `connectToken`, which the user pastes in the Brain panel and
+ * can replace, and `replicaToken`, a second copy the replication panel stored
+ * and offered no way to change. When the server revoked the second one, every
+ * sync answered 401 while the panel insisted a token was set, and pasting a
+ * fresh token where the user could reach it changed nothing — the stale copy
+ * won. Both fields ended up holding the same value anyway, pasted twice.
+ *
+ * So: prefer the one the user manages, keep the old one as a fallback for
+ * installs that still carry it, and resolve it here rather than at four call
+ * sites. Mini reads this too — its skills, prompts and ingest all authenticate
+ * with it, so a change made only in the sync path would have broken them
+ * quietly.
+ */
+function serverToken(explicit?: string): string | undefined {
+  const s = getAppSettings()
+  return s.connectToken?.trim() || s.replicaToken?.trim() || explicit?.trim() || undefined
+}
+
 function registerIpc(): void {
   const trustedHandle = (channel: string, listener: (...args: any[]) => any): void => {
     ipcMain.handle(channel, (event, ...args) => {
@@ -1615,7 +1636,20 @@ description:
     // machine, when what is needed is one admin token for this one app.
     // `replicaToken` is exactly that, and it never leaves main: the renderer is
     // told only whether it is set, never its value.
-    const auth = getAppSettings().replicaToken?.trim() || token?.trim() || undefined
+    // One token, not two.
+    //
+    // This used to prefer `replicaToken`, a second secret the panel stored and
+    // then offered no way to replace. When the server revoked it, every sync
+    // answered 401 while the panel reported a token was set, and pasting a
+    // fresh one into the Brain field changed nothing — the dead one still won.
+    // Two fields for one server was the mistake; the fix is to trust the token
+    // the user actually manages and keep `replicaToken` only as a fallback for
+    // installs that still carry one.
+    //
+    // Role still matters: an agent token reads the manifest and fails the push
+    // with `write_needs_admin`. That is the server's message to give, not a
+    // reason to hold a second secret.
+    const auth = serverToken(token)
     const root = brainVaultRoot(vaultPath)
     activity.update({ kind: 'indexing', phase: 'reindex', detail: m().replicaComparing })
     try {
@@ -1969,7 +2003,7 @@ description:
       if (touchedBehaviour && (IS_MINI || next.brainTarget === 'remote')) {
         void pushRemoteBehaviour({
           brainUrl: next.brainMcpUrl,
-          adminToken: next.replicaToken,
+          adminToken: serverToken(next.replicaToken),
           next: {
             handshakePhrase: next.handshakePhrase,
             handshakeEnabled: next.handshakeEnabled,
@@ -2535,7 +2569,7 @@ description:
     const r = await pushStagedNotes({
       stagingRoot: stagingRoot(userData),
       target: brainBaseUrl(s.brainMcpUrl ?? ''),
-      adminToken: s.replicaToken,
+      adminToken: serverToken(),
       staged: await stagedCount(userData),
     })
     if (r.ok) {
@@ -2648,7 +2682,7 @@ description:
       // renderer used to hand over whatever was in the Bearer field next to
       // the button — an agent token, which cannot create tokens.
       createMcpToken(brainUrl, name, {
-        token: adminToken?.trim() || getAppSettings().replicaToken?.trim(),
+        token: serverToken(adminToken),
       }),
   )
 

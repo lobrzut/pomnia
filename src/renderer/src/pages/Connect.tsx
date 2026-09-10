@@ -193,8 +193,6 @@ export default function Connect() {
     autoSync: boolean
     last: { at: string; ok: boolean; uploaded: number; unchanged: number; failed: number; error?: string } | null
   } | null>(null)
-  /** Held only until it is stored; the panel never reads a token back. */
-  const [replicaTokenDraft, setReplicaTokenDraft] = useState('')
 
   // Pomnia's own liveness probe is not an agent and has read nothing, so it
   // does not belong in a list of agents that used the memory. Filtered on the
@@ -496,7 +494,6 @@ export default function Connect() {
     try {
       await api.vaultReplicaConfig({ token: next })
       setReplica(await api.vaultReplicaState())
-      setReplicaTokenDraft('')
       toast({
         kind: 'success',
         title: next ? labels.vaultReplicaTokenSaved : labels.vaultReplicaTokenCleared,
@@ -1284,38 +1281,21 @@ export default function Connect() {
             />
           </Field>
 
-          {/* The field that was missing. Without it the panel could report a
-              token and offer no way to change it, so a revoked one was a dead
-              end: main prefers the stored token over anything else, and every
-              sync answered 401 with nothing on screen able to fix it. */}
-          <Field label={labels.vaultReplicaToken}>
-            <div className="flex flex-wrap items-start gap-2">
-              <Input
-                className="min-w-0 flex-1"
-                type="password"
-                value={replicaTokenDraft}
-                onChange={(e) => setReplicaTokenDraft(e.target.value)}
-                placeholder={replica?.hasToken ? '••••••••' : 'pomnia_admin_…'}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <Button
-                variant="soft"
-                onClick={() => void saveReplicaToken(replicaTokenDraft)}
-                disabled={replicaTokenDraft.trim() === ''}
-              >
-                {labels.vaultReplicaTokenSaveAction}
+          {/* One token, not two. Replication now uses the Brain admin token from
+              the panel above; the only thing left to offer here is a way out of
+              a legacy `replicaToken` that an older build stored and could not
+              replace — the state that made every sync answer 401 with nothing
+              on screen able to fix it. */}
+          {replica?.hasToken && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber/25 bg-amber/10 px-3.5 py-2.5">
+              <p className="min-w-0 flex-1 text-[11px] leading-snug text-amber-100">
+                {labels.vaultReplicaLegacyToken}
+              </p>
+              <Button variant="soft" onClick={() => void saveReplicaToken('')}>
+                {labels.vaultReplicaTokenClearAction}
               </Button>
-              {replica?.hasToken && (
-                <Button variant="soft" onClick={() => void saveReplicaToken('')}>
-                  {labels.vaultReplicaTokenClearAction}
-                </Button>
-              )}
             </div>
-            <p className="mt-1.5 text-[11px] leading-snug text-ink-faint">
-              {labels.vaultReplicaTokenHint}
-            </p>
-          </Field>
+          )}
 
           <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
             <div>

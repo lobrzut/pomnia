@@ -252,8 +252,7 @@ export interface UiLabels {
   vaultReplicaAction: string
   vaultReplicaFailed: string
   vaultReplicaUrl: string
-  vaultReplicaToken: string
-  vaultReplicaTokenHint: string
+  vaultReplicaLegacyToken: string
   vaultReplicaTokenSaved: string
   vaultReplicaTokenSaveAction: string
   vaultReplicaTokenClearAction: string
@@ -1181,9 +1180,8 @@ const PL_LABELS: UiLabels = {
   vaultReplicaAction: 'Zsynchronizuj z serwerem',
   vaultReplicaFailed: 'Replikacja nieudana',
   vaultReplicaUrl: 'Adres repliki',
-  vaultReplicaToken: 'Token repliki',
-  vaultReplicaTokenHint:
-    'Musi mieć rolę admin — token agenta przeczyta manifest i odbije się przy wysyłce. Wystawisz go w panelu Brain pod adresem serwera. Pole pokazuje tylko, czy token jest zapisany; wartości nie odczytamy z powrotem.',
+  vaultReplicaLegacyToken:
+    'Ten vault trzyma osobny, stary token repliki ze starszej wersji. Nie jest już używany — synchronizacja bierze token admina z panelu Brain wyżej. Usuń go, żeby nie mylił.',
   vaultReplicaTokenSaved: 'Token repliki zapisany',
   vaultReplicaTokenSaveAction: 'Zapisz token',
   vaultReplicaTokenClearAction: 'Usuń',
@@ -1191,7 +1189,7 @@ const PL_LABELS: UiLabels = {
   vaultReplicaAuto: 'Wysyłaj automatycznie po destylacji',
   vaultReplicaAutoHint:
     'Nieudana próba nie zniknie po cichu — wynik jest zawsze zapisany i widoczny niżej.',
-  vaultReplicaTokenOwn: 'Wysyłka używa własnego tokena repliki.',
+  vaultReplicaTokenOwn: 'Synchronizacja używa tokena admina z panelu Brain.',
   vaultReplicaTokenBorrowed:
     'Brak własnego tokena repliki — wysyłka użyje tokena Connect, który jest tokenem agenta ' +
     'i nie ma prawa zapisu. Serwer odrzuci ją z błędem o roli admina. Nie podnoś roli tokena ' +
@@ -2218,16 +2216,15 @@ const EN_LABELS: UiLabels = {
   vaultReplicaAction: 'Sync with the server',
   vaultReplicaFailed: 'Replication failed',
   vaultReplicaUrl: 'Replica address',
-  vaultReplicaToken: 'Replica token',
-  vaultReplicaTokenHint:
-    'Needs the admin role — an agent token reads the manifest and then fails on the push. Issue one in the Brain panel at the server address. This field only shows whether a token is stored; the value is never read back.',
+  vaultReplicaLegacyToken:
+    'This vault still holds a separate replica token from an older build. It is no longer used — syncing takes the admin token from the Brain panel above. Clear it so it stops confusing things.',
   vaultReplicaTokenSaved: 'Replica token saved',
   vaultReplicaTokenSaveAction: 'Save token',
   vaultReplicaTokenClearAction: 'Clear',
   vaultReplicaTokenCleared: 'Replica token cleared',
   vaultReplicaAuto: 'Push automatically after distillation',
   vaultReplicaAutoHint: 'A failed attempt is recorded and shown below — it never disappears quietly.',
-  vaultReplicaTokenOwn: 'Push uses its own replica token.',
+  vaultReplicaTokenOwn: 'Syncing uses the admin token from the Brain panel.',
   vaultReplicaTokenBorrowed:
     'No replica token set — push will fall back to the Connect token, which is an agent ' +
     'token and cannot write. The server refuses it with an admin-role error. Do not raise the ' +
