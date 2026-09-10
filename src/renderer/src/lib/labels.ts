@@ -1171,8 +1171,8 @@ const PL_LABELS: UiLabels = {
   vaultReplicaTitle: 'Replikacja vaultu',
   vaultReplicaBadge: 'ten komputer jest właścicielem',
   vaultReplicaLead:
-    'Wysyła na serwer tylko to, co się zmieniło — reszta zostaje na miejscu. Nic nie kasuje: pliki, których tu już nie ma, zostaną wypisane, nie usunięte. Blobów nie wysyła.',
-  vaultReplicaAction: 'Wyślij zmiany na serwer',
+    'Wymienia z serwerem w obie strony: najpierw pobiera to, czego tu nie ma, potem wysyła to, czego nie ma tam. Nic nie kasuje po żadnej stronie — brakujące pliki są wypisywane, nie usuwane. Blobów i snapshotów nie rusza.',
+  vaultReplicaAction: 'Zsynchronizuj z serwerem',
   vaultReplicaFailed: 'Replikacja nieudana',
   vaultReplicaUrl: 'Adres repliki',
   vaultReplicaAuto: 'Wysyłaj automatycznie po destylacji',
@@ -2201,8 +2201,8 @@ const EN_LABELS: UiLabels = {
   vaultReplicaTitle: 'Vault replication',
   vaultReplicaBadge: 'this machine owns it',
   vaultReplicaLead:
-    'Sends only what changed. Deletes nothing: files missing here are listed, not removed. Blobs stay put.',
-  vaultReplicaAction: 'Push changes to the server',
+    'Exchanges both ways: pulls what is missing here, then pushes what is missing there. Deletes nothing on either side — missing files are listed, not removed. Blobs and snapshots stay put.',
+  vaultReplicaAction: 'Sync with the server',
   vaultReplicaFailed: 'Replication failed',
   vaultReplicaUrl: 'Replica address',
   vaultReplicaAuto: 'Push automatically after distillation',
