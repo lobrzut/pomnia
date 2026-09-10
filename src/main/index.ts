@@ -1657,6 +1657,10 @@ description:
         vaultRoot: root,
         target: url,
         token: auth,
+        // What this machine and this peer last agreed each file was. Kept in
+        // app data rather than the vault: it describes an agreement between
+        // two machines, not memory, and syncing it would be circular.
+        basePath: join(app.getPath('userData'), 'sync-base.json'),
         onProgress: (done, total, path) =>
           activity.update({
             kind: 'indexing',

@@ -15,7 +15,8 @@
  */
 
 import { promises as fs } from 'node:fs'
-import { join, relative, sep } from 'node:path'
+import { promises as fsp } from 'node:fs'
+import { dirname, join, relative, sep } from 'node:path'
 
 import {
   applyFile,
@@ -65,6 +66,11 @@ export interface VaultPullResult {
   bytesDownloaded: number
   conflicts: Array<{ kept: string; wrote: string }>
   ledgerMerged: boolean
+  /**
+   * Files that were behind and caught up, rather than landing beside the local
+   * copy as a conflict. Only possible when a base is remembered.
+   */
+  fastForwarded: number
 }
 
 export interface VaultSurfaceSyncResult {
@@ -133,6 +139,41 @@ export interface VaultSyncOptions {
   token?: string
   onProgress?: (done: number, total: number, path: string) => void
   signal?: AbortSignal
+  /**
+   * Where to remember what this machine and this peer last agreed each file
+   * was. Per machine and per peer, so it lives outside the vault — it
+   * describes an agreement, not memory, and syncing it would be circular.
+   *
+   * Omit it and the sync stays two-way: every difference is a conflict, which
+   * is safe but lets a stale file stay stale for ever.
+   */
+  basePath?: string
+}
+
+/** Last agreed sha256 per relative path, for one peer. */
+type SyncBase = Record<string, string>
+
+async function readSyncBase(file?: string): Promise<SyncBase> {
+  if (!file) return {}
+  try {
+    const raw = await fsp.readFile(file, 'utf8')
+    const parsed: unknown = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? (parsed as SyncBase) : {}
+  } catch {
+    // No base yet, or unreadable: fall back to two-way. Never a hard failure —
+    // a missing memory of the last agreement must not stop a sync.
+    return {}
+  }
+}
+
+async function writeSyncBase(file: string | undefined, base: SyncBase): Promise<void> {
+  if (!file) return
+  try {
+    await fsp.mkdir(dirname(file), { recursive: true })
+    await fsp.writeFile(file, JSON.stringify(base), 'utf8')
+  } catch (e) {
+    log.warn(`sync base not written (${file}): ${(e as Error).message}`)
+  }
 }
 
 /**
@@ -163,6 +204,7 @@ export async function syncVaultToReplica(opts: VaultSyncOptions): Promise<VaultS
   }
 
   const byPath = new Map(entries.map((e) => [e.path, e]))
+
   let done = 0
   for (const rel of plan.wanted) {
     if (opts.signal?.aborted) {
@@ -224,8 +266,8 @@ export async function syncVaultToReplica(opts: VaultSyncOptions): Promise<VaultS
  * 3. fetch + applyFile one path at a time (conflict suffix / ledger union)
  */
 export async function pullVaultFromPeer(opts: VaultSyncOptions): Promise<VaultPullResult> {
-  const base = normalizeBase(opts.target)
-  const remote = (await post(base, '/sync/manifest', opts.token, {}, 120_000)) as {
+  const peerBase = normalizeBase(opts.target)
+  const remote = (await post(peerBase, '/sync/manifest', opts.token, {}, 120_000)) as {
     entries: ManifestEntry[]
     skipped?: Array<{ path: string; reason: string }>
   }
@@ -246,7 +288,10 @@ export async function pullVaultFromPeer(opts: VaultSyncOptions): Promise<VaultPu
     bytesDownloaded: 0,
     conflicts: [],
     ledgerMerged: false,
+    fastForwarded: 0,
   }
+
+  const base = await readSyncBase(opts.basePath)
 
   let done = 0
   for (const rel of plan.wanted) {
@@ -256,7 +301,7 @@ export async function pullVaultFromPeer(opts: VaultSyncOptions): Promise<VaultPu
     }
     opts.onProgress?.(++done, plan.wanted.length, rel)
     try {
-      const fetched = (await post(base, '/sync/fetch', opts.token, { path: rel }, 60_000)) as {
+      const fetched = (await post(peerBase, '/sync/fetch', opts.token, { path: rel }, 60_000)) as {
         path: string
         sha256: string
         contentBase64: string
@@ -268,6 +313,7 @@ export async function pullVaultFromPeer(opts: VaultSyncOptions): Promise<VaultPu
         path: fetched.path ?? rel,
         content,
         sha256: fetched.sha256,
+        baseSha: base[rel] ?? null,
       })
       if (!applied.ok) {
         result.failed.push({ path: rel, reason: applied.reason })
@@ -275,6 +321,11 @@ export async function pullVaultFromPeer(opts: VaultSyncOptions): Promise<VaultPu
       }
       if (applied.conflict) result.conflicts.push(applied.conflict)
       if (applied.ledgerMerged) result.ledgerMerged = true
+      if (applied.fastForward) result.fastForwarded++
+      // Agreed now: both sides hold these bytes. A conflict is deliberately not
+      // recorded — the sides still disagree, and claiming otherwise would let
+      // the next sync overwrite the copy the user has not looked at yet.
+      if (!applied.conflict) base[rel] = fetched.sha256
       if (applied.unchanged) {
         result.unchanged++
       } else {
@@ -286,8 +337,10 @@ export async function pullVaultFromPeer(opts: VaultSyncOptions): Promise<VaultPu
     }
   }
 
+  await writeSyncBase(opts.basePath, base)
+
   log.info(
-    `vault sync pull ← ${base}: ${result.downloaded} downloaded, ${result.unchanged} unchanged, ` +
+    `vault sync pull ← ${peerBase}: ${result.downloaded} downloaded, ${result.unchanged} unchanged, ` +
       `${result.conflicts.length} conflicts, ${result.failed.length} failed, ` +
       `${result.extraLocal.length} extra local`,
   )

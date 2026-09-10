@@ -172,6 +172,11 @@ export type ApplyResult =
       conflict?: { kept: string; wrote: string }
       /** distill-ledger was union-merged rather than replaced. */
       ledgerMerged?: boolean
+      /**
+       * Local was still at the last agreed state, so the incoming version
+       * replaced it instead of landing beside it as a conflict copy.
+       */
+      fastForward?: boolean
     }
   | {
       ok: false
@@ -312,6 +317,15 @@ export async function applyFile(opts: {
   path: string
   content: Buffer
   sha256: string
+  /**
+   * What the two sides last agreed this file was, if the caller remembers.
+   *
+   * Absent, the comparison is two-way and every difference is a conflict —
+   * the behaviour this sync had before, and the reason a stale file could
+   * never catch up. Present and equal to what is on disk, the local side has
+   * not been touched since, so the incoming version is simply newer.
+   */
+  baseSha?: string | null
 }): Promise<ApplyResult> {
   const verdict = safeVaultPath(opts.path)
   if (!verdict.ok) return { ok: false, path: opts.path, reason: verdict.reason }
@@ -385,6 +399,29 @@ export async function applyFile(opts: {
       // Not a conflict when the only disagreement is CR. See sameIgnoringLineEndings.
       if (existingHash !== null && (await sameIgnoringLineEndings(abs, opts.content))) {
         return { ok: true, path: verdict.relative, bytes: opts.content.length, unchanged: true }
+      }
+      if (existingHash !== null && opts.baseSha && existingHash === opts.baseSha) {
+        /*
+          Not a conflict — a pending update.
+        
+          Without a remembered base, "the two sides differ" is the only fact
+          available, so every difference looks like a disagreement and keep-both
+          refuses to overwrite. That is how a file goes stale for good: this
+          vault's USER.md sat at its July content for six weeks while three
+          identical copies piled up beside it, because nothing was allowed to
+          replace it and nobody merged by hand.
+        
+          When the local bytes still match what the two sides last agreed on,
+          this machine has not touched the file since. There is nothing to lose
+          by taking the incoming version, and keeping the old one is the loss.
+        */
+        await writeAtomic(abs, opts.content)
+        return {
+          ok: true,
+          path: verdict.relative,
+          bytes: opts.content.length,
+          fastForward: true,
+        }
       }
       if (existingHash !== null) {
         // Already on record? Then this is the same disagreement, not a new one.
