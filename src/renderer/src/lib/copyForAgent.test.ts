@@ -10,8 +10,13 @@ import { promptForAgent, skillForAgent } from './copyForAgent'
  * came back as `Unknown command`. The pages still sit behind the vault gate, so
  * the click is still not testable here — but the text that click produces is,
  * and that is where the mistake actually lived.
+ *
+ * The second half of this file is the harder question the operator asked: the
+ * two prompts that ship with the vault come out right, but will one a user
+ * writes themselves? Those cases are below, and one of them was failing.
  */
 
+const ARGS = [{ name: 'zadanie', required: true }]
 const PROMPT = `---
 description: Zanim agent napisze kod
 arguments:
@@ -27,9 +32,7 @@ Przejdź drabinę i zatrzymaj się na pierwszym „tak":
 1. Czy to w ogóle musi powstać?
 `
 
-const ARGS = [{ name: 'zadanie', required: true }]
-
-describe('promptForAgent', () => {
+describe('promptForAgent — the prompts that ship', () => {
   const out = promptForAgent(PROMPT, ARGS)
 
   it('drops the frontmatter the loader needs and the reader does not', () => {
@@ -38,7 +41,6 @@ describe('promptForAgent', () => {
   })
 
   it('leaves no slot to edit by hand', () => {
-    // Editing the paste is the work this button exists to remove.
     expect(out).not.toContain('{{')
   })
 
@@ -54,19 +56,80 @@ describe('promptForAgent', () => {
     expect(out).toContain('Przejdź drabinę')
     expect(out).toContain('1. Czy to w ogóle musi powstać?')
   })
+})
 
-  it('adds no trailing label when the prompt takes no required argument', () => {
-    const free = promptForAgent('---\ndescription: d\n---\nPisz zwięźle.\n', [])
-    expect(free.trim()).toBe('Pisz zwięźle.')
+describe('promptForAgent — prompts a user writes', () => {
+  it('re-offers a slot the frontmatter marked optional', () => {
+    // The regression this file was extended for. The server marks a placeholder
+    // it infers from the body as required, but one written out under
+    // `arguments:` without `required: true` defaults to false. Filtering on the
+    // declaration stripped the slot and offered nothing back, leaving "Zrob cos
+    // z ." — a prompt asking about something it never names.
+    const out = promptForAgent(
+      '---\narguments:\n  - name: cos\n    description: d\n---\nZrob cos z {{cos}}.\n',
+      [{ name: 'cos', required: false }],
+    )
+    expect(out).not.toContain('{{')
+    expect(out).toContain('Cos:')
   })
 
-  it('offers one line per required argument, skipping optional ones', () => {
-    const two = promptForAgent('---\nd: x\n---\n{{objaw}} i {{kiedy}}\n', [
-      { name: 'objaw', required: true },
-      { name: 'kiedy', required: false },
-    ])
-    expect(two).toContain('Objaw:')
-    expect(two).not.toContain('Kiedy:')
+  it('works with no frontmatter at all', () => {
+    const out = promptForAgent('Streszcz {{tekst}} w trzech zdaniach.\n', [])
+    expect(out).toContain('Streszcz')
+    expect(out).toContain('Tekst:')
+  })
+
+  it('offers one line per distinct slot, in the order they appear', () => {
+    const out = promptForAgent('Z {{objaw}} i {{kiedy}} zrob zgloszenie.\n', [])
+    expect(out.trimEnd().endsWith('Objaw: \nKiedy:')).toBe(true)
+  })
+
+  it('does not repeat a slot used twice', () => {
+    const out = promptForAgent('{{co}} — powtorz {{co}} inaczej.\n', [])
+    expect(out.match(/^Co: $/gm)?.length).toBe(1)
+  })
+
+  it('survives Windows line endings', () => {
+    const out = promptForAgent('---\r\ndescription: d\r\n---\r\nZrob {{x}}.\r\n', [])
+    expect(out).not.toContain('description:')
+    expect(out).toContain('X:')
+  })
+
+  it('leaves non-ASCII braces alone, because the server does too', () => {
+    // prompts.ts matches [A-Za-z0-9_-]. `{{zgłoszenie}}` is prose to the server,
+    // so cutting it here would silently delete a sentence the author wrote.
+    const out = promptForAgent('Opisz {{zgłoszenie}} krótko.\n', [])
+    expect(out).toContain('{{zgłoszenie}}')
+    expect(out.trim().endsWith('krótko.')).toBe(true)
+  })
+
+  it('adds no trailing label when the prompt has no slots', () => {
+    const out = promptForAgent('---\ndescription: d\n---\nPisz zwięźle.\n', [])
+    expect(out.trim()).toBe('Pisz zwięźle.')
+  })
+
+  it('keeps a mid-sentence slot named, so the sentence still reads', () => {
+    // The second defect the probe found. `prompts.ts` documents exactly this
+    // shape, so deleting the slot broke the form the server tells people to
+    // write: "Przetlumacz  na ." — two spaces and a stranded full stop, which
+    // reads as a bug in Pomnia rather than as something to fill in.
+    const out = promptForAgent('Przetlumacz {{tekst}} na {{jezyk}}. Zachowaj ton.\n', [])
+    expect(out).toBe('Przetlumacz {tekst} na {jezyk}. Zachowaj ton.\n\nTekst: \nJezyk: \n')
+  })
+
+  it('uses single braces inline, never the ones the server would expand', () => {
+    const out = promptForAgent('Zamien {{a}} na cos innego.\n', [])
+    expect(out).not.toContain('{{')
+    expect(out).toContain('{a}')
+  })
+
+  it('leaves no dangling space where a trailing slot was cut', () => {
+    // Cutting `{{x}}` off the end of a line leaves the space before it. The
+    // label lines below do end in a space — deliberately, that is where the
+    // reader types — so this asserts the whole shape rather than sweeping for
+    // trailing whitespace and catching the intentional kind too.
+    const out = promptForAgent('Zrob to: {{x}}\nDalej.\n', [])
+    expect(out).toBe('Zrob to:\nDalej.\n\nX: \n')
   })
 })
 
@@ -77,5 +140,9 @@ describe('skillForAgent', () => {
     expect(out).toContain('name: build-our-way')
     expect(out).toContain('# Doktryna')
     expect(out.endsWith('\n')).toBe(true)
+  })
+
+  it('is unbothered by a skill that has no frontmatter', () => {
+    expect(skillForAgent('# Luzny skill\n\nTresc.')).toBe('# Luzny skill\n\nTresc.\n')
   })
 })
