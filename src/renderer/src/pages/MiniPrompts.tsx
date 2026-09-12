@@ -222,7 +222,7 @@ export default function MiniPrompts() {
                     copyText={async () => {
                       const r = await api.promptsRemoteRead(p.name)
                       if ('error' in r) throw new Error(r.detail || r.error)
-                      return promptForAgent(r.content, p.arguments)
+                      return promptForAgent(r.content)
                     }}
                     actions={[{ label: labels.rowEdit, onClick: () => void openPrompt(p.name) }]}
                     onDelete={() => void remove(p.name)}

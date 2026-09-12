@@ -305,6 +305,7 @@ export interface UiLabels {
   copied: string
   copyEmpty: string
   copiedChars: (n: number) => string
+  skillLeftBehindFiles: (files: string[]) => string
   statusCheckFailed: string
   embeddedSnippetHint: string
   urlChangeHint: string
@@ -562,7 +563,7 @@ export interface UiLabels {
   rowDelete: string
   rowDeleteConfirm: string
   rowEdit: string
-  rowCopyName: string
+  rowCopyBody: string
   skillDeleted: (name: string) => string
   promptDeleted: (name: string) => string
   skillsCategorySection: (category: string) => string
@@ -1241,8 +1242,17 @@ const PL_LABELS: UiLabels = {
   snippetBuildFailed: 'Nie udało się zbudować snippeta',
   copyFailed: 'Nie udało się skopiować',
   copied: 'Skopiowano',
-  copyEmpty: 'Plik jest pusty — nie ma czego skopiowac',
-  copiedChars: (n) => `${n} znakow — wklej agentowi`,
+  copyEmpty: 'Plik jest pusty — nie ma czego skopiować',
+  copiedChars: (n) => `${n} znaków — wklej agentowi`,
+  skillLeftBehindFiles: (files) => {
+    const shown = files.slice(0, 8).join(', ')
+    const rest = files.length > 8 ? ` (i jeszcze ${files.length - 8})` : ''
+    return (
+      `---\n` +
+      `Uwaga dla agenta: ten skill odwołuje się do plików, których nie ma w tej wklejce — ` +
+      `${shown}${rest}. Nie zgaduj, co w nich jest; jeśli są potrzebne, poproś o nie.`
+    )
+  },
   statusCheckFailed: 'Nie udało się sprawdzić statusu',
   embeddedSnippetHint: 'Snippety wskazują na localhost — jeden serwer MCP, bez tokena.',
   urlChangeHint: 'Zmiana URL/tokena odświeża snippet automatycznie.',
@@ -1533,7 +1543,7 @@ const PL_LABELS: UiLabels = {
   rowDelete: 'Usuń',
   rowDeleteConfirm: 'Na pewno?',
   rowEdit: 'Edytuj',
-  rowCopyName: 'Kliknij, żeby skopiować nazwę',
+  rowCopyBody: 'Kliknij, żeby skopiować treść dla agenta',
   skillDeleted: (name) => `Usunięto skill: ${name}`,
   promptDeleted: (name) => `Usunięto prompt: ${name}`,
   skillsCategorySection: (category) => `KATEGORIA: ${category.toUpperCase()}`,
@@ -2280,6 +2290,15 @@ const EN_LABELS: UiLabels = {
   copied: 'Copied',
   copyEmpty: 'The file is empty — nothing to copy',
   copiedChars: (n) => `${n} characters — paste it to your agent`,
+  skillLeftBehindFiles: (files) => {
+    const shown = files.slice(0, 8).join(', ')
+    const rest = files.length > 8 ? ` (and ${files.length - 8} more)` : ''
+    return (
+      `---\n` +
+      `Note for the agent: this skill refers to files that are not part of this paste — ` +
+      `${shown}${rest}. Do not guess what they contain; ask for them if you need them.`
+    )
+  },
   statusCheckFailed: 'Could not check status',
   embeddedSnippetHint: 'Snippets point at localhost — one MCP server, no token.',
   urlChangeHint: 'Changing the URL or token refreshes the snippet automatically.',
@@ -2569,7 +2588,7 @@ const EN_LABELS: UiLabels = {
   rowDelete: 'Delete',
   rowDeleteConfirm: 'Sure?',
   rowEdit: 'Edit',
-  rowCopyName: 'Click to copy the name',
+  rowCopyBody: 'Click to copy the text for your agent',
   skillDeleted: (name) => `Deleted skill: ${name}`,
   promptDeleted: (name) => `Deleted prompt: ${name}`,
   skillsCategorySection: (category) => `CATEGORY: ${category.toUpperCase()}`,

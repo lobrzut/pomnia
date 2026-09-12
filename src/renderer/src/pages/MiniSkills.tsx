@@ -164,7 +164,7 @@ export default function MiniSkills() {
       copyText={async () => {
         const r = await api.skillsRemoteRead(skill.path)
         if ('error' in r) throw new Error(r.detail || r.error)
-        return skillForAgent(r.content)
+        return skillForAgent(r.content, labels.skillLeftBehindFiles)
       }}
       actions={[{ label: labels.rowEdit, onClick: () => void openSkill(skill) }]}
       onDelete={() => void remove(skill)}

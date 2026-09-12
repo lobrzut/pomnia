@@ -42,7 +42,7 @@ function SkillRow({
       copyText={async () => {
         const r = await api.skillsRead(skill.path)
         if (!r.ok) throw new Error(r.error)
-        return skillForAgent(r.text)
+        return skillForAgent(r.text, labels.skillLeftBehindFiles)
       }}
       actions={[
         // Editing first: it is the one thing you cannot do anywhere else.

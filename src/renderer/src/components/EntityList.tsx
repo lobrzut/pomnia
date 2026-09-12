@@ -148,7 +148,7 @@ export function ListRow({
         activate && 'cursor-pointer hover:bg-white/[0.03]',
       )}
       onClick={activate ? () => activate() : undefined}
-      title={copyText ? labels.rowCopyName : undefined}
+      title={copyText ? labels.rowCopyBody : undefined}
     >
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-1.5">

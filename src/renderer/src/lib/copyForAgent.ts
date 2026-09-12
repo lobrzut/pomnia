@@ -34,9 +34,47 @@ function stripFrontmatter(raw: string): string {
   return nl === -1 ? '' : raw.slice(nl + 1)
 }
 
-/** A skill travels whole: it is already written to be read by an agent. */
-export function skillForAgent(raw: string): string {
-  return raw.trimEnd() + '\n'
+/**
+ * Files a skill package brings with it, as its own text refers to them.
+ *
+ * A `cli/` skill is a directory, not a file — `skillsScan.ts` says so where it
+ * deletes one, and removes the folder rather than SKILL.md. Copying has to
+ * disagree: `scripts/recon.py` cannot travel through a clipboard into a chat,
+ * and bundling the rest is not an option either. Measured over the 208 skills
+ * in this vault: the extra markdown alone is 48 kB at p90 and 1.9 MB at worst,
+ * and 67 packages carry files that are not text at all.
+ *
+ * So the paste stays SKILL.md — and says which files it left behind, because
+ * 114 of those 208 tell the agent to go and open one. Silence there is what
+ * makes an agent invent the contents of a script it cannot see.
+ */
+const SEGMENT = '[A-Za-z0-9_-](?:[A-Za-z0-9_.-]*[A-Za-z0-9_-])?'
+const SUPPORT_FILE = new RegExp(
+  // Each segment must start and end on something other than a dot, or the full
+  // stop closing "keep your own files in templates/." is read as a filename.
+  // Nested on purpose: a fifth of the real references are two levels deep, and
+  // naming the folder instead of the file is a vaguer warning than it needs
+  // to be.
+  `(?:references|scripts|templates|assets)(?:/${SEGMENT})+`,
+  'g',
+)
+
+/**
+ * A skill travels whole: it is already written to be read by an agent.
+ *
+ * `note` renders the caveat above. It is required rather than optional so that
+ * a new caller cannot quietly drop the warning — the compiler asks for it.
+ */
+export function skillForAgent(raw: string, note: (files: string[]) => string): string {
+  const body = raw.trimEnd()
+
+  const referenced: string[] = []
+  for (const m of body.matchAll(SUPPORT_FILE)) {
+    if (!referenced.includes(m[0])) referenced.push(m[0])
+  }
+  if (!referenced.length) return body + '\n'
+
+  return body + '\n\n' + note(referenced).trimEnd() + '\n'
 }
 
 /**
@@ -82,8 +120,13 @@ function cutSlots(line: string): string {
  * re-offered — producing exactly the nameless prompt this function exists to
  * avoid. The body is the honest source: if a slot was cut from it, it needs a
  * line back.
+ *
+ * That is also why this takes no argument list. It used to accept one and
+ * ignore it, which left every call site handing over `prompt.arguments` as if
+ * the declaration still decided something — an open invitation to wire the bug
+ * back in. The parameter is gone so the question cannot be asked.
  */
-export function promptForAgent(raw: string, _args?: { name: string; required: boolean }[]): string {
+export function promptForAgent(raw: string): string {
   const body = stripFrontmatter(raw)
 
   const seen: string[] = []

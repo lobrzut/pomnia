@@ -54,7 +54,7 @@ function PromptRow({
       copyText={async () => {
         const r = await api.promptsRead(prompt.name)
         if (!r.ok) throw new Error(r.error)
-        return promptForAgent(r.text, prompt.arguments)
+        return promptForAgent(r.text)
       }}
       actions={[
         // Editing first: it is the one thing you cannot do anywhere else.
