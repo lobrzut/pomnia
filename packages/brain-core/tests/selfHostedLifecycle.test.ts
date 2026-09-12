@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { loadConfig } from '../src/config/index.js'
 import { createToken } from '../src/admin/tokens.js'
 import { createBrainServer, type BrainServer } from '../src/mcp/server.js'
+import { freePort } from '../src/testing/freePort.js'
 
 /**
  * Does a Pomnia nobody has a desktop for actually hold and return a memory?
@@ -25,7 +26,7 @@ import { createBrainServer, type BrainServer } from '../src/mcp/server.js'
  * without Ollama is a real deployment, and the write path has to work there too.
  */
 
-const PORT = 45000 + (process.pid % 3000)
+const PORT = await freePort()
 const BASE = `http://127.0.0.1:${PORT}`
 const OLLAMA = process.env.OLLAMA_TEST_URL ?? 'http://127.0.0.1:11434'
 

@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { loadConfig } from '../src/config/index.js'
 import { createBrainServer, type BrainServer } from '../src/mcp/server.js'
+import { freePort } from '../src/testing/freePort.js'
 
 /**
  * The first end-to-end test of this server over real HTTP.
@@ -26,7 +27,7 @@ import { createBrainServer, type BrainServer } from '../src/mcp/server.js'
  */
 
 // Deterministic per process, so two runs on one machine do not collide.
-const PORT = 41000 + (process.pid % 4000)
+const PORT = await freePort()
 const BASE = `http://127.0.0.1:${PORT}`
 
 const AGENT = 'btk_agent_for_sync_test'

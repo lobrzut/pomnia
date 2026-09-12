@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { loadConfig } from '../config/index.js'
 import { createBrainServer, type BrainServer } from './server.js'
 import { MAX_FILE_BYTES } from '../sync/paths.js'
+import { freePort } from '../testing/freePort.js'
 
 function call(
   port: number,
@@ -50,7 +51,7 @@ describe('HTTP request boundaries (F01/F14/F17)', () => {
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), 'pomnia-http-bound-'))
-    port = 43000 + (process.pid % 1000) + Math.floor(Math.random() * 200)
+    port = await freePort()
     const vault = join(dir, 'vault')
     await mkdir(vault, { recursive: true })
     const config = await loadConfig(

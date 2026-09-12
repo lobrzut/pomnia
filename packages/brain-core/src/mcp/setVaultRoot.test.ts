@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { loadConfig } from '../config/index.js'
 import { createBrainServer, type BrainServer } from './server.js'
 import { resolveVaultOwnership, vaultOwnerPath } from '../storage/vaultOwner.js'
+import { freePort } from '../testing/freePort.js'
 
 /**
  * Switching vaultRoot must re-resolve ownership. The bug: paths changed, but
@@ -21,7 +22,7 @@ describe('setVaultRoot re-resolves ownership (F06)', () => {
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), 'pomnia-setvault-'))
-    port = 42000 + (process.pid % 1000) + Math.floor(Math.random() * 200)
+    port = await freePort()
     const vaultA = join(dir, 'vault-a')
     await mkdir(vaultA, { recursive: true })
     const config = await loadConfig(

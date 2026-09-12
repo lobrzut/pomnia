@@ -9,6 +9,7 @@ import { loadConfig } from '../../../packages/brain-core/src/config/index.js'
 import { safeVaultPath } from '../../../packages/brain-core/src/sync/paths.js'
 import { createBrainServer, type BrainServer } from '../../../packages/brain-core/src/mcp/server.js'
 import { buildVaultManifest, syncVaultToReplica } from './vaultSync.js'
+import { freePort } from '../../../packages/brain-core/src/testing/freePort.js'
 
 /**
  * state/vault-writer.json records which machine owns a vault. It is the reason
@@ -26,7 +27,7 @@ import { buildVaultManifest, syncVaultToReplica } from './vaultSync.js'
  * the desktop could push into it.
  */
 
-const PORT = 47000 + (process.pid % 2000)
+const PORT = await freePort()
 const BASE = `http://127.0.0.1:${PORT}`
 
 let dir: string

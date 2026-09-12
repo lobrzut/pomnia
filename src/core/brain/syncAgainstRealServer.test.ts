@@ -8,6 +8,7 @@ import { createToken } from '../../../packages/brain-core/src/admin/tokens.js'
 import { loadConfig } from '../../../packages/brain-core/src/config/index.js'
 import { createBrainServer, type BrainServer } from '../../../packages/brain-core/src/mcp/server.js'
 import { syncVaultToReplica } from './vaultSync.js'
+import { freePort } from '../../../packages/brain-core/src/testing/freePort.js'
 
 /**
  * The desktop's sync client against a real brain-core, both halves running.
@@ -23,7 +24,7 @@ import { syncVaultToReplica } from './vaultSync.js'
  * replicates*. This checks that a push actually lands.
  */
 
-const PORT = 46000 + (process.pid % 3000)
+const PORT = await freePort()
 const BASE = `http://127.0.0.1:${PORT}`
 
 let dir: string

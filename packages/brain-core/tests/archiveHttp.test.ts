@@ -14,8 +14,9 @@ import { loadConfig } from '../src/config/index.js'
 import { createBrainServer, type BrainServer } from '../src/mcp/server.js'
 import { pushArchive, localArchiveBlobs } from '../src/archive/push.js'
 import { sha256 } from '../src/archive/receive.js'
+import { freePort } from '../src/testing/freePort.js'
 
-const PORT = 42000 + (process.pid % 4000)
+const PORT = await freePort()
 const BASE = `http://127.0.0.1:${PORT}`
 const ADMIN = 'btk_admin_for_archive_test'
 
