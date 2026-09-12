@@ -303,6 +303,8 @@ export interface UiLabels {
   snippetBuildFailed: string
   copyFailed: string
   copied: string
+  copyEmpty: string
+  copiedChars: (n: number) => string
   statusCheckFailed: string
   embeddedSnippetHint: string
   urlChangeHint: string
@@ -1239,6 +1241,8 @@ const PL_LABELS: UiLabels = {
   snippetBuildFailed: 'Nie udało się zbudować snippeta',
   copyFailed: 'Nie udało się skopiować',
   copied: 'Skopiowano',
+  copyEmpty: 'Plik jest pusty — nie ma czego skopiowac',
+  copiedChars: (n) => `${n} znakow — wklej agentowi`,
   statusCheckFailed: 'Nie udało się sprawdzić statusu',
   embeddedSnippetHint: 'Snippety wskazują na localhost — jeden serwer MCP, bez tokena.',
   urlChangeHint: 'Zmiana URL/tokena odświeża snippet automatycznie.',
@@ -2274,6 +2278,8 @@ const EN_LABELS: UiLabels = {
   snippetBuildFailed: 'Could not build the snippet',
   copyFailed: 'Could not copy',
   copied: 'Copied',
+  copyEmpty: 'The file is empty — nothing to copy',
+  copiedChars: (n) => `${n} characters — paste it to your agent`,
   statusCheckFailed: 'Could not check status',
   embeddedSnippetHint: 'Snippets point at localhost — one MCP server, no token.',
   urlChangeHint: 'Changing the URL or token refreshes the snippet automatically.',

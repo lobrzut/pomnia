@@ -85,8 +85,12 @@ export function ListRow({
   /**
    * What a click on the row puts on the clipboard. Takes precedence over
    * `onOpen`, because the two would fight over the same click.
+   *
+   * A function is resolved at click time: skill and prompt bodies live on
+   * disk, and reading every one of them just to render a list would make the
+   * page pay for text nobody asked for.
    */
-  copyText?: string
+  copyText?: string | (() => Promise<string>)
   onDelete?: () => void
   deleteLabel?: string
   confirmLabel?: string
@@ -108,9 +112,13 @@ export function ListRow({
   async function copy(): Promise<void> {
     if (!copyText) return
     // A rejected clipboard write must not look like a successful one — the
-    // reader would go and paste something stale into a chat window.
+    // reader would go and paste something stale into a chat window. A failed
+    // READ is the same lie one step earlier, so it is caught in the same try.
+    let text: string
     try {
-      await navigator.clipboard.writeText(copyText)
+      text = typeof copyText === 'string' ? copyText : await copyText()
+      if (!text) throw new Error(labels.copyEmpty)
+      await navigator.clipboard.writeText(text)
     } catch (e) {
       toast({ kind: 'error', title: labels.copyFailed, detail: (e as Error).message })
       return
@@ -118,7 +126,8 @@ export function ListRow({
     setCopied(true)
     if (copyTimer.current) clearTimeout(copyTimer.current)
     copyTimer.current = setTimeout(() => setCopied(false), COPIED_MS)
-    toast({ kind: 'success', title: labels.copied, detail: copyText })
+    // A whole skill in a toast is a wall of text over the list it came from.
+    toast({ kind: 'success', title: labels.copied, detail: labels.copiedChars(text.length) })
   }
 
   useEffect(() => {

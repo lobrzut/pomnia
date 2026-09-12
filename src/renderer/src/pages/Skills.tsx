@@ -9,6 +9,7 @@ import { useEditableFile } from '../lib/useEditableFile'
 import { relativeTime } from '../lib/format'
 import { uiLabels } from '../lib/labels'
 import { api } from '../lib/api'
+import { skillForAgent } from '../lib/copyForAgent'
 import type { LocalSkillEntry } from '../lib/types'
 import { useStore } from '../store/useStore'
 
@@ -38,7 +39,11 @@ function SkillRow({
         skill.category,
         relativeTime(new Date(skill.mtimeMs).toISOString()),
       ]}
-      copyText={skill.name}
+      copyText={async () => {
+        const r = await api.skillsRead(skill.path)
+        if (!r.ok) throw new Error(r.error)
+        return skillForAgent(r.text)
+      }}
       actions={[
         // Editing first: it is the one thing you cannot do anywhere else.
         // Revealing the file stays, for anyone who prefers their own editor.

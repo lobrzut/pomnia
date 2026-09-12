@@ -22,6 +22,7 @@ import { MarkdownEditor } from '../components/MarkdownEditor'
 import { useEditableFile } from '../lib/useEditableFile'
 import { relativeTime } from '../lib/format'
 import { api } from '../lib/api'
+import { promptForAgent } from '../lib/copyForAgent'
 import { uiLabels } from '../lib/labels'
 import type { LocalPromptEntry } from '../lib/types'
 import { useStore } from '../store/useStore'
@@ -50,7 +51,11 @@ function PromptRow({
       title={`/${prompt.name}`}
       subtitle={prompt.description}
       meta={[signature(prompt, labels), relativeTime(new Date(prompt.mtimeMs).toISOString())]}
-      copyText={`/${prompt.name}`}
+      copyText={async () => {
+        const r = await api.promptsRead(prompt.name)
+        if (!r.ok) throw new Error(r.error)
+        return promptForAgent(r.text, prompt.arguments)
+      }}
       actions={[
         // Editing first: it is the one thing you cannot do anywhere else.
         { label: labels.rowEdit, icon: Pencil, onClick: onEdit },

@@ -23,6 +23,7 @@ import { Button, GlassCard, Spinner } from '../components/ui'
 import { ListRow, ListSection } from '../components/EntityList'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { api } from '../lib/api'
+import { skillForAgent } from '../lib/copyForAgent'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
 
@@ -160,7 +161,11 @@ export default function MiniSkills() {
       title={skill.name}
       subtitle={skill.description}
       meta={[skill.category, skill.path]}
-      copyText={skill.name}
+      copyText={async () => {
+        const r = await api.skillsRemoteRead(skill.path)
+        if ('error' in r) throw new Error(r.detail || r.error)
+        return skillForAgent(r.content)
+      }}
       actions={[{ label: labels.rowEdit, onClick: () => void openSkill(skill) }]}
       onDelete={() => void remove(skill)}
       deleteLabel={labels.rowDelete}

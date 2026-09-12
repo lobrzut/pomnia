@@ -23,6 +23,7 @@ import { Button, GlassCard, Spinner } from '../components/ui'
 import { ListRow, ListSection } from '../components/EntityList'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { api } from '../lib/api'
+import { promptForAgent } from '../lib/copyForAgent'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
 
@@ -218,7 +219,11 @@ export default function MiniPrompts() {
                             .map((a) => (a.required ? `${a.name}*` : a.name))
                             .join(', ')}`,
                     ]}
-                    copyText={`/${p.name}`}
+                    copyText={async () => {
+                      const r = await api.promptsRemoteRead(p.name)
+                      if ('error' in r) throw new Error(r.detail || r.error)
+                      return promptForAgent(r.content, p.arguments)
+                    }}
                     actions={[{ label: labels.rowEdit, onClick: () => void openPrompt(p.name) }]}
                     onDelete={() => void remove(p.name)}
                     deleteLabel={labels.rowDelete}
