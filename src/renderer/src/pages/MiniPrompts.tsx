@@ -5,8 +5,11 @@
  *
  * The sibling of MiniSkills, and deliberately the same shape, because they are
  * the same job: markdown in the vault that an agent will read. What differs is
- * who acts on it. A skill is loaded mid-task by the agent; a prompt is served
- * over MCP `prompts/list` and reaches the user as `/name` in their client.
+ * who acts on it. A skill is followed by the agent; a prompt is the user's own
+ * request, written once. Both now reach an agent the same way: a row click
+ * copies a `Pomnia MCP:` reference the agent resolves with get_skill or
+ * get_prompt. This comment used to say a prompt reaches the user as `/name` in
+ * their client — Claude Code answers that with "Unknown command".
  *
  * Unlike skills, this screen can create. A library that starts empty and has
  * no way to gain a first entry is a directory listing, not a library — and the
@@ -18,9 +21,10 @@ import { MessageSquareQuote, Plus, RefreshCw } from 'lucide-react'
 
 import type { RemotePrompt } from '@core/brain/remoteSkills'
 import { isSafePromptName } from '@core/brain/remoteSkills'
+import { referenceForAgent } from '@core/brain/agentReference'
 
 import { Button, GlassCard, Spinner } from '../components/ui'
-import { ListRow, ListSection } from '../components/EntityList'
+import { AgentPickBar, ListRow, ListSection } from '../components/EntityList'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { api } from '../lib/api'
 import { promptForAgent } from '../lib/copyForAgent'
@@ -34,6 +38,8 @@ export default function MiniPrompts() {
   const labels = uiLabels()
   const toast = useStore((s) => s.toast)
   const setRoute = useStore((s) => s.setRoute)
+  const pickedPrompts = useStore((s) => s.agentPick.prompts)
+  const togglePickPrompt = useStore((s) => s.togglePickPrompt)
 
   const [prompts, setPrompts] = useState<RemotePrompt[] | null>(null)
   const [error, setError] = useState<{ code: string; detail: string } | null>(null)
@@ -196,6 +202,8 @@ export default function MiniPrompts() {
             </div>
           </GlassCard>
 
+          <AgentPickBar />
+
           {prompts === null ? (
             <GlassCard className="p-5">
               <Spinner className="h-4 w-4" />
@@ -219,11 +227,17 @@ export default function MiniPrompts() {
                             .map((a) => (a.required ? `${a.name}*` : a.name))
                             .join(', ')}`,
                     ]}
-                    copyText={async () => {
+                    copyText={async () => ({
+                      text: referenceForAgent({ skills: [], prompts: [p] }),
+                      detail: labels.copiedReference,
+                    })}
+                    copyBody={async () => {
                       const r = await api.promptsRemoteRead(p.name)
                       if ('error' in r) throw new Error(r.detail || r.error)
                       return promptForAgent(r.content)
                     }}
+                    picked={pickedPrompts.some((x) => x.name === p.name)}
+                    onTogglePick={() => togglePickPrompt({ name: p.name, arguments: p.arguments })}
                     actions={[{ label: labels.rowEdit, onClick: () => void openPrompt(p.name) }]}
                     onDelete={() => void remove(p.name)}
                     deleteLabel={labels.rowDelete}

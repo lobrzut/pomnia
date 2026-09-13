@@ -20,10 +20,11 @@ import { BookOpen, ChevronLeft, RefreshCw, Search } from 'lucide-react'
 import type { RemoteSkillRow, RemoteSkillsSummary } from '@core/brain/remoteSkills'
 
 import { Button, GlassCard, Spinner } from '../components/ui'
-import { ListRow, ListSection } from '../components/EntityList'
+import { AgentPickBar, ListRow, ListSection } from '../components/EntityList'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { api } from '../lib/api'
 import { skillForAgent } from '../lib/copyForAgent'
+import { referenceForAgent, skillCallName } from '@core/brain/agentReference'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
 
@@ -153,25 +154,46 @@ export default function MiniSkills() {
   }
 
   const dirty = open !== null && text !== original
+  const pickedSkills = useStore((s) => s.agentPick.skills)
+  const togglePickSkill = useStore((s) => s.togglePickSkill)
   const narrowed = category !== null || query.trim().length >= 2
 
+  // The summary carries every own skill in full, which is all skillCallName
+  // needs: a categorised package is named by its category, so the catalogue
+  // Mini loads one category at a time never has to be whole.
+  const ownNames = summary?.own.map((s) => s.name) ?? []
+
   /** Defined here rather than at module scope: it closes over openSkill and remove. */
-  const SkillRow = ({ skill }: { skill: RemoteSkillRow }) => (
-    <ListRow
-      title={skill.name}
-      subtitle={skill.description}
-      meta={[skill.category, skill.path]}
-      copyText={async () => {
-        const r = await api.skillsRemoteRead(skill.path)
-        if ('error' in r) throw new Error(r.detail || r.error)
-        return skillForAgent(r.content, labels.skillLeftBehindFiles)
-      }}
-      actions={[{ label: labels.rowEdit, onClick: () => void openSkill(skill) }]}
-      onDelete={() => void remove(skill)}
-      deleteLabel={labels.rowDelete}
-      confirmLabel={labels.rowDeleteConfirm}
-    />
-  )
+  const SkillRow = ({ skill }: { skill: RemoteSkillRow }) => {
+    const call = skillCallName(skill, ownNames)
+    const readBody = async (): Promise<string> => {
+      const r = await api.skillsRemoteRead(skill.path)
+      if ('error' in r) throw new Error(r.detail || r.error)
+      return skillForAgent(r.content, labels.skillLeftBehindFiles)
+    }
+    return (
+      <ListRow
+        title={skill.name}
+        subtitle={skill.description}
+        meta={[skill.category, skill.path]}
+        copyText={async () =>
+          call
+            ? { text: referenceForAgent({ skills: [call], prompts: [] }), detail: labels.copiedReference }
+            : { text: await readBody(), detail: labels.copiedTextInstead }
+        }
+        copyBody={readBody}
+        picked={pickedSkills.some((p) => p.key === skill.path)}
+        onTogglePick={() => {
+          if (call) togglePickSkill({ key: skill.path, call })
+        }}
+        pickUnavailable={call ? undefined : labels.pickUnavailable}
+        actions={[{ label: labels.rowEdit, onClick: () => void openSkill(skill) }]}
+        onDelete={() => void remove(skill)}
+        deleteLabel={labels.rowDelete}
+        confirmLabel={labels.rowDeleteConfirm}
+      />
+    )
+  }
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -214,6 +236,8 @@ export default function MiniSkills() {
         />
       ) : (
         <>
+          <AgentPickBar />
+
           {/* Making a skill from a book moved to "Do Pomnia": it is an import,
               and this page is the list of what already exists. */}
           <div className="mb-4 flex items-center gap-2">

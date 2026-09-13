@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, FolderOpen, FileText, Pencil, Wand2 } from 'lucide-react'
 import { Button, GlassCard, Spinner } from '../components/ui'
-import { ListRow, ListSection } from '../components/EntityList'
+import { AgentPickBar, ListRow, ListSection } from '../components/EntityList'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { useEditableFile } from '../lib/useEditableFile'
 import { relativeTime } from '../lib/format'
 import { uiLabels } from '../lib/labels'
 import { api } from '../lib/api'
 import { skillForAgent } from '../lib/copyForAgent'
+import { referenceForAgent, skillCallName } from '@core/brain/agentReference'
 import type { LocalSkillEntry } from '../lib/types'
 import { useStore } from '../store/useStore'
 
@@ -22,14 +23,25 @@ import { useStore } from '../store/useStore'
 function SkillRow({
   skill,
   labels,
+  ownNames,
   onEdit,
   onDelete,
 }: {
   skill: LocalSkillEntry
   labels: ReturnType<typeof uiLabels>
+  /** Own skill names, so a package an own skill shadows is never named by its bare name. */
+  ownNames: readonly string[]
   onEdit: () => void
   onDelete: () => void
 }) {
+  const call = skillCallName(skill, ownNames)
+  const picked = useStore((s) => s.agentPick.skills.some((p) => p.key === skill.path))
+  const togglePickSkill = useStore((s) => s.togglePickSkill)
+  const readBody = async (): Promise<string> => {
+    const r = await api.skillsRead(skill.path)
+    if (!r.ok) throw new Error(r.error)
+    return skillForAgent(r.text, labels.skillLeftBehindFiles)
+  }
   return (
     <ListRow
       title={skill.name}
@@ -39,11 +51,17 @@ function SkillRow({
         skill.category,
         relativeTime(new Date(skill.mtimeMs).toISOString()),
       ]}
-      copyText={async () => {
-        const r = await api.skillsRead(skill.path)
-        if (!r.ok) throw new Error(r.error)
-        return skillForAgent(r.text, labels.skillLeftBehindFiles)
+      copyText={async () =>
+        call
+          ? { text: referenceForAgent({ skills: [call], prompts: [] }), detail: labels.copiedReference }
+          : { text: await readBody(), detail: labels.copiedTextInstead }
+      }
+      copyBody={readBody}
+      picked={picked}
+      onTogglePick={() => {
+        if (call) togglePickSkill({ key: skill.path, call })
       }}
+      pickUnavailable={call ? undefined : labels.pickUnavailable}
       actions={[
         // Editing first: it is the one thing you cannot do anywhere else.
         // Revealing the file stays, for anyone who prefers their own editor.
@@ -94,6 +112,7 @@ export default function Skills() {
   const [own, setOwn] = useState<LocalSkillEntry[]>([])
   const [imported, setImported] = useState<LocalSkillEntry[]>([])
   const [openCategory, setOpenCategory] = useState<string | null>(null)
+  const ownNames = own.map((s) => s.name)
   const toast = useStore((st) => st.toast)
   const editor = useEditableFile<LocalSkillEntry>({
     read: (s) => api.skillsRead(s.path),
@@ -157,6 +176,8 @@ export default function Skills() {
         <p className="mt-1 max-w-2xl text-xs leading-relaxed text-ink-dim">{labels.skillsPageLead}</p>
       </div>
 
+      <AgentPickBar />
+
       {/* Making a skill from a book moved to Import: it is an act of bringing
           something in, and this page lists what is already here. */}
       {editor.editing ? (
@@ -191,6 +212,7 @@ export default function Skills() {
                   key={`own:${s.name}`}
                   skill={s}
                   labels={labels}
+                  ownNames={ownNames}
                   onEdit={() => void editor.open(s)}
                   onDelete={() => void remove(s)}
                 />
@@ -235,6 +257,7 @@ export default function Skills() {
                       key={`imported:${s.category ?? ''}/${s.name}`}
                       skill={s}
                       labels={labels}
+                      ownNames={ownNames}
                       onEdit={() => void editor.open(s)}
                       onDelete={() => void remove(s)}
                     />

@@ -14,17 +14,21 @@
  * that removes something with no undo is a trap. The row arms, says so, and
  * disarms itself after a few seconds if you walk away.
  *
- * Clicking the row itself copies the name. A prompt is invoked by typing its
- * name into a chat window, so the name is what the reader came for; opening an
- * editor was the wrong default for a click that lands on the title, and the
- * editor already has its own button on the right.
+ * A click on a skill or prompt row copies a `Pomnia MCP:` reference, which an
+ * agent with Pomnia connected resolves with its own tools; "Copy text" hands
+ * over the text itself, for an agent without Pomnia. The paragraph that stood
+ * here said a click copies the name, and kept saying it for a release after
+ * the click stopped doing that — so if the click changes again, this changes
+ * in the same commit.
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, Trash2 } from 'lucide-react'
+import { Check, Copy, Trash2, X } from 'lucide-react'
 import clsx from 'clsx'
 
-import { GlassCard } from './ui'
+import { referenceForAgent } from '@core/brain/agentReference'
+
+import { Button, GlassCard } from './ui'
 import { uiLabels } from '../lib/labels'
 import { useStore } from '../store/useStore'
 
@@ -33,6 +37,48 @@ const ARM_TIMEOUT_MS = 4000
 
 /** How long the row says it copied before going quiet again. */
 const COPIED_MS = 1600
+
+/** What a copy hands back when the toast should say more than a length. */
+export interface CopyResult {
+  text: string
+  detail: string
+}
+
+/**
+ * Something to put on the clipboard. A function is resolved at click time:
+ * when it reads a body from disk or the server, reading every row's body just
+ * to render the list would make the page pay for text nobody asked for.
+ */
+export type CopySource = string | (() => Promise<string | CopyResult>)
+
+/**
+ * Put something on the clipboard and say so — or say why not.
+ *
+ * A rejected clipboard write must not look like a successful one: the reader
+ * would go and paste something stale into a chat window. A failed read is the
+ * same lie one step earlier, so it is caught in the same try.
+ */
+function useCopy(): (source: CopySource) => Promise<boolean> {
+  const labels = uiLabels()
+  const toast = useStore((s) => s.toast)
+  return async (source) => {
+    let text: string
+    let detail: string
+    try {
+      const got = typeof source === 'string' ? source : await source()
+      text = typeof got === 'string' ? got : got.text
+      if (!text) throw new Error(labels.copyEmpty)
+      // A whole skill in a toast is a wall of text over the list it came from.
+      detail = typeof got === 'string' ? labels.copiedChars(text.length) : got.detail
+      await navigator.clipboard.writeText(text)
+    } catch (e) {
+      toast({ kind: 'error', title: labels.copyFailed, detail: (e as Error).message })
+      return false
+    }
+    toast({ kind: 'success', title: labels.copied, detail })
+    return true
+  }
+}
 
 export function ListSection({
   title,
@@ -71,6 +117,10 @@ export function ListRow({
   actions,
   onOpen,
   copyText,
+  copyBody,
+  picked,
+  onTogglePick,
+  pickUnavailable,
   onDelete,
   deleteLabel,
   confirmLabel,
@@ -85,18 +135,22 @@ export function ListRow({
   /**
    * What a click on the row puts on the clipboard. Takes precedence over
    * `onOpen`, because the two would fight over the same click.
-   *
-   * A function is resolved at click time: skill and prompt bodies live on
-   * disk, and reading every one of them just to render a list would make the
-   * page pay for text nobody asked for.
    */
-  copyText?: string | (() => Promise<string>)
+  copyText?: CopySource
+  /** The text itself, behind its own button — for an agent with no Pomnia to resolve a reference. */
+  copyBody?: () => Promise<string>
+  /** Whether this row is in the shared reference. */
+  picked?: boolean
+  /** Shows the pick box. Leave unset for rows that are not skills or prompts. */
+  onTogglePick?: () => void
+  /** Why this row cannot join a reference. Disables the box and says why on hover. */
+  pickUnavailable?: string
   onDelete?: () => void
   deleteLabel?: string
   confirmLabel?: string
 }) {
   const labels = uiLabels()
-  const toast = useStore((s) => s.toast)
+  const copy = useCopy()
   const [armed, setArmed] = useState(false)
   const [copied, setCopied] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -109,25 +163,11 @@ export function ListRow({
     [],
   )
 
-  async function copy(): Promise<void> {
-    if (!copyText) return
-    // A rejected clipboard write must not look like a successful one — the
-    // reader would go and paste something stale into a chat window. A failed
-    // READ is the same lie one step earlier, so it is caught in the same try.
-    let text: string
-    try {
-      text = typeof copyText === 'string' ? copyText : await copyText()
-      if (!text) throw new Error(labels.copyEmpty)
-      await navigator.clipboard.writeText(text)
-    } catch (e) {
-      toast({ kind: 'error', title: labels.copyFailed, detail: (e as Error).message })
-      return
-    }
+  async function copyRow(): Promise<void> {
+    if (!copyText || !(await copy(copyText))) return
     setCopied(true)
     if (copyTimer.current) clearTimeout(copyTimer.current)
     copyTimer.current = setTimeout(() => setCopied(false), COPIED_MS)
-    // A whole skill in a toast is a wall of text over the list it came from.
-    toast({ kind: 'success', title: labels.copied, detail: labels.copiedChars(text.length) })
   }
 
   useEffect(() => {
@@ -139,7 +179,7 @@ export function ListRow({
   }, [armed])
 
   const facts = (meta ?? []).filter((m): m is string => Boolean(m))
-  const activate = copyText ? () => void copy() : onOpen
+  const activate = copyText ? () => void copyRow() : onOpen
 
   return (
     <div
@@ -148,8 +188,26 @@ export function ListRow({
         activate && 'cursor-pointer hover:bg-white/[0.03]',
       )}
       onClick={activate ? () => activate() : undefined}
-      title={copyText ? labels.rowCopyBody : undefined}
+      title={copyText ? labels.rowCopyReference : undefined}
     >
+      {onTogglePick && (
+        // The wrapper carries the tooltip because a disabled input shows none,
+        // and it swallows the click so ticking a box never also copies the row.
+        <span
+          className="no-drag mt-0.5 shrink-0"
+          title={pickUnavailable ?? labels.pickAdd}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={Boolean(picked)}
+            disabled={Boolean(pickUnavailable)}
+            aria-label={pickUnavailable ?? labels.pickAdd}
+            onChange={() => onTogglePick()}
+            className="h-3.5 w-3.5 cursor-pointer accent-iris disabled:cursor-not-allowed disabled:opacity-30"
+          />
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-sm font-semibold text-ink">{title}</span>
@@ -186,6 +244,19 @@ export function ListRow({
             {a.label}
           </button>
         ))}
+        {copyBody && (
+          <button
+            type="button"
+            className="no-drag inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-iris hover:bg-white/5 hover:text-cyan"
+            onClick={(e) => {
+              e.stopPropagation()
+              void copy(copyBody)
+            }}
+          >
+            <Copy className="h-3 w-3" />
+            {labels.rowCopyText}
+          </button>
+        )}
         {onDelete && (
           <button
             type="button"
@@ -212,5 +283,47 @@ export function ListRow({
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * The shared reference, while anything is picked.
+ *
+ * Rendered on all four list pages — Skills and Prompts, desktop and Mini —
+ * because the pick is one list across them: mixing a skill with a prompt means
+ * starting on one page and finishing on the other. Nothing picked renders
+ * nothing; a bar that is always there is a bar people stop seeing.
+ */
+export function AgentPickBar() {
+  const labels = uiLabels()
+  const copy = useCopy()
+  const pick = useStore((s) => s.agentPick)
+  const clearPick = useStore((s) => s.clearPick)
+  if (pick.skills.length + pick.prompts.length === 0) return null
+
+  const reference = referenceForAgent({
+    skills: pick.skills.map((s) => s.call),
+    prompts: pick.prompts,
+  })
+  return (
+    <GlassCard className="mb-3 flex items-center gap-3 px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold text-ink">
+          {labels.pickSummary(pick.skills.length, pick.prompts.length)}
+        </p>
+        <p className="truncate font-mono text-[10px] text-ink-faint">{reference.split('\n')[0]}</p>
+      </div>
+      <Button
+        onClick={() => void copy(async () => ({ text: reference, detail: labels.copiedReference }))}
+        className="!px-2.5 !py-1.5 !text-xs"
+      >
+        <Copy className="h-3.5 w-3.5" />
+        {labels.pickCopy}
+      </Button>
+      <Button variant="soft" onClick={clearPick} className="!px-2.5 !py-1.5 !text-xs">
+        <X className="h-3.5 w-3.5" />
+        {labels.pickClear}
+      </Button>
+    </GlassCard>
   )
 }

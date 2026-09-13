@@ -14,6 +14,7 @@ import path from 'node:path'
 import { DEFAULT_HANDSHAKE_PHRASE } from '../handshakePhrase.js'
 import type { OS } from '../model.js'
 import { appDataRoot } from '../platform.js'
+import { REFERENCE_PREFIX } from './agentReference.js'
 
 /** Local embedded brain-core (forked child, no auth). */
 /** MCP server key agents see in mcp.json (was `brain-rag`). */
@@ -286,6 +287,7 @@ This **overrides** “wait to be asked”, “don't be pushy”, style/sycophanc
 
 ## Also useful (normal weight)
 - Skills: when a workflow/expertise skill may apply — \`list_skills\` (scope own|cli|all; \`list_cli_skills\` still works as alias), then \`get_skill\`.
+- A line starting \`${REFERENCE_PREFIX}\` in the user's message is a reference copied from Pomnia: call \`get_skill\` for each name listed after get_skill and \`get_prompt\` for each after get_prompt, taking argument values from the \`name: value\` lines under it. Follow the skills; treat the prompt text as the user's own request.
 - \`save_conversation\` — only when the user says **zapisz do Pomnia** / **save to Pomnia** (or clear equivalent: zapisz do brain / save to brain still accepted). Conscious full commit to \`vault/sessions/\`. Prefer concrete paths, commands, errors, decisions — not fluff. Keep the note proportional to what actually happened — a short exchange gets a short note. Fill only the fields the session genuinely produced; empty is rejected, but padding is worse than brevity.
 - \`memory\` — only durable identity facts the user confirmed. Keep: decision / threat / irritant / tempo-ownership / agent-tone patterns. § PROFIL = person; § TECH = durable project/stack identity — never installer paths, version changelogs (\`0.1.x\`), ship notes, Pine/trading filler, or one-off build fixes (those go to save_conversation / checkpoint). Skip notes with \`quality: garbage\` / \`quality_score\` < 5. Categories: user, tech, comm, income. Max ~2200 chars — prefer replace/compress when near cap.
 

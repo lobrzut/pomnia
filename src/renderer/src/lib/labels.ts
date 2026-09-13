@@ -563,7 +563,15 @@ export interface UiLabels {
   rowDelete: string
   rowDeleteConfirm: string
   rowEdit: string
-  rowCopyBody: string
+  rowCopyReference: string
+  rowCopyText: string
+  copiedReference: string
+  copiedTextInstead: string
+  pickAdd: string
+  pickUnavailable: string
+  pickSummary: (skills: number, prompts: number) => string
+  pickCopy: string
+  pickClear: string
   skillDeleted: (name: string) => string
   promptDeleted: (name: string) => string
   skillsCategorySection: (category: string) => string
@@ -1518,8 +1526,8 @@ const PL_LABELS: UiLabels = {
   skillsNoMatch: 'Nic nie pasuje.',
   skillsBackToCategories: 'Wszystkie kategorie',
   promptsTitle: 'Prompty',
-  promptsLead: 'Biblioteka na serwerze. To Ty je wywołujesz w kliencie — agent sam po nie nie sięgnie, od tego są skille.',
-  promptsLeadLocal: 'Biblioteka w vaulcie: vault/prompts/. Serwer podaje je przez MCP, a klient pokazuje Ci je do wyboru.',
+  promptsLead: 'Biblioteka na serwerze. Klik kopiuje odwołanie — agent z Pomnią pobierze treść i wstawi argumenty. „Kopiuj treść” to sam tekst, dla agenta bez Pomni.',
+  promptsLeadLocal: 'Biblioteka w vaulcie: vault/prompts/. Klik kopiuje odwołanie — agent z Pomnią pobierze treść i wstawi argumenty. „Kopiuj treść” to sam tekst, dla agenta bez Pomni.',
   promptsRefresh: 'Odśwież',
   promptsEmpty: 'Pusto. Dodaj pierwszy prompt — plik .md z opisem i treścią.',
   promptsCount: (n) => `${plCount(n, 'prompt', 'prompty', 'promptów')} w bibliotece.`,
@@ -1543,7 +1551,21 @@ const PL_LABELS: UiLabels = {
   rowDelete: 'Usuń',
   rowDeleteConfirm: 'Na pewno?',
   rowEdit: 'Edytuj',
-  rowCopyBody: 'Kliknij, żeby skopiować treść dla agenta',
+  rowCopyReference: 'Kliknij, żeby skopiować odwołanie — agent z Pomnią pobierze resztę',
+  rowCopyText: 'Kopiuj treść',
+  copiedReference: 'Odwołanie — agent pobierze treść z Pomni',
+  copiedTextInstead: 'Skopiowano treść — Twój skill o tej samej nazwie zasłania tę paczkę, więc odwołanie wczytałoby nie to',
+  pickAdd: 'Dodaj do wspólnego odwołania',
+  pickUnavailable: 'Twój skill o tej samej nazwie zasłania tę paczkę — skopiuj jej treść',
+  pickSummary: (skills, prompts) =>
+    [
+      skills ? plCount(skills, 'skill', 'skille', 'skilli') : '',
+      prompts ? plCount(prompts, 'prompt', 'prompty', 'promptów') : '',
+    ]
+      .filter(Boolean)
+      .join(' · '),
+  pickCopy: 'Kopiuj odwołanie',
+  pickClear: 'Wyczyść',
   skillDeleted: (name) => `Usunięto skill: ${name}`,
   promptDeleted: (name) => `Usunięto prompt: ${name}`,
   skillsCategorySection: (category) => `KATEGORIA: ${category.toUpperCase()}`,
@@ -2563,8 +2585,8 @@ const EN_LABELS: UiLabels = {
   skillsNoMatch: 'Nothing matches.',
   skillsBackToCategories: 'All categories',
   promptsTitle: 'Prompts',
-  promptsLead: 'The library on the server. You invoke these in your client — an agent will not reach for them; that is what skills are for.',
-  promptsLeadLocal: 'The library in this vault: vault/prompts/. The server offers them over MCP and your client lists them for you to pick.',
+  promptsLead: 'The library on the server. A click copies a reference — an agent with Pomnia loads the text and fills the arguments. "Copy text" is the text itself, for an agent without Pomnia.',
+  promptsLeadLocal: 'The library in this vault: vault/prompts/. A click copies a reference — an agent with Pomnia loads the text and fills the arguments. "Copy text" is the text itself, for an agent without Pomnia.',
   promptsRefresh: 'Refresh',
   promptsEmpty: 'Empty. Add the first prompt — a .md file with a description and a body.',
   promptsCount: (n) => `${n} ${n === 1 ? 'prompt' : 'prompts'} in the library.`,
@@ -2588,7 +2610,21 @@ const EN_LABELS: UiLabels = {
   rowDelete: 'Delete',
   rowDeleteConfirm: 'Sure?',
   rowEdit: 'Edit',
-  rowCopyBody: 'Click to copy the text for your agent',
+  rowCopyReference: 'Click to copy a reference — an agent with Pomnia loads the rest',
+  rowCopyText: 'Copy text',
+  copiedReference: 'Reference — your agent loads the text from Pomnia',
+  copiedTextInstead: 'Copied the text — your own skill with the same name answers for this package, so a reference would load the wrong one',
+  pickAdd: 'Add to one shared reference',
+  pickUnavailable: 'Your own skill with the same name answers for this package — copy its text instead',
+  pickSummary: (skills, prompts) =>
+    [
+      skills ? `${skills} skill${skills === 1 ? '' : 's'}` : '',
+      prompts ? `${prompts} prompt${prompts === 1 ? '' : 's'}` : '',
+    ]
+      .filter(Boolean)
+      .join(' · '),
+  pickCopy: 'Copy reference',
+  pickClear: 'Clear',
   skillDeleted: (name) => `Deleted skill: ${name}`,
   promptDeleted: (name) => `Deleted prompt: ${name}`,
   skillsCategorySection: (category) => `CATEGORY: ${category.toUpperCase()}`,

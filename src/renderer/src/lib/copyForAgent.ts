@@ -11,8 +11,10 @@
  * because the clipboard looks full.
  *
  * The list exists so a rule can leave the vault and land in a chat without
- * being retyped or explained. That means the text travels, not a reference to
- * it.
+ * being retyped or explained. For an agent with Pomnia connected that is now a
+ * reference — see `@core/brain/agentReference`. This file is the other half:
+ * the text itself, behind "Copy text", for an agent with no Pomnia to resolve
+ * a reference with.
  */
 
 /**
@@ -54,8 +56,9 @@ const SUPPORT_FILE = new RegExp(
   // stop closing "keep your own files in templates/." is read as a filename.
   // Nested on purpose: a fifth of the real references are two levels deep, and
   // naming the folder instead of the file is a vaguer warning than it needs
-  // to be.
-  `(?:references|scripts|templates|assets)(?:/${SEGMENT})+`,
+  // to be. `chapters/` is what Pomnia's own book importer writes, and
+  // `workflows/` is the folder the first version missed in this vault.
+  `(?:references|scripts|templates|assets|workflows|chapters)(?:/${SEGMENT})+`,
   'g',
 )
 

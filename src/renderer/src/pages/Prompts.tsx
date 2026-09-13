@@ -17,12 +17,13 @@ import { useEffect, useState } from 'react'
 import { FileText, FolderOpen, MessageSquareQuote, Pencil, Plus } from 'lucide-react'
 
 import { Button, GlassCard, Spinner } from '../components/ui'
-import { ListRow, ListSection } from '../components/EntityList'
+import { AgentPickBar, ListRow, ListSection } from '../components/EntityList'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { useEditableFile } from '../lib/useEditableFile'
 import { relativeTime } from '../lib/format'
 import { api } from '../lib/api'
 import { promptForAgent } from '../lib/copyForAgent'
+import { referenceForAgent } from '@core/brain/agentReference'
 import { uiLabels } from '../lib/labels'
 import type { LocalPromptEntry } from '../lib/types'
 import { useStore } from '../store/useStore'
@@ -46,16 +47,25 @@ function PromptRow({
   onEdit: () => void
   onDelete: () => void
 }) {
+  const picked = useStore((s) => s.agentPick.prompts.some((p) => p.name === prompt.name))
+  const togglePickPrompt = useStore((s) => s.togglePickPrompt)
+  const named = { name: prompt.name, arguments: prompt.arguments }
   return (
     <ListRow
       title={`/${prompt.name}`}
       subtitle={prompt.description}
       meta={[signature(prompt, labels), relativeTime(new Date(prompt.mtimeMs).toISOString())]}
-      copyText={async () => {
+      copyText={async () => ({
+        text: referenceForAgent({ skills: [], prompts: [named] }),
+        detail: labels.copiedReference,
+      })}
+      copyBody={async () => {
         const r = await api.promptsRead(prompt.name)
         if (!r.ok) throw new Error(r.error)
         return promptForAgent(r.text)
       }}
+      picked={picked}
+      onTogglePick={() => togglePickPrompt(named)}
       actions={[
         // Editing first: it is the one thing you cannot do anywhere else.
         { label: labels.rowEdit, icon: Pencil, onClick: onEdit },
@@ -200,6 +210,8 @@ export default function Prompts() {
         </div>
         <p className="mt-2 text-[11px] text-ink-faint">{labels.promptsHowItReaches}</p>
       </GlassCard>
+
+      <AgentPickBar />
 
       {loading ? (
         <GlassCard className="p-5">

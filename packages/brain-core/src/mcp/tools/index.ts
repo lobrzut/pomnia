@@ -218,13 +218,13 @@ export function listTools(
     {
       name: 'get_prompt',
       description:
-        'Load one prompt by name and fill in its arguments. Returns the text plus which required arguments are still missing — ask the user for those rather than inventing them.',
+        'Load one prompt by name and fill in its arguments. Returns the text plus which required arguments are still missing — ask the user for those rather than inventing them. In a `Pomnia MCP:` line the values are the `name: value` lines under it.',
       inputSchema: getPromptSchema,
     },
     {
       name: 'get_skill',
       description:
-        'Load a skill by name (brain .md or cli SKILL.md). Accepts category/name when two categories share a name. Returns full markdown — follow it for that task. Discover names via list_skills.',
+        'Load a skill by name (brain .md or cli SKILL.md). Accepts category/name when two categories share a name, or an exact path from shadows. Returns full markdown — follow it for that task. Discover names via list_skills. A user line `Pomnia MCP: get_skill a, b; get_prompt c` names what to load — load every one.',
       inputSchema: getSkillSchema,
     },
     // run_skill / search_code / code_status are deliberately absent here.

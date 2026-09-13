@@ -23,6 +23,8 @@
 import { readdirSync, readFileSync, existsSync, statSync, type Dirent } from 'node:fs'
 import { join, basename } from 'node:path'
 
+import { isSafeSkillRel } from '../../admin/library.js'
+
 /** Above this, a listing stops being an answer and becomes a context leak. */
 const DEFAULT_LIMIT = 100
 const MAX_LIMIT = 200
@@ -60,7 +62,8 @@ export const getSkillSchema = {
   properties: {
     name: {
       type: 'string' as const,
-      description: 'Skill name, or category/name when two categories use the same name.',
+      description:
+        'Skill name, or category/name when two categories use the same name, or an exact path such as cli/<category>/<name>/SKILL.md (see shadows).',
     },
   },
   required: ['name'] as string[],
@@ -207,6 +210,46 @@ function listCli(skillsRoot: string): SkillMeta[] {
   return out.sort((a, b) => a.name.localeCompare(b.name))
 }
 
+/**
+ * Paths of every cli package answering to `name`, in the form `get_skill`
+ * accepts back.
+ *
+ * Directory names only. `listCli` opens each SKILL.md to describe it, which a
+ * listing needs and this does not — and this runs on every call that lands on
+ * an own skill, the most common call there is. Below the category level a name
+ * that does not match costs no stat at all.
+ */
+function sameNamedCli(root: string, name: string): string[] {
+  const cli = join(root, 'cli')
+  if (!existsSync(cli)) return []
+  const want = name.toLowerCase()
+  const out: string[] = []
+  const visit = (dir: string, rel: string[], depth: number): void => {
+    let entries: Dirent[]
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const ent of entries) {
+      if (!ent.isDirectory() || isJunkSkillName(ent.name)) continue
+      const here = join(dir, ent.name)
+      const matches = ent.name.toLowerCase() === want
+      if (depth < CLI_MAX_DEPTH) {
+        if (existsSync(join(here, 'SKILL.md'))) {
+          if (matches) out.push(['cli', ...rel, ent.name, 'SKILL.md'].join('/'))
+        } else {
+          visit(here, [...rel, ent.name], depth + 1)
+        }
+      } else if (matches && existsSync(join(here, 'SKILL.md'))) {
+        out.push(['cli', ...rel, ent.name, 'SKILL.md'].join('/'))
+      }
+    }
+  }
+  visit(cli, [], 1)
+  return out.sort()
+}
+
 function parseScope(args: unknown): 'own' | 'cli' | 'all' {
   if (!args || typeof args !== 'object') return 'all'
   const scope = (args as { scope?: unknown }).scope
@@ -316,8 +359,32 @@ export function runListCliSkills(_args: unknown, deps: SkillsDeps): string {
   return runListSkills({ scope: 'cli' }, deps)
 }
 
-/** Locate one skill by name, accepting `category/name` and any letter case. */
+/**
+ * Locate one skill by name, accepting `category/name`, an exact path, and any
+ * letter case.
+ */
 function findSkill(root: string, name: string): SkillMeta | { matches: SkillMeta[] } | null {
+  // An exact path names one file and nothing else. It is also the only name
+  // that reaches an uncategorised package whose name an own skill already uses:
+  // the bare name loads the own skill, and `cli/<name>` reads as a category
+  // called "cli". The check is the one the admin API trusts before a write, so
+  // a path from an agent cannot name anything outside the skills tree.
+  if (isSafeSkillRel(name)) {
+    const file = join(root, name)
+    if (!existsSync(file) || !statSync(file).isFile()) return null
+    const parts = name.split('/')
+    if (parts[0] === 'brain') {
+      return { kind: 'brain', name: basename(parts[1], '.md'), description: describeFile(file), path: file }
+    }
+    return {
+      kind: 'cli',
+      name: parts[parts.length - 2],
+      category: parts.length === 4 ? parts[1] : undefined,
+      description: describeFile(file),
+      path: file,
+    }
+  }
+
   const slash = name.indexOf('/')
   const bare = slash >= 0 ? name.slice(slash + 1) : name
   const wantCat = slash >= 0 ? name.slice(0, slash).toLowerCase() : ''
@@ -364,7 +431,12 @@ export function runGetSkill(args: unknown, deps: SkillsDeps): string {
       {
         error: `ambiguous skill name: ${name}`,
         skillsRoot: root,
-        candidates: found.matches.map((s) => (s.category ? `${s.category}/${s.name}` : s.name)),
+        // An uncategorised package has no category/name spelling, so it is offered
+        // as its exact path. The bare name it used to list is the one spelling that
+        // is ambiguous by definition, so the candidate could never be loaded.
+        candidates: found.matches.map((s) =>
+          s.category ? `${s.category}/${s.name}` : `cli/${s.name}/SKILL.md`,
+        ),
         hint: 'call get_skill with category/name',
       },
       null,
@@ -374,6 +446,12 @@ export function runGetSkill(args: unknown, deps: SkillsDeps): string {
 
   const content = readFileSync(found.path, 'utf8')
   const fm = parseFrontmatter(content)
+  // A bare name tries brain/ first, so an own skill answers even when a cli
+  // package uses the same name. That stays the answer — an own skill is a
+  // deliberate override — but it used to be given in silence, which is the very
+  // thing the ambiguity branch above refuses to do. Now the answer says what it
+  // stood in front of, and how to load that instead.
+  const shadows = found.kind === 'brain' && !name.includes('/') ? sameNamedCli(root, found.name) : []
   return JSON.stringify(
     {
       name: fm.name ?? found.name,
@@ -381,6 +459,12 @@ export function runGetSkill(args: unknown, deps: SkillsDeps): string {
       category: found.category,
       description: fm.description,
       path: found.path,
+      ...(shadows.length
+        ? {
+            shadows,
+            hint: 'this is the own skill; cli packages with the same name are listed in shadows — pass one of those paths to get_skill to load it instead',
+          }
+        : {}),
       content,
     },
     null,

@@ -228,6 +228,18 @@ export interface Toast {
   onAction?: () => void
 }
 
+/** A skill picked into the reference line: its row's identity, and the name `get_skill` resolves. */
+export interface PickedSkill {
+  key: string
+  call: string
+}
+
+/** A prompt picked into the reference line, with the arguments its line has to offer. */
+export interface PickedPrompt {
+  name: string
+  arguments: { name: string; required: boolean }[]
+}
+
 interface State {
   route: Route
   setRoute: (r: Route) => void
@@ -350,6 +362,17 @@ interface State {
     pendingOnly?: boolean
   }) => Promise<void>
   cancelBrainPipeline: () => void
+
+  /**
+   * Skills and prompts picked to hand an agent as one `Pomnia MCP:` line.
+   * Held here rather than in a page because mixing them is the point: a pick
+   * started on Skills has to still be there on Prompts. Not persisted — a
+   * half-built reference left over from yesterday is a trap, not a convenience.
+   */
+  agentPick: { skills: PickedSkill[]; prompts: PickedPrompt[] }
+  togglePickSkill: (skill: PickedSkill) => void
+  togglePickPrompt: (prompt: PickedPrompt) => void
+  clearPick: () => void
 
   toasts: Toast[]
   toast: (t: Omit<Toast, 'id'>) => void
@@ -943,6 +966,25 @@ export const useStore = create<State>((set, get) => ({
   cancelBrainPipeline() {
     void api.brainRunCancel()
   },
+
+  agentPick: { skills: [], prompts: [] },
+  togglePickSkill: (skill) =>
+    set((s) => {
+      const has = s.agentPick.skills.some((x) => x.key === skill.key)
+      const skills = has
+        ? s.agentPick.skills.filter((x) => x.key !== skill.key)
+        : [...s.agentPick.skills, skill]
+      return { agentPick: { ...s.agentPick, skills } }
+    }),
+  togglePickPrompt: (prompt) =>
+    set((s) => {
+      const has = s.agentPick.prompts.some((x) => x.name === prompt.name)
+      const prompts = has
+        ? s.agentPick.prompts.filter((x) => x.name !== prompt.name)
+        : [...s.agentPick.prompts, prompt]
+      return { agentPick: { ...s.agentPick, prompts } }
+    }),
+  clearPick: () => set({ agentPick: { skills: [], prompts: [] } }),
 
   toasts: [],
   toast: (t) => {

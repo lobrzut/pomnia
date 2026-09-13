@@ -184,6 +184,14 @@ describe('skillForAgent', () => {
     expect(out).toContain('LEFT BEHIND: references/art-styles/kandinsky.md')
   })
 
+  it('names chapters and workflows, the folders the first version did not know', () => {
+    // chapters/ is what Pomnia's own book importer writes, under a SKILL.md that
+    // says "rozdziały czytaj pojedynczo". workflows/ is the one folder measured
+    // in this vault that the first list missed.
+    const out = skillForAgent('Czytaj chapters/ch01-wstep.md, potem workflows/deploy.md.', note)
+    expect(out).toContain('LEFT BEHIND: chapters/ch01-wstep.md, workflows/deploy.md')
+  })
+
   it('does not fire on a bare folder name', () => {
     // "put your own files in templates/" is advice, not a reference to one.
     expect(skillForAgent('Trzymaj swoje pliki w templates/.', note)).not.toContain('LEFT BEHIND')
