@@ -144,8 +144,14 @@ export function createAuthGate(opts: AuthGateOptions): AuthGate {
     } catch {
       // Unreadable or malformed: treat as "no tokens", i.e. deny everything.
       // Failing open here would turn a typo into an open MCP server.
+      //
+      // But do not remember the mtime. Caching the refusal against it meant the
+      // gate looked again only once the file changed, and with every request
+      // refused nothing changed it: a healthy server answering 401 to every
+      // token until someone rewrote the store. Leaving it unset retries on the
+      // next stat, two seconds later, still closed while the store stays bad.
       cached = []
-      cachedMtimeMs = mtimeMs
+      cachedMtimeMs = -1
     }
     return cached
   }
