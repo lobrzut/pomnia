@@ -23,18 +23,15 @@ import { useStore } from '../store/useStore'
 function SkillRow({
   skill,
   labels,
-  ownNames,
   onEdit,
   onDelete,
 }: {
   skill: LocalSkillEntry
   labels: ReturnType<typeof uiLabels>
-  /** Own skill names, so a package an own skill shadows is never named by its bare name. */
-  ownNames: readonly string[]
   onEdit: () => void
   onDelete: () => void
 }) {
-  const call = skillCallName(skill, ownNames)
+  const call = skillCallName(skill)
   const picked = useStore((s) => s.agentPick.skills.some((p) => p.key === skill.path))
   const togglePickSkill = useStore((s) => s.togglePickSkill)
   const readBody = async (): Promise<string> => {
@@ -112,7 +109,6 @@ export default function Skills() {
   const [own, setOwn] = useState<LocalSkillEntry[]>([])
   const [imported, setImported] = useState<LocalSkillEntry[]>([])
   const [openCategory, setOpenCategory] = useState<string | null>(null)
-  const ownNames = own.map((s) => s.name)
   const toast = useStore((st) => st.toast)
   const editor = useEditableFile<LocalSkillEntry>({
     read: (s) => api.skillsRead(s.path),
@@ -212,7 +208,6 @@ export default function Skills() {
                   key={`own:${s.name}`}
                   skill={s}
                   labels={labels}
-                  ownNames={ownNames}
                   onEdit={() => void editor.open(s)}
                   onDelete={() => void remove(s)}
                 />
@@ -257,7 +252,6 @@ export default function Skills() {
                       key={`imported:${s.category ?? ''}/${s.name}`}
                       skill={s}
                       labels={labels}
-                      ownNames={ownNames}
                       onEdit={() => void editor.open(s)}
                       onDelete={() => void remove(s)}
                     />

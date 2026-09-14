@@ -1554,9 +1554,9 @@ const PL_LABELS: UiLabels = {
   rowCopyReference: 'Kliknij, żeby skopiować odwołanie — agent z Pomnią pobierze resztę',
   rowCopyText: 'Kopiuj treść',
   copiedReference: 'Odwołanie — agent pobierze treść z Pomni',
-  copiedTextInstead: 'Skopiowano treść — Twój skill o tej samej nazwie zasłania tę paczkę, więc odwołanie wczytałoby nie to',
+  copiedTextInstead: 'Skopiowano treść — paczki bez kategorii serwer nie rozpozna po nazwie',
   pickAdd: 'Dodaj do wspólnego odwołania',
-  pickUnavailable: 'Twój skill o tej samej nazwie zasłania tę paczkę — skopiuj jej treść',
+  pickUnavailable: 'Paczka bez kategorii — serwer nie rozpozna jej po nazwie, więc kliknięcie kopiuje treść',
   pickSummary: (skills, prompts) =>
     [
       skills ? plCount(skills, 'skill', 'skille', 'skilli') : '',
@@ -2613,9 +2613,9 @@ const EN_LABELS: UiLabels = {
   rowCopyReference: 'Click to copy a reference — an agent with Pomnia loads the rest',
   rowCopyText: 'Copy text',
   copiedReference: 'Reference — your agent loads the text from Pomnia',
-  copiedTextInstead: 'Copied the text — your own skill with the same name answers for this package, so a reference would load the wrong one',
+  copiedTextInstead: 'Copied the text — the server cannot resolve an uncategorised package by name',
   pickAdd: 'Add to one shared reference',
-  pickUnavailable: 'Your own skill with the same name answers for this package — copy its text instead',
+  pickUnavailable: 'Uncategorised package — the server cannot resolve it by name, so a click copies its text',
   pickSummary: (skills, prompts) =>
     [
       skills ? `${skills} skill${skills === 1 ? '' : 's'}` : '',

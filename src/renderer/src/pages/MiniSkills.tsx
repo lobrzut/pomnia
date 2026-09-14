@@ -158,14 +158,9 @@ export default function MiniSkills() {
   const togglePickSkill = useStore((s) => s.togglePickSkill)
   const narrowed = category !== null || query.trim().length >= 2
 
-  // The summary carries every own skill in full, which is all skillCallName
-  // needs: a categorised package is named by its category, so the catalogue
-  // Mini loads one category at a time never has to be whole.
-  const ownNames = summary?.own.map((s) => s.name) ?? []
-
   /** Defined here rather than at module scope: it closes over openSkill and remove. */
   const SkillRow = ({ skill }: { skill: RemoteSkillRow }) => {
-    const call = skillCallName(skill, ownNames)
+    const call = skillCallName(skill)
     const readBody = async (): Promise<string> => {
       const r = await api.skillsRemoteRead(skill.path)
       if ('error' in r) throw new Error(r.detail || r.error)

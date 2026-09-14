@@ -5,36 +5,25 @@ import { describe, expect, it } from 'vitest'
 import { REFERENCE_PREFIX, referenceForAgent, skillCallName } from './agentReference.js'
 
 describe('skillCallName', () => {
-  const own = ['build-our-way', 'art-of-war-skill']
-
   it('names an own skill bare, from either side of the wire', () => {
-    expect(skillCallName({ kind: 'own', name: 'build-our-way' }, own)).toBe('build-our-way')
-    expect(skillCallName({ kind: 'brain', name: 'build-our-way' }, own)).toBe('build-our-way')
+    expect(skillCallName({ kind: 'own', name: 'build-our-way' })).toBe('build-our-way')
+    expect(skillCallName({ kind: 'brain', name: 'build-our-way' })).toBe('build-our-way')
   })
 
   it('names a categorised package with its category, whatever else shares the name', () => {
     // `category/name` never looks in brain/, and one category cannot hold the
     // same name twice, so this is exact without knowing the catalogue.
-    expect(skillCallName({ kind: 'cli', name: 'art-of-war-skill', category: 'strategy' }, own)).toBe(
+    expect(skillCallName({ kind: 'cli', name: 'art-of-war-skill', category: 'strategy' })).toBe(
       'strategy/art-of-war-skill',
     )
   })
 
-  it('names an uncategorised package bare when no own skill stands in front of it', () => {
-    expect(skillCallName({ kind: 'imported', name: 'nmap-recon' }, own)).toBe('nmap-recon')
-  })
-
-  it('refuses to name an uncategorised package an own skill would answer for', () => {
-    // The bare name loads brain/art-of-war-skill.md instead, and on the server
-    // as deployed nothing else reaches the package. A reference that loads the
-    // wrong skill is worse than none, so the caller copies the text.
-    expect(skillCallName({ kind: 'imported', name: 'art-of-war-skill' }, own)).toBeNull()
-  })
-
-  it('compares with the own names exactly, as the server finds brain files', () => {
-    // brain/<name>.md is looked up by exact file name on a case-sensitive disk,
-    // so a package that differs only in case is not shadowed.
-    expect(skillCallName({ kind: 'cli', name: 'Build-Our-Way' }, own)).toBe('Build-Our-Way')
+  it('refuses to name an uncategorised package, from Mini or from the desktop', () => {
+    // On the live server, 5 of 5 sampled uncategorised packages had a filed
+    // twin, so their bare names came back "ambiguous". The caller copies the
+    // text rather than hand an agent a reference that fails.
+    expect(skillCallName({ kind: 'cli', name: '01-recon-osint' })).toBeNull()
+    expect(skillCallName({ kind: 'imported', name: 'nmap-recon' })).toBeNull()
   })
 })
 

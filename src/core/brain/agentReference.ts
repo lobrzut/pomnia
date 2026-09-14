@@ -30,27 +30,29 @@ export interface SkillToName {
 
 /**
  * The name `get_skill` resolves to exactly this skill, or null when no name
- * reaches it on the server as deployed.
+ * reaches it reliably on the server as deployed.
  *
  * Mirrors the parts of `findSkill` (packages/brain-core/src/mcp/tools/skills.ts)
  * that decide which file answers:
  *
- * - a bare name tries `brain/<name>.md` first, by exact file name;
- * - `category/name` searches that cli category and never looks in `brain/`;
- * - one category cannot hold two packages with the same name.
+ * - a bare name tries `brain/<name>.md` first, by exact file name, so an own
+ *   skill is always its bare name;
+ * - `category/name` searches that cli category and never looks in `brain/`,
+ *   and one category cannot hold two packages with the same name, so a
+ *   categorised package is always `category/name` — no catalogue needed, which
+ *   matters because Mini never holds the catalogue.
  *
- * So an own skill is its bare name and a categorised package is
- * `category/name`, with no catalogue needed — which matters, because Mini never
- * holds the catalogue; it loads one category at a time. What is left is an
- * uncategorised package sharing its name with an own skill. The bare name loads
- * the own skill instead, silently, and no other name reaches the package. This
- * returns null for it, and the caller copies the text rather than a reference
- * that would load the wrong skill.
+ * An uncategorised package gets no name. The first version gave it its bare
+ * name, and on the live server on 2026-09-14 that failed for every one
+ * sampled: 5 of 5 had a filed twin (`01-recon-osint` also lives at
+ * `cyber-curriculum/01-recon-osint`), so `get_skill` answered "ambiguous", and a
+ * server as deployed offers no other spelling for the flat copy. The row copies
+ * the text instead: a reference that fails is worse than a paste that works.
+ * Once servers accept exact paths (`cli/<name>/SKILL.md`), that goes here.
  */
-export function skillCallName(skill: SkillToName, ownNames: readonly string[]): string | null {
+export function skillCallName(skill: SkillToName): string | null {
   if (skill.kind === 'own' || skill.kind === 'brain') return skill.name
-  if (skill.category) return `${skill.category}/${skill.name}`
-  return ownNames.includes(skill.name) ? null : skill.name
+  return skill.category ? `${skill.category}/${skill.name}` : null
 }
 
 export interface PromptToName {
