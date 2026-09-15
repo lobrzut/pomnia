@@ -49,6 +49,7 @@ import {
   listPromptsSchema,
   getPromptSchema,
 } from './promptTools.js'
+import { listAgentsSchema, runListAgents } from './agents.js'
 // Only the handler: these tools are answered, not advertised. See listTools.
 import { runStub } from './stubs.js'
 
@@ -227,6 +228,12 @@ export function listTools(
         'Load a skill by name (brain .md or cli SKILL.md). Accepts category/name when two categories share a name, or an exact path from shadows. Returns full markdown — follow it for that task. Discover names via list_skills. A user line `Pomnia MCP: get_skill a, b; get_prompt c` names what to load — load every one.',
       inputSchema: getSkillSchema,
     },
+    {
+      name: 'list_agents',
+      description:
+        'Which agents share this memory, and which one you are. Returns every MCP client that has introduced itself to this server since it started, and `you` — the name of the token you presented, which the auth gate verified. Client names come from each client\'s own `initialize` and prove nothing on their own; only `you` is authenticated, so a mismatch between them is worth reporting rather than ignoring. Call it when the user asks who is connected, or asks you to coordinate or delegate to their other agents.',
+      inputSchema: listAgentsSchema,
+    },
     // run_skill / search_code / code_status are deliberately absent here.
     //
     // They are still *handled* — callTool answers them with an explanation, so
@@ -257,8 +264,14 @@ export async function callTool(
   name: string,
   args: unknown,
   ctx: ToolContext,
+  /**
+   * Token name from the auth gate, threaded through so a tool can answer
+   * "which one am I". Optional: a loopback call has no token, and every
+   * existing caller keeps working without passing it.
+   */
+  caller?: string,
 ): Promise<string> {
-  const out = await dispatchTool(name, args, ctx)
+  const out = await dispatchTool(name, args, ctx, caller)
   const decision = afterCall({
     tool: name,
     state: unsavedState,
@@ -319,6 +332,8 @@ async function dispatchTool(
   name: string,
   args: unknown,
   ctx: ToolContext,
+  /** Token name from the auth gate. Authenticated, unlike anything a client says about itself. */
+  caller?: string,
 ): Promise<string> {
   // Enforce at the call site too, not only in the catalog: a client caches the
   // tool list, so an agent that connected before the flag was set would still
@@ -420,6 +435,9 @@ async function dispatchTool(
       return runListPrompts(args, { vaultRoot: ctx.vaultRoot })
     case 'get_prompt':
       return runGetPrompt(args, { vaultRoot: ctx.vaultRoot })
+
+    case 'list_agents':
+      return runListAgents({ caller })
 
     case 'run_skill':
     case 'search_code':

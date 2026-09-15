@@ -370,7 +370,7 @@ function createMcpServer(
       onMcpQuery?.(ev)
     }
     try {
-      const text = await callTool(toolName, toolArgs, ctx)
+      const text = await callTool(toolName, toolArgs, ctx, actor)
       return { content: [{ type: 'text', text }] }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
