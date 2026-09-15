@@ -2310,10 +2310,31 @@ description:
           )
           throw new Error('endpoint did not answer as an MCP server')
         }
+        /*
+         * What is this token? Asked once, here, where the URL and the secret
+         * both already are — `syncManagedMcpConfigs` is filesystem-only and
+         * must not grow a network call it cannot be tested without.
+         *
+         * This is not hypothetical. Every caller (Connect.tsx, Settings.tsx,
+         * useStore) hands that function the app's `connectToken`, and in Mini
+         * that token is the admin one. On 2026-09-15 opening Connect wrote
+         * `btk_igum…` into three Antigravity configs — the right to mint tokens
+         * and change server behaviour, sitting in an agent's config file.
+         */
+        const tokenRole =
+          resolvedTarget === 'remote' && token
+            ? (await probeTokenRole({ baseUrl: brainBaseUrl(url), token })).role
+            : undefined
+        if (tokenRole === 'admin') {
+          log.warn(
+            'not writing this token into agent configs: it is an admin token — mint an agent token and use that',
+          )
+        }
         const sync = await syncManagedMcpConfigs({
           brainUrl: url,
           target: resolvedTarget,
           token: resolvedTarget === 'remote' ? token : undefined,
+          tokenRole,
         })
         if (sync.updated.length) {
           log.info(

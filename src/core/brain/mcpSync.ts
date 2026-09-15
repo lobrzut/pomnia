@@ -9,6 +9,7 @@ import { promises as fs } from 'node:fs'
 import { CLIENTS, buildSnippet, type BrainTarget, type ClientId } from './snippet.js'
 import { repairReason } from './mcpRepair.js'
 import { POMNIA_KEYS, __testPickUrl } from './status.js'
+import type { TokenRole } from './tokenRole.js'
 import type { OS } from '../model.js'
 
 export const MCP_MANAGED_KEYS = [
@@ -103,6 +104,16 @@ export async function syncManagedMcpConfigs(opts: {
   brainUrl: string
   target: BrainTarget
   token?: string
+  /**
+   * What `token` is, asked of the server by the caller.
+   *
+   * Supplied rather than probed here because this function is filesystem-only
+   * and its tests run with no server; `main/index.ts` already imports
+   * `probeTokenRole` and asks once, where the URL and the token live. Absent
+   * means "not established" and is treated as safe-to-write, which keeps every
+   * existing caller behaving as before.
+   */
+  tokenRole?: TokenRole
   os?: OS
   home?: string
 }): Promise<SyncMcpResult> {
@@ -142,6 +153,28 @@ export async function syncManagedMcpConfigs(opts: {
     const current = managedUrl(mcp)
     if (!current) {
       skipped.push({ id: spec.id, reason: 'no Pomnia-managed server block' })
+      continue
+    }
+
+    /*
+     * An admin token never goes into an agent's config.
+     *
+     * `mcpTokens.ts` has always said so: an admin token "must never be pasted
+     * into those configs — it would put the right to change server behaviour
+     * and mint further tokens into six files on disk". Nothing enforced it, and
+     * on 2026-09-15 it happened for real — all three callers hand this function
+     * the app's `connectToken`, which in Mini is the admin token, and opening
+     * Connect wrote it into three Antigravity configs.
+     *
+     * Skipping, not writing a token-less entry: a remote block with no
+     * Authorization fails auth on the very next call, and yesterday's working
+     * config beats today's broken one.
+     */
+    if (opts.target === 'remote' && opts.token && opts.tokenRole === 'admin') {
+      skipped.push({
+        id: spec.id,
+        reason: 'refusing to write an admin token into an agent config — mint an agent token first',
+      })
       continue
     }
     const snippet = buildSnippet(
