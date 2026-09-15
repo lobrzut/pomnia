@@ -218,6 +218,41 @@ export async function composeBookSkill(opts: ComposeOptions): Promise<ComposeRes
   report({ phase: 'distilling', done: chapters.length, total: chapters.length })
   const prose = await distilWhole(ollama, title, chapters, opts.model, opts.signal)
 
+  /*
+   * Read the counter that was supposed to move.
+   *
+   * Every model call above fails soft: a chapter whose summary fails still
+   * ships, and a section that fails simply produces no file. That is right for
+   * one flaky call and wrong for a model that is not there at all — the same
+   * rule then turns a total failure into `ok: true` with no warnings, and the
+   * caller writes a skill that is a table of contents over raw splits. Measured
+   * on 2026-09-15 with Ollama down: four sections absent, every summary absent,
+   * `warnings: []`, green toast. A hollow skill in the tree an agent reads from
+   * is worse than no skill, so nothing coming back is an error.
+   */
+  const sections = [prose.mentalModels, prose.glossary, prose.patterns, prose.cheatsheet]
+  const gotSections = sections.filter((s) => s && s.trim()).length
+  const gotSummaries = withSummaries.filter((c) => c.summary?.trim()).length
+  const distillWarnings: string[] = []
+
+  if (gotSections === 0 && gotSummaries === 0) {
+    const url = opts.ollamaUrl?.trim() || defaultOllamaConfig().baseUrl
+    return {
+      ok: false,
+      error:
+        `destylacja nie zwróciła niczego — ${chapters.length} rozdziałów podzielono, ` +
+        `ale model nie odpowiedział ani razu (${url}). ` +
+        `Bez niej skill byłby samym spisem treści, więc nic nie zapisuję. ` +
+        `Sprawdź, czy Ollama działa, i spróbuj ponownie.`,
+    }
+  }
+  if (gotSections < sections.length) {
+    distillWarnings.push(`model zwrócił ${gotSections} z ${sections.length} sekcji`)
+  }
+  if (gotSummaries < chapters.length) {
+    distillWarnings.push(`streszczenia rozdziałów: ${gotSummaries} z ${chapters.length}`)
+  }
+
   // 4. Assemble and write all-or-nothing.
   const pkg = buildSkillPackage({
     slug,
@@ -230,7 +265,7 @@ export async function composeBookSkill(opts: ComposeOptions): Promise<ComposeRes
     ...prose,
   })
 
-  return { ok: true, slug, category, files: pkg.files, warnings: pkg.warnings }
+  return { ok: true, slug, category, files: pkg.files, warnings: [...distillWarnings, ...pkg.warnings] }
 }
 
 /** Desktop: compose, then place it in this machine's vault. */
