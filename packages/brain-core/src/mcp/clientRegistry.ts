@@ -110,3 +110,58 @@ export function noteMcpBody(body: unknown, now: number = Date.now()): void {
 export function seenClients(): SeenClient[] {
   return [...clients.values()].sort((a, b) => b.lastSeen - a.lastSeen)
 }
+
+/** A caller keyed by the token name the auth gate verified. */
+export interface SeenCaller {
+  name: string
+  firstSeen: number
+  lastSeen: number
+  calls: number
+}
+
+const callers = new Map<string, SeenCaller>()
+
+/** Test seam, like resetSeenClients. */
+export function resetSeenCallers(): void {
+  callers.clear()
+}
+
+/**
+ * Record an authenticated request.
+ *
+ * `noteMcpBody` fires only on `initialize`, and a stateless server never makes
+ * a client repeat it. Measured 2026-09-16: a Claude Code session called tools
+ * for minutes while absent from the client list, because it had introduced
+ * itself before the server restarted and had no reason to do it again. A
+ * conductor asking "who is connected" would have been told nobody.
+ *
+ * The token name is present on every request and is the only identity that is
+ * proof, so it is the right key. `loopback` is not a caller.
+ */
+export function noteMcpCaller(name: string | undefined, now: number = Date.now()): void {
+  const key = clean(name, MAX_NAME)
+  if (!key || key === 'loopback') return
+  const existing = callers.get(key)
+  if (existing) {
+    existing.lastSeen = now
+    existing.calls += 1
+    return
+  }
+  if (callers.size >= MAX_CLIENTS) {
+    let oldestKey: string | null = null
+    let oldest = Infinity
+    for (const [k, v] of callers) {
+      if (v.lastSeen < oldest) {
+        oldest = v.lastSeen
+        oldestKey = k
+      }
+    }
+    if (oldestKey) callers.delete(oldestKey)
+  }
+  callers.set(key, { name: key, firstSeen: now, lastSeen: now, calls: 1 })
+}
+
+/** Most recently seen first. */
+export function seenCallers(): SeenCaller[] {
+  return [...callers.values()].sort((a, b) => b.lastSeen - a.lastSeen)
+}
