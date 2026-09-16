@@ -44,7 +44,26 @@ export function freshState(now: number): UnsavedState {
 }
 
 /** A tool that puts something durable in the vault resets the count. */
+/**
+ * Everything that writes into the vault.
+ *
+ * The read-only replica gate must refuse all of them. Task tools belong here:
+ * a replica serves a copy it does not own, and a queue entry accepted there is
+ * a queue entry the next sync deletes.
+ */
 export function isWritingTool(name: string): boolean {
+  return resetsUnsavedNag(name) || name === 'create_task' || name === 'complete_task'
+}
+
+/**
+ * The subset that counts as saving the conversation.
+ *
+ * The nag asks whether there is unsaved work; leaving a task for another agent
+ * is not an answer to that question, so it must not silence it. Split out for
+ * that single reason, and kept beside isWritingTool so the two cannot drift
+ * apart unnoticed.
+ */
+export function resetsUnsavedNag(name: string): boolean {
   return name === 'save_conversation' || name === 'checkpoint_session' || name === 'memory'
 }
 
@@ -69,7 +88,7 @@ export function afterCall(opts: {
 }): NagDecision {
   const { tool, state, now } = opts
 
-  if (isWritingTool(tool)) {
+  if (resetsUnsavedNag(tool)) {
     return { reminder: null, next: { callsSinceWrite: 0, lastWriteAt: now, lastNagAt: 0 } }
   }
 
