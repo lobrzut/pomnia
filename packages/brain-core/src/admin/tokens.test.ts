@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   createToken,
   mintToken,
+  modeExposesSecret,
   readTokens,
   revokeToken,
   summarise,
@@ -203,5 +204,23 @@ describe('concurrent createToken (F03)', () => {
     // Further telemetry must not resurrect the revoked token.
     await touchToken(file, 'gone')
     expect((await readTokens(file)).map((t) => t.name)).toEqual(['keep'])
+  })
+})
+
+describe('modeExposesSecret', () => {
+  it('accepts owner-only modes and flags any group or other access', () => {
+    // The store is written with a 0600 request; a CIFS/SMB mount can land it
+    // 0666 silently. This predicate is what turns that into a warning.
+    expect(modeExposesSecret(0o600)).toBe(false)
+    expect(modeExposesSecret(0o700)).toBe(false)
+    expect(modeExposesSecret(0o640)).toBe(true)
+    expect(modeExposesSecret(0o604)).toBe(true)
+    expect(modeExposesSecret(0o666)).toBe(true)
+  })
+
+  it('ignores the file-type bits stat leaves above the permission bits', () => {
+    // fs.stat returns S_IFREG | perms; the mask must see only the low 9.
+    expect(modeExposesSecret(0o100600)).toBe(false)
+    expect(modeExposesSecret(0o100666)).toBe(true)
   })
 })

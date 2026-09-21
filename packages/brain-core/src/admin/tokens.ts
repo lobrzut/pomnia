@@ -152,6 +152,20 @@ export async function readTokensOrEmpty(file: string): Promise<StoredToken[]> {
   }
 }
 
+/**
+ * True when a mode leaves any group- or other-bit set — i.e. a file meant to be
+ * 0600 is readable by someone other than its owner. Owner-only modes (0600,
+ * 0700) return false; 0640, 0666, 0604 return true.
+ */
+export function modeExposesSecret(mode: number): boolean {
+  return (mode & 0o077) !== 0
+}
+
+// Warn at most once per process: touchToken rewrites the store roughly once a
+// minute, and a permission problem that cannot be fixed here must not become a
+// line every minute for the life of the daemon.
+let warnedTokenMode = false
+
 async function writeTokens(file: string, tokens: StoredToken[]): Promise<void> {
   await fs.mkdir(dirname(file), { recursive: true })
   // 0600 at creation: a token file that is world-readable for even a moment
@@ -159,6 +173,28 @@ async function writeTokens(file: string, tokens: StoredToken[]): Promise<void> {
   await writeFileKeepingPrev(file, Buffer.from(`${JSON.stringify(tokens, null, 2)}\n`, 'utf8'), {
     mode: 0o600,
   })
+  // openSync's mode is a request the filesystem may refuse. A CIFS/SMB mount
+  // pins its own permissions and drops chmod silently, so the store we just
+  // asked to keep at 0600 can land 0666 while every call still reports success
+  // — the plaintext secrets then sit group/world-readable at rest. Read the
+  // mode back and say so once, rather than trust the ask.
+  // Windows reports 0666 for files that NTFS ACLs actually protect per-user, so
+  // the mode bits are only meaningful on POSIX — where the CIFS problem lives.
+  if (!warnedTokenMode && process.platform !== 'win32') {
+    try {
+      const { mode } = await fs.stat(file)
+      if (modeExposesSecret(mode)) {
+        warnedTokenMode = true
+        console.error(
+          `[pomnia-core] WARNING: token store ${file} is mode ${(mode & 0o777).toString(8)}, not 0600 — ` +
+            'the filesystem ignored chmod (CIFS/SMB share?). Plaintext secrets are group/world-readable at ' +
+            'rest. Fix with mount options (uid/gid + file_mode=0600) or move the store off the share.',
+        )
+      }
+    } catch {
+      // A stat failure must never turn a successful write into a thrown error.
+    }
+  }
 }
 
 export type CreateResult =
