@@ -122,7 +122,9 @@ export async function runSearchLibrary(
   // Keep ranking order, but let no single file own the answer: the measured
   // problem was 4 of 8 hits from one note, ~6k tokens for one file's worth of
   // signal. Cap per file, then take top_k.
-  const hits = capPerFile(live, MAX_PER_FILE, top_k)
+  // In compact mode one snippet per file is enough to scan — read_note pulls
+  // the rest; full mode may keep 2 passages from a rich note.
+  const hits = capPerFile(live, useCompact ? 1 : MAX_PER_FILE, top_k)
   const verdict = classifyGrounding(hits)
 
   if (hits.length === 0) {
@@ -159,16 +161,20 @@ export async function runSearchLibrary(
     const name = String((h.meta as { name?: unknown })?.name ?? '')
     const dated = noteDate(name)
     if (useCompact) {
-      // Path, title, date, score and one line — enough to decide relevance
-      // without carrying the whole passage. The full text is one re-query away.
+      // Path, date, score and one line — enough to decide relevance without
+      // carrying the whole passage. No title: the path already ends in the
+      // file name, so a title field just repeats it. Full text is read_note away.
       const text = String((h as { text?: unknown }).text ?? '')
+      const flat = text.replace(/\s+/g, ' ').trim()
+      // Cut on a word boundary, not mid-token, and mark the trim.
+      const snippet =
+        flat.length > SNIPPET_LEN ? `${flat.slice(0, SNIPPET_LEN).replace(/\s+\S*$/, '')}…` : flat
       return {
         path: (h as { path?: unknown }).path ?? null,
-        title: name || null,
         dated,
         score: (h as { score?: unknown }).score ?? null,
         matched,
-        snippet: text.replace(/\s+/g, ' ').trim().slice(0, SNIPPET_LEN),
+        snippet,
       }
     }
     return { ...h, matched, dated }

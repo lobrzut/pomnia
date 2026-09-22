@@ -52,7 +52,7 @@ export function freshState(now: number): UnsavedState {
  * a queue entry the next sync deletes.
  */
 export function isWritingTool(name: string): boolean {
-  return resetsUnsavedNag(name) || name === 'create_task' || name === 'complete_task'
+  return resetsUnsavedNag(name)
 }
 
 /**

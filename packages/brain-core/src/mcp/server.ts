@@ -76,7 +76,7 @@ import { createDistillJob, parseConversation } from '../distill/index.js'
 import { DEFAULT_DISTILL_MODEL } from '../distill/ollamaChat.js'
 import { renderAdminPage } from './adminPage.js'
 import { renderStatusPage } from './statusPage.js'
-import { noteMcpBody, noteMcpCaller, seenClients } from './clientRegistry.js'
+import { noteMcpBody, seenClients } from './clientRegistry.js'
 import { APPLE_TOUCH_B64, FAVICON_ICO_B64, ICON_PNG_B64 } from './brandAssets.js'
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
@@ -1058,9 +1058,6 @@ export async function createBrainServer(
             res.end('mcp not ready')
             return
           }
-          // Every authenticated MCP request, not only `initialize` — see
-          // noteMcpCaller for why the introduction alone is not enough.
-          noteMcpCaller(auth.name)
           await serveMcp(req, res, auth.name)
         })().catch((err: unknown) => {
           console.error('[pomnia-core] request error:', err)
