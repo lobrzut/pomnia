@@ -14,7 +14,7 @@
  * refused rather than followed. Reading is all this tool does — there is no
  * write path here by design.
  */
-import { existsSync, realpathSync, statSync, readFileSync } from 'node:fs'
+import { existsSync, realpathSync, statSync, openSync, readSync, closeSync } from 'node:fs'
 import { isAbsolute, resolve, sep } from 'node:path'
 
 /** Full notes are small; a library chunk's source file can be large. Cap the read. */
@@ -83,19 +83,35 @@ export function runReadNote(args: unknown, deps: ReadNoteDeps): string {
     typeof a.max_chars === 'number' && a.max_chars > 0 ? Math.floor(a.max_chars) : DEFAULT_MAX,
     HARD_MAX,
   )
-  let text: string
+  // Read only what the cap can return, never the whole file: a search hit's
+  // path can point at a large library source, and loading it in full just to
+  // slice it to `cap` would spike memory for bytes we always throw away. At
+  // most 4 bytes encode one UTF-8 char, so cap*4 (+a little) guarantees `cap`
+  // chars are present in the buffer.
+  const wantBytes = Math.min(st.size, cap * 4 + 64)
+  let raw: string
   try {
-    text = readFileSync(safe, 'utf8')
+    const fd = openSync(safe, 'r')
+    try {
+      const buf = Buffer.alloc(wantBytes)
+      const n = readSync(fd, buf, 0, wantBytes, 0)
+      raw = buf.subarray(0, n).toString('utf8')
+    } finally {
+      closeSync(fd)
+    }
   } catch (e) {
     return JSON.stringify({ error: 'unreadable', detail: (e as Error).message })
   }
-  const truncated = text.length > cap
+  // Truncated if we did not return the whole file — either we sliced to the
+  // cap, or the file had more bytes than we read.
+  const text = raw.length > cap ? raw.slice(0, cap) : raw
+  const truncated = raw.length > cap || st.size > wantBytes
   return JSON.stringify({
     path: rawPath,
     bytes: st.size,
     chars: text.length,
     truncated,
-    ...(truncated ? { note: `Showing the first ${cap} of ${text.length} chars. Raise max_chars for more.` } : {}),
-    text: truncated ? text.slice(0, cap) : text,
+    ...(truncated ? { note: `Showing the first ${text.length} chars of a ${st.size}-byte file. Raise max_chars for more.` } : {}),
+    text,
   })
 }

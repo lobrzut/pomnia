@@ -64,6 +64,17 @@ describe('read_note', () => {
     const out = J(runReadNote({ path: join(vaultRoot, 'distilled', 'big.md'), max_chars: 1000 }, { vaultRoot }))
     expect(out.truncated).toBe(true)
     expect(out.text.length).toBe(1000)
-    expect(out.chars).toBe(5000)
+    expect(out.chars).toBe(1000)
+    expect(out.bytes).toBe(5000)
+  })
+
+  it('does not read the whole file into memory to satisfy a small cap', () => {
+    // A 2 MB file with a 200-char cap must not load 2 MB. We cannot easily
+    // assert memory here, but we can assert it returns promptly and correctly.
+    writeFileSync(join(vaultRoot, 'distilled', 'huge.md'), 'y'.repeat(2_000_000), 'utf8')
+    const out = J(runReadNote({ path: join(vaultRoot, 'distilled', 'huge.md'), max_chars: 200 }, { vaultRoot }))
+    expect(out.text.length).toBe(200)
+    expect(out.truncated).toBe(true)
+    expect(out.bytes).toBe(2_000_000)
   })
 })

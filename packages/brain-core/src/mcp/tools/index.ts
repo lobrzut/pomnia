@@ -269,14 +269,8 @@ export async function callTool(
   name: string,
   args: unknown,
   ctx: ToolContext,
-  /**
-   * Token name from the auth gate, threaded through so a tool can answer
-   * "which one am I". Optional: a loopback call has no token, and every
-   * existing caller keeps working without passing it.
-   */
-  caller?: string,
 ): Promise<string> {
-  const out = await dispatchTool(name, args, ctx, caller)
+  const out = await dispatchTool(name, args, ctx)
   const decision = afterCall({
     tool: name,
     state: unsavedState,
@@ -337,8 +331,6 @@ async function dispatchTool(
   name: string,
   args: unknown,
   ctx: ToolContext,
-  /** Token name from the auth gate. Authenticated, unlike anything a client says about itself. */
-  caller?: string,
 ): Promise<string> {
   // Enforce at the call site too, not only in the catalog: a client caches the
   // tool list, so an agent that connected before the flag was set would still
