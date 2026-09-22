@@ -64,6 +64,13 @@ export interface BrainConfig {
   autoCheckpointEnabled?: boolean
 
   /**
+   * Token-saver: when not false, search_library returns compact hits by default
+   * and full text is pulled with read_note only where needed (~76% fewer search
+   * tokens, measured). Default true. Set false to serve full passages inline.
+   */
+  compactSearch?: boolean
+
+  /**
    * Serve a replica: refuse save_conversation / checkpoint_session.
    *
    * Set this on every instance that does not own the vault. Two writable brains

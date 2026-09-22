@@ -18,6 +18,7 @@ import type { EmbedClient } from '../../rag/embed.js'
 import { indexFiles } from '../../rag/indexer.js'
 
 import { runSearchLibrary, searchLibrarySchema } from './searchLibrary.js'
+import { runReadNote, readNoteSchema } from './readNote.js'
 import type { Reranker } from '../../rag/rerank.js'
 import { VaultFreshness, freshnessReminder, hashContent } from '../vaultFreshness.js'
 import { UsageSignal } from '../../rag/usageSignal.js'
@@ -106,6 +107,13 @@ export interface ToolContext {
    */
   autoCheckpointEnabled?: boolean
   /**
+   * Token-saver: when not false, search_library defaults to compact hits
+   * (path/title/date/score/snippet) and the model pulls full text with read_note
+   * only where it needs it. The measured cut is ~76% of search tokens. A caller
+   * passing compact:true/false on the tool still overrides this.
+   */
+  compactSearch?: boolean
+  /**
    * Replica mode: this instance serves a copy, it does not own it.
    *
    * A deployment with more than one writable brain over the same corpus
@@ -167,8 +175,14 @@ export function listTools(
     {
       name: 'search_library',
       description:
-        'Hybrid semantic+keyword search over the private Pomnia index (distilled notes + library). Call proactively before technical answers that may already be decided — think „sprawdź w Pomnia” / check Pomnia. Query in the user language (PL+EN vault). Returns top chunks with source, page, score. This is retrieval only — not chat generation.',
+        'Hybrid semantic+keyword search over the private Pomnia index (distilled notes + library). Call proactively before technical answers that may already be decided — think „sprawdź w Pomnia” / check Pomnia. Query in the user language (PL+EN vault). Returns hits with path, title, date and score. By default hits are compact (a one-line snippet, not the full passage) to save tokens — when a hit matters, pull its full text with read_note(path). Pass compact:false for full text inline. Retrieval only — not chat generation.',
       inputSchema: searchLibrarySchema,
+    },
+    {
+      name: 'read_note',
+      description:
+        'Fetch the full text of a search_library hit by its `path`. Use after a compact search when a hit needs its whole passage — so full text is paid for only where it matters, not on every hit. Read-only and confined to the vault.',
+      inputSchema: readNoteSchema,
     },
     {
       name: 'save_conversation',
@@ -382,8 +396,15 @@ async function dispatchTool(
     case 'search_library': {
       const q = args && typeof args === 'object' ? (args as { query?: unknown }).query : undefined
       if (typeof q === 'string') ctx.usage?.searched(q)
-      return runSearchLibrary(args, { db: ctx.db, embedder: ctx.embedder, reranker: ctx.reranker })
+      return runSearchLibrary(args, {
+        db: ctx.db,
+        embedder: ctx.embedder,
+        reranker: ctx.reranker,
+        compactDefault: ctx.compactSearch !== false,
+      })
     }
+    case 'read_note':
+      return runReadNote(args, { vaultRoot: ctx.vaultRoot })
     case 'save_conversation': {
       const saved = await runSaveConversation(args, { vaultRoot: ctx.vaultRoot })
       // The write is atomic; the index was not part of that promise. See

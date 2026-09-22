@@ -220,6 +220,8 @@ export interface BrainServer {
   setHandshake(opts: { phrase: string; enabled: boolean }): void
   /** Update auto-checkpoint setting (Settings → autoCheckpointEnabled). */
   setAutoCheckpoint(enabled: boolean): void
+  /** Toggle the token-saver: compact search hits by default (read_note for full text). */
+  setCompactSearch(enabled: boolean): void
 }
 
 /**
@@ -540,6 +542,11 @@ export async function createBrainServer(
       if (ctx) ctx.autoCheckpointEnabled = enabled
     },
 
+    setCompactSearch(enabled: boolean) {
+      config.compactSearch = enabled
+      if (ctx) ctx.compactSearch = enabled
+    },
+
     async start() {
       // Open storage + embedder first so the MCP server refuses connections
       // if either is broken (fail-fast beats accepting requests we can't serve).
@@ -606,6 +613,7 @@ export async function createBrainServer(
         handshakePhrase: config.handshakePhrase,
         handshakeEnabled: config.handshakeEnabled !== false,
         autoCheckpointEnabled: config.autoCheckpointEnabled !== false,
+        compactSearch: config.compactSearch !== false,
         readOnly: !ownership.writable,
         // Prefer the marker's own account of who holds the vault over a hint
         // someone typed into a unit file months ago — the hint is what went
@@ -1236,6 +1244,7 @@ export async function createBrainServer(
               handshakePhrase: config.handshakePhrase ?? 'OK to Go Go Go',
               handshakeEnabled: config.handshakeEnabled !== false,
               autoCheckpointEnabled: config.autoCheckpointEnabled !== false,
+        compactSearch: config.compactSearch !== false,
               instanceLabel: config.instanceLabel ?? hostname(),
             }),
             set(next) {

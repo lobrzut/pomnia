@@ -42,7 +42,9 @@ const argsSchema = z.object({
   query: z.string(),
   top_k: z.number().int().positive().optional().default(4),
   source: z.enum(['all', 'vault', 'library']).optional().default('all'),
-  compact: z.boolean().optional().default(false),
+  // No default here: absent means "use the server's token-saver setting", which
+  // the deps carry. An explicit true/false from the caller still wins.
+  compact: z.boolean().optional(),
 })
 
 /** At most this many chunks from one file, so a single rich note cannot fill the answer. */
@@ -81,6 +83,12 @@ export interface SearchLibraryDeps {
    * blended score decides, exactly as before — see rag/rerank.ts.
    */
   reranker?: Reranker
+  /**
+   * What compact means when the caller does not say — the server's token-saver
+   * setting. Defaults to true (compact), which the measured 76% token cut earns;
+   * a caller passing compact:false still gets full text.
+   */
+  compactDefault?: boolean
 }
 
 /**
@@ -92,6 +100,8 @@ export async function runSearchLibrary(
   deps: SearchLibraryDeps,
 ): Promise<string> {
   const { query, top_k, source, compact } = argsSchema.parse(args)
+  // Explicit arg wins; otherwise the server's token-saver setting; otherwise on.
+  const useCompact = compact ?? deps.compactDefault ?? true
 
   // Fetch a wider pool than we return: dedup by file drops chunks, so asking
   // search for exactly top_k could hand back fewer than top_k after dedup, or
@@ -148,7 +158,7 @@ export async function runSearchLibrary(
       : 'weak on both'
     const name = String((h.meta as { name?: unknown })?.name ?? '')
     const dated = noteDate(name)
-    if (compact) {
+    if (useCompact) {
       // Path, title, date, score and one line — enough to decide relevance
       // without carrying the whole passage. The full text is one re-query away.
       const text = String((h as { text?: unknown }).text ?? '')
