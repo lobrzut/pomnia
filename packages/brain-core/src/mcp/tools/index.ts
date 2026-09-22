@@ -167,8 +167,7 @@ export function listTools(
     {
       name: 'search_library',
       description:
-        'Hybrid semantic+keyword search over the private Pomnia index (distilled notes + library). Call proactively before technical answers that may already be decided — think „sprawdź w Pomnia” / check Pomnia. Query in the user language (PL+EN vault). Returns top chunks with source, page, score. This is retrieval only — not chat generation.' +
-        (hs ? ` ${hs}` : ''),
+        'Hybrid semantic+keyword search over the private Pomnia index (distilled notes + library). Call proactively before technical answers that may already be decided — think „sprawdź w Pomnia” / check Pomnia. Query in the user language (PL+EN vault). Returns top chunks with source, page, score. This is retrieval only — not chat generation.',
       inputSchema: searchLibrarySchema,
     },
     {
@@ -204,8 +203,7 @@ export function listTools(
     {
       name: 'library_status',
       description:
-        'Report counts from the brain index — number of files, chunks, and a sample of file names.' +
-        (hs ? ` ${hs}` : ''),
+        'Report counts from the brain index — number of files, chunks, and a sample of file names.',
       inputSchema: libraryStatusSchema,
     },
     {
