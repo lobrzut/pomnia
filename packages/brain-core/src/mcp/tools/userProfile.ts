@@ -91,6 +91,24 @@ function writeProfile(path: string, content: string): void {
   writeFileKeepingPrevSync(path, Buffer.from(content, 'utf-8'))
 }
 
+/** How much of AGENTS.md rides in the session-start profile; the rest is read_note on demand. */
+const AGENTS_PREVIEW = 1200
+
+/**
+ * Trim to at most `cap` chars, but end on a section (`## `) or paragraph break
+ * inside the second half of that window rather than mid-sentence. Falls back to
+ * a hard cut only when no boundary is near.
+ */
+export function truncateAtBoundary(text: string, cap: number): string {
+  if (text.length <= cap) return text
+  const window = text.slice(0, cap)
+  const half = cap * 0.5
+  const section = window.lastIndexOf('\n## ')
+  const blank = window.lastIndexOf('\n\n')
+  const cut = section > half ? section : blank > half ? blank : cap
+  return text.slice(0, cut).trimEnd()
+}
+
 function agentsMdHint(userMdPath: string): string {
   const agentsPath = join(dirname(userMdPath), 'AGENTS.md')
   if (!existsSync(agentsPath)) {
@@ -102,10 +120,13 @@ function agentsMdHint(userMdPath: string): string {
   try {
     const brief = readFileSync(agentsPath, 'utf-8').trim()
     if (!brief) return `\n\n[AGENTS] vault/AGENTS.md exists but is empty.`
-    // Cap so get_user_profile stays usable; full brief is on disk.
+    // Inject a lean preview, not the whole brief: the full file loads every
+    // session in every client, so every extra char is paid many times over.
+    // Cut on a section boundary rather than mid-sentence, and point at the
+    // full text on demand via read_note instead of dumping it here.
     const preview =
-      brief.length > 1200
-        ? `${brief.slice(0, 1200)}\n…[AGENTS.md truncated — read vault/AGENTS.md]`
+      brief.length > AGENTS_PREVIEW
+        ? `${truncateAtBoundary(brief, AGENTS_PREVIEW)}\n\n…[AGENTS.md preview — full brief: read_note('AGENTS.md')]`
         : brief
     return `\n\n[AGENTS — operational brief, outside USER.md ${USER_MAX}]\n${preview}`
   } catch {
