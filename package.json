@@ -46,7 +46,7 @@
     "release:win": "node scripts/release-win.mjs",
     "publish:release": "tsx scripts/publish-release.mjs",
     "attach:linux-release": "tsx scripts/attach-linux-release.mjs",
-    "attach:win-release": "node scripts/attach-win-release.mjs",
+    "attach:win-release": "tsx scripts/attach-win-release.mjs",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.json",
     "typecheck:brain-core": "npm run typecheck --prefix packages/brain-core",

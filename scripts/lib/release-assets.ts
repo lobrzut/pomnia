@@ -335,3 +335,58 @@ export function collectBrainCoreAssets(opts: { releaseDir: string; version: stri
   }
   return { ok: errors.length === 0, present: true, errors, plan, assets }
 }
+
+/**
+ * The Windows block of a release body, as publish-release writes it.
+ *
+ * attach:win-release replaces the installer and its .sha256 asset, but the
+ * notes carry the size, the commit and the SHA-256 as prose. Leaving them
+ * stale is worse than omitting them: v0.1.91 was re-attached from a fixed
+ * commit and the notes still told readers to expect the old hash, so anyone
+ * verifying the download as instructed would have seen a mismatch.
+ */
+export function windowsNotesBlock(opts: {
+  version: string
+  sizeMb: string
+  commit: string
+  sha256: string
+}): string {
+  const { version, sizeMb, commit, sha256 } = opts
+  return `**Windows installer** · ${sizeMb} MB · built from \`${commit}\`
+
+This build is **not code-signed**, so Windows shows “Windows protected your PC”.
+Choose **More info → Run anyway**, or verify the file first:
+
+\`\`\`powershell
+Get-FileHash Pomnia-${version}-setup.exe -Algorithm SHA256
+\`\`\`
+
+\`\`\`
+${sha256}
+\`\`\``
+}
+
+/**
+ * Bring the Windows line and its SHA-256 in `body` up to date, or append the
+ * Windows block when the release was created without one (a CI-first draft).
+ * Only the hash that follows this version's Get-FileHash line is replaced, so
+ * checksums quoted for other platforms are left alone. Idempotent.
+ */
+export function refreshWindowsNotes(
+  body: string,
+  opts: { version: string; sizeMb: string; commit: string; sha256: string },
+): string {
+  const { version, sizeMb, commit, sha256 } = opts
+  const line = /\*\*Windows installer\*\* · [\d.]+ MB · built from `[0-9a-f]+`/
+  if (!line.test(body)) {
+    const trimmed = body.replace(/\s+$/, '')
+    return `${trimmed}${trimmed ? '\n\n' : ''}${windowsNotesBlock(opts)}\n`
+  }
+  const esc = version.replace(/\./g, '\.')
+  const hash = new RegExp(
+    `(Get-FileHash Pomnia-${esc}-setup\.exe -Algorithm SHA256\r?\n\`\`\`\r?\n\r?\n\`\`\`\r?\n)[0-9A-Fa-f]{64}`,
+  )
+  return body
+    .replace(line, `**Windows installer** · ${sizeMb} MB · built from \`${commit}\``)
+    .replace(hash, `$1${sha256}`)
+}

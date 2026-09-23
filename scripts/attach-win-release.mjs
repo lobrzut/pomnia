@@ -27,6 +27,8 @@ import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { refreshWindowsNotes } from './lib/release-assets.ts'
+
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
 const tagIdx = args.indexOf('--tag')
@@ -75,6 +77,27 @@ console.log(`assets     ${assets.map((a) => a.replace(`${releaseDir}\\`, '').rep
 
 sh('gh', ['release', 'upload', tag, ...assets, '--clobber'])
 console.log(`\n✔ uploaded Windows assets to ${tag}`)
+
+// The assets are replaced, but the notes quote the size, commit and SHA-256 in
+// prose. Refresh them too — otherwise a reader who verifies the download the
+// way the notes tell them to sees a mismatch (v0.1.91 shipped exactly that).
+{
+  const body = sh('gh', ['release', 'view', tag, '--json', 'body', '--jq', '.body'])
+  const next = refreshWindowsNotes(body, {
+    version,
+    sizeMb: (readFileSync(exe).length / 1024 / 1024).toFixed(2),
+    commit: sh('git', ['rev-parse', '--short', 'HEAD']),
+    sha256,
+  })
+  if (next === body) {
+    console.log('✔ release notes already name this installer')
+  } else {
+    const notesFile = join(releaseDir, '.release-notes-win.md')
+    writeFileSync(notesFile, next, 'utf8')
+    sh('gh', ['release', 'edit', tag, '--notes-file', notesFile])
+    console.log('✔ refreshed the Windows size, commit and SHA-256 in the release notes')
+  }
+}
 
 // Uploading is not the same as being reachable, and this whole script exists
 // because nobody checked the second thing. Inherit stdio so a failure names the

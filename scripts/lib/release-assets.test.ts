@@ -14,8 +14,10 @@ import {
   ensureMatchingSha256,
   formatSha256Line,
   parseSha256Line,
+  refreshWindowsNotes,
   validateUpdateManifest,
   versionFromTag,
+  windowsNotesBlock,
 } from './release-assets.ts'
 
 describe('versionFromTag', () => {
@@ -184,5 +186,50 @@ describe('collectLinuxDesktopAssets', () => {
     expect(r.ok).toBe(false)
     expect(r.errors.join('\n')).toMatch(/SHA-256 mismatch/)
     expect(r.errors.join('\n')).toMatch(/latest-linux\.yml/)
+  })
+})
+
+describe('refreshWindowsNotes', () => {
+  const OLD = '3F3C781DBEF1D69B961F788F2B58EE6BD2471428412D7945E0027FE15000D712'
+  const NEW = '0E20F2C5A5480B832CF10D0C8C23CEF791B18479ADC78592E110543F50DC44AC'
+  const LINUX_SHA = 'A'.repeat(64)
+  const staleBody = (sha: string) =>
+    `Pomnia 0.1.91\n\n${windowsNotesBlock({ version: '0.1.91', sizeMb: '145.64', commit: '9855d40', sha256: sha })}\n\n` +
+    `Pomnia checks for newer releases and tells you — it never installs anything by itself.\n\n` +
+    `**Linux** · AppImage/deb (unsigned).\n\n\`\`\`\n${LINUX_SHA}\n\`\`\`\n`
+
+  it('replaces the stale size, commit and hash after a re-attach', () => {
+    // The v0.1.91 case: installer re-attached from 68680c9, notes still said 9855d40.
+    const out = refreshWindowsNotes(staleBody(OLD), { version: '0.1.91', sizeMb: '145.65', commit: '68680c9', sha256: NEW })
+    expect(out).toContain('145.65 MB · built from `68680c9`')
+    expect(out).toContain(NEW)
+    expect(out).not.toContain(OLD)
+    expect(out).not.toContain('9855d40')
+  })
+
+  it('leaves checksums quoted for other platforms alone', () => {
+    const out = refreshWindowsNotes(staleBody(OLD), { version: '0.1.91', sizeMb: '145.65', commit: '68680c9', sha256: NEW })
+    expect(out).toContain(LINUX_SHA)
+    expect(out).toContain('**Linux**')
+  })
+
+  it('appends the Windows block when the release was created without one', () => {
+    const out = refreshWindowsNotes('Linux-first draft from CI.', { version: '0.1.92', sizeMb: '150.00', commit: 'abc1234', sha256: NEW })
+    expect(out.startsWith('Linux-first draft from CI.')).toBe(true)
+    expect(out).toContain('**Windows installer** · 150.00 MB · built from `abc1234`')
+    expect(out).toContain('Get-FileHash Pomnia-0.1.92-setup.exe')
+    expect(out).toContain(NEW)
+  })
+
+  it('is idempotent', () => {
+    const opts = { version: '0.1.91', sizeMb: '145.65', commit: '68680c9', sha256: NEW }
+    const once = refreshWindowsNotes(staleBody(OLD), opts)
+    expect(refreshWindowsNotes(once, opts)).toBe(once)
+  })
+
+  it('handles a body GitHub hands back with CRLF line endings', () => {
+    const out = refreshWindowsNotes(staleBody(OLD).replace(/\n/g, '\r\n'), { version: '0.1.91', sizeMb: '145.65', commit: '68680c9', sha256: NEW })
+    expect(out).toContain(NEW)
+    expect(out).not.toContain(OLD)
   })
 })
