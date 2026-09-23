@@ -30,8 +30,8 @@ The vault is the archive and the backup (AES for chat and document blobs). Knowl
 
 ┌─────────────────────────────────────────────────────────┐
 │  REMOTE (homelab)                                       │
-│  Your Brain server on the LAN, e.g. http://your-host:7862│
-│  Needs: a Bearer token + a working MCP proxy            │
+│  Your Brain server on the LAN, e.g. http://your-host:7865│
+│  Needs: a Bearer token (server admin panel → Tokens)    │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -45,7 +45,7 @@ Install [Ollama](https://ollama.com), start it, pull:
 
 ```bash
 ollama pull nomic-embed-text    # embeddings — REQUIRED for search
-ollama pull qwen2.5:14b         # chat distillation — REQUIRED for distill
+ollama pull llama3.1:8b         # chat distillation — REQUIRED for distill (the default model)
 ```
 
 ### 2. Vault + backup
@@ -63,21 +63,21 @@ This turns raw conversation logs into condensed `.md` notes and builds the vecto
 
 **Windows (Pomnia app):** the **Connect** tab → remote or embedded → copy the whole snippet → paste → Reload Window.
 
-**Mac / no app:** see [docs/CURSOR-MCP.md](./CURSOR-MCP.md) → URL `:7862` + a token from the dashboard on `:7860` → **Copy mcp.json** → `~/.cursor/mcp.json` → Reload Window.
+**Mac / no app:** see [docs/CURSOR-MCP.md](./CURSOR-MCP.md) — embedded brain: `http://127.0.0.1:7862/mcp`, no token; remote brain-core: `http://<host>:7865/mcp` + a token minted in the server's admin panel (`http://<host>:7865/admin` → Tokens). Paste into `~/.cursor/mcp.json` → Reload Window.
 
-Remote always needs **three** servers: `pomnia`, `pomnia-vault`, `pomnia-library`. `pomnia` alone is an incomplete configuration (the legacy `brain-rag` key is still accepted by the status check).
+There is **one** MCP server: `pomnia` (the legacy `brain-rag` key is still accepted). Older configs that list `pomnia-vault` / `pomnia-library` (or `brain-vault` / `brain-library`) point at servers that no longer exist — remove those entries.
 
 ### 5. Verify
 
 **Settings → Diagnostics** — Ollama, models, vault, brain-core and MCP should all be green.
 
-In Cursor, ask the agent about something from an earlier session; it should call `search_library` through Brain MCP.
+In Cursor, ask the agent about something from an earlier session; it should call `search_library` through the `pomnia` MCP server.
 
 ## Two content pipelines
 
 | Type | Path | LLM? |
 |-----|---------|------|
-| **Chats** (live backup, ZIP import) | Vault → **Distill** → index | Yes (qwen) |
+| **Chats** (live backup, ZIP import) | Vault → **Distill** → index | Yes (`llama3.1:8b` by default) |
 | **Documents** (PDF, DOCX, EPUB) | Vault → **Direct index** (+ optional thin OCR) | No (embed only; OCR is tesseract) |
 
 Do not distil PDFs — index them straight from the Import tab. A scanned PDF (little text) → **Run OCR**, then index. **Refresh index** skips unchanged files. Auto-checkpoint vs "save to Pomnia": [README](../README.md#kontynuacja-sesji-mcp).

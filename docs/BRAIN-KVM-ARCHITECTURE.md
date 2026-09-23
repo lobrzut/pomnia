@@ -1,3 +1,5 @@
+> **Historical** — describes the Python-era KVM stack (a dashboard on `:7860`, an MCP proxy on `:7862`), which is gone. Today the server is one brain-core process on `:7865` serving MCP, the admin panel and `/healthz`, with a built-in embedder — see [CURSOR-MCP.md](./CURSOR-MCP.md) and [LINUX-SELF-HOSTED.md](./LINUX-SELF-HOSTED.md).
+
 # Pomnia × Brain — KVM architecture (client / server split)
 
 ## Who does what

@@ -35,7 +35,7 @@ Every assistant keeps conversations somewhere else. Switch machines and you lose
 
 Optional: **Handshake** — personal start ritual in the UI; not required for the product to work.
 
-**Advanced:** remote Brain / homelab KVM (other host `:7862`, Bearer, auto-deploy) — [docs/START-HERE.md](docs/START-HERE.md), [docs/BRAIN-KVM-ARCHITECTURE.md](docs/BRAIN-KVM-ARCHITECTURE.md), [docs/BRAIN-INTEGRATION.md](docs/BRAIN-INTEGRATION.md).
+**Advanced:** remote Brain / homelab server (brain-core on another host at `:7865`, Bearer token) — [docs/START-HERE.md](docs/START-HERE.md), [docs/CURSOR-MCP.md](docs/CURSOR-MCP.md), [docs/LINUX-SELF-HOSTED.md](docs/LINUX-SELF-HOSTED.md).
 
 ## Sources
 
@@ -88,6 +88,8 @@ MCP client key is **`pomnia`**. Agent phrases: *check Pomnia* / *save to Pomnia*
 - **“Save to Pomnia” / “zapisz do Pomnia”** — conscious full commit → `save_conversation` → `vault/sessions/`.
 
 Agent rules include **PRIORITY** session-start (`get_user_profile` + search) and Handshake proof that MCP `pomnia` is wired.
+
+Search is **compact by default**: `search_library` returns path, date, score and a one-line snippet (at most one hit per note), and the agent pulls a note's full text with `read_note` only when a hit matters — about 76% fewer tokens per search, measured on a real vault. `compact: false` returns full passages inline.
 
 ### Incremental index
 

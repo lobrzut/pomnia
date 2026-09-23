@@ -46,9 +46,7 @@ The client bundles **embedded Brain** (`brain-core` / MCP `:7862`) in Desktop. A
 
 ## 4. Trust pitch
 
-**EN:** Conversation and document **blobs** live in a local encrypted vault — the key stays in your head, and the app never moves them anywhere without your explicit choice. Knowledge sidecars and the Brain search index on disk are plaintext; protect those folders.
-
-**PL:** Bloby rozmów i dokumentów leżą w lokalnym, zaszyfrowanym sejfie — klucz tylko w Twojej głowie, a aplikacja nie wysyła ich nigdzie bez Twojej wyraźnej decyzji. Sidecary wiedzy i indeks Brain na dysku są plaintext — chroń te foldery.
+Conversation and document **blobs** live in a local encrypted vault — the key stays in your head, and the app never moves them anywhere without your explicit choice. Knowledge sidecars and the Brain search index on disk are plaintext; protect those folders.
 
 ---
 

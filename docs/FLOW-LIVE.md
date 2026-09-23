@@ -28,14 +28,14 @@ flowchart LR
     POLL --> ACTIVITY --> DIAG
   end
 
-  clients -->|search_library / get_skill / run_skill| MCP
+  clients -->|search_library / read_note / get_skill| MCP
   API -->|poll when remote + window focused| POLL
   EMB[embedded brain-core] -->|fork IPC mcp-query| ACTIVITY
 ```
 
 ## What happens on a query
 
-1. The agent calls an MCP tool (`search_library`, `get_skill`, `run_skill`, …).
+1. The agent calls an MCP tool (`search_library`, `read_note`, `get_skill`, …).
 2. brain-core records `{ tool, ts, query_preview }` and serves the most recent call from `GET /mcp/activity`.
 3. Pomnia:
    - **Embedded** (`brainTarget=embedded`): the `brain-core` child process emits `mcp-query` over fork IPC — no polling at all.
