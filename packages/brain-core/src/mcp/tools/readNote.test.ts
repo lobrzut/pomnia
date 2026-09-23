@@ -5,7 +5,7 @@
  * pin that it stays inside the vault, returns what is there, caps large files,
  * and never follows a path out of the tree.
  */
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -76,5 +76,29 @@ describe('read_note', () => {
     expect(out.text.length).toBe(200)
     expect(out.truncated).toBe(true)
     expect(out.bytes).toBe(2_000_000)
+  })
+})
+
+describe('read_note — symlinked vault roots', () => {
+  it('reads a note when the vault root itself is a symlink or junction', () => {
+    // macOS tmpdir is /var -> /private/var; a moved or cloud-synced vault can
+    // sit behind a link too. The root must be resolved like the target, or
+    // every file inside reads as outside_vault. Reproduced here with a
+    // junction so it fails the same way on Windows and Linux as on macOS.
+    const link = join(vaultRoot, '..', 'vault-link')
+    symlinkSync(vaultRoot, link, 'junction')
+    const out = J(runReadNote({ path: join(link, 'distilled', 'note.md') }, { vaultRoot: link }))
+    expect(out.error).toBeUndefined()
+    expect(out.text).toContain('full passage here')
+  })
+
+  it('still refuses a link inside the vault that points out of it', () => {
+    const outsideDir = join(vaultRoot, '..', 'elsewhere')
+    mkdirSync(outsideDir)
+    writeFileSync(join(outsideDir, 'SECRET.md'), 'do not read me', 'utf8')
+    symlinkSync(outsideDir, join(vaultRoot, 'escape'), 'junction')
+    const out = J(runReadNote({ path: join(vaultRoot, 'escape', 'SECRET.md') }, { vaultRoot }))
+    expect(out.error).toBe('outside_vault')
+    expect(out.text).toBeUndefined()
   })
 })

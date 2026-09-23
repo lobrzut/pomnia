@@ -42,17 +42,29 @@ export interface ReadNoteDeps {
 
 /** Resolve `p` and return it only if it stays inside `root`, following symlinks. */
 function insideVault(root: string, p: string): string | null {
-  const base = resolve(root)
-  const abs = isAbsolute(p) ? resolve(p) : resolve(base, p)
-  // A path that resolves outside the vault is refused before any stat, so a
-  // crafted `..` cannot even probe for existence elsewhere.
-  if (abs !== base && !abs.startsWith(base + sep)) return null
-  if (!existsSync(abs)) return abs === base ? null : abs // let caller's stat report not_found
-  // Follow symlinks and re-check: a link inside the vault must not point out of it.
+  const baseLex = resolve(root)
+  // The vault root may itself sit behind a symlink or junction — macOS tmpdir
+  // is /var -> /private/var, a vault can be moved or cloud-synced, Windows can
+  // hand out 8.3 short names. The target is compared after realpath, so the
+  // root must be too; comparing a resolved target against a lexical root made
+  // every file inside a symlinked vault read as outside it (caught by macOS CI).
+  let baseReal = baseLex
+  try {
+    baseReal = realpathSync(baseLex)
+  } catch {
+    /* root missing: keep the lexical form */
+  }
+  const within = (b: string, x: string): boolean => x === b || x.startsWith(b + sep)
+  const abs = isAbsolute(p) ? resolve(p) : resolve(baseLex, p)
+  // Lexical gate first, against either spelling of the root, so a crafted `..`
+  // is refused before any stat can probe for existence elsewhere.
+  if (!within(baseLex, abs) && !within(baseReal, abs)) return null
+  if (!existsSync(abs)) return abs === baseLex || abs === baseReal ? null : abs // caller's stat reports not_found
+  // Follow symlinks and re-check against the resolved root: a link inside the
+  // vault must not point out of it.
   try {
     const real = realpathSync(abs)
-    if (real !== base && !real.startsWith(base + sep)) return null
-    return real
+    return within(baseReal, real) ? real : null
   } catch {
     return abs
   }
