@@ -100,7 +100,7 @@ Install → Vault (passphrase) → Chat backup → Import (optional)
 |-----------|--------------|---------------------|
 | **Ollama** | distill, embed, doc index | README yes; onboarding partly |
 | **nomic-embed-text** | every embedding | mentioned in the onboarding engine step |
-| **qwen2.5:14b** (or a VRAM profile) | distillation | profiles in Brain, hidden in simple mode |
+| **llama3.1:8b** (or a VRAM profile; Lite is `qwen2.5:3b`) | distillation | profiles in Brain, hidden in simple mode. `qwen2.5:14b` is not the default |
 | **Bearer token** | remote MCP | Connect mints one fine, but never says where to get one by hand |
 | **Apple / MS code signing** | distribution | **none** — unsigned in CI (`release-mac.yml`) |
 

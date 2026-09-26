@@ -9,7 +9,7 @@
 |---------|------------|-------|----------------|
 | **brain-core** (`packages/brain-core`, Node) | `BRAIN_EMBED_BACKEND=fastembed` **or** `ollama` | `nomic-ai/nomic-embed-text-v1.5` / Ollama `nomic-embed-text` → **dim 768** | KVM/Docker: **no**; desktop default: Ollama |
 | **Pomnia desktop, embedded** | forked child → the same `EmbedClient` (default ollama) | as above | **Yes** for MVP search/index — URL from Settings / `127.0.0.1:11434` |
-| **Pomnia distill** | `qwen2.5:14b` (chat) | ~9 GB | Yes, on the **client PC** (GPU) |
+| **Pomnia distill** | `llama3.1:8b` (chat, the default) | ~4.7 GB | Yes, on the **client PC** (GPU) |
 | **Brain hub, Python** (`Projects/brain`) | `BRAIN_EMBED_BACKEND=fastembed` **or** `ollama` | `nomic-ai/nomic-embed-text-v1.5` / Ollama `nomic-embed-text` | Docker edge: **no**; live homelab KVM: Ollama with many models |
 | **Docker edge** (`brain/docker-compose.yml` + `Dockerfile`) | fastembed ONNX, model **prefetched at build** | v1.5 | **No** — "no Ollama, no GPU" |
 
@@ -27,7 +27,7 @@ The key point: vectors from Ollama `nomic-embed-text` and Python fastembed v1.5 
 
 ### Do not bundle
 
-- **`qwen2.5:14b` (~9 GB) or any other chat/LLM** — distillation stays on the client PC with its GPU. A Brain server is memory to ask questions of, not a note factory.
+- **`llama3.1:8b` (~4.7 GB) or any other chat/LLM** — distillation stays on the client PC with its GPU. A Brain server is memory to ask questions of, not a note factory. Do not treat the retired default `qwen2.5:14b` as required.
 - The full 32-model catalogue from the live homelab KVM — that is a homelab power user, not the "Brain Server" product.
 
 ### Footprint (expectations)
@@ -36,7 +36,7 @@ The key point: vectors from Ollama `nomic-embed-text` and Python fastembed v1.5 
 |--|----------------------|-------------------------|
 | nomic only (Ollama sidecar) | ~274 MB + the Ollama runtime | ~0.5–1 GB with the model warm |
 | fastembed ONNX (Docker edge) | ~0.5 GB in the image layer | ~0.5–1 GB after lazy load |
-| + qwen 14b (NO) | +~9 GB | +~10–16 GB VRAM/RAM |
+| + a chat model such as llama3.1:8b (NO) | +~4.7 GB | extra VRAM on the client, not the server |
 
 A small KVM (2–4 GB RAM, no GPU) → **embedding only**. Distillation optional, or offboard.
 
@@ -86,7 +86,7 @@ A small KVM (2–4 GB RAM, no GPU) → **embedding only**. Distillation optional
 ### Milestone 0 — desktop first (agreed)
 
 - Embedded brain-core plus the **user's Ollama** with `nomic-embed-text` (pull from the UI when missing).
-- Distillation is a local `qwen2.5:14b` (or another chat model), outside the scope of the server bundle.
+- Distillation is a local `llama3.1:8b` (or another chat model), outside the scope of the server bundle.
 - UI: a clear split between "Ollama + nomic" health and "search works".
 
 ### Milestone 1 — KVM / Brain Server image with a bundled embedder

@@ -10,10 +10,14 @@ import {
   assessReleaseAssets,
   belongsToVersion,
   collectLinuxDesktopAssets,
+  collectMiniAssets,
   computeSha256Hex,
   ensureMatchingSha256,
   formatSha256Line,
+  miniNotesBlock,
+  miniZipFileName,
   parseSha256Line,
+  refreshMiniNotes,
   refreshWindowsNotes,
   validateUpdateManifest,
   versionFromTag,
@@ -33,6 +37,7 @@ describe('belongsToVersion', () => {
     expect(belongsToVersion('Pomnia-0.1.82.deb', '0.1.82')).toBe(true)
     expect(belongsToVersion('pomnia_0.1.82_amd64.deb', '0.1.82')).toBe(true)
     expect(belongsToVersion('pomnia-brain-core-0.1.82-linux-x64.tar.gz', '0.1.82')).toBe(true)
+    expect(belongsToVersion('PomniaMini-0.1.82.zip', '0.1.82')).toBe(true)
     expect(belongsToVersion('Pomnia-0.1.81.AppImage', '0.1.82')).toBe(false)
   })
 })
@@ -53,6 +58,8 @@ describe('assessReleaseAssets', () => {
     'Pomnia-0.1.82-x64.dmg.sha256',
     'pomnia-brain-core-0.1.82-linux-x64.tar.gz',
     'pomnia-brain-core-0.1.82-linux-x64.tar.gz.sha256',
+    'PomniaMini-0.1.82.zip',
+    'PomniaMini-0.1.82.zip.sha256',
   ]
 
   it('passes a full version-matched set', () => {
@@ -82,6 +89,18 @@ describe('assessReleaseAssets', () => {
     expect(r.missing).toContain('Windows installer')
     expect(r.missing).toContain('brain-core tarball')
     expect(r.missing).toContain('Linux AppImage')
+    expect(r.missing).toContain('Pomnia Mini zip')
+  })
+
+  it('does not treat the portable exe or a -portable.zip as the Mini download', () => {
+    const withoutMini = complete.filter((n) => !n.startsWith('PomniaMini-'))
+    const r = assessReleaseAssets(
+      [...withoutMini, 'PomniaMini-0.1.82-portable.exe', 'PomniaMini-0.1.82-portable.zip'],
+      version,
+    )
+    expect(r.complete).toBe(false)
+    expect(r.missing).toContain('Pomnia Mini zip')
+    expect(r.missing).toContain('Pomnia Mini SHA-256')
   })
 
   it('names missing Linux server assets like public v0.1.82', () => {
@@ -231,5 +250,84 @@ describe('refreshWindowsNotes', () => {
     const out = refreshWindowsNotes(staleBody(OLD).replace(/\n/g, '\r\n'), { version: '0.1.91', sizeMb: '145.65', commit: '68680c9', sha256: NEW })
     expect(out).toContain(NEW)
     expect(out).not.toContain(OLD)
+  })
+})
+
+describe('mini zip naming', () => {
+  it('names the download PomniaMini-<version>.zip', () => {
+    expect(miniZipFileName('0.1.91')).toBe('PomniaMini-0.1.91.zip')
+    expect(() => miniZipFileName('v0.1.91')).toThrow(/0\.1\.91/)
+  })
+})
+
+describe('collectMiniAssets', () => {
+  it('plans the zip and writes a sidecar', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pomnia-mini-'))
+    const name = miniZipFileName('0.1.91')
+    writeFileSync(join(dir, name), 'mini-bytes')
+    const r = collectMiniAssets({ releaseDir: dir, version: '0.1.91' })
+    expect(r.ok).toBe(true)
+    expect(r.present).toBe(true)
+    expect(r.assets.some((p) => p.endsWith(name))).toBe(true)
+    expect(r.assets.some((p) => p.endsWith(`${name}.sha256`))).toBe(true)
+    expect(r.sha256).toBe(computeSha256Hex('mini-bytes'))
+  })
+
+  it('refuses a portable zip in place of the download', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pomnia-mini-'))
+    writeFileSync(join(dir, 'PomniaMini-0.1.91-portable.zip'), 'nope')
+    const r = collectMiniAssets({ releaseDir: dir, version: '0.1.91' })
+    expect(r.ok).toBe(false)
+    expect(r.present).toBe(false)
+    expect(r.errors.join(' ')).toMatch(/portable/)
+  })
+
+  it('is absent when the directory is missing', () => {
+    const r = collectMiniAssets({ releaseDir: join(tmpdir(), 'pomnia-mini-missing'), version: '0.1.91' })
+    expect(r.ok).toBe(true)
+    expect(r.present).toBe(false)
+  })
+})
+
+describe('refreshMiniNotes', () => {
+  const OLD = 'B'.repeat(64)
+  const NEW = 'C'.repeat(64)
+  const WIN = 'D'.repeat(64)
+  const body = (sha: string) =>
+    `Pomnia 0.1.91\n\n${windowsNotesBlock({ version: '0.1.91', sizeMb: '145.65', commit: '68680c9', sha256: WIN })}\n\n` +
+    `${miniNotesBlock({ version: '0.1.91', sizeMb: '80.00', commit: 'aaaaaaaa', sha256: sha })}\n`
+
+  it('appends the zip instructions when the release has none', () => {
+    const out = refreshMiniNotes('Pomnia 0.1.91\n', {
+      version: '0.1.91',
+      sizeMb: '90.00',
+      commit: 'abc1234',
+      sha256: NEW,
+    })
+    expect(out).toContain('Download `PomniaMini-0.1.91.zip`')
+    expect(out).toContain('unpack it once')
+    expect(out).toContain('not the download')
+    expect(out).toContain('Get-FileHash PomniaMini-0.1.91.zip')
+    expect(out).toContain(NEW)
+  })
+
+  it('replaces the Mini hash and leaves the installer hash alone', () => {
+    const out = refreshMiniNotes(body(OLD), {
+      version: '0.1.91',
+      sizeMb: '91.25',
+      commit: 'bbbbbbb',
+      sha256: NEW,
+    })
+    expect(out).toContain('91.25 MB · built from `bbbbbbb`')
+    expect(out).toContain(NEW)
+    expect(out).not.toContain(OLD)
+    expect(out).toContain(WIN)
+    expect(out).toContain('**Windows installer**')
+  })
+
+  it('is idempotent', () => {
+    const opts = { version: '0.1.91', sizeMb: '91.25', commit: 'bbbbbbb', sha256: NEW }
+    const once = refreshMiniNotes(body(OLD), opts)
+    expect(refreshMiniNotes(once, opts)).toBe(once)
   })
 })

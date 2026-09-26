@@ -6,7 +6,7 @@
 
 Pomnia Desktop (Windows / macOS / Linux) collects chats from assistants (Claude Code, Codex, Cursor, Claude Desktop, Antigravity, VS Code, Continue) **and** imports from exports (Claude.ai, ChatGPT, Gemini, Grok) plus documents (PDF, DOCX, EPUB) into one vault — with search (**Chats**), distill via Ollama, and Brain on `127.0.0.1:7862`.
 
-**Pomnia Mini** ships alongside it in every release: the same app with no vault of its own, talking to a Brain server you already run. It has Connect, Settings, Skills, Prompts and an ingest screen, and it is the build to reach for on a machine you do not want to leave a vault on. Take the `.zip` — the portable `.exe` unpacks itself to `%TEMP%` on every launch, measured at about 70 seconds each time.
+**Pomnia Mini** ships alongside it on the same GitHub Release: the same app with no vault of its own, talking to a Brain server you already run. It has Connect, Settings, Skills, Prompts and an ingest screen, and it is the build to reach for on a machine you do not want to leave a vault on. Download **`PomniaMini-<version>.zip`**, unpack it once, and run `PomniaMini.exe`. That zip is the Mini build. A portable `.exe` is a different file — it unpacks into `%TEMP%` on every launch, measured at about 70 seconds — and it is not the download.
 
 I have run this on my own machines every working day since early 2026, and the vault
 behind this sentence holds 7269 indexed files across 8102 chunks as of 2026-09-10.
@@ -103,7 +103,7 @@ On Import: when the text layer is sparse → OCR runs (`tesseract.js`, eng+pol),
 
 | Symptom | What to do |
 |-------|-----------|
-| Distill won’t start | Ollama offline or missing distill model — Brain → Pull model |
+| Distill won’t start | Ollama offline, or `llama3.1:8b` / `nomic-embed-text` not pulled. The app blocks with a checklist (install link or `ollama pull …`) and does not mark the backlog done |
 | No Brain results | Missing `nomic-embed-text` |
 | Cursor “Not connected” | Snippet from Connect; restart Cursor |
 | Cursor 0 chats after backup | Large `state.vscdb` — use **Import** instead of live backup |
@@ -119,7 +119,19 @@ On Import: when the text layer is sparse → OCR runs (`tesseract.js`, eng+pol),
 
 Unsigned builds can trip heuristics (Electron + vault I/O). Never disable AV.
 
-**Installers** — Windows: **`npm run release:win` is the only allowed path** to a shippable `.exe` (clean tree → build `brain-core` + `doc-parser` → typecheck → tests → patch bump + `Release X.Y.Z` commit → `build:win` with injected build identity). Do not bump version by hand and run `pack:win` / `build:win` alone for a release. Mac: `npm run pack:mac` (local). Releases: [GitHub Releases](https://github.com/lobrzut/pomnia/releases).
+**Installers** — Windows: **`npm run release:win` is the only allowed path** to a shippable `.exe` (clean tree → build `brain-core` + `doc-parser` → typecheck → tests → patch bump + `Release X.Y.Z` commit → `build:win` with injected build identity → Mini zip for that same version). Do not bump version by hand and run `pack:win` / `build:win` alone for a release.
+
+**Pomnia Mini zip** — **`npm run release:mini` is the only allowed path** to `release/mini/PomniaMini-<version>.zip`. It does **not** bump the version (Mini uses the version `release:win` already committed). It refuses a dirty tree, runs the same typecheck / test / golden gates, builds with `--mode mini`, and packs the zip only. Upload it onto the existing release with **`npm run attach:mini-release`** (the release for the current version is `v` + `package.json`; pass `--tag` only when attaching somewhere else). `publish:release` includes the zip when it is already in `release/mini/`.
+
+To put Mini on the current public release (0.1.91) without cutting a new version, on the Windows machine you already use for `release:win`, from a clean checkout of that version **after this naming is on the commit** (`attach:mini-release` refuses an older `PomniaMini-<version>-portable.zip`):
+
+```bash
+npm ci
+npm run release:mini
+npm run attach:mini-release
+```
+
+Mac: `npm run pack:mac` (local). Releases: [GitHub Releases](https://github.com/lobrzut/pomnia/releases).
 
 Logs: `%AppData%/Pomnia/logs/` (Windows).
 
@@ -133,8 +145,11 @@ npm run generate:build-info   # writes src/buildInfo.ts (version · git sha · t
 npm run dev          # Electron + hot reload (regenerates buildInfo first)
 npm test             # vitest
 npm run build        # bundle → out/ (regenerates buildInfo)
-npm run release:win  # ONLY path to Windows installer (see above)
+npm run release:win  # ONLY path to Windows installer (see above); also packs the Mini zip
 npm run build:win    # pack only — used by release:win after the Release commit
+npm run release:mini # ONLY path to PomniaMini-<version>.zip (no version bump)
+npm run attach:mini-release   # upload that zip onto the existing GitHub Release
+npm run dev:mini     # Mini flavour, hot reload
 npm run pack:mac     # DMG / macOS app
 ```
 
