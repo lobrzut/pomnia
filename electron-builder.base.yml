@@ -1,0 +1,187 @@
+# Shared electron-builder config for Desktop and Mini.
+#
+# The staged embedded Brain is NOT in this file. electron-builder concatenates
+# `extraResources` across `extends` (deepAssign), so a child config cannot drop
+# an entry it inherits — that is why Mini used to ship ~25 MB of
+# resources/brain-core. The runtime (build/brain-core-runtime-v2 → brain-core)
+# lives only in electron-builder.yml.
+#
+# Mini extends this file. Desktop extends it too, and electron-builder.yml is
+# the default name, so `electron-builder` with no `--config` still embeds Brain
+# (build:win, pack:mac, build:linux, release-mac.yml, release-linux.yml).
+#
+# Do not put an array here that a flavour must replace (win.target, or a
+# brain-core extraResources entry). Scalars and objects override; arrays concat.
+#
+# Windows Authenticode: set CSC_LINK + CSC_KEY_PASSWORD (see docs/CODE-SIGNING.md).
+# Without a cert, builds stay unsigned; SmartScreen/Defender noise is expected.
+
+appId: ai.pomnia.app
+productName: Pomnia
+copyright: Copyright © 2026 Pomnia
+directories:
+  output: release
+  buildResources: resources
+# Publishing target for the release assets. `--publish never` stays the default
+# for local packs; this only tells electron-builder where a release lives so it
+# emits latest.yml alongside the installer. That file carries the artifact's
+# sha512 and is what makes the download verifiable — it was generated locally
+# and never uploaded, so the checksum reached nobody.
+publish:
+  provider: github
+  owner: lobrzut
+  repo: pomnia
+  releaseType: release
+files:
+  - out/**/*
+  - resources/icon.ico
+  - resources/icon.png
+  - "!**/*.{map,md}"
+  - "!**/*.bak*"
+  # Server-only embedding stack. brain-core declares @huggingface/transformers so
+  # a KVM appliance can embed without Ollama; npm workspaces hoist it to the root,
+  # so electron-builder walked into it from @pomnia/brain-core and packed
+  # onnxruntime-node -- every platform it supports, including the two this build
+  # can never load. The desktop has no code path that selects that backend, and
+  # the import is dynamic, so excluding it costs nothing and saves ~175 MB.
+  #
+  # onnxruntime-web was missed by that list and kept shipping: 74 MB of WASM in
+  # every build, four variants of one runtime (jsep 25, asyncify 23, jspi 14,
+  # plain 13 MB) of which exactly one could ever load. Measured before removing
+  # it: no reference in out/main, out/preload or out/renderer; both imports, in
+  # rag/embed.js and rag/rerank.js, are dynamic; and the shipped
+  # resources/brain-core carries its own node_modules holding neither
+  # transformers nor onnx, so Node resolution from there never reaches
+  # app.asar.unpacked. The backend was already unreachable — this stops paying
+  # to carry it.
+  #
+  # If the embedded Brain ever has to embed without Ollama, the fix is to stage
+  # transformers into resources/brain-core, not to restore these: they were
+  # never on a path it could load from.
+  - "!**/node_modules/@huggingface/**"
+  - "!**/node_modules/onnxruntime-node/**"
+  - "!**/node_modules/onnxruntime-common/**"
+  - "!**/node_modules/onnxruntime-web/**"
+  # npm workspaces → junction/symlink; electron-builder skips them unless copied explicitly.
+  # Main should bundle doc-parser + mammoth/unpdf/bluebird (electron.vite.config).
+  # Safety net: still ship those packages into asar if any bare import remains.
+  - from: packages/doc-parser
+    to: node_modules/@pomnia/doc-parser
+    filter:
+      - package.json
+      - dist/**/*
+  - from: packages/brain-core
+    to: node_modules/@pomnia/brain-core
+    filter:
+      - package.json
+      - dist/**/*
+  # Top-level bluebird (root dep) — required for residual subpath imports
+  # like bluebird/js/release/promise from out/main.
+  - from: node_modules/bluebird
+    to: node_modules/bluebird
+  - from: node_modules/mammoth
+    to: node_modules/mammoth
+  - from: node_modules/unpdf
+    to: node_modules/unpdf
+  # mammoth transitive deps (hoisted or nested) — cover residual requires
+  - from: node_modules/@xmldom/xmldom
+    to: node_modules/@xmldom/xmldom
+  - from: node_modules/argparse
+    to: node_modules/argparse
+  - from: node_modules/base64-js
+    to: node_modules/base64-js
+  - from: node_modules/dingbat-to-unicode
+    to: node_modules/dingbat-to-unicode
+  - from: node_modules/jszip
+    to: node_modules/jszip
+  - from: node_modules/lop
+    to: node_modules/lop
+  - from: node_modules/path-is-absolute
+    to: node_modules/path-is-absolute
+  - from: node_modules/underscore
+    to: node_modules/underscore
+  - from: node_modules/xmlbuilder
+    to: node_modules/xmlbuilder
+  - from: node_modules/tesseract.js
+    to: node_modules/tesseract.js
+  - from: node_modules/tesseract.js-core
+    to: node_modules/tesseract.js-core
+  - from: node_modules/@napi-rs/canvas
+    to: node_modules/@napi-rs/canvas
+  - from: node_modules/pdfjs-dist
+    to: node_modules/pdfjs-dist
+
+asarUnpack:
+  - "**/*.wasm"
+  - "**/node_modules/@napi-rs/canvas/**/*"
+  - "**/node_modules/tesseract.js-core/**/*"
+# Shared extraResources only. Desktop appends the embedded Brain runtime in
+# electron-builder.yml. The asar copy of packages/brain-core (above, under
+# files:) stays here: Mini still imports @pomnia/brain-core/vault. That copy is
+# dist JS, not the staged runtime under resources/brain-core.
+extraResources:
+  - from: resources/tessdata
+    to: tessdata
+    filter:
+      - "**/*"
+      - "!**/.gitkeep"
+  # Color brand tray icons outside asar — path-based Tray so @2x is discovered on disk.
+  - from: resources/trayIcon.png
+    to: trayIcon.png
+  - from: "resources/trayIcon@2x.png"
+    to: "trayIcon@2x.png"
+  - from: resources/ollama-relay.py
+    to: ollama-relay.py
+# win.target is set by the flavour file. Listing it here would be concatenated
+# with Mini's portable+zip and Mini would also build an NSIS installer.
+win:
+  icon: resources/icon.ico
+  executableName: Pomnia
+  # Must match Authenticode certificate Subject CN when you sign.
+  publisherName: Pomnia
+  artifactName: ${productName}-${version}-setup.${ext}
+  # Signing is automatic when CSC_LINK / WIN_CSC_LINK is set. Do not force-sign
+  # without a cert (CI/local unsigned packs would fail).
+  # forceCodeSigning: true
+  # Optional local PFX (prefer CSC_LINK env — never commit certs):
+  # certificateFile: C:\\secure\\pomnia-codesign.pfx
+  # certificatePassword: ${env.CSC_KEY_PASSWORD}
+  requestedExecutionLevel: asInvoker
+  # No fileAssociations — avoids extra shell/AV surface for a vault app.
+# nsis: lives in electron-builder.yml. Mini does not ship an installer.
+# macOS: one architecture per pack. CI runs two jobs (`--arm64` / `--x64`) so
+# native modules (better-sqlite3, sqlite-vec, canvas) match the DMG. Packing
+# both archs from one Apple Silicon stage copied arm64 .node into the Intel
+# app — it launched, then died on the first library.db query.
+mac:
+  target:
+    - target: dmg
+  category: public.app-category.utilities
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  # Sonoma/Sequoia: without this, LAN fetch to Ollama/Brain can fail while curl works.
+  extendInfo:
+    NSLocalNetworkUsageDescription: >-
+      Pomnia łączy się z Ollamą i serwerem Brain w Twojej sieci lokalnej,
+      żeby destylować rozmowy i szukać w vault.
+    NSBonjourServices:
+      - _http._tcp
+# Linux: build on Linux (or ubuntu-latest CI). AppImage needs Linux host —
+# Windows cannot cross-produce a working AppImage with native better-sqlite3.
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Utility
+  icon: resources/icon.png
+  executableName: Pomnia
+  artifactName: ${productName}-${version}.${ext}
+  synopsis: Local-first AI memory — encrypted vault, MCP-native Brain
+  description: >-
+    Pomnia — one encrypted memory your AI agents share. Local-first,
+    MCP-native: encrypted vault, distill pipeline, embedded Brain.
+  desktop:
+    Name: Pomnia
+    Comment: Local-first AI memory
+    Categories: Utility;
+    StartupWMClass: Pomnia
+
