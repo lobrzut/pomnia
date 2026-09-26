@@ -216,10 +216,10 @@ Rules: [SECURITY.md](SECURITY.md).
 - [x] Brain pipeline Collect→Distill→Index (CLI + GUI)
 - [ ] Map-reduce for very long conversations
 - [ ] Incremental backup by mtime
-- [ ] Vault sync (git-remote / S3 / WebDAV)
+- [ ] Cloud vault sync (git-remote / S3 / WebDAV) — not shipped. Copying a vault between your own machines is self-hosted replica (brain-core), not cloud sync — [docs/LINUX-SELF-HOSTED.md](docs/LINUX-SELF-HOSTED.md)
 - [ ] Backup schedules (CLI + Task Scheduler / launchd)
 - [ ] Signed installers
-- [ ] Linux AppImage/deb via CI ([docs/LINUX-BUILD.md](docs/LINUX-BUILD.md)) — configure shipped; premiere artifact from `ubuntu-latest`
+- [x] Linux AppImage and deb — on current GitHub Releases ([docs/LINUX-BUILD.md](docs/LINUX-BUILD.md), [docs/LINUX-SELF-HOSTED.md](docs/LINUX-SELF-HOSTED.md))
 
 ---
 

@@ -736,6 +736,17 @@ export interface UiLabels {
   sourceMcpUnreachable: string
   sourceChatsCount: (n: number) => string
   sourceNoChats: string
+  /** Cursor tile when state.vscdb is over the parse cap and no transcripts exist. */
+  sourceChatsUnreadable: string
+  cursorEmptyCaptureTitle: string
+  /** Scan proved the database was skipped and no agent transcripts exist. */
+  cursorEmptyCaptureDetail: string
+  /** A Cursor snapshot sealed 0 chats; the scan flag may be gone after restart. */
+  cursorEmptyCaptureUnknown: string
+  /** Import was given state.vscdb (or a similar database), which this tab does not parse. */
+  cursorEmptyCaptureFile: string
+  cursorEmptyCaptureNext: string
+  cursorEmptyCaptureAction: string
   detectedOnMachine: string
   notFound: string
   customOverride: string
@@ -1773,6 +1784,17 @@ const PL_LABELS: UiLabels = {
   sourceMcpUnreachable: '⚠️ Nie odpowiada — MCP nie wskazuje na ten Brain',
   sourceChatsCount: (n) => `${n} rozmów`,
   sourceNoChats: 'brak czatów do wyciągnięcia',
+  sourceChatsUnreadable: 'czaty nieczytelne (DB > 256 MB)',
+  cursorEmptyCaptureTitle: 'Cursor: 0 czatów',
+  cursorEmptyCaptureDetail:
+    'Backup się wykonał. state.vscdb ma ponad 256 MB, więc Pomnia nie czyta go w aplikacji — pełne parsowanie zawiesiłoby program. Nie ma też transkryptów agenta w ~/.cursor/projects, więc ta lista zostaje pusta. Backup nie jest zepsuty.',
+  cursorEmptyCaptureUnknown:
+    'Ten backup Cursora zapisał 0 rozmów. Tak jest, gdy state.vscdb ma ponad 256 MB (parsowanie pominięte) albo gdy nie ma lokalnych czatów ani transkryptów agenta.',
+  cursorEmptyCaptureFile:
+    'To baza Cursora (state.vscdb), nie eksport czatów. Import jej nie czyta — duży plik jest pomijany, żeby aplikacja się nie zawiesiła.',
+  cursorEmptyCaptureNext:
+    'Dalej: wgraj eksport czatów (ZIP, JSON lub JSONL) albo zmniejsz bazę Cursora i zrób backup jeszcze raz. Transkrypty agenta, gdy są, wchodzą same.',
+  cursorEmptyCaptureAction: 'Otwórz Import',
   detectedOnMachine: 'Wykryty na tym komputerze',
   notFound: 'Nie znaleziono',
   customOverride: 'własne',
@@ -2820,6 +2842,17 @@ const EN_LABELS: UiLabels = {
   sourceMcpUnreachable: '⚠️ Not responding — MCP does not point at this Brain',
   sourceChatsCount: (n) => `${n} chats`,
   sourceNoChats: 'no chats to capture',
+  sourceChatsUnreadable: 'chats unreadable (DB > 256 MB)',
+  cursorEmptyCaptureTitle: 'Cursor captured 0 chats',
+  cursorEmptyCaptureDetail:
+    'The backup finished. state.vscdb is over 256 MB, so Pomnia does not read it in the app — a full parse would freeze. No agent transcripts were found under ~/.cursor/projects, so this list stays empty. The backup is not broken.',
+  cursorEmptyCaptureUnknown:
+    'This Cursor backup stored 0 conversations. That happens when state.vscdb is over 256 MB (parse skipped) or when there are no local chats and no agent transcripts.',
+  cursorEmptyCaptureFile:
+    'This is a Cursor database (state.vscdb), not a chat export. Import does not read it — a large file is skipped so the app does not freeze.',
+  cursorEmptyCaptureNext:
+    'Next: bring a ZIP, JSON, or JSONL chat export, or shrink the Cursor database and run backup again. Agent transcripts are included when they exist.',
+  cursorEmptyCaptureAction: 'Open Import',
   detectedOnMachine: 'Detected on this machine',
   notFound: 'Not found',
   customOverride: 'custom override',

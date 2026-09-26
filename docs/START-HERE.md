@@ -119,7 +119,8 @@ If the Cursor backup shows 0 chats, use Import.
 | System status | Dashboard → the "Where you are now" bar · Settings → Diagnostics |
 | Logs | `%AppData%/pomnia/logs/` |
 | The full document pipeline | [DOCUMENT-PIPELINE.md](./DOCUMENT-PIPELINE.md) |
-| Homelab Brain integration | [BRAIN-INTEGRATION.md](./BRAIN-INTEGRATION.md) (internal/historical) |
+| Self-hosted Brain (your own machine or server) | [LINUX-SELF-HOSTED.md](./LINUX-SELF-HOSTED.md) — brain-core, not the old Python hub |
+| Archived Python hub (`:7860` / Continuum) | [BRAIN-INTEGRATION.md](./BRAIN-INTEGRATION.md) — superseded, not a setup guide |
 
 ## What this beta still does not have
 
