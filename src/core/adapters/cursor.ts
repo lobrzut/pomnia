@@ -381,9 +381,13 @@ export const cursorAdapter: Adapter = {
     if (tooLarge) {
       const light = st ? await countCursorComposersLight(st.path) : null
       // Prefer parseable agent-transcripts (messages). Light COUNT is keys only — may include empty shells.
+      // Do not report that key count as chats: backup will not extract them, and a "N chats" tile
+      // followed by an empty list looks like a failed backup.
       if (agentCount > 0) d.conversations = agentCount
-      else if (light != null) d.conversations = light
-      else d.conversations = undefined
+      else {
+        d.conversations = 0
+        d.unreadableChats = 'cursor-db-too-large'
+      }
       const bits = [
         `state.vscdb is ${fmtBytes(st!.size)} — full in-app SQLite parse skipped (sql.js would freeze).`
       ]
