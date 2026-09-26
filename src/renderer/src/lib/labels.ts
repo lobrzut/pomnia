@@ -3,6 +3,8 @@
 /** Polish + English UI chrome labels. Brain knowledge stays auto bilingual (no knowledgeLang). */
 
 import type { VramProfileId } from '@core/brain/profiles'
+import type { VersionSkewAssessment } from '@core/brain/versionSkew'
+import { formatVersionSkew } from '@core/brain/versionSkew'
 import { formatPipelineProgressLabel } from '@core/pipelineLabels.js'
 import type { ActivityState } from './types'
 import { getUiLocale } from './uiLocale'
@@ -865,6 +867,13 @@ export interface UiLabels {
   healthChatModel: string
   healthBrainCore: string
   healthMcp: string
+  healthVersions: string
+  healthNotice: string
+  /** Short status-strip label when Desktop and Brain are not the same release. */
+  versionSkewShort: string
+  versionSkewPair: (client: string | null, brain: string | null) => string
+  /** Full warning. Empty when the assessment is a quiet match. */
+  versionSkew: (assessment: VersionSkewAssessment) => string
   healthDeployPath: string
   healthOpenLogs: string
   healthOk: string
@@ -1887,6 +1896,11 @@ const PL_LABELS: UiLabels = {
   healthChatModel: 'Model destylacji',
   healthBrainCore: 'Lokalna wyszukiwarka',
   healthMcp: 'Brain MCP',
+  healthVersions: 'Wersje',
+  healthNotice: 'Uwaga',
+  versionSkewShort: 'inne wydanie',
+  versionSkewPair: (client, brain) => `Desktop ${client ?? '—'} · Brain ${brain ?? '—'}`,
+  versionSkew: (a) => formatVersionSkew(a, 'pl') ?? '',
   healthDeployPath: 'Folder deploy (opcjonalnie)',
   healthOpenLogs: 'Otwórz logi',
   healthOk: 'OK',
@@ -2792,6 +2806,11 @@ const EN_LABELS: UiLabels = {
   healthChatModel: 'Distill model',
   healthBrainCore: 'Local search',
   healthMcp: 'Brain MCP',
+  healthVersions: 'Versions',
+  healthNotice: 'Notice',
+  versionSkewShort: 'different release',
+  versionSkewPair: (client, brain) => `Desktop ${client ?? '—'} · Brain ${brain ?? '—'}`,
+  versionSkew: (a) => formatVersionSkew(a, 'en') ?? '',
   healthDeployPath: 'Deploy folder (optional)',
   healthOpenLogs: 'Open logs',
   healthOk: 'OK',

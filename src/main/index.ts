@@ -1823,6 +1823,13 @@ description:
   )
 
   trustedHandle('brainCore:status', () => brainCore.status())
+  // Read-only /healthz. connect:status also pings, then rewrites MCP configs —
+  // the dashboard must not do that on a timer just to read a version.
+  trustedHandle('brain:healthz', async (_e, url?: string) => {
+    const fromCore = brainCore.status().url
+    const base = (typeof url === 'string' && url.trim()) || fromCore || 'http://127.0.0.1:7862'
+    return pingBrain(base.replace(/\/+$/, '').replace(/\/mcp$/, ''))
+  })
   trustedHandle('brainCore:start', async (_e, ollamaUrl?: string) => {
     const { configured, transport } = await resolveOllamaTransport(ollamaUrl)
     activity.update({ kind: 'brain-start', phase: 'start', detail: m().checkingOllama })

@@ -5,6 +5,8 @@ import clsx from 'clsx'
 import { BrainCircuit, Clock, Database, FileText, Sparkles, Stethoscope } from 'lucide-react'
 import { GlassCard, Spinner } from './ui'
 import { api } from '../lib/api'
+import { EMBEDDED_BRAIN_DEFAULT_URL } from '@core/brain/snippet'
+import { assessHealthPayload, type VersionSkewAssessment } from '@core/brain/versionSkew'
 import { shortPath, relativeTime } from '../lib/format'
 import { uiLabels } from '../lib/labels'
 import { loadDoctorLastResult } from '../lib/doctorLastResult'
@@ -38,6 +40,7 @@ export function StatusStrip() {
   const [ollama, setOllama] = useState<BrainStatus | null>(() => stripCache?.ollama ?? null)
   const [core, setCore] = useState<EmbeddedBrainStatus | null>(() => stripCache?.core ?? null)
   const [remoteOk, setRemoteOk] = useState<boolean | null>(null)
+  const [versionSkew, setVersionSkew] = useState<VersionSkewAssessment | null>(null)
   const [localBrainState, setLocalBrainState] = useState<BrainStateInfo | null>(
     () => stripCache?.state ?? brainState
   )
@@ -49,11 +52,8 @@ export function StatusStrip() {
     setChecking(true)
     // Re-read against the running build: a FAIL recorded on an older build (or a
     // stale one) is discarded rather than shown next to five green live probes.
-    const identity = await api
-      .appVersion()
-      .then((v) => v.identity)
-      .catch(() => undefined)
-    setDoctorHasFail(loadDoctorLastResult(identity)?.hasFail === true)
+    const ver = await api.appVersion().catch(() => null)
+    setDoctorHasFail(loadDoctorLastResult(ver?.identity)?.hasFail === true)
     try {
       const remote = brainTarget === 'remote'
       const [status, coreStatus, state, conn] = await Promise.all([
@@ -69,9 +69,21 @@ export function StatusStrip() {
               .catch(() => null)
           : Promise.resolve(null),
       ])
+      // Embedded: a read-only /healthz, and only once the child is up.
+      // connect:status would rewrite MCP configs on this 30s timer.
+      // A stopped core is "not running", not "no version".
+      const embeddedHealth =
+        !remote && coreStatus?.running
+          ? await api
+              .brainHealthz(coreStatus.url || EMBEDDED_BRAIN_DEFAULT_URL)
+              .catch(() => null)
+          : null
+      const healthBody = remote ? conn?.brain.data : embeddedHealth?.data
+      const skew = assessHealthPayload(ver?.version, healthBody)
       setOllama(status)
       setCore(coreStatus)
       setRemoteOk(conn ? !!conn.brain.reachable : remote ? false : null)
+      setVersionSkew(skew && skew.level === 'warn' ? skew : null)
       setLocalBrainState(state)
       stripCache = { ollama: status, core: coreStatus, state }
     } finally {
@@ -94,9 +106,13 @@ export function StatusStrip() {
       ? relativeTime(localBrainState?.lastRun ?? brainState?.lastRun ?? '')
       : labels.statusNoDistill
 
+  const skewNote = versionSkew && versionSkew.level === 'warn' ? versionSkew : null
   const brainPending = isRemoteBrain
     ? checking && remoteOk === null
     : checking && core === null
+  const brainUp = brainPending ? null : isRemoteBrain ? remoteOk : (core?.running ?? false)
+  // Amber only while the Brain is actually up. A dead host stays red.
+  const showVersionSkew = skewNote !== null && brainUp !== false
   const ollamaPending = !isRemoteBrain && checking && ollama === null
 
   const items: StripItem[] = [
@@ -115,16 +131,22 @@ export function StatusStrip() {
       label: labels.statusBrain,
       value: brainPending
         ? labels.statusChecking
-        : isRemoteBrain
-          ? labels.statusBrainRemote
-          : core?.running
-            ? labels.statusBrainRunning
-            : labels.statusBrainStopped,
-      detail: isRemoteBrain && remoteBrainUrl.trim()
-        ? shortPath(remoteBrainUrl.trim(), 28)
-        : undefined,
-      ok: brainPending ? null : isRemoteBrain ? remoteOk : (core?.running ?? false),
-      tab: isRemoteBrain ? 'connect' : 'brain'
+        : showVersionSkew
+          ? labels.versionSkewShort
+          : isRemoteBrain
+            ? labels.statusBrainRemote
+            : core?.running
+              ? labels.statusBrainRunning
+              : labels.statusBrainStopped,
+      detail: skewNote
+        ? labels.versionSkewPair(skewNote.client, skewNote.brain ?? skewNote.brainReported)
+        : isRemoteBrain && remoteBrainUrl.trim()
+          ? shortPath(remoteBrainUrl.trim(), 28)
+          : undefined,
+      // Amber only while the Brain is up. A dead host stays red; the version
+      // pair still sits in the detail when the body named a release.
+      ok: brainPending ? null : showVersionSkew ? null : isRemoteBrain ? remoteOk : (core?.running ?? false),
+      tab: skewNote || isRemoteBrain ? 'connect' : 'brain'
     },
     {
       id: 'ollama',

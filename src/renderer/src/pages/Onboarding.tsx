@@ -30,6 +30,7 @@ import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
 import { useStore, ollamaUrlFromBrainUrl, ollamaUrlLooksLocal } from '../store/useStore'
 import { identifyEngine } from '@core/brain/engine'
+import { assessHealthPayload, type VersionSkewAssessment } from '@core/brain/versionSkew'
 import { hasOllamaModel } from '@core/brain/modelMatch'
 import { defaultChatModel } from '@core/brain/profiles'
 import { EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from '@core/brain/snippet'
@@ -489,6 +490,7 @@ function EngineStep({
   const [remoteTesting, setRemoteTesting] = useState(false)
   const [remoteOk, setRemoteOk] = useState<boolean | null>(null)
   const [remoteDetail, setRemoteDetail] = useState('')
+  const [remoteVersionSkew, setRemoteVersionSkew] = useState<VersionSkewAssessment | null>(null)
   const [pull, setPull] = useState<OllamaPullEvent | null>(null)
   const [pullError, setPullError] = useState<string | null>(null)
 
@@ -503,6 +505,7 @@ function EngineStep({
     if (!url) return
     setRemoteTesting(true)
     setRemoteOk(null)
+    setRemoteVersionSkew(null)
     try {
       const r = await api.connectStatus(url, undefined, 'remote')
       if (!r.brain.reachable) {
@@ -517,6 +520,13 @@ function EngineStep({
           ? labels.onboardingEngineRemoteOk
           : labels.onboardingEngineRemoteWrongEngine(engine.label),
       )
+      // Compatible still leaves the release unsaid. A mismatch stays a warning
+      // under the green line — it does not fail the test or block the wizard.
+      if (engine.compatible) {
+        const ver = await api.appVersion().catch(() => null)
+        const skew = assessHealthPayload(ver?.version, r.brain.data)
+        setRemoteVersionSkew(skew && skew.level === 'warn' ? skew : null)
+      }
     } catch (e) {
       setRemoteOk(false)
       setRemoteDetail((e as Error).message)
@@ -684,6 +694,7 @@ function EngineStep({
               onChange={(e) => {
                 setRemoteUrl(e.target.value)
                 setRemoteOk(null)
+                setRemoteVersionSkew(null)
               }}
               placeholder={REMOTE_URL_PLACEHOLDER}
             />
@@ -695,6 +706,11 @@ function EngineStep({
             </Button>
             {remoteOk === true && (
               <span className="text-[11px] font-medium text-mint">{remoteDetail}</span>
+            )}
+            {remoteOk === true && remoteVersionSkew && (
+              <p className="w-full text-[11px] leading-relaxed text-amber" role="status">
+                {labels.versionSkew(remoteVersionSkew)}
+              </p>
             )}
             {remoteOk === false && (
               <span className="text-[11px] text-amber">{remoteDetail}</span>

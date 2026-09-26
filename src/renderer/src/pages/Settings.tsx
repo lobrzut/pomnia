@@ -18,6 +18,7 @@ import { isMcpClientActive } from '../lib/mcpClientVisibility'
 import { hasOllamaModel as hasModel } from '@core/brain/modelMatch'
 import { isMini } from '../lib/flavour'
 import { resolveBrainTarget } from '@core/brain/brainTarget'
+import { assessHealthPayload } from '@core/brain/versionSkew'
 import type { ClientId } from '../lib/types'
 import { defaultChatModel } from '@core/brain/profiles'
 
@@ -25,7 +26,7 @@ const ALL_CLIENTS: ClientId[] = ['claude-code', 'cursor', 'antigravity', 'claude
 
 const EMBEDDED_URL = 'http://127.0.0.1:7862'
 
-type HealthRow = { id: string; label: string; ok: boolean | null; detail: string }
+type HealthRow = { id: string; label: string; ok: boolean | null; detail: string; warn?: boolean }
 
 function HealthCheck() {
   const labels = uiLabels()
@@ -169,6 +170,20 @@ function HealthCheck() {
             ? conn.brain.url
             : conn.brain.error || labels.healthMcpUnreachable
         })
+        const ver = await api.appVersion().catch(() => null)
+        const skew = assessHealthPayload(ver?.version, conn.brain.data)
+        // A match stays off this list. The row exists only when there is
+        // something to do — both versions, and which side to update.
+        // Not gated on HTTP 200: a 503 body can still name its release.
+        if (skew && skew.level === 'warn') {
+          next.push({
+            id: 'versions',
+            label: labels.healthVersions,
+            ok: null,
+            warn: true,
+            detail: labels.versionSkew(skew),
+          })
+        }
       } catch (e) {
         next.push({
           id: 'mcp',
@@ -242,8 +257,13 @@ function HealthCheck() {
               <span
                 className="mt-1 h-2 w-2 shrink-0 rounded-full"
                 style={{
-                  background:
-                    r.ok === true ? '#34d399' : r.ok === false ? '#fb7185' : '#5b6178',
+                  background: r.warn
+                    ? '#fbbf24'
+                    : r.ok === true
+                      ? '#34d399'
+                      : r.ok === false
+                        ? '#fb7185'
+                        : '#5b6178',
                   boxShadow: r.ok === true ? '0 0 8px #34d39980' : undefined
                 }}
               />
@@ -252,7 +272,7 @@ function HealthCheck() {
                 <div className="mt-0.5 break-all font-mono text-[11px] text-ink-dim">{r.detail}</div>
               </div>
               <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-ink-faint">
-                {r.ok === true ? labels.healthOk : r.ok === false ? labels.healthFail : '—'}
+                {r.warn ? labels.healthNotice : r.ok === true ? labels.healthOk : r.ok === false ? labels.healthFail : '—'}
               </span>
             </li>
           ))
