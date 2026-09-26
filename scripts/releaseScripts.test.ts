@@ -76,6 +76,26 @@ describe('release scripts', () => {
     expect(checkAt, 'the check has to come before the undraft, not after').toBeLessThan(undraftAt)
   })
 
+  it('packs Mini on the release:win version without a second bump', () => {
+    const win = readFileSync(join(scriptsDir, 'release-win.mjs'), 'utf8')
+    const mini = readFileSync(join(scriptsDir, 'release-mini.mjs'), 'utf8')
+    const miniCode = mini.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+    expect(win).toContain('npm run release:mini -- --pack-only')
+    expect(miniCode).not.toMatch(/npm version/)
+    expect(miniCode).not.toMatch(/pack:mini:portable/)
+    expect(miniCode).not.toMatch(/\bpack:win\b/)
+    expect(miniCode).not.toMatch(/\bbuild:win\b/)
+    expect(mini).toContain('pack:mini:zip')
+    expect(mini).toContain('build:mini:bundle')
+    expect(mini).toContain("process.platform !== 'win32'")
+
+    const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+    expect(pkg.scripts['build:mini:bundle']).toBe('electron-vite build --mode mini')
+    expect(pkg.scripts['release:mini']).toBe('tsx scripts/release-mini.mjs')
+    expect(pkg.scripts['attach:mini-release']).toBe('tsx scripts/attach-mini-release.mjs')
+  })
+
   it('never forces a push or rewrites a tag', () => {
     for (const { name, text } of releaseScripts) {
       const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')

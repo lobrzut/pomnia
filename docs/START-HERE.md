@@ -8,6 +8,19 @@ A **local application** that collects conversations from every AI assistant into
 
 Nothing leaves for the cloud unless you configure a deploy to your own server.
 
+## Two downloads
+
+Both files belong on the same [GitHub Release](https://github.com/lobrzut/pomnia/releases/latest). The `<version>` in the name is the product version. Mini's download is the zip in the table — if a portable exe is listed beside it, that is not the file to take.
+
+| You want | Download | Then |
+|---|---|---|
+| The full app — vault, distill, embedded Brain on this machine | `Pomnia-<version>-setup.exe` | Run the installer |
+| **Pomnia Mini** — this machine only connects to a Brain server you already run | **`PomniaMini-<version>.zip`** | Unpack the zip **once**, then run `PomniaMini.exe` |
+
+Mini is that zip. Unpack it once; every start after that is a normal program start. Do not use a portable unpacker for Mini — a portable `.exe`, if you see one, extracts into `%TEMP%` on every launch and is not the download.
+
+Mini's screens are Connect, Settings, Skills, Prompts and Import. It does not start Ollama or a local Brain, and it does not hold a vault. The rest of this page is the full app.
+
 > **In the app:** the **How it works** tab (Pomnia Map) in the sidebar — a visual walkthrough of the flow, plus the "Where you are now" bar on the Dashboard. The "I don't know where to start →" link leads there too.
 
 ## Two stores — do not confuse them

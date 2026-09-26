@@ -12,6 +12,7 @@
  * 5. golden path — index coverage / search / handshake / rules (read-only)
  * 6. npm version patch --no-git-tag-version + commit "Release X.Y.Z"
  * 7. npm run build:win  (generates buildInfo from the Release commit, then packs)
+ * 8. npm run release:mini -- --pack-only  (same version, zip only — no second bump)
  *
  * Flags:
  *   --check-clean  only step 1 (exit 0 if clean)
@@ -110,4 +111,13 @@ run(`git commit -m "Release ${version}"`)
 console.log(`\nRelease commit ready (${version}). Building installer with buildInfo from this commit…\n`)
 run('npm run build:win')
 
-console.log(`\n✔ release:win complete — Pomnia ${version}`)
+// Mini ships on this same version. release:mini --pack-only does not bump and
+// does not re-run the gates above; it still refuses a dirty tree and a bundle
+// that is not actually Mini. The backfill path (current tag, no bump) is
+// `npm run release:mini` without --pack-only.
+console.log(`\nPacking Pomnia Mini ${version} (zip only, no version bump)…`)
+console.log('If this pack fails, re-run `npm run release:mini -- --pack-only`.')
+console.log('Do not re-run release:win — the version commit is already made.\n')
+run('npm run release:mini -- --pack-only')
+
+console.log(`\n✔ release:win complete — Pomnia ${version} + PomniaMini-${version}.zip`)
