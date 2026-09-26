@@ -164,6 +164,12 @@ export interface DetectedSource {
   sizeBytes: number
   /** Quick preview counts (conversations) when cheap to compute. */
   conversations?: number
+  /**
+   * Scan saw history on disk that this backup cannot turn into conversations.
+   * `cursor-db-too-large`: state.vscdb is over the in-app parse cap and there
+   * are no agent transcripts, so a backup seals 0 chats on purpose.
+   */
+  unreadableChats?: 'cursor-db-too-large'
   /** Anything notable for the UI (e.g. "WAL present", "cloud-synced"). */
   notes?: string[]
 }

@@ -22,6 +22,7 @@ import {
 import clsx from 'clsx'
 import { AppLogo } from '../components/AppLogo'
 import { Button, Field, Input, ProgressBar, Spinner } from '../components/ui'
+import { CursorEmptyCapture } from '../components/CursorEmptyCapture'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { Hint } from '../components/Hint'
 import { GuideOverlay } from '../components/GuideMap'
@@ -452,6 +453,9 @@ function BackupStep({
           ))}
           {backingUp && (
             <p className="text-xs text-ink-dim">{backupPhase || labels.onboardingBackupBackingUp}</p>
+          )}
+          {picked.some((s) => s.id === 'cursor' && s.unreadableChats === 'cursor-db-too-large') && (
+            <CursorEmptyCapture reason="db-too-large" />
           )}
         </div>
       )}

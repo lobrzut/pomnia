@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { MessagesSquare, Search } from 'lucide-react'
 import { GlassCard, Input, SourceTile, Spinner } from '../components/ui'
+import { CursorEmptyCapture } from '../components/CursorEmptyCapture'
+import { cursorEmptyListReason } from '@core/cursorEmptyCapture'
 import { relativeTime, sourceMeta } from '../lib/format'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
@@ -12,7 +14,7 @@ import { useStore } from '../store/useStore'
 
 export default function Browse() {
   const labels = uiLabels()
-  const { vault } = useStore()
+  const { vault, sources: detectedSources, snapshots, setRoute } = useStore()
   const [list, setList] = useState<ConversationMeta[]>([])
   const [loading, setLoading] = useState(false)
   const [query, setQuery] = useState('')
@@ -69,6 +71,11 @@ export default function Browse() {
     )
 
   const showingHits = hits !== null
+  const cursorEmpty = cursorEmptyListReason({
+    conversationCount: list.length,
+    sources: detectedSources,
+    snapshots,
+  })
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -144,15 +151,19 @@ export default function Browse() {
               })
             )
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-white/10 px-4 py-8 text-center">
-              <MessagesSquare className="h-6 w-6 text-ink-faint" />
-              <p className="text-sm text-ink-dim">
-                {list.length === 0 ? labels.browseEmptyYet : labels.browseEmptySource}
-              </p>
-              <p className="text-[11px] text-ink-faint">
-                {list.length === 0 ? labels.browseEmptyYetHint : labels.browseEmptySourceHint}
-              </p>
-            </div>
+            cursorEmpty && list.length === 0 ? (
+              <CursorEmptyCapture reason={cursorEmpty} onImport={() => setRoute('import')} />
+            ) : (
+              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-white/10 px-4 py-8 text-center">
+                <MessagesSquare className="h-6 w-6 text-ink-faint" />
+                <p className="text-sm text-ink-dim">
+                  {list.length === 0 ? labels.browseEmptyYet : labels.browseEmptySource}
+                </p>
+                <p className="text-[11px] text-ink-faint">
+                  {list.length === 0 ? labels.browseEmptyYetHint : labels.browseEmptySourceHint}
+                </p>
+              </div>
+            )
           ) : (
             filtered.map((c) => {
               const m = sourceMeta(c.source)
