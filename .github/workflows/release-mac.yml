@@ -70,6 +70,9 @@ jobs:
       - name: Stage bundled resources
         run: npm run stage:brain-core && npm run stage:tessdata && npm run generate:build-info
 
+      # No --config on purpose. electron-builder.yml is the desktop layer: it
+      # extends the shared base and adds resources/brain-core. Mini uses
+      # electron-builder.mini.yml and must not be what this job loads.
       - name: Build macOS DMG (${{ matrix.arch }})
         run: npx electron-vite build && npx electron-builder --mac --${{ matrix.arch }} --publish never
         env:
