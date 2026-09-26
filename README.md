@@ -103,7 +103,7 @@ On Import: when the text layer is sparse → OCR runs (`tesseract.js`, eng+pol),
 
 | Symptom | What to do |
 |-------|-----------|
-| Distill won’t start | Ollama offline or missing distill model — Brain → Pull model |
+| Distill won’t start | Ollama offline, or `llama3.1:8b` / `nomic-embed-text` not pulled. The app blocks with a checklist (install link or `ollama pull …`) and does not mark the backlog done |
 | No Brain results | Missing `nomic-embed-text` |
 | Cursor “Not connected” | Snippet from Connect; restart Cursor |
 | Cursor 0 chats after backup | Large `state.vscdb` — use **Import** instead of live backup |

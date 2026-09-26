@@ -1,4 +1,4 @@
-> **Historical** — describes the Python-era KVM stack (a dashboard on `:7860`, an MCP proxy on `:7862`), which is gone. Today the server is one brain-core process on `:7865` serving MCP, the admin panel and `/healthz`, with a built-in embedder — see [CURSOR-MCP.md](./CURSOR-MCP.md) and [LINUX-SELF-HOSTED.md](./LINUX-SELF-HOSTED.md).
+> **Historical** — describes the Python-era KVM stack (a dashboard on `:7860`, an MCP proxy on `:7862`), which is gone. Today the server is one brain-core process on `:7865` serving MCP, the admin panel and `/healthz`, with a built-in embedder — see [CURSOR-MCP.md](./CURSOR-MCP.md) and [LINUX-SELF-HOSTED.md](./LINUX-SELF-HOSTED.md). The distill model in the table below was the old default; the current default to pull is `llama3.1:8b`, not `qwen2.5:14b`.
 
 # Pomnia × Brain — KVM architecture (client / server split)
 

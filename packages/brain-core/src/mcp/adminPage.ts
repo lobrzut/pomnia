@@ -276,7 +276,7 @@ ${brandSkyHtml()}
       distillFeature
         ? `<section class="card hidden" id="tab-distill">
       <h2 data-i18n="distillTitle">Destylacja</h2>
-      <p class="lead" data-i18n="distillLead">Destylacja sesji na GPU Ollama (qwen) — zapis do distilled/.</p>
+      <p class="lead" data-i18n="distillLead">Destylacja sesji na GPU Ollama (domyślnie llama3.1:8b) — zapis do distilled/.</p>
       <table><tbody id="distill-info"></tbody></table>
       <div class="row">
         <button id="distill-start" data-i18n="distillStart">Uruchom (inbox)</button>
