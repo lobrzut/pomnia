@@ -115,7 +115,7 @@ Legend: **L** = locally in Pomnia, **S** = homelab Brain server, **Q** = extract
 | | **`save_conversation` (MCP, in a chat)** | **Distill (Pomnia)** |
 |---|---|---|
 | **When** | The agent calls it at the end of a session ("save to brain"), or from a rule in `.cursor/rules` | Manually, or "distill backlog" in the Brain tab, or the CLI `brain pipeline` |
-| **Input** | What the agent *remembers* from the current conversation | The **raw log** from an adapter (Antigravity's `transcript.jsonl`, Cursor's DB) |
+| **Input** | What the agent *remembers* from the current conversation | The **raw log** from an adapter (Antigravity `transcript_full.jsonl` / `transcript.jsonl`, Cursor's DB) |
 | **Who writes the note** | The agent in the chat (Cursor/Claude/Antigravity) | Local Ollama (qwen) — in batch, after the fact |
 | **Where the file lands** | `vault/sessions/` · `saved_via: mcp_save_conversation` | staging `%AppData%/pomnia/brain-notes/` → deploy → `vault/distilled/` · `distilled_via: pomnia` |
 | **Full transcript?** | **No** — a structured summary only (Summary, Decisions, Files, Commands…) | **No** — also a summary, but drawn from the whole log (head+tail up to ~12k characters) |
