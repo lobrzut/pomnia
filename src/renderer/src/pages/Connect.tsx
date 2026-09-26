@@ -27,6 +27,7 @@ import {
   REMOTE_BRAIN_URL_PLACEHOLDER,
 } from '@core/brain/snippet'
 import { identifyEngine } from '@core/brain/engine'
+import { assessHealthPayload, type VersionSkewAssessment } from '@core/brain/versionSkew'
 import { brainBaseUrl, canEditBrainUrl, resolveBrainTarget } from '@core/brain/brainTarget'
 import { isInsecureRemoteHttpUrl } from '@core/brain/transportPolicy'
 import { isMini } from '../lib/flavour'
@@ -112,6 +113,7 @@ export default function Connect() {
   const [clients, setClients] = useState<ClientStatus[]>([])
   const [brainOk, setBrainOk] = useState<boolean | null>(null)
   const [brainDetail, setBrainDetail] = useState('')
+  const [versionSkew, setVersionSkew] = useState<VersionSkewAssessment | null>(null)
   const [embeddedRunning, setEmbeddedRunning] = useState<boolean | null>(null)
 
   const [picked, setPicked] = useState<ClientId | null>(null)
@@ -267,14 +269,19 @@ export default function Connect() {
   async function refresh() {
     setLoading(true)
     try {
-      const [r, core] = await Promise.all([
+      const [r, core, ver] = await Promise.all([
         api.connectStatus(brainUrl, effectiveTarget === 'remote' ? connectToken || undefined : undefined, effectiveTarget),
         effectiveTarget === 'embedded' ? api.brainCoreStatus() : Promise.resolve(null),
+        api.appVersion().catch(() => null),
       ])
       setClients(r.clients)
       setBrainOk(r.brain.reachable)
       setEmbeddedRunning(core?.running ?? null)
       const d = r.brain.data as Record<string, unknown> | undefined
+      // Only a brain-core body. A legacy proxy is already named by the engine
+      // label; a version warning on top of that would hide it.
+      const skew = assessHealthPayload(ver?.version, d)
+      setVersionSkew(skew)
       // Name the engine that answered. "reachable" alone hid the case that
       // matters: a saved URL pointing at the legacy Python brain still replies,
       // so the badge went green while search returned a months-old corpus.
@@ -285,6 +292,7 @@ export default function Connect() {
           : r.brain.reachable
             ? [
                 engine,
+                skew?.reason === 'match' && skew.brain ? skew.brain : null,
                 // Reachable and writable are different questions. A replica
                 // answers every probe and then refuses every save — better to
                 // read that here than from an agent's apology afterwards.
@@ -301,6 +309,7 @@ export default function Connect() {
             : r.brain.error || 'unreachable'
       )
     } catch (e) {
+      setVersionSkew(null)
       toast({ kind: 'error', title: labels.statusCheckFailed, detail: (e as Error).message })
     } finally {
       setLoading(false)
@@ -725,6 +734,15 @@ export default function Connect() {
             Refresh
           </Button>
         </div>
+
+        {versionSkew && versionSkew.level === 'warn' && (
+          <p
+            className="mb-3 rounded-xl border border-amber/25 bg-amber/10 px-3.5 py-2.5 text-[12px] leading-relaxed text-amber-100"
+            role="status"
+          >
+            {labels.versionSkew(versionSkew)}
+          </p>
+        )}
 
         {/* Mini is remote by construction; offering the switch would offer a
             mode it cannot enter. */}

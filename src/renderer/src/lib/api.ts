@@ -161,6 +161,8 @@ export interface PomniaBridge {
   brainRunCancel(): Promise<{ ok: boolean }>
   brainState(): Promise<BrainStateInfo>
   brainCoreStatus(): Promise<EmbeddedBrainStatus>
+  /** Read-only /healthz. Does not rewrite MCP configs. */
+  brainHealthz(url?: string): Promise<BrainPing>
   brainCoreStart(ollamaUrl?: string): Promise<EmbeddedBrainStatus>
   brainCoreStop(): Promise<EmbeddedBrainStatus>
   brainCoreReindex(): Promise<{ stats: { files: number; chunks: number; empty: number; prunedFiles: number } }>
@@ -865,6 +867,14 @@ function mockBridge(): PomniaBridge {
     },
     async brainCoreStatus() {
       return { ...mockEmbedded }
+    },
+    async brainHealthz() {
+      return {
+        url: 'http://127.0.0.1:7862/healthz',
+        reachable: true,
+        status: 200,
+        data: { ok: true, service: 'brain-core', version: '0.1.8' },
+      }
     },
     async brainCoreStart() {
       mockEmbedded.starting = true

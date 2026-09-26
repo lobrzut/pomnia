@@ -50,6 +50,14 @@ The vault is the archive and the backup (AES for chat and document blobs). Knowl
 
 Choose the mode in **Connect** before you copy the MCP snippet.
 
+## Desktop and Brain versions
+
+Desktop and brain-core ship the same release number. Connect, the dashboard status strip, Settings → Diagnostics, and `pomnia doctor` read `version` from the Brain's `/healthz`.
+
+- Same `x.y.z` (a leading `v` does not count): no warning.
+- Different releases: both versions, which side is older, and whether to update Desktop or the Brain. The connection stays open. There is no separate protocol version, so a mismatch is not a refused connection.
+- No `version`, or `0.0.0` (the server could not read its own package): a warning, not a crash and not a failed connection. Update or rebuild that Brain if search or sync misbehaves.
+
 ## Five steps to "Cursor remembers me"
 
 ### 1. Ollama + models

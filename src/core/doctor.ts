@@ -24,6 +24,7 @@ import { defaultOllamaConfig, ollamaUrlLooksLocal, Ollama } from './brain/ollama
 import { isDistillableSource } from './brain/distillSources.js'
 import { ledgerPathInVault, ownerProcessed, parseLedger } from './brain/ledgerStore.js'
 import { pingBrain } from './brain/status.js'
+import { assessHealthPayload, versionSkewToDoctorCheck } from './brain/versionSkew.js'
 import { appDataRoot, currentOS, homeDir } from './platform.js'
 import type { SourceId } from './model.js'
 import { isPomniaService } from '../../packages/brain-core/src/serviceName.js'
@@ -940,6 +941,12 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
         },
       })
     }
+    // Reachable is not the same release. A matching pair adds nothing.
+    // A skew or a missing version is a warning, not a failed connection —
+    // including when /healthz answered 503 and the liveness line above is red.
+    const skew = assessHealthPayload(BUILD_VERSION, ping.data)
+    const versionCheck = skew ? versionSkewToDoctorCheck(skew) : null
+    if (versionCheck) checks.push(versionCheck)
   }
 
   const summary = tally(checks)

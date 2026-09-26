@@ -31,7 +31,7 @@ so a remote brain and a desktop brain never fight over one port.
 ## HTTP endpoints
 
 - `/mcp` — MCP over streamable HTTP. Stateless: a new server per request.
-- `/healthz` — no auth; version, vault, index, disk and embedder state.
+- `/healthz` — no auth; version, vault, index, disk and embedder state. `version` is this package's release. Desktop compares it with its own and warns, without dropping the connection, when the two `x.y.z` numbers differ or when the field is missing. `0.0.0` means this process could not read `package.json`, not that a 0.0.0 release is running.
 - `/admin` — panel for tokens, accounts, settings, skills and prompts (login required).
 
 ## Embeddings and distillation
