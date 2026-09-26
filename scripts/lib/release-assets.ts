@@ -3,10 +3,10 @@
 /**
  * Shared release asset rules for check / publish / attach / CI.
  *
- * One releases/latest URL serves Windows CTA, Linux desktop, macOS, and
- * curl|sh (brain-core tarball). A green regex on the wrong version is the
- * same defect as a missing file — patterns are therefore version-bound when
- * the tag/version is known.
+ * One releases/latest URL serves Windows CTA, Pomnia Mini (the zip), Linux
+ * desktop, macOS, and curl|sh (brain-core tarball). A green regex on the wrong
+ * version is the same defect as a missing file — patterns are therefore
+ * version-bound when the tag/version is known.
  */
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
@@ -86,6 +86,18 @@ export function requiredAssetClasses(version: string): AssetClass[] {
       label: 'Windows latest.yml',
       pattern: /^latest\.yml$/,
       why: 'update manifest carrying the installer sha512',
+    },
+    {
+      id: 'mini-zip',
+      label: 'Pomnia Mini zip',
+      pattern: new RegExp(`^PomniaMini-${v}\\.zip$`),
+      why: 'Windows Mini download — unpack once and run PomniaMini.exe; the portable exe is not this asset',
+    },
+    {
+      id: 'mini-sha',
+      label: 'Pomnia Mini SHA-256',
+      pattern: new RegExp(`^PomniaMini-${v}\\.zip\\.sha256$`),
+      why: 'same checksum promise as the installer',
     },
     {
       id: 'linux-appimage',
@@ -334,6 +346,137 @@ export function collectBrainCoreAssets(opts: { releaseDir: string; version: stri
     assets.push(full, sha.shaPath)
   }
   return { ok: errors.length === 0, present: true, errors, plan, assets }
+}
+
+/** Release file name for the Mini zip. Not the portable exe, and not `*-portable.zip`. */
+export function miniZipFileName(version: string): string {
+  if (!version || version.startsWith('v')) {
+    throw new Error(`mini zip version must look like 0.1.91, got ${JSON.stringify(version)}`)
+  }
+  return `PomniaMini-${version}.zip`
+}
+
+/**
+ * The Mini zip in `release/mini/`, plus a SHA-256 sidecar.
+ *
+ * Missing directory or missing zip is "not present" (a Windows-first draft may
+ * not have it yet). A zip with any other name is an error — including the old
+ * `PomniaMini-<version>-portable.zip`, which is the unpacker story and not the
+ * download. The portable exe is never an asset.
+ */
+export function collectMiniAssets(opts: { releaseDir: string; version: string }) {
+  const { releaseDir, version } = opts
+  const name = miniZipFileName(version)
+  const errors: string[] = []
+  const plan: AssetPlanRow[] = []
+  const assets: string[] = []
+
+  if (!existsSync(releaseDir)) {
+    return {
+      ok: true as const,
+      present: false,
+      errors,
+      plan,
+      assets,
+      sha256: null as string | null,
+      sizeMb: null as string | null,
+    }
+  }
+
+  const zips = readdirSync(releaseDir).filter((n) => n.endsWith('.zip') && !n.endsWith('.blockmap'))
+  const foreign = zips.filter((n) => n !== name)
+  if (foreign.length) {
+    errors.push(
+      `unexpected zip in ${releaseDir}: ${foreign.join(', ')} — the release asset is ${name} (unpack that; do not ship a portable zip)`,
+    )
+  }
+
+  const full = join(releaseDir, name)
+  if (!existsSync(full)) {
+    return {
+      ok: errors.length === 0,
+      present: false,
+      errors,
+      plan,
+      assets,
+      sha256: null as string | null,
+      sizeMb: null as string | null,
+    }
+  }
+
+  const sha = ensureMatchingSha256({ filePath: full })
+  if (!sha.ok) {
+    errors.push(sha.error)
+    return {
+      ok: false as const,
+      present: true,
+      errors,
+      plan,
+      assets,
+      sha256: sha.hex,
+      sizeMb: null as string | null,
+    }
+  }
+
+  const sizeMb = (readFileSync(full).length / 1024 / 1024).toFixed(2)
+  plan.push({
+    role: 'mini-zip',
+    path: full,
+    note: sha.wrote ? `wrote ${basename(sha.shaPath)}` : `sha256 ${sha.hex.slice(0, 12)}...`,
+  })
+  assets.push(full, sha.shaPath)
+  return { ok: errors.length === 0, present: true, errors, plan, assets, sha256: sha.hex, sizeMb }
+}
+
+/**
+ * The Mini block of a release body.
+ *
+ * The download is the zip. Saying "portable" here sends people to the exe that
+ * unpacks into %TEMP% on every launch.
+ */
+export function miniNotesBlock(opts: {
+  version: string
+  sizeMb: string
+  commit: string
+  sha256: string
+}): string {
+  const { version, sizeMb, commit, sha256 } = opts
+  return `**Pomnia Mini** · Windows zip · ${sizeMb} MB · built from \`${commit}\`
+
+Download \`PomniaMini-${version}.zip\`, unpack it once, and run \`PomniaMini.exe\`.
+That zip is the build to use. The portable \`.exe\` unpacks into \`%TEMP%\` on every launch — it is not the download.
+
+\`\`\`powershell
+Get-FileHash PomniaMini-${version}.zip -Algorithm SHA256
+\`\`\`
+
+\`\`\`
+${sha256}
+\`\`\``
+}
+
+/**
+ * Bring the Mini line and its SHA-256 in `body` up to date, or append the
+ * Mini block when the release was published without one. Only the hash that
+ * follows this version's Mini Get-FileHash line is replaced. Idempotent.
+ */
+export function refreshMiniNotes(
+  body: string,
+  opts: { version: string; sizeMb: string; commit: string; sha256: string },
+): string {
+  const { version, sizeMb, commit, sha256 } = opts
+  const line = /\*\*Pomnia Mini\*\* · Windows zip · [\d.]+ MB · built from `[0-9a-f]+`/
+  if (!line.test(body)) {
+    const trimmed = body.replace(/\s+$/, '')
+    return `${trimmed}${trimmed ? '\n\n' : ''}${miniNotesBlock(opts)}\n`
+  }
+  const esc = version.replace(/\./g, '\\.')
+  const hash = new RegExp(
+    `(Get-FileHash PomniaMini-${esc}\\.zip -Algorithm SHA256\\r?\\n\`\`\`\\r?\\n\\r?\\n\`\`\`\\r?\\n)[0-9A-Fa-f]{64}`,
+  )
+  return body
+    .replace(line, `**Pomnia Mini** · Windows zip · ${sizeMb} MB · built from \`${commit}\``)
+    .replace(hash, `$1${sha256}`)
 }
 
 /**
