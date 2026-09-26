@@ -52,6 +52,16 @@ function appData(os: OS, home: string, app: string): string {
   return (os === 'win32' ? path.win32 : path.posix).join(base, app)
 }
 
+/**
+ * IDE user-data folders, current name first.
+ * The 2026 rename moved the VS Code profile from "Antigravity" to "Antigravity IDE"
+ * (`%APPDATA%\Antigravity IDE`, `~/Library/Application Support/Antigravity IDE`,
+ * `~/.config/Antigravity IDE`). Chats themselves are not in either folder.
+ */
+export function antigravityProfileRoots(os: OS, home: string): string[] {
+  return [appData(os, home, 'Antigravity IDE'), appData(os, home, 'Antigravity')]
+}
+
 function join(os: OS, ...parts: string[]): string {
   return (os === 'win32' ? path.win32 : path.posix).join(...parts)
 }
@@ -158,9 +168,9 @@ export const SOURCES: SourceDescriptor[] = [
     ],
     pathSensitive: ['app_storage.json', 'Preferences', 'Local State'],
     notes: [
-      'Google IDE (Windsurf/VS Code lineage)',
-      'Chats parsed from ~/.gemini/antigravity/brain/*/transcript.jsonl',
-      'Session DBs in ~/.gemini/antigravity/conversations/*.db'
+      'JSONL under ~/.gemini/antigravity-ide, ~/.gemini/antigravity, and ~/.gemini/antigravity-cli.',
+      'Uses transcript_full.jsonl when present, else transcript.jsonl. SQLite conversations/*.db are not parsed.',
+      'Profile folder is "Antigravity IDE" (current) or "Antigravity" (older).'
     ]
   },
   {
