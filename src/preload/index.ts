@@ -72,6 +72,7 @@ const bridge = {
   brainRunCancel: () => ipcRenderer.invoke('brain:runCancel'),
   brainState: () => ipcRenderer.invoke('brain:state'),
   brainCoreStatus: () => ipcRenderer.invoke('brainCore:status'),
+  brainHealthz: (url?: string) => ipcRenderer.invoke('brain:healthz', url),
   brainCoreStart: (ollamaUrl?: string) => ipcRenderer.invoke('brainCore:start', ollamaUrl),
   brainCoreStop: () => ipcRenderer.invoke('brainCore:stop'),
   brainCoreReindex: () => ipcRenderer.invoke('brainCore:reindex'),

@@ -71,6 +71,14 @@ export { urlsPointAtSameBrain } from './mcpUrl.js'
 export { syncManagedMcpConfigs, mergeManagedServers } from './mcpSync.js'
 export { identifyEngine } from './engine.js'
 export type { BrainEngine, EngineInfo } from './engine.js'
+export {
+  assessHealthPayload,
+  assessVersionSkew,
+  formatVersionSkew,
+  parseReleaseVersion,
+  versionSkewToDoctorCheck,
+} from './versionSkew.js'
+export type { VersionSkewAssessment, VersionSkewDoctorCheck, VersionSkewReason } from './versionSkew.js'
 export type {
   ClientStatus,
   WiredState,

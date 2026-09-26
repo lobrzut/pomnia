@@ -19,9 +19,9 @@ import { buildVaultManifest, SYNCED_DIRS, SYNCED_ROOT_FILES } from './vaultSync.
  * moves, and both sides report a clean sync. That is the failure this file
  * exists to make impossible: a comment cannot fail, a test can.
  *
- * It catches drift inside one build. It cannot catch a desktop talking to an
- * older server — for that the desktop has to read the version the server
- * already publishes on /healthz, which it currently ignores.
+ * It catches drift inside one build. A desktop talking to an older server is
+ * a different failure: Connect, the status strip, and doctor read `version`
+ * on /healthz and warn. This test still does not change what gets sent.
  */
 describe('the two halves of the replication contract agree', () => {
   it('replicates the same directories from both sides', () => {
