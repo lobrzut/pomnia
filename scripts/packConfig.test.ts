@@ -12,8 +12,10 @@ import { describe, expect, it } from 'vitest'
  * landed in Mini even though Mini never starts it. These assertions load the
  * merged config the packager actually uses — not a hand-rolled merge.
  *
- * A zip listing is still the pack-time check (see the PR): this file does not
- * build an installer.
+ * Pack-time check (this file does not build a zip):
+ *   unzip -l release/mini/PomniaMini-*-portable.zip | grep resources/brain-core
+ * Expect no matches. After a desktop pack,
+ * release/win-unpacked/resources/brain-core/embedded.js should exist.
  */
 
 const require = createRequire(import.meta.url)
