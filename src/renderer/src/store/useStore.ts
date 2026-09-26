@@ -2,7 +2,8 @@
 // Copyright (C) 2026 Pomnia
 import { create } from 'zustand'
 import { resolveConnectToken } from '@core/brain/tokenPrecedence'
-import { VRAM_PROFILES } from '@core/brain/profiles'
+import { assessDistillPreflight } from '@core/brain/distillPreflight'
+import { VRAM_PROFILES, defaultChatModel } from '@core/brain/profiles'
 import { DISTILLABLE_SOURCES } from '@core/brain/distillSources'
 import { EMBEDDED_BRAIN_DEFAULT_URL } from '@core/brain/snippet'
 import {
@@ -36,12 +37,14 @@ const EMBEDDED_URL = EMBEDDED_BRAIN_DEFAULT_URL
 const DISTILLABLE_SET = new Set<SourceId>(DISTILLABLE_SOURCES)
 const BRAIN_PROFILE_KEY = 'pomnia.brain.profile'
 
-function loadDistillChatModel(): string {
+/** Chat model the next distill will use — the saved VRAM profile, else Standard. */
+export function currentDistillChatModel(): string {
   try {
     const id = localStorage.getItem(BRAIN_PROFILE_KEY) ?? 'standard'
-    return (VRAM_PROFILES.find((p) => p.id === id) ?? VRAM_PROFILES[1]).chatModel
+    return (VRAM_PROFILES.find((p) => p.id === id) ?? VRAM_PROFILES.find((p) => p.recommended) ?? VRAM_PROFILES[0])
+      .chatModel
   } catch {
-    return VRAM_PROFILES[1].chatModel
+    return defaultChatModel()
   }
 }
 
@@ -360,7 +363,24 @@ interface State {
     ollamaUrl: string
     importPath?: string
     pendingOnly?: boolean
+    /** Set after the blocking checklist already passed. */
+    preflightDone?: boolean
+    /** False for remote Brain — the server owns embeddings. */
+    requireEmbed?: boolean
   }) => Promise<void>
+  /**
+   * Distill was refused. The checklist stays up until the user pulls what is
+   * missing or dismisses it. Dismiss does not mark the backlog processed.
+   */
+  distillGate: {
+    sources: SourceId[]
+    model: string
+    ollamaUrl: string
+    importPath?: string
+    pendingOnly?: boolean
+    requireEmbed: boolean
+  } | null
+  dismissDistillGate: () => void
   cancelBrainPipeline: () => void
 
   /**
@@ -564,7 +584,7 @@ export const useStore = create<State>((set, get) => ({
                 // Same as Brain "Przygotuj pamięć (N nowych)": only ledger-pending chats.
                 await get().runBrainPipeline({
                   sources: distillable,
-                  model: loadDistillChatModel(),
+                  model: currentDistillChatModel(),
                   ollamaUrl: get().ollamaUrl,
                   pendingOnly: true
                 })
@@ -585,7 +605,7 @@ export const useStore = create<State>((set, get) => ({
     // Incremental: skip already-ledgered sessions (isWorthDistilling still skips trivia).
     await get().runBrainPipeline({
       sources: distillable,
-      model: loadDistillChatModel(),
+      model: currentDistillChatModel(),
       ollamaUrl: get().ollamaUrl,
       pendingOnly: true
     })
@@ -898,12 +918,65 @@ export const useStore = create<State>((set, get) => ({
       set({ brainStateLoading: false })
     }
   },
+  distillGate: null,
+  dismissDistillGate: () => set({ distillGate: null }),
   async runBrainPipeline(opts) {
     if (get().brainRunning) return
+    const labels = uiLabels()
+    const target = resolveBrainTarget({
+      mini: isMini,
+      simpleMode: get().simpleMode,
+      stored: get().brainTarget,
+    })
+    const requireEmbed = opts.requireEmbed ?? target !== 'remote'
+    if (!opts.preflightDone) {
+      set({
+        brainRunning: true,
+        brainProgress: { label: labels.distillPreflightChecking, pct: 4, phase: 'start' },
+        brainResult: null,
+      })
+      let reachable = false
+      let models: string[] = []
+      let embedModel = 'nomic-embed-text'
+      let baseUrl = opts.ollamaUrl || 'http://127.0.0.1:11434'
+      try {
+        const status = await api.brainStatus(opts.ollamaUrl || undefined)
+        reachable = status.reachable
+        models = status.models ?? []
+        embedModel = status.embedModel || embedModel
+        baseUrl = status.baseUrl || baseUrl
+      } catch {
+        reachable = false
+      }
+      const report = assessDistillPreflight({
+        reachable,
+        models,
+        distillModel: opts.model || defaultChatModel(),
+        embedModel,
+        requireEmbed,
+        ollamaUrl: baseUrl,
+      })
+      if (!report.ok) {
+        set({
+          brainRunning: false,
+          brainProgress: null,
+          distillGate: {
+            sources: opts.sources,
+            model: opts.model,
+            ollamaUrl: opts.ollamaUrl,
+            importPath: opts.importPath,
+            pendingOnly: opts.pendingOnly,
+            requireEmbed,
+          },
+        })
+        return
+      }
+    }
     set({
       brainRunning: true,
-      brainProgress: { label: uiLabels().brainPipelineStarting, pct: 4, phase: 'start' },
+      brainProgress: { label: labels.brainPipelineStarting, pct: 4, phase: 'start' },
       brainResult: null,
+      distillGate: null,
     })
     const off = api.onBrainProgress((e) => {
       if (e.phase === 'idle') {
@@ -941,10 +1014,10 @@ export const useStore = create<State>((set, get) => ({
         deployUrl: s.brainDeployUrl || dashboardUrlFromBrainUrl(s.remoteBrainUrl),
         deployTarget: s.brainDeployTarget || undefined,
         deployToken: s.connectToken || undefined,
-        reindex: true
+        reindex: true,
+        requireEmbed,
       })
       set({ brainResult: r })
-      const labels = uiLabels()
       if (r.emptyBacklog) {
         get().toast({
           kind: 'info',

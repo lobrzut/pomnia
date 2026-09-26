@@ -1,10 +1,6 @@
 # Connecting an agent to Pomnia over MCP
 
-One server, one endpoint. If you are working from an older copy of this page
-that told you to configure three servers against `/sse` and
-`/servers/brain-vault/sse`, that was the Python hub, which is gone. Those paths
-no longer answer, and a config built from them fails at the next client restart
-with an error that names none of this.
+One server, one endpoint.
 
 ## The endpoint
 
@@ -95,3 +91,9 @@ Do not commit a real token. On macOS and Linux: `chmod 600 ~/.cursor/mcp.json`.
 A `403` from `/mcp` means the URL still has `/admin` in it. A `401` means the
 token is missing, empty or revoked — on Windows an empty Authorization header is
 the usual cause; see above.
+
+> Footnote: older copies of this page told you to configure three servers
+> against `/sse` and `/servers/brain-vault/sse`. That was the Python hub. Those
+> paths no longer answer. A config that still lists `pomnia-vault` and
+> `pomnia-library` fails at the next client restart with an error that names
+> none of this. Delete those entries and keep the single `pomnia` server above.

@@ -21,12 +21,18 @@ Current version: see `package.json`. Artifacts:
 
 ## Release process (draft → complete → promote)
 
-`releases/latest` serves Windows CTA, Linux desktop, macOS DMGs, and
-`curl | sh` (brain-core tarball). An incomplete tag must **not** become latest.
+`releases/latest` serves the Windows installer, **Pomnia Mini**
+(`PomniaMini-<version>.zip` — unpack once, run `PomniaMini.exe`; not a portable
+exe), Linux desktop, macOS DMGs, and `curl | sh` (brain-core tarball). An
+incomplete tag must **not** become latest. A missing Mini zip fails
+`check:release` the same way a missing installer does.
 
 1. Create a **draft** (`npm run publish:release` or CI on tag — always `--draft`).
-2. Attach every platform (Windows / Linux desktop / macOS / brain-core) to that tag.
-3. `npm run check:release -- --tag vX.Y.Z` — version-bound asset names; old leftovers fail.
+   `publish:release` uploads `release/mini/PomniaMini-<version>.zip` when `release:win`
+   (or `release:mini`) has already packed it.
+2. Attach every platform (Windows installer / Pomnia Mini zip / Linux desktop / macOS / brain-core) to that tag.
+   Mini is packed on Windows, not by the Linux workflow: `npm run attach:mini-release`.
+3. `npm run check:release -- --tag vX.Y.Z` — version-bound asset names; old leftovers fail. `PomniaMini-<version>-portable.zip` does not count.
 4. `npm run promote:release -- --tag vX.Y.Z` — undrafts only when the check passes.
 
 Never upload an older tarball or AppImage just to turn a regex green.
@@ -73,7 +79,10 @@ gh run download <run-id> -n pomnia-linux -D release/
 ```bash
 npm run attach:linux-release -- --dry-run   # shows the exact set
 npm run attach:linux-release
-# then, when Windows+macOS+brain-core are all present:
+# Mini zip, from the Windows machine that packed it (no version bump):
+npm run attach:mini-release -- --dry-run
+npm run attach:mini-release
+# then, when Windows, Pomnia Mini, macOS and brain-core are all present:
 npm run promote:release -- --tag vX.Y.Z
 ```
 

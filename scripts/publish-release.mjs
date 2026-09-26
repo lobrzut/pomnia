@@ -20,6 +20,8 @@ import { fileURLToPath } from 'node:url'
 import {
   collectBrainCoreAssets,
   collectLinuxDesktopAssets,
+  collectMiniAssets,
+  miniNotesBlock,
   validateUpdateManifest,
 } from './lib/release-assets.ts'
 
@@ -119,6 +121,19 @@ if (brain.present) {
 `
 }
 
+const mini = collectMiniAssets({ releaseDir: join(root, 'release', 'mini'), version })
+if (!mini.ok) {
+  for (const e of mini.errors) console.error(`✗ ${e}`)
+  die('refusing to publish with an invalid Pomnia Mini zip in release/mini/')
+}
+if (mini.present) {
+  assets.push(...mini.assets)
+  notes += `
+
+${miniNotesBlock({ version, sizeMb: mini.sizeMb, commit: sha, sha256: mini.sha256 })}
+`
+}
+
 // Deduplicate
 const seen = new Set()
 for (let i = assets.length - 1; i >= 0; i--) {
@@ -155,7 +170,9 @@ sh('gh', [
 console.log(`\n✔ release ${tag} created as a draft`)
 
 if (!wantPublish) {
-  console.log(`  attach other platforms, then: npm run promote:release -- --tag ${tag}`)
+  console.log(
+    `  attach other platforms (Pomnia Mini zip: npm run attach:mini-release), then: npm run promote:release -- --tag ${tag}`,
+  )
   process.exit(0)
 }
 
@@ -172,7 +189,7 @@ try {
   die(
     `${tag} stays a draft — not every platform is on the release yet.\n` +
       '  That is intentional: an incomplete tag must not become releases/latest.\n' +
-      '  Attach Linux/macOS/brain-core, then npm run promote:release -- --tag ' +
+      '  Attach Linux/macOS/brain-core and the Pomnia Mini zip, then npm run promote:release -- --tag ' +
       tag,
   )
 }

@@ -14,7 +14,10 @@
 # programs writing one settings file is the failure this whole flavour split
 # exists to avoid.
 #
-# Build with: npm run build:mini:win
+# Release path (no version bump): npm run release:mini
+#   → release/mini/PomniaMini-<version>.zip
+#   → npm run attach:mini-release
+# Local portable exe + zip together: npm run build:mini:win
 extends: ./electron-builder.yml
 appId: ai.pomnia.mini
 productName: PomniaMini
@@ -78,14 +81,23 @@ directories:
 # day to day: unpack it once, and every start after that is an ordinary exe
 # start with no extractor at all. The portable exe stays for the case it is
 # genuinely for — a machine you do not want to leave files on.
+#
+# Names are per target on purpose. `win.artifactName` is what the zip target
+# inherits (there is no top-level `zip` key — the schema rejects it). Putting
+# `-portable` on that shared name is how the zip became
+# `PomniaMini-<version>-portable.zip`. The GitHub Release asset is
+# `PomniaMini-<version>.zip`. The portable exe sets its own name and is not
+# uploaded.
 portable:
   unpackDirName: PomniaMini
+  artifactName: ${productName}-${version}-portable.${ext}
 win:
   target: [portable, zip]
   icon: resources/icon.ico
   executableName: PomniaMini
   publisherName: Pomnia
-  artifactName: ${productName}-${version}-portable.${ext}
+  # Zip only. Portable overrides this via portable.artifactName.
+  artifactName: ${productName}-${version}.${ext}
   requestedExecutionLevel: asInvoker
 # Mini ships no installer, so the update feed the full app emits would describe
 # an artifact nobody can install over.

@@ -345,7 +345,7 @@ export interface UiLabels {
   onboardingEngineRunning: string
   onboardingEngineMoreModels: (n: number) => string
   onboardingEngineEmbedHint: (model: string) => string
-  onboardingEngineDistillHint: (model: string) => string
+  onboardingEngineDistillHint: (model: string, size: string) => string
   onboardingEngineModelsNeeded: string
   onboardingEngineEmbedMissing: (cmd: string) => string
   onboardingEngineDistillMissing: (cmd: string, size: string) => string
@@ -362,6 +362,23 @@ export interface UiLabels {
   onboardingEngineRecheck: string
   onboardingEngineRemoteOllamaOptional: string
   onboardingEngineSkip: string
+  /** Distill refused until Ollama and the required models are present. */
+  distillPreflightTitle: string
+  distillPreflightLead: string
+  distillPreflightChecking: string
+  distillPreflightOllamaOk: (url: string) => string
+  distillPreflightOllamaDownLocal: string
+  distillPreflightOllamaDownRemote: (url: string) => string
+  distillPreflightInstallLink: string
+  distillPreflightEmbedOk: (model: string) => string
+  distillPreflightEmbedMissing: (cmd: string) => string
+  distillPreflightDistillOk: (model: string) => string
+  distillPreflightDistillMissing: (cmd: string, size: string) => string
+  distillPreflightDismiss: string
+  distillPreflightContinue: string
+  distillPreflightRecheck: string
+  onboardingReadyDistillLead: string
+  onboardingReadyEnterWithoutDistill: string
   onboardingContinue: string
   onboardingSimpleBrainTitle: string
   onboardingSimpleBrainLead: string
@@ -1310,13 +1327,13 @@ const PL_LABELS: UiLabels = {
   onboardingEngineMoreModels: (n) => `+${n} więcej`,
   onboardingEngineEmbedHint: (model) =>
     `Model embeddingów: ${model} (~0,3 GB) — lokalne wyszukiwanie semantyczne.`,
-  onboardingEngineDistillHint: (model) =>
-    `Model destylacji: ${model} (~9 GB) — skraca rozmowy do notatek.`,
+  onboardingEngineDistillHint: (model, size) =>
+    `Model destylacji: ${model}${size ? ` (${size})` : ''} — skraca rozmowy do notatek.`,
   onboardingEngineModelsNeeded: 'Potrzebne modele Ollama',
   onboardingEngineEmbedMissing: (cmd) =>
     `Brak modelu embeddingów — pobierz poniżej (albo w terminalu: ${cmd}).`,
   onboardingEngineDistillMissing: (cmd, size) =>
-    `Brak modelu destylacji — pobierz poniżej (albo: ${cmd}, ok. ${size}; nie blokuje dalszej konfiguracji).`,
+    `Brak modelu destylacji — pobierz poniżej (albo: ${cmd}${size ? `, ok. ${size}` : ''}). Bez niego destylacja się nie zacznie. Wyszukiwanie działa dalej.`,
   onboardingEnginePullBtn: 'Pobierz w Pomni',
   onboardingEngineCancelPull: 'Anuluj',
   onboardingEngineNotFound: 'Nie znaleziono Ollama',
@@ -1326,12 +1343,32 @@ const PL_LABELS: UiLabels = {
   onboardingEngineOllamaUrl: 'URL Ollama',
   onboardingEngineInstall1: 'Pobierz z ollama.com/download i zainstaluj (~2 min).',
   onboardingEngineInstall2:
-    'Po instalacji wróć tutaj — modele pobierzesz przyciskiem w aplikacji (albo: ollama pull nomic-embed-text).',
+    'Po instalacji wróć tutaj — modele pobierzesz przyciskiem w aplikacji (albo: ollama pull nomic-embed-text && ollama pull llama3.1:8b).',
   onboardingEngineInstall3: 'Wróć i sprawdź ponownie.',
   onboardingEngineRecheck: 'Sprawdź ponownie',
   onboardingEngineRemoteOllamaOptional:
     'Search/MCP: serwer Brain (ma własne Ollama lub fastembed). Destylacja w Desktop nadal potrzebuje URL Ollama — domyślnie ten sam host :11434; lokalna instalacja nie jest wymagana, dopóki nie destylujesz.',
   onboardingEngineSkip: 'Pomiń — wybierz później w Connect',
+  distillPreflightTitle: 'Destylacja czeka na Ollamę',
+  distillPreflightLead:
+    'Kolejka stoi, dopóki poniższe punkty nie są zielone. Nic nie zostało oznaczone jako przerobione.',
+  distillPreflightChecking: 'Sprawdzam Ollamę…',
+  distillPreflightOllamaOk: (url) => `Ollama odpowiada (${url})`,
+  distillPreflightOllamaDownLocal: 'Ollama nie działa na tym komputerze.',
+  distillPreflightOllamaDownRemote: (url) =>
+    `Ollama nie odpowiada pod ${url}. Uruchom demona na tym hoście — lokalna instalacja nie jest potrzebna.`,
+  distillPreflightInstallLink: 'Pobierz Ollama',
+  distillPreflightEmbedOk: (model) => `Model embeddingów jest: ${model}`,
+  distillPreflightEmbedMissing: (cmd) => `Brak modelu embeddingów. Pobierz w Pomni albo w terminalu: ${cmd}`,
+  distillPreflightDistillOk: (model) => `Model destylacji jest: ${model}`,
+  distillPreflightDistillMissing: (cmd, size) =>
+    `Brak modelu destylacji. Pobierz w Pomni albo: ${cmd}${size ? ` (ok. ${size})` : ''}`,
+  distillPreflightDismiss: 'Nie teraz',
+  distillPreflightContinue: 'Destyluj',
+  distillPreflightRecheck: 'Sprawdź ponownie',
+  onboardingReadyDistillLead:
+    'Zanim wejdziesz: destylacja nie wystartuje, dopóki Ollama i modele poniżej nie są na miejscu.',
+  onboardingReadyEnterWithoutDistill: 'Wejdź bez destylacji',
   onboardingContinue: 'Dalej',
   onboardingSimpleBrainTitle: 'Uruchom lokalną wyszukiwarkę',
   onboardingSimpleBrainLead:
@@ -2381,13 +2418,13 @@ const EN_LABELS: UiLabels = {
   onboardingEngineMoreModels: (n) => `+${n} more`,
   onboardingEngineEmbedHint: (model) =>
     `Embedding model: ${model} (~0.3GB) — powers local semantic search.`,
-  onboardingEngineDistillHint: (model) =>
-    `Distill model: ${model} (~9GB) — shortens chats into notes.`,
+  onboardingEngineDistillHint: (model, size) =>
+    `Distill model: ${model}${size ? ` (${size})` : ''} — shortens chats into notes.`,
   onboardingEngineModelsNeeded: 'Ollama models needed',
   onboardingEngineEmbedMissing: (cmd) =>
     `Embedding model missing — pull below (or in a terminal: ${cmd}).`,
   onboardingEngineDistillMissing: (cmd, size) =>
-    `Distill model missing — pull below (or: ${cmd}, ~${size}; does not block setup).`,
+    `Distill model missing — pull below (or: ${cmd}${size ? `, ~${size}` : ''}). Distillation will not start without it. Search still works.`,
   onboardingEnginePullBtn: 'Pull in Pomnia',
   onboardingEngineCancelPull: 'Cancel',
   onboardingEngineNotFound: 'Ollama not found',
@@ -2397,12 +2434,32 @@ const EN_LABELS: UiLabels = {
   onboardingEngineOllamaUrl: 'Ollama URL',
   onboardingEngineInstall1: 'Download from ollama.com/download and install (2 min).',
   onboardingEngineInstall2:
-    'After install, come back — pull models with the in-app button (or: ollama pull nomic-embed-text).',
+    'After install, come back — pull models with the in-app button (or: ollama pull nomic-embed-text && ollama pull llama3.1:8b).',
   onboardingEngineInstall3: 'Come back and re-check.',
   onboardingEngineRecheck: 'Re-check',
   onboardingEngineRemoteOllamaOptional:
     'Search/MCP: remote Brain (server has its own Ollama or fastembed). Distill in Desktop still needs an Ollama URL — default is the same host :11434; no local install until you distill.',
   onboardingEngineSkip: 'Skip — pick later in Connect tab',
+  distillPreflightTitle: 'Distillation is waiting on Ollama',
+  distillPreflightLead:
+    'The queue stays put until every row below is green. Nothing was marked as already distilled.',
+  distillPreflightChecking: 'Checking Ollama…',
+  distillPreflightOllamaOk: (url) => `Ollama is answering (${url})`,
+  distillPreflightOllamaDownLocal: 'Ollama is not running on this computer.',
+  distillPreflightOllamaDownRemote: (url) =>
+    `Ollama is not answering at ${url}. Start the daemon on that host — a local install is not required.`,
+  distillPreflightInstallLink: 'Download Ollama',
+  distillPreflightEmbedOk: (model) => `Embedding model is installed: ${model}`,
+  distillPreflightEmbedMissing: (cmd) => `Embedding model missing. Pull in Pomnia or in a terminal: ${cmd}`,
+  distillPreflightDistillOk: (model) => `Distill model is installed: ${model}`,
+  distillPreflightDistillMissing: (cmd, size) =>
+    `Distill model missing. Pull in Pomnia or: ${cmd}${size ? ` (~${size})` : ''}`,
+  distillPreflightDismiss: 'Not now',
+  distillPreflightContinue: 'Distill',
+  distillPreflightRecheck: 'Re-check',
+  onboardingReadyDistillLead:
+    'Before you go in: distillation will not start until Ollama and the models below are in place.',
+  onboardingReadyEnterWithoutDistill: 'Enter without distillation',
   onboardingContinue: 'Continue',
   onboardingSimpleBrainTitle: 'Start local search',
   onboardingSimpleBrainLead:
