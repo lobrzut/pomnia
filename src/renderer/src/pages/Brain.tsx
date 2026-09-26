@@ -716,7 +716,7 @@ export default function Brain() {
               {brainState.pending > 0 && (
                 <Button
                   onClick={() => run(true)}
-                  disabled={brainRunning || !status?.reachable}
+                  disabled={brainRunning}
                   className="ml-auto !px-3.5 !py-1.5 !text-[12px]"
                 >
                   {brainRunning ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
@@ -1068,7 +1068,7 @@ export default function Brain() {
           </p>
         )}
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button onClick={runFullRedistill} disabled={brainRunning || !status?.reachable} variant="soft">
+          <Button onClick={runFullRedistill} disabled={brainRunning} variant="soft">
             {brainRunning ? <Spinner className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
             {labels.runPipeline}
           </Button>

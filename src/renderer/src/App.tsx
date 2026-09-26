@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import Aurora from './components/Aurora'
 import { Sidebar, TitleBar } from './components/Shell'
 import { Toasts } from './components/ui'
+import { DistillPreflightDialog } from './components/DistillPreflightDialog'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useStore, type Route } from './store/useStore'
 import { api } from './lib/api'
@@ -231,6 +232,7 @@ export default function App() {
         comment. So Mini opens straight onto the one thing it does.
       */}
       {isMini ? null : !onboarded ? <Onboarding /> : !vault.open ? <VaultGate /> : null}
+      <DistillPreflightDialog />
       <Toasts />
     </div>
   )

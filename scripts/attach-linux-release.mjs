@@ -83,4 +83,6 @@ try {
 
 sh('gh', ['release', 'upload', tag, ...assets, '--clobber'])
 console.log(`\n✔ uploaded Linux assets to ${tag}`)
-console.log(`  next: when Windows+macOS+brain-core are all present → npm run promote:release -- --tag ${tag}`)
+console.log(
+  `  next: when Windows, Pomnia Mini, macOS and brain-core are all present → npm run promote:release -- --tag ${tag}`,
+)

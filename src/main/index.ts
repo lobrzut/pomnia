@@ -60,6 +60,8 @@ import {
   localizePipelineProgress,
 } from '@core/index'
 import { shouldWarnVaultNotSynced } from '../core/brain/vaultSyncWarning.js'
+import { assessDistillPreflight, formatDistillPreflightBlock } from '../core/brain/distillPreflight.js'
+import { hasOllamaModel } from '../core/brain/modelMatch.js'
 import { m } from './mainStrings.js'
 import { formatBuildIdentity } from '../buildInfo.js'
 
@@ -1408,6 +1410,11 @@ description:
         reindex?: boolean
         /** Bearer token for remote Brain dashboard API (reindex). */
         deployToken?: string
+        /**
+         * Remote Brain embeds on the server. Missing `nomic-embed-text` on this
+         * Ollama must not refuse distill or build a local index that nobody reads.
+         */
+        requireEmbed?: boolean
       }
     ) => {
       brainRunAbort?.abort()
@@ -1417,7 +1424,21 @@ description:
       try {
         const { configured } = await resolveOllamaTransport(opts.ollamaUrl)
         const o = ollamaFor(opts.ollamaUrl, opts.model)
-        if (!(await o.reachable())) throw new Error(`Ollama offline at ${configured}`)
+        const reachable = await o.reachable()
+        const installedModels = reachable ? (await o.listModels()).map((m) => m.name) : []
+        const chatModel = opts.model || o.cfg.chatModel
+        const preflight = assessDistillPreflight({
+          reachable,
+          models: installedModels,
+          distillModel: chatModel,
+          embedModel: o.cfg.embedModel,
+          requireEmbed: opts.requireEmbed !== false,
+          ollamaUrl: configured,
+        })
+        // Refuse before any conversation is marked processed. A missing model
+        // used to fail every chat and then lock the backlog.
+        if (!preflight.ok) throw new Error(formatDistillPreflightBlock(preflight))
+        const embedPresent = hasOllamaModel(installedModels, o.cfg.embedModel)
         let convs = opts.importPath
           ? (await parseExportPath(opts.importPath)).conversations.slice(0, opts.limit || undefined)
           : await collectLive(opts.sources, opts.limit)
@@ -1464,7 +1485,9 @@ description:
         const brainWillIndex = brainCore.status().running && opts.reindex !== false
         let idxChunks = 0
         let idxDim = 0
-        if (!brainWillIndex) {
+        // Remote distill can run against an Ollama that only has the chat model
+        // (the server embeds with fastembed). Skip the local pre-index then.
+        if (!brainWillIndex && embedPresent) {
           const idx = await buildIndex(
             okNotes.map((n) => ({ source: n.source, notePath: n.sessionId, text: n.markdown })),
             o,
@@ -1473,7 +1496,7 @@ description:
           await saveIndex(idx, brainIndexFile())
           idxChunks = idx.entries.length
           idxDim = idx.dim
-        } else {
+        } else if (brainWillIndex) {
           idxChunks = okNotes.reduce((n, note) => n + chunkText(note.markdown).length, 0)
           idxDim = 768
         }

@@ -64,7 +64,7 @@ Legend: **L** = locally in Pomnia, **S** = homelab Brain server, **Q** = extract
                   │ browse / searchText (substring, no GPU)
                   ▼
          ┌─────────────────┐     needs Ollama + a chat model
-         │    DISTILL      │     qwen2.5:14b, JSON → an .md note
+         │    DISTILL      │     llama3.1:8b (default), JSON → an .md note
          │  distill.ts     │     quality gate: ok | stub | garbage
          └────────┬────────┘
                   ▼
@@ -228,7 +228,7 @@ Document encryption is paid **at import time only**, never in the search loop:
 
 ### 5.2 Pomnia + local Ollama (the default power user)
 
-- Distillation on the host GPU (qwen2.5:14b).
+- Distillation on the host GPU (`llama3.1:8b` by default).
 - A JSON pre-index (`localIndex.ts`) — immediate search over the notes.
 - An embedded `brain-core` fork → `library.db` plus MCP on `127.0.0.1:7862` for Cursor / Claude Code.
 - Documents: parsed offline, indexed into the same `library.db`.
