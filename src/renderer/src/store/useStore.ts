@@ -481,7 +481,25 @@ export const useStore = create<State>((set, get) => ({
     try {
       const made = await api.backup([...selected], note)
       await get().refreshVault()
-      if (!opts?.silent) {
+      const cursorEmpty = made.filter((m) => m.source.id === 'cursor' && m.stats.conversations === 0)
+      const cursorUnreadable = get().sources.some(
+        (s) => s.id === 'cursor' && s.unreadableChats === 'cursor-db-too-large',
+      )
+      if (cursorEmpty.length > 0) {
+        const others = made.filter((m) => !cursorEmpty.includes(m)).map((m) => m.source.label)
+        get().toast({
+          kind: 'warn',
+          title: labels.cursorEmptyCaptureTitle,
+          detail: [
+            cursorUnreadable ? labels.cursorEmptyCaptureDetail : labels.cursorEmptyCaptureUnknown,
+            others.length ? `${labels.dashboardBackupDone(others.length)}: ${others.join(', ')}` : '',
+          ]
+            .filter(Boolean)
+            .join(' '),
+          actionLabel: labels.cursorEmptyCaptureAction,
+          onAction: () => get().setRoute('import'),
+        })
+      } else if (!opts?.silent) {
         const skipped = made.reduce((n, m) => n + (m.stats.skipped || 0), 0)
         get().toast({
           kind: skipped ? 'warn' : 'success',
@@ -508,8 +526,14 @@ export const useStore = create<State>((set, get) => ({
     const ok = await get().backup(note, { silent: true })
     if (!ok) return
 
-    const distillable = [...get().selected].filter((id) => DISTILLABLE_SET.has(id))
+    const cursorBlocked = get().sources.some(
+      (s) => s.id === 'cursor' && s.unreadableChats === 'cursor-db-too-large',
+    )
+    const selectedDistillable = [...get().selected].filter((id) => DISTILLABLE_SET.has(id))
+    const distillable = selectedDistillable.filter((id) => !(id === 'cursor' && cursorBlocked))
     if (distillable.length === 0) {
+      // Cursor-only and the database was skipped: backup() already explained the 0 chats.
+      if (selectedDistillable.length > 0 && cursorBlocked) return
       get().toast({
         kind: 'info',
         title: labels.dashboardNoDistillSourcesTitle,

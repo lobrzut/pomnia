@@ -16,6 +16,7 @@ import {
   Wand2
 } from 'lucide-react'
 import { Badge, Button, GlassCard, Input, ProgressBar, SourceTile, Spinner } from '../components/ui'
+import { CursorEmptyCapture } from '../components/CursorEmptyCapture'
 import { ActivityBanner } from '../components/ActivityBanner'
 import { StatusStrip } from '../components/StatusStrip'
 import { humanBytes, relativeTime, sourceMeta } from '../lib/format'
@@ -103,6 +104,9 @@ export default function Dashboard() {
     [installed]
   )
   const allSelected = installed.length > 0 && installed.every((s) => selected.has(s.id))
+  const cursorUnreadable = installed.some(
+    (s) => s.id === 'cursor' && s.unreadableChats === 'cursor-db-too-large',
+  )
   const activityLine =
     globalActivity.kind !== 'idle' && globalActivity.kind !== 'finale'
       ? labels.dashboardActivityNow(globalActivity)
@@ -285,9 +289,11 @@ export default function Dashboard() {
               const strategyLabel =
                 s.strategy === 'hybrid' ? labels.strategyHybrid : labels.strategySnapshot
               const chatsLabel =
-                s.conversations != null && s.conversations > 0
-                  ? labels.sourceChatsCount(s.conversations)
-                  : labels.sourceNoChats
+                s.unreadableChats === 'cursor-db-too-large'
+                  ? labels.sourceChatsUnreadable
+                  : s.conversations != null && s.conversations > 0
+                    ? labels.sourceChatsCount(s.conversations)
+                    : labels.sourceNoChats
               const mcpState = mcpClientMemoryState(s.id as ClientId, mcpClients)
               return (
                 <GlassCard
@@ -352,7 +358,8 @@ export default function Dashboard() {
                           {labels.sourceMcpNotConnected}
                         </button>
                       )}
-                      {s.notes?.some((n) => /too large|skipped|agent-transcripts/i.test(n)) && (
+                      {s.unreadableChats !== 'cursor-db-too-large' &&
+                        s.notes?.some((n) => /too large|skipped|agent-transcripts/i.test(n)) && (
                         <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-ink-faint">
                           {s.notes.find((n) => /agent-transcripts|too large|skipped/i.test(n))}
                         </p>
@@ -371,6 +378,12 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {cursorUnreadable && (
+        <div className="mb-2 shrink-0">
+          <CursorEmptyCapture reason="db-too-large" onImport={() => setRoute('import')} />
+        </div>
+      )}
 
       {/* Backup + Distill — pinned to bottom of flex column (no sticky scroll-trap) */}
       <motion.div layout className="mt-2 shrink-0">

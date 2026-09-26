@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle2, FileText, FileUp, Import as ImportIcon, Trash2, Upload } from 'lucide-react'
 import { Badge, Button, GlassCard, SourceTile, Spinner } from '../components/ui'
+import { CursorEmptyCapture } from '../components/CursorEmptyCapture'
 import { BookSkillCard } from '../components/BookSkillCard'
 import { humanBytes, sourceMeta } from '../lib/format'
 import { pathFromDroppedFile } from '../lib/dropFile'
@@ -60,6 +61,8 @@ export default function Import() {
   const [docFilter, setDocFilter] = useState('')
   const [docSort, setDocSort] = useState<DocSortKey>('date')
   const [chatPreview, setChatPreview] = useState<ImportChatPreview | null>(null)
+  /** Set when a chat file yields 0 conversations — the toast alone disappears. */
+  const [chatEmpty, setChatEmpty] = useState<'file' | 'none' | null>(null)
   const [sealing, setSealing] = useState(false)
 
   const refreshLibraryDocs = useCallback(async () => {
@@ -126,11 +129,23 @@ export default function Import() {
     if (!vault.open || busy || sealing || chatPreview) return
     setBusy(true)
     setResult(null)
+    setChatEmpty(null)
     try {
       const file = filePath ?? (await api.pickFile())
       if (!file) return
+      const base = file.split(/[\\/]/).pop() ?? file
+      if (/\.vscdb$/i.test(base)) {
+        setChatEmpty('file')
+        toast({
+          kind: 'warn',
+          title: labels.cursorEmptyCaptureTitle,
+          detail: labels.cursorEmptyCaptureFile,
+        })
+        return
+      }
       const preview = await api.importPreview(file)
       if (preview.conversationCount === 0) {
+        setChatEmpty('none')
         toast({ kind: 'warn', title: labels.importChatNothingRecognized })
         return
       }
@@ -274,7 +289,17 @@ export default function Import() {
     if (!vault.open || busy || sealing || chatPreview) return
     const dropped = e.dataTransfer.files[0]
     if (!dropped) return
+    if (fileExt(dropped) === 'vscdb') {
+      setChatEmpty('file')
+      toast({
+        kind: 'warn',
+        title: labels.cursorEmptyCaptureTitle,
+        detail: labels.cursorEmptyCaptureFile,
+      })
+      return
+    }
     if (!isChatDropFile(dropped)) {
+      setChatEmpty(null)
       toast({ kind: 'warn', title: labels.importUnsupportedFormat, detail: labels.importFormats })
       return
     }
@@ -390,6 +415,19 @@ export default function Import() {
           </Button>
         </div>
       </div>
+
+      {chatEmpty === 'file' && (
+        <div className="mb-5">
+          <CursorEmptyCapture reason="file" />
+        </div>
+      )}
+
+      {chatEmpty === 'none' && (
+        <div className="mb-5 flex flex-col items-center gap-2 rounded-xl border border-dashed border-white/10 px-4 py-6 text-center">
+          <p className="text-sm font-medium text-ink">{labels.importChatNothingRecognized}</p>
+          <p className="max-w-md text-[11px] leading-relaxed text-ink-faint">{labels.importFormats}</p>
+        </div>
+      )}
 
       {chatPreview && (
         <motion.div initial={{ y: 8 }} animate={{ y: 0 }}>
