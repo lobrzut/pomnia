@@ -182,7 +182,7 @@ export default function MiniIngest() {
       {/*
         The distiller, and where it lives. Nothing here assumes localhost:
         the reason to run Mini is usually that the heavy parts are on another
-        machine, and a 9 GB model is the heaviest part there is.
+        machine, and the chat model is the heaviest part there is.
       */}
       <GlassCard className="mb-5 p-5">
         {/*
