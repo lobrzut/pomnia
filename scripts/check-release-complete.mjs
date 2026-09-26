@@ -8,6 +8,7 @@
  * One URL has three audiences and no owner:
  *
  *  - the site's "Download for Windows" buttons and the JSON-LD `downloadUrl`
+ *  - Pomnia Mini, the Windows zip (`PomniaMini-<version>.zip`, not a portable exe)
  *  - Linux desktop (AppImage/deb + latest-linux.yml)
  *  - `curl | sh`, which resolves the brain-core tarball off `releases/latest`
  *    (packages/brain-core/deploy/bootstrap.sh)
@@ -83,4 +84,6 @@ if (!assessment.complete) {
   )
 }
 
-console.log(`✔ ${release.tag_name} serves Windows, macOS, Linux desktop and the curl|sh tarball (${version})`)
+console.log(
+  `✔ ${release.tag_name} serves Windows, Pomnia Mini, macOS, Linux desktop and the curl|sh tarball (${version})`,
+)

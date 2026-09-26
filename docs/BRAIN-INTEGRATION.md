@@ -1,4 +1,10 @@
-> **Internal / historical note** — not user-facing docs. Continuum-era host-side pipeline analysis (2026-06); keep for operators, not onboarding.
+> **Superseded — do not use this to set up Pomnia.**
+>
+> This file is an archive of the retired Python hub (dashboard on `:7860`, MCP proxy on `:7862`, `/opt/BRAIN`, Continuum). Those ports and that install are gone.
+>
+> Current self-hosted path: one **brain-core** process (Desktop embedded on `:7862`, a server you run yourself typically on `:7865`). Start at [LINUX-SELF-HOSTED.md](./LINUX-SELF-HOSTED.md), [START-HERE.md](./START-HERE.md), and [CURSOR-MCP.md](./CURSOR-MCP.md).
+>
+> Nothing below is a current install guide. Kept so old operator notes stay findable.
 
 # Continuum × Brain — analysis and the host-side pipeline
 

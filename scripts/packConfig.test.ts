@@ -13,8 +13,9 @@ import { describe, expect, it } from 'vitest'
  * merged config the packager actually uses — not a hand-rolled merge.
  *
  * Pack-time check (this file does not build a zip):
- *   unzip -l release/mini/PomniaMini-*-portable.zip | grep resources/brain-core
- * Expect no matches. After a desktop pack,
+ *   unzip -l release/mini/PomniaMini-*.zip | grep -E 'resources/brain-core/|brain-core-runtime' || echo 'no embedded Brain runtime'
+ * The release zip is PomniaMini-<version>.zip (not *-portable.zip). Expect no
+ * resources/brain-core/ paths. After a desktop pack,
  * release/win-unpacked/resources/brain-core/embedded.js should exist.
  */
 
@@ -39,7 +40,7 @@ interface BuilderConfig {
   directories?: { output?: string; buildResources?: string }
   win?: { target?: string[]; executableName?: string; artifactName?: string }
   nsis?: { include?: string; oneClick?: boolean }
-  portable?: { unpackDirName?: string }
+  portable?: { unpackDirName?: string; artifactName?: string }
   mac?: { artifactName?: string }
   linux?: { target?: string[]; executableName?: string }
 }
@@ -100,9 +101,12 @@ describe('electron-builder flavour configs', () => {
 
     expect(mini.win?.target).toEqual(['portable', 'zip'])
     expect(mini.win?.executableName).toBe('PomniaMini')
-    expect(mini.win?.artifactName).toBe('${productName}-${version}-portable.${ext}')
+    // Zip inherits win.artifactName. The portable exe overrides it so the
+    // GitHub asset stays PomniaMini-<version>.zip, not *-portable.zip.
+    expect(mini.win?.artifactName).toBe('${productName}-${version}.${ext}')
     expect(mini.nsis).toBeUndefined()
     expect(mini.portable?.unpackDirName).toBe('PomniaMini')
+    expect(mini.portable?.artifactName).toBe('${productName}-${version}-portable.${ext}')
     expect(mini.publish).toBeNull()
     expect(desktop.publish).toMatchObject({ provider: 'github', owner: 'lobrzut', repo: 'pomnia' })
 

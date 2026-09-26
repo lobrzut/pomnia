@@ -47,6 +47,9 @@ describe('uiLabels', () => {
     expect(labels.redistillEverythingConfirm(235)).toMatch(/235/)
     expect(labels.redistillEverythingConfirm(235)).toMatch(/nadpisane/i)
     expect(labels.brainStateUncountable).toMatch(/256 MB/)
+    expect(labels.cursorEmptyCaptureTitle).toBe('Cursor: 0 czatów')
+    expect(labels.cursorEmptyCaptureAction).toBe('Otwórz Import')
+    expect(labels.sourceChatsUnreadable).toMatch(/256 MB/)
     expect(labels.distillEmptyBacklog).toBe('Brak nowych sesji do destylacji')
     expect(labels.brainPipeCollect).toBe('Zbieraj')
     expect(labels.brainPipeCollectNote).toBe('z asystentów')
@@ -192,6 +195,8 @@ describe('uiLabels', () => {
     expect(labels.runPipeline).not.toBe(labels.distill)
     expect(labels.brainStateDistilledHint).toMatch(/tools scan/i)
     expect(labels.brainStateUncountable).toMatch(/256 MB/)
+    expect(labels.cursorEmptyCaptureTitle).toBe('Cursor captured 0 chats')
+    expect(labels.cursorEmptyCaptureAction).toBe('Open Import')
     expect(labels.redistillEverythingConfirm(12)).toMatch(/overwritten/i)
     expect(labels.activityBanner({ kind: 'distill', done: 1, total: 2 })).toBe(
       'In progress: distillation (1/2)',

@@ -155,6 +155,8 @@ export interface PomniaBridge {
     deployTarget?: string
     deployToken?: string
     reindex?: boolean
+    /** False when a remote Brain owns embeddings. */
+    requireEmbed?: boolean
   }): Promise<BrainRunResult>
   brainRunCancel(): Promise<{ ok: boolean }>
   brainState(): Promise<BrainStateInfo>

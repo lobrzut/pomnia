@@ -8,6 +8,19 @@ A **local application** that collects conversations from every AI assistant into
 
 Nothing leaves for the cloud unless you configure a deploy to your own server.
 
+## Two downloads
+
+Both files belong on the same [GitHub Release](https://github.com/lobrzut/pomnia/releases/latest). The `<version>` in the name is the product version. Mini's download is the zip in the table — if a portable exe is listed beside it, that is not the file to take.
+
+| You want | Download | Then |
+|---|---|---|
+| The full app — vault, distill, embedded Brain on this machine | `Pomnia-<version>-setup.exe` | Run the installer |
+| **Pomnia Mini** — this machine only connects to a Brain server you already run | **`PomniaMini-<version>.zip`** | Unpack the zip **once**, then run `PomniaMini.exe` |
+
+Mini is that zip. Unpack it once; every start after that is a normal program start. Do not use a portable unpacker for Mini — a portable `.exe`, if you see one, extracts into `%TEMP%` on every launch and is not the download.
+
+Mini's screens are Connect, Settings, Skills, Prompts and Import. It does not start Ollama or a local Brain, and it does not hold a vault. The rest of this page is the full app.
+
 > **In the app:** the **How it works** tab (Pomnia Map) in the sidebar — a visual walkthrough of the flow, plus the "Where you are now" bar on the Dashboard. The "I don't know where to start →" link leads there too.
 
 ## Two stores — do not confuse them
@@ -65,7 +78,7 @@ This turns raw conversation logs into condensed `.md` notes and builds the vecto
 
 **Mac / no app:** see [docs/CURSOR-MCP.md](./CURSOR-MCP.md) — embedded brain: `http://127.0.0.1:7862/mcp`, no token; remote brain-core: `http://<host>:7865/mcp` + a token minted in the server's admin panel (`http://<host>:7865/admin` → Tokens). Paste into `~/.cursor/mcp.json` → Reload Window.
 
-There is **one** MCP server: `pomnia` (the legacy `brain-rag` key is still accepted). Older configs that list `pomnia-vault` / `pomnia-library` (or `brain-vault` / `brain-library`) point at servers that no longer exist — remove those entries.
+There is **one** MCP server: `pomnia` (the legacy `brain-rag` key is still accepted). A leftover three-server config is the retired Python hub — see the footnote, and delete those extra entries.
 
 ### 5. Verify
 
@@ -93,11 +106,13 @@ If the Cursor backup shows 0 chats, use Import.
 
 | Problem | Where |
 |---------|-------|
+| Distill sits idle | Ollama down, or `nomic-embed-text` / `llama3.1:8b` not pulled. The app shows a checklist and does not mark chats as distilled |
 | I don't understand how this works | **How it works** (menu) or Dashboard → "I don't know where to start" |
 | System status | Dashboard → the "Where you are now" bar · Settings → Diagnostics |
 | Logs | `%AppData%/pomnia/logs/` |
 | The full document pipeline | [DOCUMENT-PIPELINE.md](./DOCUMENT-PIPELINE.md) |
-| Homelab Brain integration | [BRAIN-INTEGRATION.md](./BRAIN-INTEGRATION.md) (internal/historical) |
+| Self-hosted Brain (your own machine or server) | [LINUX-SELF-HOSTED.md](./LINUX-SELF-HOSTED.md) — brain-core, not the old Python hub |
+| Archived Python hub (`:7860` / Continuum) | [BRAIN-INTEGRATION.md](./BRAIN-INTEGRATION.md) — superseded, not a setup guide |
 
 ## What this beta still does not have
 
@@ -107,6 +122,8 @@ If the Cursor backup shows 0 chats, use Import.
 - A guarantee that Antigravity works on every machine (the adapter is still in testing)
 
 Linux Desktop (AppImage/deb): built on Linux/CI — [LINUX-BUILD.md](./LINUX-BUILD.md).
+
+> Footnote: a config that lists three SSE servers (`pomnia` + `pomnia-vault` + `pomnia-library`, or `brain-vault` / `brain-library`) is the retired Python hub. It is not a setup path. There is one server, `pomnia`.
 
 ---
 

@@ -22,16 +22,18 @@ import {
 import clsx from 'clsx'
 import { AppLogo } from '../components/AppLogo'
 import { Button, Field, Input, ProgressBar, Spinner } from '../components/ui'
+import { CursorEmptyCapture } from '../components/CursorEmptyCapture'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { Hint } from '../components/Hint'
 import { GuideOverlay } from '../components/GuideMap'
 import { ClientIcon } from '../components/ClientIcon'
 import { api } from '../lib/api'
 import { uiLabels } from '../lib/labels'
-import { useStore, ollamaUrlFromBrainUrl, ollamaUrlLooksLocal } from '../store/useStore'
+import { useStore, currentDistillChatModel, ollamaUrlFromBrainUrl, ollamaUrlLooksLocal } from '../store/useStore'
 import { identifyEngine } from '@core/brain/engine'
 import { hasOllamaModel } from '@core/brain/modelMatch'
-import { defaultChatModel } from '@core/brain/profiles'
+import { chatModelDownloadSize, defaultChatModel } from '@core/brain/profiles'
+import { DistillPreflightPanel } from '../components/DistillPreflightPanel'
 import { EMBEDDED_BRAIN_DEFAULT_URL, REMOTE_BRAIN_URL_PLACEHOLDER } from '@core/brain/snippet'
 import type {
   BrainStatus,
@@ -452,6 +454,9 @@ function BackupStep({
           {backingUp && (
             <p className="text-xs text-ink-dim">{backupPhase || labels.onboardingBackupBackingUp}</p>
           )}
+          {picked.some((s) => s.id === 'cursor' && s.unreadableChats === 'cursor-db-too-large') && (
+            <CursorEmptyCapture reason="db-too-large" />
+          )}
         </div>
       )}
 
@@ -573,13 +578,15 @@ function EngineStep({
   const models = status?.models ?? []
   const embedModel = status?.embedModel ?? 'nomic-embed-text'
   const distillModel = status?.chatModel ?? defaultChatModel()
+  const distillSize = chatModelDownloadSize(distillModel)
   const hasEmbed = hasOllamaModel(models, embedModel)
   const hasDistill = hasOllamaModel(models, distillModel)
   const remoteUrlTrimmed = remoteUrl.trim()
   // The embed model is not a nice-to-have: without it the local brain indexes
   // nothing and every agent search comes back empty, while the app still looks
-  // healthy. Finishing setup in that state is the failure we keep paying for.
-  // The distill model stays optional — search works without it.
+  // healthy. Finishing this step in that state is the failure we keep paying for.
+  // Search can continue without the distill model; the Ready step and every
+  // distill click still refuse to run until that model is installed.
   //
   // Remote gets the same bar for the same reason: a URL that was typed but
   // never verified is setup that reports done while nothing is wired. The step
@@ -757,7 +764,7 @@ function EngineStep({
               {labels.onboardingEngineEmbedHint(embedModel)}
             </p>
             <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
-              {labels.onboardingEngineDistillHint(distillModel)}
+              {labels.onboardingEngineDistillHint(distillModel, distillSize)}
             </p>
             {(!hasEmbed || !hasDistill) && (
               <div className="mt-3 space-y-2.5 rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-[11px] text-amber-100">
@@ -767,7 +774,7 @@ function EngineStep({
                 {!hasDistill &&
                   pullRow(
                     distillModel,
-                    labels.onboardingEngineDistillMissing(`ollama pull ${distillModel}`, '~9 GB'),
+                    labels.onboardingEngineDistillMissing(`ollama pull ${distillModel}`, distillSize),
                   )}
                 {pullError && <p className="text-rose">{pullError}</p>}
               </div>
@@ -1039,6 +1046,12 @@ function ReadyStep({
   onFinish: () => void
 }) {
   const labels = uiLabels()
+  const ollamaUrl = useStore((s) => s.ollamaUrl)
+  // Remote search lives on the server. Local distill is the path that used to
+  // look finished while Ollama was down.
+  const impliesDistill = outcomes.brainTarget !== 'remote'
+  const [distillReady, setDistillReady] = useState(!impliesDistill)
+  const distillModel = currentDistillChatModel()
   const rows = simpleMode
     ? [
         { label: labels.onboardingReadyVault, state: outcomes.vault ?? 'skipped' },
@@ -1060,14 +1073,25 @@ function ReadyStep({
         initial={{ scale: 0, rotate: -30 }}
         animate={{ scale: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.1 }}
-        className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-mint/15 ring-1 ring-mint/40"
+        className={clsx(
+          'mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full ring-1',
+          impliesDistill && !distillReady ? 'bg-amber/15 ring-amber/40' : 'bg-mint/15 ring-mint/40'
+        )}
       >
-        <PartyPopper className="h-7 w-7 text-mint" />
+        {impliesDistill && !distillReady ? (
+          <Cpu className="h-7 w-7 text-amber" />
+        ) : (
+          <PartyPopper className="h-7 w-7 text-mint" />
+        )}
       </motion.div>
 
       <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.onboardingReadyTitle}</h1>
       <p className="mx-auto mt-2 max-w-[360px] text-sm text-ink-dim">
-        {simpleMode ? labels.onboardingReadyLeadDone : labels.onboardingReadyLeadPartial}
+        {impliesDistill && !distillReady
+          ? labels.onboardingReadyDistillLead
+          : simpleMode
+            ? labels.onboardingReadyLeadDone
+            : labels.onboardingReadyLeadPartial}
       </p>
 
       <div className="mx-auto mt-6 max-w-[340px] space-y-2 text-left">
@@ -1092,7 +1116,27 @@ function ReadyStep({
         ))}
       </div>
 
-      <Button onClick={onFinish} className="mt-8 w-full">
+      {impliesDistill && (
+        <div className="mx-auto mt-5 max-w-[420px] text-left">
+          <DistillPreflightPanel
+            ollamaUrl={ollamaUrl}
+            distillModel={distillModel}
+            requireEmbed
+            onReadyChange={setDistillReady}
+          />
+          {!distillReady && (
+            <button
+              type="button"
+              onClick={onFinish}
+              className="no-drag mt-3 text-[12px] text-ink-faint hover:text-ink"
+            >
+              {labels.onboardingReadyEnterWithoutDistill}
+            </button>
+          )}
+        </div>
+      )}
+
+      <Button onClick={onFinish} disabled={impliesDistill && !distillReady} className="mt-8 w-full">
         <Sparkles className="h-4 w-4" /> {labels.onboardingEnterApp}
       </Button>
     </div>

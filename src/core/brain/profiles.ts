@@ -102,3 +102,8 @@ export const VRAM_PROFILES: VramProfile[] = [
     recommended: true
   }
 ]
+
+/** Rounded download size for a profile chat model. Empty when the name is custom. */
+export function chatModelDownloadSize(model: string): string {
+  return VRAM_PROFILES.find((p) => p.chatModel === model)?.chatSize ?? ''
+}
