@@ -45,7 +45,7 @@ Optional: **Handshake** — personal start ritual in the UI; not required for th
 | **Codex** | hybrid | `~/.codex` | rollout JSONL → conversations **+** snapshot of `sessions/`, `skills/`, `config.toml`, `AGENTS.md` |
 | **Cursor** | hybrid | `…/Cursor/User` | chats from `globalStorage/state.vscdb` **+** config snapshot |
 | **Claude Desktop** | snapshot | `%APPDATA%/Claude` / `~/Library/Application Support/Claude` | config, local sessions, Local Storage |
-| **Antigravity** | hybrid | `%APPDATA%/Antigravity` · chats in `~/.gemini/antigravity` | Cascade transcripts **+** profile snapshot |
+| **Antigravity** | hybrid | application-data folder `Antigravity IDE` (older: `Antigravity`) · chats in `~/.gemini/antigravity-ide`, `~/.gemini/antigravity`, `~/.gemini/antigravity-cli` | JSONL transcripts (`transcript_full.jsonl`, else `transcript.jsonl`) **+** profile snapshot. SQLite `conversations/*.db` are not parsed |
 | **VS Code** / **Windsurf** | snapshot | `…/Code/User` · `…/Windsurf/User` | settings, snippets, `globalStorage` |
 | **Continue** | snapshot | `~/.continue` | config, sessions, assistants |
 

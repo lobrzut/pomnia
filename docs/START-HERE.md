@@ -104,7 +104,7 @@ If the Cursor backup shows 0 chats, use Import.
 - A code-signed installer (SmartScreen / Gatekeeper)
 - Full OCR of every page / Ollama vision (there is thin OCR: the first sparse pages)
 - Cloud vault sync
-- A guarantee that Antigravity works on every machine (the adapter is still in testing)
+- Antigravity sessions that exist only as SQLite (`conversations/*.db`) or protobuf. Pomnia reads JSONL transcripts under `~/.gemini/antigravity-ide`, `~/.gemini/antigravity`, and `~/.gemini/antigravity-cli` (`transcript_full.jsonl`, else `transcript.jsonl`)
 
 Linux Desktop (AppImage/deb): built on Linux/CI — [LINUX-BUILD.md](./LINUX-BUILD.md).
 
