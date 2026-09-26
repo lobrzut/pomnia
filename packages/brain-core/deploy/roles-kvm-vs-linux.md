@@ -12,7 +12,7 @@ Różnica to nie tylko „ONNX vs Ollama embed”. Linux **przejmuje destylację
 |--|--|--|
 | Rola | search appliance (mało RAM, always-on) | **pełny SoT** — search + **distill** |
 | Embed | **fastembed ONNX** in-process — **bez Ollamy** | **Ollama** `nomic-embed-text` (HTTP) |
-| Distill w serwerze | **NIE** — `BRAIN_DISTILL=0`, UI Destylacja ukryta | **TAK** — Ollama chat `qwen2.5:14b` (`BRAIN_DISTILL_MODEL`) |
+| Distill w serwerze | **NIE** — `BRAIN_DISTILL=0`, UI Destylacja ukryta | **TAK** — Ollama chat `llama3.1:8b` (domyślne `BRAIN_DISTILL_MODEL`) |
 | Vault | docelowo writer / Sejf | **writer** wymagany do zapisu `distilled/` |
 | Deploy | Docker / Dockge | systemd `/opt/pomnia-brain-core` |
 | UI | ten sam `packages/brain-core` | Destylacja widoczna gdy writable + feature on |
@@ -22,7 +22,7 @@ Różnica to nie tylko „ONNX vs Ollama embed”. Linux **przejmuje destylację
 ```text
 .150 /healthz → embed.backend=fastembed   # OK dla appliance; BRAIN_DISTILL=0
 .201 /healthz → embed.backend=ollama      # OK
-.201 Ollama   → :11434 embed (nomic) + generate (qwen2.5:14b)
+.201 Ollama   → :11434 embed (nomic) + generate (domyślnie llama3.1:8b; starsze jednostki mogły mieć qwen2.5:14b)
 .201 unit     → --read-only --vault-owner "Pomnia Desktop"  # dziś RO replica
 .201 distill  → kod w core GOTOWY; produkcja NIE pisze dopóki RO
 ```
@@ -45,18 +45,18 @@ Desktop nadal ma lokalną ścieżkę distill — nie kasujemy. Remote job z Desk
 ```bash
 # Dry-run przeciw Ollama (bez zapisu vault):
 brain-core --distill-dry-run --ollama-url http://127.0.0.1:11434 \
-  --distill-model qwen2.5:14b
+  --distill-model llama3.1:8b
 
 # Inbox → distilled/ (wymaga writable SoT):
 brain-core --distill --vault-root /var/lib/pomnia/vault \
-  --ollama-url http://127.0.0.1:11434 --distill-model qwen2.5:14b
+  --ollama-url http://127.0.0.1:11434 --distill-model llama3.1:8b
 
 # Albo panel: /admin → Destylacja → Uruchom (inbox) / Dry-run
 # Albo: POST /admin/distill  { "dryRun": true }
 #       POST /admin/distill  { "conversations": [ ... ] }
 ```
 
-Env: `BRAIN_DISTILL=1` (domyślnie on), `BRAIN_DISTILL_MODEL=qwen2.5:14b`, ten sam `BRAIN_OLLAMA_URL` co embed.
+Env: `BRAIN_DISTILL=1` (domyślnie on), `BRAIN_DISTILL_MODEL=llama3.1:8b` (to jest default w kodzie — nie ustawiaj `qwen2.5:14b`, chyba że świadomie zostajesz przy starym modelu), ten sam `BRAIN_OLLAMA_URL` co embed.
 
 ## Jak helluk zdejmuje `--read-only` (władza zapisu — NIE zrobione w tej sesji)
 
