@@ -158,7 +158,7 @@ export default function Skills() {
   }
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col overflow-hidden">
+    <div className="mx-auto flex h-full min-h-0 w-full min-w-0 max-w-5xl flex-col overflow-hidden">
       <div className="mb-3 shrink-0">
         <button
           type="button"

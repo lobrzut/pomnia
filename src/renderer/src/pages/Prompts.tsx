@@ -166,7 +166,7 @@ export default function Prompts() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto w-full min-w-0 max-w-3xl">
       <div className="mb-6 flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl accent-grad ring-glow">
           <MessageSquareQuote className="h-6 w-6 text-white" />
