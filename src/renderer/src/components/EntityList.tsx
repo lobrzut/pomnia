@@ -20,6 +20,13 @@
  * here said a click copies the name, and kept saying it for a release after
  * the click stopped doing that — so if the click changes again, this changes
  * in the same commit.
+ *
+ * Actions sit in one wrapping row, not a column. A column made every card as
+ * tall as Edytuj + Kopiuj treść + Usuń, and on a narrow Mini window that
+ * column was `shrink-0`, so the right edge (the only delete, and the header
+ * buttons beside it) slid past the window and was clipped. One cluster, one
+ * delete. Labels stay visible; the cluster wraps onto another line instead of
+ * stretching the card or leaving the panel.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -184,7 +191,7 @@ export function ListRow({
   return (
     <div
       className={clsx(
-        'group flex items-start gap-3 border-b border-white/5 px-3 py-2.5 last:border-0',
+        'group flex min-w-0 flex-wrap items-start gap-x-3 gap-y-1.5 border-b border-white/5 px-3 py-2.5 last:border-0',
         activate && 'cursor-pointer hover:bg-white/[0.03]',
       )}
       onClick={activate ? () => activate() : undefined}
@@ -222,19 +229,22 @@ export function ListRow({
         </div>
         <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-ink-dim">{subtitle || '—'}</p>
         {facts.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0 text-[10px] text-ink-faint">
+          <div className="mt-1 flex min-w-0 flex-wrap gap-x-3 gap-y-0 text-[10px] text-ink-faint">
             {facts.map((f) => (
-              <span key={f}>{f}</span>
+              <span key={f} className="min-w-0 max-w-full break-all">
+                {f}
+              </span>
             ))}
           </div>
         )}
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-1">
+      <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-0.5">
         {(actions ?? []).map((a) => (
           <button
             key={a.label}
             type="button"
-            className="no-drag inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-iris hover:bg-white/5 hover:text-cyan"
+            title={a.label}
+            className="no-drag inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium text-iris hover:bg-white/5 hover:text-cyan"
             onClick={(e) => {
               e.stopPropagation()
               a.onClick()
@@ -247,7 +257,8 @@ export function ListRow({
         {copyBody && (
           <button
             type="button"
-            className="no-drag inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-iris hover:bg-white/5 hover:text-cyan"
+            title={labels.rowCopyText}
+            className="no-drag inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium text-iris hover:bg-white/5 hover:text-cyan"
             onClick={(e) => {
               e.stopPropagation()
               void copy(copyBody)
@@ -260,8 +271,9 @@ export function ListRow({
         {onDelete && (
           <button
             type="button"
+            title={armed ? (confirmLabel ?? 'Confirm') : (deleteLabel ?? 'Delete')}
             className={clsx(
-              'no-drag inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium',
+              'no-drag inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium',
               armed
                 ? 'bg-rose/15 text-rose'
                 : 'text-ink-faint hover:bg-white/5 hover:text-rose',
@@ -306,24 +318,26 @@ export function AgentPickBar() {
     prompts: pick.prompts,
   })
   return (
-    <GlassCard className="mb-3 flex items-center gap-3 px-3 py-2">
-      <div className="min-w-0 flex-1">
+    <GlassCard className="mb-3 flex w-full min-w-0 shrink-0 flex-wrap items-center gap-2 px-3 py-2">
+      <div className="min-w-0 flex-1 basis-48">
         <p className="text-xs font-semibold text-ink">
           {labels.pickSummary(pick.skills.length, pick.prompts.length)}
         </p>
         <p className="truncate font-mono text-[10px] text-ink-faint">{reference.split('\n')[0]}</p>
       </div>
-      <Button
-        onClick={() => void copy(async () => ({ text: reference, detail: labels.copiedReference }))}
-        className="!px-2.5 !py-1.5 !text-xs"
-      >
-        <Copy className="h-3.5 w-3.5" />
-        {labels.pickCopy}
-      </Button>
-      <Button variant="soft" onClick={clearPick} className="!px-2.5 !py-1.5 !text-xs">
-        <X className="h-3.5 w-3.5" />
-        {labels.pickClear}
-      </Button>
+      <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
+        <Button
+          onClick={() => void copy(async () => ({ text: reference, detail: labels.copiedReference }))}
+          className="shrink-0 !px-2.5 !py-1.5 !text-xs"
+        >
+          <Copy className="h-3.5 w-3.5" />
+          {labels.pickCopy}
+        </Button>
+        <Button variant="soft" onClick={clearPick} className="shrink-0 !px-2.5 !py-1.5 !text-xs">
+          <X className="h-3.5 w-3.5" />
+          {labels.pickClear}
+        </Button>
+      </div>
     </GlassCard>
   )
 }

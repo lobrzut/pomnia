@@ -196,8 +196,13 @@ export default function App() {
 
             The padding scales with the window for the same reason: 72px of
             side padding is comfortable at 1200px and a quarter of the usable
-            width at 630px, which is what a 150% display scale leaves. */}
-        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-4 pb-3 pt-3 sm:px-6 lg:px-9">
+            width at 630px, which is what a 150% display scale leaves.
+
+            That padding has to live on the absolute layer, not on main. An
+            absolute `inset-0` child is positioned against main's padding edge,
+            so padding on main is covered and the page sits flush with the
+            window edge — which is how Odśwież and the row actions got clipped. */}
+        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {/* Absolute stack keeps main height stable while pages crossfade — avoids flex collapse / scroll thrash. */}
           <AnimatePresence initial={false}>
             <motion.div
@@ -206,7 +211,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4, pointerEvents: 'none' }}
               transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-0 flex min-h-0 flex-col overflow-y-auto"
+              className="absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-y-auto px-4 pb-3 pt-3 sm:px-6 lg:px-9"
             >
               <ErrorBoundary>
                 <Page />

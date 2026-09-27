@@ -191,23 +191,23 @@ export default function MiniSkills() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl accent-grad ring-glow">
+    <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-4xl flex-1 flex-col overflow-hidden">
+      <div className="mb-4 flex shrink-0 flex-wrap items-center gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl accent-grad ring-glow">
           <BookOpen className="h-6 w-6 text-white" />
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-40">
           <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.skillsTitle}</h1>
           <p className="text-sm text-ink-dim">{labels.skillsLead}</p>
         </div>
-        <Button variant="soft" onClick={() => void loadSummary()} disabled={loading}>
+        <Button variant="soft" className="shrink-0" onClick={() => void loadSummary()} disabled={loading}>
           {loading ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
           {labels.skillsRefresh}
         </Button>
       </div>
 
       {error && (
-        <GlassCard className="mb-5 p-5">
+        <GlassCard className="mb-4 shrink-0 p-5">
           <p className="text-xs text-amber">{labels.skillsRemoteReason(error.code)}</p>
           {/* A rejected token is fixed in one place, so the page says where. */}
           {(error.code === 'unauthorized' || error.code === 'no-token') && (
@@ -219,23 +219,25 @@ export default function MiniSkills() {
       )}
 
       {open ? (
-        <MarkdownEditor
-          title={open.name}
-          subtitle={open.path}
-          text={text}
-          onChange={setText}
-          onClose={() => setOpen(null)}
-          onSave={() => void save()}
-          saving={saving}
-          dirty={dirty}
-        />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <MarkdownEditor
+            title={open.name}
+            subtitle={open.path}
+            text={text}
+            onChange={setText}
+            onClose={() => setOpen(null)}
+            onSave={() => void save()}
+            saving={saving}
+            dirty={dirty}
+          />
+        </div>
       ) : (
         <>
           <AgentPickBar />
 
           {/* Making a skill from a book moved to "Do Pomnia": it is an import,
               and this page is the list of what already exists. */}
-          <div className="mb-4 flex items-center gap-2">
+          <div className="mb-4 flex shrink-0 flex-wrap items-center gap-2">
             {category && (
               <Button variant="soft" onClick={() => setCategory(null)}>
                 <ChevronLeft className="h-3.5 w-3.5" />
@@ -249,18 +251,18 @@ export default function MiniSkills() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={labels.skillsSearchPlaceholder}
                 spellCheck={false}
-                className="no-drag w-full rounded-xl border border-white/10 bg-black/30 py-2 pl-9 pr-3 text-sm text-ink placeholder:text-ink-faint"
+                className="no-drag w-full min-w-0 rounded-xl border border-white/10 bg-black/30 py-2 pl-9 pr-3 text-sm text-ink placeholder:text-ink-faint"
               />
             </div>
           </div>
 
           {narrowed ? (
             rows === null ? (
-              <GlassCard className="p-5">
+              <GlassCard className="shrink-0 p-5">
                 <Spinner className="h-4 w-4" />
               </GlassCard>
             ) : (
-              <div className="max-h-[58vh] overflow-y-auto">
+              <div className="min-h-0 flex-1 overflow-y-auto">
                 <ListSection
                   title={category ? labels.skillsCategorySection(category) : labels.skillsPacksHeading}
                   count={rows.total}
@@ -273,11 +275,11 @@ export default function MiniSkills() {
               </div>
             )
           ) : summary === null ? (
-            <GlassCard className="p-5">
+            <GlassCard className="shrink-0 p-5">
               <Spinner className="h-4 w-4" />
             </GlassCard>
           ) : (
-            <div className="space-y-3">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
               <ListSection
                 title={labels.skillsOwnHeading}
                 count={summary.own.length}

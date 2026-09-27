@@ -144,23 +144,23 @@ export default function MiniPrompts() {
   const dirty = open !== null && text !== original
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl accent-grad ring-glow">
+    <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-4xl flex-1 flex-col overflow-hidden">
+      <div className="mb-4 flex shrink-0 flex-wrap items-center gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl accent-grad ring-glow">
           <MessageSquareQuote className="h-6 w-6 text-white" />
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-40">
           <h1 className="text-[26px] font-bold tracking-tight text-grad">{labels.promptsTitle}</h1>
           <p className="text-sm text-ink-dim">{labels.promptsLead}</p>
         </div>
-        <Button variant="soft" onClick={() => void load()} disabled={loading}>
+        <Button variant="soft" className="shrink-0" onClick={() => void load()} disabled={loading}>
           {loading ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
           {labels.promptsRefresh}
         </Button>
       </div>
 
       {error && (
-        <GlassCard className="mb-5 p-5">
+        <GlassCard className="mb-4 shrink-0 p-5">
           <p className="text-xs text-amber">{labels.skillsRemoteReason(error.code)}</p>
           {(error.code === 'unauthorized' || error.code === 'no-token') && (
             <Button className="mt-3" variant="soft" onClick={() => setRoute('settings')}>
@@ -171,20 +171,22 @@ export default function MiniPrompts() {
       )}
 
       {open ? (
-        <MarkdownEditor
-          title={`/${open}`}
-          subtitle={labels.promptsHowItReaches}
-          text={text}
-          onChange={setText}
-          onClose={() => setOpen(null)}
-          onSave={() => void save()}
-          saving={saving}
-          dirty={dirty}
-        />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <MarkdownEditor
+            title={`/${open}`}
+            subtitle={labels.promptsHowItReaches}
+            text={text}
+            onChange={setText}
+            onClose={() => setOpen(null)}
+            onSave={() => void save()}
+            saving={saving}
+            dirty={dirty}
+          />
+        </div>
       ) : (
         <>
-          <GlassCard className="mb-4 p-5">
-            <div className="flex items-center gap-2">
+          <GlassCard className="mb-4 shrink-0 p-4">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
@@ -193,9 +195,9 @@ export default function MiniPrompts() {
                 }}
                 placeholder={labels.promptsNewName}
                 spellCheck={false}
-                className="no-drag min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-faint"
+                className="no-drag min-w-0 flex-1 basis-48 rounded-xl border border-white/10 bg-black/30 px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-faint"
               />
-              <Button onClick={() => void create()} disabled={saving || newName.trim() === ''}>
+              <Button className="shrink-0" onClick={() => void create()} disabled={saving || newName.trim() === ''}>
                 <Plus className="h-3.5 w-3.5" />
                 {labels.promptsCreate}
               </Button>
@@ -205,11 +207,11 @@ export default function MiniPrompts() {
           <AgentPickBar />
 
           {prompts === null ? (
-            <GlassCard className="p-5">
+            <GlassCard className="shrink-0 p-5">
               <Spinner className="h-4 w-4" />
             </GlassCard>
           ) : (
-            <div className="max-h-[58vh] overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto">
               <ListSection
                 title={labels.promptsTitle}
                 count={prompts.length}
