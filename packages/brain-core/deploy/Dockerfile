@@ -58,6 +58,18 @@ RUN mkdir -p /opt/pomnia/embed-cache /var/lib/pomnia \
 
 # The vault and the index are state — mount them, do not bake them in.
 VOLUME ["/var/lib/pomnia"]
+
+# Same command install.sh puts on the host PATH. The entrypoint stays
+# `node dist/daemon.js`, so `docker run … --add-token` is unchanged;
+# `docker exec <ctr> brain-core --add-token` matches what the server prints.
+# BRAIN_DATA_DIR is already set, and a later --data-dir still overrides it.
+RUN printf '%s\n' \
+      '#!/bin/sh' \
+      'set -eu' \
+      'exec node /opt/pomnia/brain-core/dist/daemon.js --data-dir "${BRAIN_DATA_DIR:-/var/lib/pomnia}" "$@"' \
+      > /usr/local/bin/brain-core \
+    && chmod 755 /usr/local/bin/brain-core
+
 USER pomnia
 
 EXPOSE 7865

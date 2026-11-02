@@ -9,6 +9,7 @@ import { EMBEDDED_BRAIN_DEFAULT_URL } from '@core/brain/snippet'
 import { assessHealthPayload, type VersionSkewAssessment } from '@core/brain/versionSkew'
 import { shortPath, relativeTime } from '../lib/format'
 import { uiLabels } from '../lib/labels'
+import { useBrainLink } from '../lib/useBrainLink'
 import { loadDoctorLastResult } from '../lib/doctorLastResult'
 import { useStore, type Route } from '../store/useStore'
 import type { BrainStateInfo, BrainStatus, EmbeddedBrainStatus } from '../lib/types'
@@ -32,6 +33,7 @@ let stripCache: {
 
 export function StatusStrip() {
   const labels = uiLabels()
+  const link = useBrainLink()
   const { vault, setRoute, ollamaUrl, loadBrainState, brainState, brainTarget, remoteBrainUrl } =
     useStore()
   /** Honor stored remote even if simpleMode hides the Connect toggle — Ollama must not go red. */
@@ -133,11 +135,17 @@ export function StatusStrip() {
         ? labels.statusChecking
         : showVersionSkew
           ? labels.versionSkewShort
-          : isRemoteBrain
-            ? labels.statusBrainRemote
-            : core?.running
-              ? labels.statusBrainRunning
-              : labels.statusBrainStopped,
+          : link.phase === 'down'
+            ? labels.connDown
+            : link.role === 'admin'
+              ? labels.connAdmin
+              : link.role === 'standard'
+                ? labels.connStandard
+                : isRemoteBrain
+                  ? labels.statusBrainRemote
+                  : core?.running
+                    ? labels.statusBrainRunning
+                    : labels.statusBrainStopped,
       detail: skewNote
         ? labels.versionSkewPair(skewNote.client, skewNote.brain ?? skewNote.brainReported)
         : isRemoteBrain && remoteBrainUrl.trim()
@@ -216,8 +224,9 @@ export function StatusStrip() {
             <button
               key={item.id}
               type="button"
+              aria-label={`${item.label}: ${item.value}`}
               onClick={() => setRoute(item.tab)}
-              className="no-drag flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-white/6 bg-black/20 px-2.5 py-1.5 text-left transition-colors hover:border-white/12 hover:bg-white/6"
+              className="no-drag flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 text-left transition-colors hover:border-white/15 hover:bg-white/6"
             >
               <span
                 className={clsx(
@@ -231,11 +240,11 @@ export function StatusStrip() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
                   <Icon className="h-3 w-3 shrink-0 text-ink-faint" />
-                  <span className="truncate text-[9px] font-medium uppercase tracking-wider text-ink-faint">
+                  <span className="truncate text-[10px] font-medium uppercase tracking-wider text-ink-faint">
                     {item.label}
                   </span>
                 </div>
-                <div className="truncate text-[11px] font-semibold leading-tight text-ink">
+                <div className="truncate text-[12px] font-semibold leading-tight text-ink">
                   {item.value}
                   {item.detail ? (
                     <span className="ml-1 font-normal text-ink-faint">{item.detail}</span>

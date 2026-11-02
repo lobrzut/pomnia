@@ -17,6 +17,8 @@ import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { rewriteReleaseNotes } from './lib/release-notes.ts'
+
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
 const tagIdx = args.indexOf('--tag')
@@ -80,8 +82,18 @@ if (!view.isDraft) {
 }
 
 if (dryRun) {
-  console.log(`dry-run: would undraft ${tag} (becomes releases/latest if newest)`)
+  console.log(`dry-run: would rewrite notes from the sha256 sidecars, then undraft ${tag}`)
   process.exit(0)
+}
+
+// Notes are rewritten from the sidecars actually on the release, as UTF-8,
+// before the release can become /latest. `--notes` on Windows double-encoded
+// the punctuation in v0.1.91.
+try {
+  rewriteReleaseNotes({ cwd: root, tag })
+  console.log('✔ release notes rewritten from the SHA-256 sidecars (UTF-8)')
+} catch (e) {
+  die(e instanceof Error ? e.message : String(e))
 }
 
 execFileSync('gh', ['release', 'edit', tag, '--draft=false'], { cwd: root, stdio: 'inherit' })

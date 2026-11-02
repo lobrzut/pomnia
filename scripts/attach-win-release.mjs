@@ -21,13 +21,15 @@
  *   npm run attach:win-release
  *   npm run attach:win-release -- --tag v0.1.63
  */
-import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { refreshWindowsNotes } from './lib/release-assets.ts'
+import { formatReleaseCommit } from './lib/release-guard.ts'
+import { rewriteReleaseNotes } from './lib/release-notes.ts'
+import { preflightReleaseUpload } from './lib/release-preflight.ts'
+import { computeSha256Hex, formatSha256Line } from './lib/release-assets.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
@@ -57,12 +59,16 @@ if (!readFileSync(latestYml, 'utf8').includes(`Pomnia-${version}-setup.exe`)) {
   die('latest.yml names a different artifact than the installer — stale build directory')
 }
 
-const sha256 = createHash('sha256').update(readFileSync(exe)).digest('hex').toUpperCase()
+const sha256 = computeSha256Hex(readFileSync(exe))
 const shaFile = join(releaseDir, `Pomnia-${version}-setup.exe.sha256`)
-writeFileSync(shaFile, `${sha256}  Pomnia-${version}-setup.exe\n`, 'utf8')
+writeFileSync(shaFile, formatSha256Line(sha256, `Pomnia-${version}-setup.exe`), 'utf8')
 
 const blockmap = `${exe}.blockmap`
-const assets = [exe, latestYml, shaFile, ...(existsSync(blockmap) ? [blockmap] : [])]
+const gate = preflightReleaseUpload({ cwd: root, tag, version })
+if (!gate.ok) die(gate.error)
+const commitFile = join(releaseDir, `pomnia-${version}.commit`)
+writeFileSync(commitFile, formatReleaseCommit(gate.head), 'utf8')
+const assets = [exe, latestYml, shaFile, commitFile, ...(existsSync(blockmap) ? [blockmap] : [])]
 
 try {
   sh('gh', ['release', 'view', tag])
@@ -78,25 +84,11 @@ console.log(`assets     ${assets.map((a) => a.replace(`${releaseDir}\\`, '').rep
 sh('gh', ['release', 'upload', tag, ...assets, '--clobber'])
 console.log(`\n✔ uploaded Windows assets to ${tag}`)
 
-// The assets are replaced, but the notes quote the size, commit and SHA-256 in
-// prose. Refresh them too — otherwise a reader who verifies the download the
-// way the notes tell them to sees a mismatch (v0.1.91 shipped exactly that).
-{
-  const body = sh('gh', ['release', 'view', tag, '--json', 'body', '--jq', '.body'])
-  const next = refreshWindowsNotes(body, {
-    version,
-    sizeMb: (readFileSync(exe).length / 1024 / 1024).toFixed(2),
-    commit: sh('git', ['rev-parse', '--short', 'HEAD']),
-    sha256,
-  })
-  if (next === body) {
-    console.log('✔ release notes already name this installer')
-  } else {
-    const notesFile = join(releaseDir, '.release-notes-win.md')
-    writeFileSync(notesFile, next, 'utf8')
-    sh('gh', ['release', 'edit', tag, '--notes-file', notesFile])
-    console.log('✔ refreshed the Windows size, commit and SHA-256 in the release notes')
-  }
+try {
+  rewriteReleaseNotes({ cwd: root, tag })
+  console.log('✔ release notes list every SHA-256 sidecar, in lowercase')
+} catch (e) {
+  die(e instanceof Error ? e.message : String(e))
 }
 
 // Uploading is not the same as being reachable, and this whole script exists

@@ -57,7 +57,7 @@ and its `.sha256`. Fixing that is **release ops**, not a repo commit:
 ## Fastest path (premiere from Windows)
 
 1. Push this branch (or merge) so `.github/workflows/release-linux.yml` is on the remote.
-2. A push to `fix/machine-move-honesty` / `master` / `main` starts the job automatically.
+2. A push to `master` / `main` starts the job automatically.
    After the file exists on the **default** branch, you can also dispatch:
 
 ```bash

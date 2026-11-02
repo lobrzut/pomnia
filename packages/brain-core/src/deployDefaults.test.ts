@@ -24,6 +24,14 @@ describe('appliance install defaults', () => {
     expect(deploy('pomnia-brain-core.service')).toContain('Environment=BRAIN_EMBED_BACKEND=fastembed')
   })
 
+  it('installs a brain-core command the server already tells people to run', () => {
+    const sh = deploy('install.sh')
+    expect(sh).toContain('WRAPPER=/usr/local/bin/brain-core')
+    expect(sh).toContain('dist/daemon.js')
+    expect(sh).toContain('--data-dir')
+    expect(deploy('Dockerfile')).toContain('/usr/local/bin/brain-core')
+  })
+
   it('turns distillation on only when the operator asks for Ollama', () => {
     const sh = deploy('install.sh')
     expect(sh).toMatch(/^DISTILL=0$/m)

@@ -11,17 +11,21 @@
  *   node scripts/publish-release.mjs            # create draft
  *   node scripts/publish-release.mjs --publish  # create + promote if complete
  */
-import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { formatReleaseCommit } from './lib/release-guard.ts'
+import { composeReleaseNotes, writeReleaseNotesFile } from './lib/release-notes.ts'
+import { preflightReleaseUpload } from './lib/release-preflight.ts'
 import {
   collectBrainCoreAssets,
   collectLinuxDesktopAssets,
   collectMiniAssets,
-  miniNotesBlock,
+  computeSha256Hex,
+  formatSha256Line,
+  parseSha256Line,
   validateUpdateManifest,
 } from './lib/release-assets.ts'
 
@@ -61,31 +65,19 @@ if (!ymlCheck.ok) die(`latest.yml: ${ymlCheck.error} — stale build directory`)
 const blockmap = `${exe}.blockmap`
 const assets = [exe, latestYml, ...(existsSync(blockmap) ? [blockmap] : [])]
 
-const sha256 = createHash('sha256').update(readFileSync(exe)).digest('hex').toUpperCase()
+const sha256 = computeSha256Hex(readFileSync(exe))
 const shaFile = join(releaseDir, `Pomnia-${version}-setup.exe.sha256`)
-writeFileSync(shaFile, `${sha256}  Pomnia-${version}-setup.exe\n`, 'utf8')
+writeFileSync(shaFile, formatSha256Line(sha256, `Pomnia-${version}-setup.exe`), 'utf8')
 assets.push(shaFile)
 
 const sizeMb = (readFileSync(exe).length / 1024 / 1024).toFixed(2)
-const sha = sh('git', ['rev-parse', '--short', 'HEAD'])
 
-let notes = `Pomnia ${version}
-
-**Windows installer** · ${sizeMb} MB · built from \`${sha}\`
-
-This build is **not code-signed**, so Windows shows “Windows protected your PC”.
-Choose **More info → Run anyway**, or verify the file first:
-
-\`\`\`powershell
-Get-FileHash Pomnia-${version}-setup.exe -Algorithm SHA256
-\`\`\`
-
-\`\`\`
-${sha256}
-\`\`\`
-
-Pomnia checks for newer releases and tells you — it never installs anything by itself.
-`
+const gate = preflightReleaseUpload({ cwd: root, tag, version })
+if (!gate.ok) die(gate.error)
+const fullSha = gate.head
+const commitFile = join(releaseDir, `pomnia-${version}.commit`)
+writeFileSync(commitFile, formatReleaseCommit(fullSha), 'utf8')
+assets.push(commitFile)
 
 // Optional Linux / brain-core in the same directory — shared validator with attach.
 const names = readdirSync(releaseDir)
@@ -98,14 +90,6 @@ if (hasLinuxDesktop) {
     die('refusing to publish with invalid Linux assets in release/')
   }
   assets.push(...linux.assets)
-  notes += `
-
-**Linux** · AppImage/deb also in this release (unsigned).
-
-\`\`\`bash
-chmod +x Pomnia-${version}.AppImage && ./Pomnia-${version}.AppImage
-\`\`\`
-`
 }
 
 const brain = collectBrainCoreAssets({ releaseDir, version })
@@ -115,10 +99,6 @@ if (!brain.ok) {
 }
 if (brain.present) {
   assets.push(...brain.assets)
-  notes += `
-
-**Server** · \`pomnia-brain-core-${version}-linux-x64.tar.gz\` (curl|sh / bootstrap).
-`
 }
 
 const mini = collectMiniAssets({ releaseDir: join(root, 'release', 'mini'), version })
@@ -128,10 +108,6 @@ if (!mini.ok) {
 }
 if (mini.present) {
   assets.push(...mini.assets)
-  notes += `
-
-${miniNotesBlock({ version, sizeMb: mini.sizeMb, commit: sha, sha256: mini.sha256 })}
-`
 }
 
 // Deduplicate
@@ -141,8 +117,18 @@ for (let i = assets.length - 1; i >= 0; i--) {
   else seen.add(assets[i])
 }
 
+const digests = []
+for (const asset of assets) {
+  if (!asset.endsWith('.sha256')) continue
+  const parsed = parseSha256Line(readFileSync(asset, 'utf8'))
+  if (parsed) digests.push({ file: parsed.fileName, sha256: parsed.hex })
+}
+const notes = composeReleaseNotes({ version, tag, commit: fullSha, digests })
+const notesFile = join(releaseDir, '.release-notes.md')
+writeReleaseNotesFile(notesFile, notes)
+
 console.log(`tag        ${tag}`)
-console.log(`commit     ${sha}`)
+console.log(`commit     ${fullSha}`)
 console.log(`installer  ${sizeMb} MB`)
 console.log(`sha256     ${sha256}`)
 console.log(`assets     ${assets.map((a) => a.replace(`${releaseDir}\\`, '').replace(`${releaseDir}/`, '')).join(', ')}`)
@@ -162,8 +148,8 @@ sh('gh', [
   ...assets,
   '--title',
   `Pomnia ${version}`,
-  '--notes',
-  notes,
+  '--notes-file',
+  notesFile,
   '--draft',
 ])
 

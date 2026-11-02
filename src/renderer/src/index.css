@@ -9,7 +9,8 @@
   --color-line: #24352c;
   --color-ink: #e8f0eb;
   --color-ink-dim: #8fa89a;
-  --color-ink-faint: #5a6e64;
+  /* Was #5a6e64, about 3.7:1 on the void background — under the 4.5:1 bar for small text. */
+  --color-ink-faint: #7d9688;
   /* Legacy names kept for class compatibility; hex remapped away from purple. */
   --color-violet: #10b981;
   --color-iris: #2dd4bf;
@@ -128,8 +129,10 @@ html[data-theme='mint'] {
     background-clip: text;
     color: transparent;
   }
+  /* White label on the old mid-stop (#34d399) was about 1.9:1. The stops stay
+     in the same green family and clear 4.5:1 for white text. */
   .accent-grad {
-    background: linear-gradient(120deg, #1a5c3a, var(--color-mint) 48%, var(--color-iris));
+    background: linear-gradient(120deg, #0c3d28, #146b48 52%, #0e5c58);
   }
   .ring-glow {
     box-shadow: 0 0 0 1px #ffffff1f, 0 0 40px -8px #34d39999;

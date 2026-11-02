@@ -1040,6 +1040,16 @@ export interface UiLabels {
   statusPendingDocs: (n: number) => string
   statusPendingDocsNone: string
   statusDocuments: string
+  connWhereLocal: string
+  connWhereRemote: string
+  connUp: string
+  connDown: string
+  connChecking: string
+  connAdmin: string
+  connStandard: string
+  winMinimize: string
+  winMaximize: string
+  winClose: string
   dashboardTitle: string
   dashboardLead: string
   dashboardRescan: string
@@ -2110,6 +2120,16 @@ const PL_LABELS: UiLabels = {
   statusPendingDocs: (n) => `${n} dok. czeka na indeks`,
   statusPendingDocsNone: 'brak oczekujących',
   statusDocuments: 'Dokumenty',
+  connWhereLocal: 'serwer lokalny',
+  connWhereRemote: 'serwer zdalny',
+  connUp: 'połączono',
+  connDown: 'brak połączenia',
+  connChecking: 'sprawdzam połączenie',
+  connAdmin: 'admin',
+  connStandard: 'standard',
+  winMinimize: 'Minimalizuj',
+  winMaximize: 'Maksymalizuj',
+  winClose: 'Zamknij',
   dashboardTitle: 'Centrum dowodzenia',
   dashboardLead:
     'Rozmowy z twoich asystentów w jednym zaszyfrowanym vaulcie — czyta je każdy agent mówiący MCP.',
@@ -2967,6 +2987,16 @@ const EN_LABELS: UiLabels = {
   statusPendingDocs: (n) => `${n} doc(s) waiting for index`,
   statusPendingDocsNone: 'none pending',
   statusDocuments: 'Documents',
+  connWhereLocal: 'local server',
+  connWhereRemote: 'remote server',
+  connUp: 'connected',
+  connDown: 'not connected',
+  connChecking: 'checking connection',
+  connAdmin: 'admin',
+  connStandard: 'standard',
+  winMinimize: 'Minimize',
+  winMaximize: 'Maximize',
+  winClose: 'Close',
   dashboardTitle: 'Command center',
   dashboardLead:
     'Chats from your assistants in one encrypted vault — every MCP-speaking agent can read them.',

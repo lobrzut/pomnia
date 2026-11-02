@@ -22,6 +22,14 @@ function call(
   body?: string,
 ): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
+    let settled = false
+    let status = 0
+    let b = ''
+    const finish = (): void => {
+      if (settled) return
+      settled = true
+      resolve({ status, body: b })
+    }
     const r = request(
       {
         hostname: '127.0.0.1',
@@ -31,14 +39,27 @@ function call(
         headers,
       },
       (res) => {
-        let b = ''
+        status = res.statusCode ?? 0
         res.on('data', (c) => {
           b += c
         })
-        res.on('end', () => resolve({ status: res.statusCode ?? 0, body: b }))
+        res.on('end', finish)
+        res.on('aborted', finish)
+        res.on('error', finish)
       },
     )
-    r.on('error', reject)
+    // A 413 that closes the upload surfaces as ECONNRESET after the status
+    // has already been delivered. That is a closed socket, not a missed reply.
+    r.on('error', (err) => {
+      if (status > 0) {
+        finish()
+        return
+      }
+      if (!settled) {
+        settled = true
+        reject(err)
+      }
+    })
     r.setTimeout(15_000, () => r.destroy(new Error('timeout')))
     r.end(body)
   })
@@ -105,8 +126,11 @@ describe('HTTP request boundaries (F01/F14/F17)', () => {
     expect([400, 401]).toContain(r.status)
   })
 
-  it('returns 413 when the MCP body exceeds the stream limit (F14)', async () => {
-    const oversized = 'x'.repeat(MAX_FILE_BYTES * 2 + 1024)
+  it('returns 413 when the declared MCP body exceeds the stream limit (F14)', async () => {
+    // The header is the contract. Sending the bytes as well is what made this
+    // case flake: the server destroyed the socket mid-upload and the client
+    // saw ECONNRESET instead of 413. A one-byte body with an honest
+    // Content-Length still has to be refused before it is read.
     const r = await call(
       port,
       '/mcp',
@@ -114,10 +138,11 @@ describe('HTTP request boundaries (F01/F14/F17)', () => {
         host: `127.0.0.1:${port}`,
         'content-type': 'application/json',
         accept: 'application/json, text/event-stream',
-        'content-length': String(oversized.length),
+        'content-length': String(MAX_FILE_BYTES * 2 + 1024),
       },
-      oversized,
+      'x',
     )
     expect(r.status).toBe(413)
-  }, 60_000)
+    expect(r.body).toMatch(/payload_too_large/)
+  })
 })

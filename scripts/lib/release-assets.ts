@@ -9,8 +9,10 @@
  * version-bound when the tag/version is known.
  */
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
+
+import { reconcileUpdateManifest } from './update-manifest.ts'
 
 export type AssetClass = {
   id: string
@@ -32,6 +34,18 @@ export type AssetPlanRow = {
   path: string
   note?: string
 }
+
+/** Stable Mini names. `releases/latest/download/<name>` keeps working after the next tag. */
+export const STABLE_MINI_WIN_ZIP = 'PomniaMini-win-x64.zip'
+/** Not required until the Mini Linux pack lands. Same idea as the Windows zip. */
+export const STABLE_MINI_LINUX_APPIMAGE = 'PomniaMini-linux-x64.AppImage'
+
+const STABLE_NAMES = new Set<string>([
+  STABLE_MINI_WIN_ZIP,
+  `${STABLE_MINI_WIN_ZIP}.sha256`,
+  STABLE_MINI_LINUX_APPIMAGE,
+  `${STABLE_MINI_LINUX_APPIMAGE}.sha256`,
+])
 
 export function versionFromTag(tag: string): string {
   if (!tag || typeof tag !== 'string') throw new Error('tag is required')
@@ -56,7 +70,10 @@ export function belongsToVersion(name: string, version: string): boolean {
     name.includes(`_${version}_`) ||
     name.includes(`-${version}-`) ||
     name === 'latest.yml' ||
-    name === 'latest-linux.yml'
+    name === 'latest-linux.yml' ||
+    name === 'latest-mac.yml' ||
+    name === `pomnia-${version}.commit` ||
+    STABLE_NAMES.has(name)
   )
 }
 
@@ -98,6 +115,18 @@ export function requiredAssetClasses(version: string): AssetClass[] {
       label: 'Pomnia Mini SHA-256',
       pattern: new RegExp(`^PomniaMini-${v}\\.zip\\.sha256$`),
       why: 'same checksum promise as the installer',
+    },
+    {
+      id: 'mini-stable',
+      label: 'Pomnia Mini stable zip',
+      pattern: /^PomniaMini-win-x64\.zip$/,
+      why: 'pomnia.ai can keep linking releases/latest/download/PomniaMini-win-x64.zip',
+    },
+    {
+      id: 'mini-stable-sha',
+      label: 'Pomnia Mini stable SHA-256',
+      pattern: /^PomniaMini-win-x64\.zip\.sha256$/,
+      why: 'checksum for the stable Mini name',
     },
     {
       id: 'linux-appimage',
@@ -145,6 +174,12 @@ export function requiredAssetClasses(version: string): AssetClass[] {
       versionOk: (hit) => belongsToVersion(hit.replace(/\.sha256$/, ''), version),
     },
     {
+      id: 'mac-yml',
+      label: 'macOS latest-mac.yml',
+      pattern: /^latest-mac\.yml$/,
+      why: 'one update manifest listing both Mac architectures',
+    },
+    {
       id: 'brain-tarball',
       label: 'brain-core tarball',
       pattern: new RegExp(`^pomnia-brain-core-${v}-linux-x64\\.tar\\.gz$`),
@@ -155,6 +190,12 @@ export function requiredAssetClasses(version: string): AssetClass[] {
       label: 'brain-core SHA-256',
       pattern: new RegExp(`^pomnia-brain-core-${v}-linux-x64\\.tar\\.gz\\.sha256$`),
       why: 'bootstrap.sh verifies the tarball with it',
+    },
+    {
+      id: 'source-commit',
+      label: 'source commit',
+      pattern: new RegExp(`^pomnia-${v}\\.commit$`),
+      why: 'records the single commit every platform was built from',
     },
   ]
 }
@@ -182,30 +223,39 @@ export function assessReleaseAssets(assetNames: string[], version: string) {
 }
 
 export function computeSha256Hex(data: Buffer | Uint8Array | string): string {
-  return createHash('sha256').update(data).digest('hex').toUpperCase()
+  // Lowercase, matching sha256sum / shasum. Uppercase sidecars failed bootstrap
+  // (it compares with `=` ) and disagreed with the Windows publisher.
+  return createHash('sha256').update(data).digest('hex')
 }
 
 export function formatSha256Line(hex: string, fileName: string): string {
-  return `${hex.toUpperCase()}  ${fileName}\n`
+  return `${hex.toLowerCase()}  ${fileName}\n`
 }
 
 export function parseSha256Line(content: string): { hex: string; fileName: string } | null {
   const line = String(content).trim().split(/\r?\n/)[0] ?? ''
   const m = line.match(/^([0-9a-fA-F]{64})\s{1,2}(.+)$/)
   if (!m) return null
-  return { hex: m[1].toUpperCase(), fileName: m[2].trim() }
+  return { hex: m[1].toLowerCase(), fileName: m[2].trim() }
 }
 
 export function ensureMatchingSha256(opts: {
   filePath: string
   shaPath?: string
   write?: boolean
+  /** Rewrite a sidecar whose name is reused across versions (the stable Mini zip). */
+  overwrite?: boolean
 }): { ok: true; hex: string; shaPath: string; wrote: boolean } | { ok: false; hex: string; shaPath: string; error: string } {
   const filePath = opts.filePath
   const fileName = basename(filePath)
   const shaPath = opts.shaPath ?? `${filePath}.sha256`
   const write = opts.write !== false
   const hex = computeSha256Hex(readFileSync(filePath))
+
+  if (opts.overwrite && write) {
+    writeFileSync(shaPath, formatSha256Line(hex, fileName), 'utf8')
+    return { ok: true, hex, shaPath, wrote: true }
+  }
 
   if (existsSync(shaPath)) {
     const parsed = parseSha256Line(readFileSync(shaPath, 'utf8'))
@@ -304,13 +354,27 @@ export function collectLinuxDesktopAssets(opts: {
   const ymlName = 'latest-linux.yml'
   const ymlPath = join(releaseDir, ymlName)
   if (existsSync(ymlPath)) {
-    const body = readFileSync(ymlPath, 'utf8')
+    const present = new Set(readdirSync(releaseDir))
+    const reconciled = reconcileUpdateManifest(readFileSync(ymlPath, 'utf8'), present)
+    if (reconciled.body !== readFileSync(ymlPath, 'utf8')) {
+      writeFileSync(ymlPath, reconciled.body, 'utf8')
+    }
+    const body = reconciled.body
     const needles = [...appImages, ...debs]
     const v = validateUpdateManifest(body, { version, mustInclude: needles.length ? [needles[0]] : [] })
     if (!v.ok) errors.push(`latest-linux.yml: ${v.error}`)
     else {
       plan.push({ role: 'manifest', path: ymlPath })
       assets.push(ymlPath)
+      for (const bm of reconciled.blockmaps) {
+        const fullBm = join(releaseDir, bm)
+        if (!existsSync(fullBm)) {
+          errors.push(`latest-linux.yml names ${bm} but the file is not in release/`)
+          continue
+        }
+        plan.push({ role: 'blockmap', path: fullBm })
+        assets.push(fullBm)
+      }
     }
   } else if (requireManifest) {
     errors.push('missing release/latest-linux.yml — electron-builder should emit it beside AppImage/deb')
@@ -384,7 +448,7 @@ export function collectMiniAssets(opts: { releaseDir: string; version: string })
   }
 
   const zips = readdirSync(releaseDir).filter((n) => n.endsWith('.zip') && !n.endsWith('.blockmap'))
-  const foreign = zips.filter((n) => n !== name)
+  const foreign = zips.filter((n) => n !== name && n !== STABLE_MINI_WIN_ZIP)
   if (foreign.length) {
     errors.push(
       `unexpected zip in ${releaseDir}: ${foreign.join(', ')} — the release asset is ${name} (unpack that; do not ship a portable zip)`,
@@ -425,6 +489,18 @@ export function collectMiniAssets(opts: { releaseDir: string; version: string })
     note: sha.wrote ? `wrote ${basename(sha.shaPath)}` : `sha256 ${sha.hex.slice(0, 12)}...`,
   })
   assets.push(full, sha.shaPath)
+
+  // Same bytes, stable name. The versioned zip still exists; this is the URL
+  // that does not change when the version does.
+  const stable = join(releaseDir, STABLE_MINI_WIN_ZIP)
+  copyFileSync(full, stable)
+  const stableSha = ensureMatchingSha256({ filePath: stable, overwrite: true })
+  if (!stableSha.ok) {
+    errors.push(stableSha.error)
+  } else {
+    plan.push({ role: 'mini-stable', path: stable, note: `sha256 ${stableSha.hex.slice(0, 12)}...` })
+    assets.push(stable, stableSha.shaPath)
+  }
   return { ok: errors.length === 0, present: true, errors, plan, assets, sha256: sha.hex, sizeMb }
 }
 
@@ -440,7 +516,8 @@ export function miniNotesBlock(opts: {
   commit: string
   sha256: string
 }): string {
-  const { version, sizeMb, commit, sha256 } = opts
+  const { version, sizeMb, commit } = opts
+  const sha256 = opts.sha256.toLowerCase()
   return `**Pomnia Mini** · Windows zip · ${sizeMb} MB · built from \`${commit}\`
 
 Download \`PomniaMini-${version}.zip\`, unpack it once, and run \`PomniaMini.exe\`.
@@ -464,7 +541,8 @@ export function refreshMiniNotes(
   body: string,
   opts: { version: string; sizeMb: string; commit: string; sha256: string },
 ): string {
-  const { version, sizeMb, commit, sha256 } = opts
+  const { version, sizeMb, commit } = opts
+  const sha256 = opts.sha256.toLowerCase()
   const line = /\*\*Pomnia Mini\*\* · Windows zip · [\d.]+ MB · built from `[0-9a-f]+`/
   if (!line.test(body)) {
     const trimmed = body.replace(/\s+$/, '')
@@ -494,7 +572,8 @@ export function windowsNotesBlock(opts: {
   commit: string
   sha256: string
 }): string {
-  const { version, sizeMb, commit, sha256 } = opts
+  const { version, sizeMb, commit } = opts
+  const sha256 = opts.sha256.toLowerCase()
   return `**Windows installer** · ${sizeMb} MB · built from \`${commit}\`
 
 This build is **not code-signed**, so Windows shows “Windows protected your PC”.
@@ -519,7 +598,8 @@ export function refreshWindowsNotes(
   body: string,
   opts: { version: string; sizeMb: string; commit: string; sha256: string },
 ): string {
-  const { version, sizeMb, commit, sha256 } = opts
+  const { version, sizeMb, commit } = opts
+  const sha256 = opts.sha256.toLowerCase()
   const line = /\*\*Windows installer\*\* · [\d.]+ MB · built from `[0-9a-f]+`/
   if (!line.test(body)) {
     const trimmed = body.replace(/\s+$/, '')

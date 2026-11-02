@@ -19,7 +19,7 @@ import { BookOpen, ChevronLeft, RefreshCw, Search } from 'lucide-react'
 
 import type { RemoteSkillRow, RemoteSkillsSummary } from '@core/brain/remoteSkills'
 
-import { Button, GlassCard, Spinner } from '../components/ui'
+import { Button, GlassCard, ServerErrorCard, Spinner } from '../components/ui'
 import { AgentPickBar, ListRow, ListSection } from '../components/EntityList'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { api } from '../lib/api'
@@ -207,15 +207,16 @@ export default function MiniSkills() {
       </div>
 
       {error && (
-        <GlassCard className="mb-4 shrink-0 p-5">
-          <p className="text-xs text-amber">{labels.skillsRemoteReason(error.code)}</p>
-          {/* A rejected token is fixed in one place, so the page says where. */}
-          {(error.code === 'unauthorized' || error.code === 'no-token') && (
-            <Button className="mt-3" variant="soft" onClick={() => setRoute('settings')}>
-              {labels.navSettings}
-            </Button>
-          )}
-        </GlassCard>
+        <ServerErrorCard
+          title={labels.skillsRemoteReason(error.code)}
+          detail={error.detail}
+          actionLabel={
+            error.code === 'unauthorized' || error.code === 'no-token' ? labels.navConnect : undefined
+          }
+          onAction={
+            error.code === 'unauthorized' || error.code === 'no-token' ? () => setRoute('connect') : undefined
+          }
+        />
       )}
 
       {open ? (
@@ -250,6 +251,7 @@ export default function MiniSkills() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={labels.skillsSearchPlaceholder}
+                aria-label={labels.skillsSearchPlaceholder}
                 spellCheck={false}
                 className="no-drag w-full min-w-0 rounded-xl border border-white/10 bg-black/30 py-2 pl-9 pr-3 text-sm text-ink placeholder:text-ink-faint"
               />
