@@ -91,6 +91,7 @@ const IS_MINI = import.meta.env?.MAIN_VITE_POMNIA_FLAVOUR === 'mini'
 
 import { brainBaseUrl } from '@core/brain/brainTarget.js'
 import { probeTokenRole } from '@core/brain/tokenRole.js'
+import { adminToken as resolveAdminToken, serverToken as resolveServerToken } from './brainTokens.js'
 import { DOC_IMPORT_EXTENSIONS, importDocument, isDocImportPath } from './docImport.js'
 import { runDocumentOcr } from './docOcr.js'
 import { removeLibraryDocumentWithIndex } from './libraryDocRemove.js'
@@ -596,7 +597,10 @@ async function warnIfRemoteBrainUnusable(): Promise<void> {
   if (!base) return
   const root = base.replace(/\/+$/, '').replace(/\/mcp$/, '')
   const url = `${root}/mcp`
-  const probe = await probeMcpUrl(url, s.connectToken)
+  // What an agent would send. After adopt that is the minted agent token in
+  // the field, not the admin token stored beside it.
+  const agent = serverToken()
+  const probe = await probeMcpUrl(url, agent)
   if (!probe.reachable) {
     warnedRemoteBrain = true
     sendAppToast({
@@ -611,7 +615,7 @@ async function warnIfRemoteBrainUnusable(): Promise<void> {
   // older machine pointed at the legacy Python brain: it replies to `initialize`
   // exactly like brain-core does, so reachability alone would have kept quiet
   // while every agent read a different vault.
-  const ping = await pingBrain(root, s.connectToken)
+  const ping = await pingBrain(root, agent)
   const engine = identifyEngine(ping.data)
   if (engine.compatible) return
   warnedRemoteBrain = true
@@ -795,24 +799,25 @@ function createWindow(): void {
 
 /* ── IPC ───────────────────────────────────────────────────────────────── */
 /**
- * The one token this app uses to talk to a Brain server.
- *
- * There were two: `connectToken`, which the user pastes in the Brain panel and
- * can replace, and `replicaToken`, a second copy the replication panel stored
- * and offered no way to change. When the server revoked the second one, every
- * sync answered 401 while the panel insisted a token was set, and pasting a
- * fresh token where the user could reach it changed nothing — the stale copy
- * won. Both fields ended up holding the same value anyway, pasted twice.
- *
- * So: prefer the one the user manages, keep the old one as a fallback for
- * installs that still carry it, and resolve it here rather than at four call
- * sites. Mini reads this too — its skills, prompts and ingest all authenticate
- * with it, so a change made only in the sync path would have broken them
- * quietly.
+ * Bearer for agent operations: MCP probes and anything that ends up in a
+ * client config. The field wins. After adopt it holds the minted agent token.
  */
 function serverToken(explicit?: string): string | undefined {
-  const s = getAppSettings()
-  return s.connectToken?.trim() || s.replicaToken?.trim() || explicit?.trim() || undefined
+  return resolveServerToken(getAppSettings(), explicit)
+}
+
+/**
+ * Bearer for admin operations.
+ *
+ * Pasting an admin token stores it in `replicaToken` (GET /admin/tokens
+ * returned 200) and the connect flow then replaces `connectToken` with an
+ * agent token. Prefer the stored admin token, or those routes are called
+ * with the agent token and answer 401. Fall back to the field when that is
+ * the only copy — adopt has not run, which is how a fresh Mini install
+ * reported "no admin token" while the same paste was accepted as admin.
+ */
+function adminToken(explicit?: string): string | undefined {
+  return resolveAdminToken(getAppSettings(), explicit)
 }
 
 function registerIpc(): void {
@@ -925,7 +930,7 @@ function registerIpc(): void {
         `cli/${composed.category}/${composed.slug}`,
         composed.files,
         st.brainMcpUrl,
-        st.replicaToken,
+        adminToken(),
       )
       if ('error' in r) return { ok: false as const, error: `${r.error}: ${r.detail}` }
       return {
@@ -1649,30 +1654,17 @@ description:
     if (!vaultPath) throw new Error(m().vaultNotOpen)
     const url = (target ?? '').trim()
     if (!url) throw new Error(m().replicaNoTarget)
-    // Prefer the purpose-built replica token over whatever the renderer passed.
+    // Writes need an admin token. The renderer only holds the field, and after
+    // adopt that field is the minted agent token: it can read the manifest and
+    // the push fails with `write_needs_admin`. The admin token stays in main.
+    // Prefer it. The field (and the explicit argument, which is that field) is
+    // the fallback when no separate admin token has been stored yet.
     //
-    // The renderer only holds the Connect token, and that one is minted for MCP
-    // agents: it can read, so the pull half of the sync succeeds, and it cannot
-    // write, so the push half fails with `write_needs_admin` — a server error
-    // whose hint then advises reissuing the Connect token as admin. Following
-    // that advice would hand admin write access to every MCP client on the
-    // machine, when what is needed is one admin token for this one app.
-    // `replicaToken` is exactly that, and it never leaves main: the renderer is
-    // told only whether it is set, never its value.
-    // One token, not two.
-    //
-    // This used to prefer `replicaToken`, a second secret the panel stored and
-    // then offered no way to replace. When the server revoked it, every sync
-    // answered 401 while the panel reported a token was set, and pasting a
-    // fresh one into the Brain field changed nothing — the dead one still won.
-    // Two fields for one server was the mistake; the fix is to trust the token
-    // the user actually manages and keep `replicaToken` only as a fallback for
-    // installs that still carry one.
-    //
-    // Role still matters: an agent token reads the manifest and fails the push
-    // with `write_needs_admin`. That is the server's message to give, not a
-    // reason to hold a second secret.
-    const auth = serverToken(token)
+    // A revoked legacy replica still wins until it is cleared — that is the
+    // button on this panel. Clearing it is what lets a fresh paste in the
+    // field through. Raising the field to admin so the push works would put
+    // that admin token into every MCP client config.
+    const auth = adminToken(token)
     const root = brainVaultRoot(vaultPath)
     activity.update({ kind: 'indexing', phase: 'reindex', detail: m().replicaComparing })
     try {
@@ -1752,7 +1744,7 @@ description:
       const r = await syncVaultSurface({
         vaultRoot: brainVaultRoot(vaultPath),
         target,
-        token: s.replicaToken?.trim() || undefined,
+        token: adminToken(),
       })
       const failed = [...r.push.failed, ...r.pull.failed]
       const uploaded = r.push.uploaded + r.pull.downloaded
@@ -2037,7 +2029,7 @@ description:
       if (touchedBehaviour && (IS_MINI || next.brainTarget === 'remote')) {
         void pushRemoteBehaviour({
           brainUrl: next.brainMcpUrl,
-          adminToken: serverToken(next.replicaToken),
+          adminToken: adminToken(),
           next: {
             handshakePhrase: next.handshakePhrase,
             handshakeEnabled: next.handshakeEnabled,
@@ -2503,7 +2495,7 @@ description:
    */
   const skillsAuth = (): { url?: string; token?: string } => {
     const s = getAppSettings()
-    return { url: s.brainMcpUrl, token: s.replicaToken }
+    return { url: s.brainMcpUrl, token: adminToken() }
   }
 
   trustedHandle('skills:remoteList', async () => {
@@ -2624,7 +2616,7 @@ description:
     const r = await pushStagedNotes({
       stagingRoot: stagingRoot(userData),
       target: brainBaseUrl(s.brainMcpUrl ?? ''),
-      adminToken: serverToken(),
+      adminToken: adminToken(),
       staged: await stagedCount(userData),
     })
     if (r.ok) {
@@ -2684,7 +2676,7 @@ description:
   trustedHandle('connect:tokenStatus', async () => {
     const s = getAppSettings()
     const url = (s.brainMcpUrl ?? '').trim()
-    const token = (s.replicaToken ?? '').trim()
+    const token = adminToken() ?? ''
     if (!url) return { state: 'no-target' as const, detail: '' }
     if (!token) return { state: 'missing' as const, detail: '' }
     const probe = await probeTokenRole({ baseUrl: brainBaseUrl(url), token })
@@ -2732,13 +2724,18 @@ description:
 
   trustedHandle(
     'connect:mcpTokenCreate',
-    (_e, brainUrl: string, name: string, adminToken?: string) =>
-      // Fall back to the stored admin token, which never leaves main. The
-      // renderer used to hand over whatever was in the Bearer field next to
-      // the button — an agent token, which cannot create tokens.
-      createMcpToken(brainUrl, name, {
-        token: serverToken(adminToken),
-      }),
+    async (_e, brainUrl: string, name: string, explicit?: string) => {
+      // The renderer replaces the field with the minted agent token as soon as
+      // this returns. The credential the server just accepted as admin has to
+      // be stored first, or the next admin call has only the agent token.
+      //
+      // `explicit` is last on purpose. The renderer used to pass the field
+      // next to the button — an agent token, which cannot create tokens.
+      const used = adminToken(explicit)
+      const minted = await createMcpToken(brainUrl, name, { token: used })
+      if (used) await setAppSettings({ replicaToken: used })
+      return minted
+    },
   )
 
   trustedOn('win:minimize', () => {

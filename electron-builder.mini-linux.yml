@@ -1,0 +1,35 @@
+# Pomnia Mini for Linux — AppImage only.
+#
+# Extends the Windows Mini file so appId, productName, the output directory,
+# publish: null, and the exclusion of the embedded Brain runtime all come from
+# there. Do not extend electron-builder.yml: `extraResources` is concatenated,
+# and that file is what packs resources/brain-core into the desktop build.
+#
+# `linux.target` is set here and on no file this one extends. electron-builder
+# concatenates arrays across `extends`, so inheriting the desktop list
+# (AppImage + deb) would still build a deb after a one-item override.
+#
+# release-linux.yml builds this and uploads it as PomniaMini-linux-x64.AppImage.
+# The name has no version so the site can use
+# releases/latest/download/PomniaMini-linux-x64.AppImage
+# Local: npm run build:mini:linux
+#   → release/mini/PomniaMini-linux-x64.AppImage
+extends: ./electron-builder.mini.yml
+linux:
+  target:
+    - AppImage
+  executableName: PomniaMini
+  # Stable asset name. ${productName}-${version} would change every release
+  # and the site link would have to change with it.
+  artifactName: PomniaMini-linux-x64.${ext}
+  icon: resources/icon.png
+  category: Utility
+  synopsis: Pomnia Mini — client for a remote Brain server
+  description: >-
+    Pomnia Mini talks to a Pomnia Brain server. It does not embed one.
+    Admin actions use the stored admin token; MCP clients get an agent token.
+  desktop:
+    Name: PomniaMini
+    Comment: Pomnia Mini — remote Brain client
+    Categories: Utility;
+    StartupWMClass: PomniaMini

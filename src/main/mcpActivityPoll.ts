@@ -11,6 +11,7 @@ import { fetchMcpActivity } from '@core/brain/status.js'
 import { log } from '@core/index.js'
 
 import { getAppSettings } from './appSettings.js'
+import { serverToken } from './brainTokens.js'
 
 const POLL_MS = 1_500
 
@@ -65,7 +66,9 @@ async function pollOnce(): Promise<void> {
   // Remote only — embedded brain-core emits mcp-query over fork IPC.
   if (target !== 'remote' || !settings.brainMcpUrl?.trim()) return
 
-  const resp = await fetchMcpActivity(settings.brainMcpUrl.trim(), settings.connectToken)
+  // Agent traffic. The field is the minted agent token after adopt; falling
+  // back to the stored admin token only covers an install that has no field.
+  const resp = await fetchMcpActivity(settings.brainMcpUrl.trim(), serverToken(settings))
   if (!resp?.recent || !resp.last?.ts) return
   if (resp.last.ts <= lastSeenTs) return
   lastSeenTs = resp.last.ts

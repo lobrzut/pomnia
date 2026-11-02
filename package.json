@@ -57,6 +57,8 @@
     "build:mini:win": "npm run build:doc-parser && npm run stage:tessdata && npm run generate:build-info && npm run build:mini:bundle && npm run pack:mini:portable && npm run pack:mini:zip",
     "pack:mini:portable": "electron-builder --win portable --config electron-builder.mini.yml --publish never",
     "pack:mini:zip": "electron-builder --win zip --config electron-builder.mini.yml --publish never",
+    "pack:mini:linux": "electron-builder --linux AppImage --config electron-builder.mini-linux.yml --publish never",
+    "build:mini:linux": "npm run build:doc-parser && npm run stage:tessdata && npm run generate:build-info && npm run build:mini:bundle && npm run pack:mini:linux",
     "dev:mini": "npm run generate:build-info && electron-vite dev --mode mini",
     "web": "vite --config vite.web.config.ts",
     "web:mini": "vite --config vite.web.config.ts --mode mini"

@@ -47,3 +47,21 @@ describe('darwin tray icon resolution', () => {
     expect(pickTrayPath('darwin', '/App/Contents/Resources', '/tmp/app', exists)).toBeUndefined()
   })
 })
+
+describe('linux tray icon resolution', () => {
+  it('does not try icon.ico — nativeImage cannot decode it', () => {
+    expect(trayFileNames('linux')).toEqual(['trayIcon.png', 'icon.png'])
+    expect(trayFileNames('linux')).not.toContain('icon.ico')
+  })
+
+  it('picks the PNG when icon.ico is also on disk', () => {
+    const png = join('/res', 'trayIcon.png')
+    const ico = join('/res', 'icon.ico')
+    const exists = (p: string) => p === png || p === ico
+    expect(pickTrayPath('linux', '/res', '/app', exists)).toBe(png)
+  })
+
+  it('keeps icon.ico first on Windows', () => {
+    expect(trayFileNames('win32')[0]).toBe('icon.ico')
+  })
+})

@@ -167,10 +167,12 @@ mac:
       - _http._tcp
 # Linux: build on Linux (or ubuntu-latest CI). AppImage needs Linux host —
 # Windows cannot cross-produce a working AppImage with native better-sqlite3.
+#
+# `target` is not listed here. Arrays concatenate across `extends`, so a child
+# that wants a shorter list cannot drop an entry it inherited. Desktop sets
+# AppImage + deb in electron-builder.yml. Mini Linux sets AppImage only in
+# electron-builder.mini-linux.yml.
 linux:
-  target:
-    - AppImage
-    - deb
   category: Utility
   icon: resources/icon.png
   executableName: Pomnia

@@ -9,10 +9,10 @@
 # adds the embedded Brain runtime, and `extends` concatenates `extraResources`
 # instead of replacing them.
 #
-# There is no macOS or Linux Mini workflow. Desktop mac/linux call
-# electron-builder with no `--config`, which loads electron-builder.yml and
-# still embeds Brain. A future Mini pack on those platforms should pass
-# `--config electron-builder.mini.yml` so it inherits this exclusion.
+# Linux Mini is electron-builder.mini-linux.yml (AppImage, no embedded Brain).
+# Desktop mac/linux call electron-builder with no `--config`, which loads
+# electron-builder.yml and still embeds Brain. Do not point a Mini pack at
+# that file. There is no macOS Mini workflow.
 #
 # `appId` and `output` are separate on purpose. Mini and the full app must not
 # share an install, a shortcut, or an output directory — and they already do not

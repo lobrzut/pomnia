@@ -20,9 +20,13 @@ import { describe, expect, it } from 'vitest'
  */
 
 const require = createRequire(import.meta.url)
-const { getConfig } = require('app-builder-lib/out/util/config/config.js') as {
+const { getConfig, validateConfiguration } = require('app-builder-lib/out/util/config/config.js') as {
   getConfig: (projectDir: string, configPath: string | null, configFromOptions: null) => Promise<BuilderConfig>
+  validateConfiguration: (config: BuilderConfig, debugLogger: { isEnabled: boolean; add: () => void }) => Promise<void>
 }
+
+/** Schema check. getConfig merges; it does not reject an unknown key. */
+const quietLog = { isEnabled: false, add() {} }
 
 interface FileSet {
   from?: string
@@ -42,7 +46,12 @@ interface BuilderConfig {
   nsis?: { include?: string; oneClick?: boolean }
   portable?: { unpackDirName?: string; artifactName?: string }
   mac?: { artifactName?: string }
-  linux?: { target?: string[]; executableName?: string }
+  linux?: {
+    target?: Array<string | { target: string }>
+    executableName?: string
+    artifactName?: string
+    desktop?: { Name?: string; StartupWMClass?: string }
+  }
 }
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -122,5 +131,35 @@ describe('electron-builder flavour configs', () => {
     expect(mini.mac?.artifactName).toBe(desktop.mac?.artifactName)
     expect(desktop.linux?.target).toEqual(['AppImage', 'deb'])
     expect(mini.linux?.executableName).toBe('Pomnia')
+    await validateConfiguration(desktop, quietLog)
+    await validateConfiguration(byDefault, quietLog)
+    await validateConfiguration(mini, quietLog)
+    // Windows Mini does not inherit a linux target list. Arrays concatenate,
+    // so the list lives only on the config that builds that platform.
+    expect(mini.linux?.target).toBeUndefined()
+  })
+
+  it('Mini Linux is an AppImage with no embedded Brain', async () => {
+    const miniLinux = await getConfig(root, join(root, 'electron-builder.mini-linux.yml'), null)
+
+    expect(miniLinux.productName).toBe('PomniaMini')
+    expect(miniLinux.appId).toBe('ai.pomnia.mini')
+    expect(miniLinux.directories?.output).toBe('release/mini')
+    expect(miniLinux.publish).toBeNull()
+    expect(destinations(miniLinux.extraResources)).toEqual(sharedResources)
+    expect(JSON.stringify(miniLinux.extraResources)).not.toContain('brain-core')
+    expect(JSON.stringify(miniLinux.extraResources)).not.toContain('brain-core-runtime')
+
+    expect(miniLinux.linux?.target).toEqual(['AppImage'])
+    expect(miniLinux.linux?.executableName).toBe('PomniaMini')
+    expect(miniLinux.linux?.artifactName).toBe('PomniaMini-linux-x64.${ext}')
+    expect(miniLinux.linux?.desktop?.Name).toBe('PomniaMini')
+    expect(miniLinux.linux?.desktop?.StartupWMClass).toBe('PomniaMini')
+
+    // Same asar file list as desktop. The staged runtime is the extraResources
+    // entry this config does not inherit, not the JS copy under files:.
+    const desktop = await getConfig(root, join(root, 'electron-builder.yml'), null)
+    expect(sources(miniLinux.files)).toEqual(sources(desktop.files))
+    await validateConfiguration(miniLinux, quietLog)
   })
 })
