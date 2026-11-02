@@ -8,6 +8,7 @@ import { AppLogo } from './AppLogo'
 import { Spinner } from './ui'
 import { api, isMock } from '../lib/api'
 import { uiLabels } from '../lib/labels'
+import { useBrainLink } from '../lib/useBrainLink'
 import { useStore, type Route } from '../store/useStore'
 
 const NAV_ICONS: Record<Route, typeof LayoutDashboard> = {
@@ -94,7 +95,8 @@ export function TitleBar() {
         )}
       </div>
 
-      <div className="no-drag flex shrink-0 items-center gap-1">
+      <div className="no-drag flex shrink-0 items-center gap-2">
+        <ConnectionChip />
         {isMock && (
           <span className="mr-2 rounded-full border border-amber/30 bg-amber/10 px-2 py-0.5 text-[10px] font-medium text-amber">
             preview
@@ -102,9 +104,9 @@ export function TitleBar() {
         )}
         {api.platform !== 'darwin' && (
           <>
-            <WinBtn onClick={() => api.minimize()}><Minus className="h-3.5 w-3.5" /></WinBtn>
-            <WinBtn onClick={() => api.toggleMaximize()}><Square className="h-3 w-3" /></WinBtn>
-            <WinBtn onClick={() => api.close()} danger><X className="h-3.5 w-3.5" /></WinBtn>
+            <WinBtn label={labels.winMinimize} onClick={() => api.minimize()}><Minus className="h-3.5 w-3.5" /></WinBtn>
+            <WinBtn label={labels.winMaximize} onClick={() => api.toggleMaximize()}><Square className="h-3 w-3" /></WinBtn>
+            <WinBtn label={labels.winClose} onClick={() => api.close()} danger><X className="h-3.5 w-3.5" /></WinBtn>
           </>
         )}
       </div>
@@ -112,9 +114,51 @@ export function TitleBar() {
   )
 }
 
-function WinBtn({ children, onClick, danger }: { children: React.ReactNode; onClick: () => void; danger?: boolean }) {
+function ConnectionChip() {
+  const labels = uiLabels()
+  const link = useBrainLink()
+  const where = link.where === 'local' ? labels.connWhereLocal : labels.connWhereRemote
+  const state =
+    link.phase === 'checking' ? labels.connChecking : link.phase === 'up' ? labels.connUp : labels.connDown
+  const role = link.role === 'admin' ? labels.connAdmin : link.role === 'standard' ? labels.connStandard : null
+  const text = link.phase === 'up' && role ? `${where} · ${role}` : `${where} · ${state}`
+  return (
+    <span
+      role="status"
+      aria-live="polite"
+      title={link.phase === 'up' && role ? `${text} · ${state}` : text}
+      className="inline-flex max-w-[15rem] items-center gap-1.5 rounded-full border border-white/10 bg-black/35 px-2 py-0.5"
+    >
+      <span
+        aria-hidden
+        className={clsx(
+          'h-1.5 w-1.5 shrink-0 rounded-full',
+          link.phase === 'up' && 'bg-mint',
+          link.phase === 'down' && 'bg-rose',
+          link.phase === 'checking' && 'bg-amber',
+        )}
+        style={link.phase === 'up' ? { boxShadow: '0 0 8px #34d399' } : undefined}
+      />
+      <span className="truncate text-[11px] font-medium text-ink">{text}</span>
+    </span>
+  )
+}
+
+function WinBtn({
+  children,
+  onClick,
+  danger,
+  label,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  danger?: boolean
+  label: string
+}) {
   return (
     <button
+      type="button"
+      aria-label={label}
       onClick={onClick}
       className={clsx(
         'flex h-7 w-9 items-center justify-center rounded-md text-ink-dim transition-colors',
@@ -153,6 +197,8 @@ export function Sidebar() {
         return (
           <button
             key={n.id}
+            type="button"
+            aria-current={active ? 'page' : undefined}
             onClick={() => setRoute(n.id)}
             className="no-drag relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors"
           >

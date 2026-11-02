@@ -88,6 +88,33 @@ export function Badge({ children, color = '#9aa3bd' }: { children: ReactNode; co
   )
 }
 
+/** A failed call to the Brain server, with the next place to fix it. */
+export function ServerErrorCard({
+  title,
+  detail,
+  actionLabel,
+  onAction,
+}: {
+  title: string
+  detail?: string
+  actionLabel?: string
+  onAction?: () => void
+}) {
+  return (
+    <GlassCard className="mb-4 shrink-0 border border-rose/30 p-5">
+      <div role="alert">
+        <p className="text-sm font-semibold text-rose">{title}</p>
+        {detail ? <p className="mt-1 text-xs leading-relaxed text-ink-dim">{detail}</p> : null}
+        {actionLabel && onAction ? (
+          <Button className="mt-3" variant="soft" onClick={onAction}>
+            {actionLabel}
+          </Button>
+        ) : null}
+      </div>
+    </GlassCard>
+  )
+}
+
 export function Spinner({ className }: { className?: string }) {
   return <Loader2 className={clsx('animate-spin', className)} />
 }

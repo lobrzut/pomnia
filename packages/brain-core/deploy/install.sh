@@ -83,6 +83,26 @@ cp -r "$SRC/dist" "$SRC/package.json" "$PREFIX/"
 chown -R root:root "$PREFIX"
 ok "installed to $PREFIX"
 
+# The server, the daemon usage text, and the docs all say `brain-core`.
+# Nothing else installed that command, so the 403 told operators to run a
+# program that was not on the machine. The wrapper pins the node, the prefix
+# and the data dir this install just chose — a printed `sudo -u … node …`
+# goes stale the moment any of those three is not the default, and it is
+# wrong inside Docker. Last `--data-dir` wins, so an explicit one still overrides.
+shell_quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+NODE_BIN="$(command -v node)"
+WRAPPER=/usr/local/bin/brain-core
+{
+  echo '#!/bin/sh'
+  echo 'set -eu'
+  echo "if [ \"\$(id -un)\" = $(shell_quote "$USER_NAME") ]; then"
+  echo "  exec $(shell_quote "$NODE_BIN") $(shell_quote "$PREFIX/dist/daemon.js") --data-dir $(shell_quote "$DATA") \"\$@\""
+  echo 'fi'
+  echo "exec sudo -u $(shell_quote "$USER_NAME") -- $(shell_quote "$NODE_BIN") $(shell_quote "$PREFIX/dist/daemon.js") --data-dir $(shell_quote "$DATA") \"\$@\""
+} > "$WRAPPER"
+chmod 755 "$WRAPPER"
+ok "brain-core command → $WRAPPER"
+
 # Tokens: generate one on first install, never regenerate. Rotating a token on
 # every upgrade would silently disconnect every agent that was working.
 TOKENS="$DATA/mcp-tokens.json"

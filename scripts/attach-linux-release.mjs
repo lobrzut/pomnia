@@ -12,11 +12,14 @@
  *   npm run attach:linux-release -- --tag v0.1.82
  *   npm run attach:linux-release -- --tag v0.1.82 --dry-run
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { formatReleaseCommit } from './lib/release-guard.ts'
+import { rewriteReleaseNotes } from './lib/release-notes.ts'
+import { preflightReleaseUpload } from './lib/release-preflight.ts'
 import {
   collectBrainCoreAssets,
   collectLinuxDesktopAssets,
@@ -75,14 +78,20 @@ if (dryRun) {
   process.exit(0)
 }
 
-try {
-  sh('gh', ['release', 'view', tag])
-} catch {
-  die(`release ${tag} does not exist — create a draft first (publish:release) or push the tag`)
-}
+const gate = preflightReleaseUpload({ cwd: root, tag, version })
+if (!gate.ok) die(gate.error)
+const commitFile = join(releaseDir, `pomnia-${version}.commit`)
+writeFileSync(commitFile, formatReleaseCommit(gate.head), 'utf8')
+assets.push(commitFile)
 
 sh('gh', ['release', 'upload', tag, ...assets, '--clobber'])
 console.log(`\n✔ uploaded Linux assets to ${tag}`)
+try {
+  rewriteReleaseNotes({ cwd: root, tag })
+  console.log('✔ release notes list every SHA-256 sidecar, in lowercase')
+} catch (e) {
+  die(e instanceof Error ? e.message : String(e))
+}
 console.log(
   `  next: when Windows, Pomnia Mini, macOS and brain-core are all present → npm run promote:release -- --tag ${tag}`,
 )

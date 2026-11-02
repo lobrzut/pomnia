@@ -993,7 +993,7 @@ export async function createBrainServer(
                       // not a missing role. Mentioning the token first sent
                       // users minting admin tokens they never needed.
                       hint:
-                        'agents connect to /mcp — this is the admin surface. If your MCP client is configured with a URL ending in /admin/mcp, drop the /admin. A genuine admin tool needs `brain-core --add-token <name> --role admin`.',
+                        'agents connect to /mcp — this is the admin surface. If your MCP client is configured with a URL ending in /admin/mcp, drop the /admin. A genuine admin tool needs `brain-core --add-token <name> --role admin` (install.sh and the container image put `brain-core` on PATH).',
                     }
                   : {
                       error: auth.reason === 'rate_limited' ? 'rate_limited' : 'unauthorized',
@@ -1425,7 +1425,7 @@ export async function createBrainServer(
             error: 'write_needs_admin',
             hint:
               `This instance owns the vault (${who}), so a push here writes the source of truth. ` +
-              'That needs an admin token: `brain-core --add-token <name> --role admin`. ' +
+              'That needs an admin token: `brain-core --add-token <name> --role admin` (install.sh and the container image put `brain-core` on PATH). ' +
               'An agent token can still push to a read-only replica, and may always pull via /sync/manifest + /sync/fetch.',
           })
         }
@@ -1542,7 +1542,7 @@ export async function createBrainServer(
               error: 'write_needs_admin',
               hint:
                 `This instance owns the vault (${who}), so archive writes need an admin token. ` +
-                '`brain-core --add-token <name> --role admin`.',
+                '`brain-core --add-token <name> --role admin` (install.sh and the container image put `brain-core` on PATH).',
             })
             return false
           }
@@ -1681,20 +1681,22 @@ export async function createBrainServer(
           // one, and the transport's own message is the accurate one.
           let parsedBody: unknown
           if (req.method === 'POST') {
+            const declared = Number(req.headers['content-length'])
+            // Refuse on the declared length before reading. Destroying the
+            // socket halfway through a multi-megabyte upload is what turned
+            // this 413 into ECONNRESET for the client — the status never left
+            // the server. A missing or lying Content-Length still hits the
+            // streaming cap below.
+            if (Number.isFinite(declared) && declared > MAX_MCP_BODY_BYTES) {
+              refuseOversizedMcp(req, res, MAX_MCP_BODY_BYTES)
+              return
+            }
             const chunks: Buffer[] = []
             let total = 0
             for await (const c of req) {
               total += (c as Buffer).length
               if (total > MAX_MCP_BODY_BYTES) {
-                res.statusCode = 413
-                res.setHeader('content-type', 'application/json')
-                res.end(
-                  JSON.stringify({
-                    error: 'payload_too_large',
-                    detail: `MCP body exceeds ${MAX_MCP_BODY_BYTES} bytes`,
-                  }),
-                )
-                req.destroy()
+                refuseOversizedMcp(req, res, MAX_MCP_BODY_BYTES)
                 return
               }
               chunks.push(c as Buffer)
@@ -1715,6 +1717,29 @@ export async function createBrainServer(
             res.end('internal error')
           }
         }
+      }
+
+      /**
+       * 413, then close. `res.end`'s callback runs after the status is flushed,
+       * so the client can read it before the socket goes away.
+       */
+      function refuseOversizedMcp(req: IncomingMessage, res: ServerResponse, limit: number): void {
+        if (res.headersSent || res.writableEnded) {
+          req.destroy()
+          return
+        }
+        const payload = JSON.stringify({
+          error: 'payload_too_large',
+          detail: `MCP body exceeds ${limit} bytes`,
+        })
+        res.writeHead(413, {
+          'content-type': 'application/json',
+          'content-length': Buffer.byteLength(payload),
+          connection: 'close',
+        })
+        res.end(payload, () => {
+          req.destroy()
+        })
       }
 
       try {

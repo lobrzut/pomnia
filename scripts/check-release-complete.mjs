@@ -20,8 +20,12 @@
  *   node scripts/check-release-complete.mjs --tag v0.1.82
  */
 import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import { assessReleaseAssets, versionFromTag } from './lib/release-assets.ts'
+import { unmetManifestClaims } from './lib/update-manifest.ts'
 
 const args = process.argv.slice(2)
 const tagIdx = args.indexOf('--tag')
@@ -72,6 +76,24 @@ console.log('')
 
 if (!tagArg && (release.draft || release.prerelease)) {
   die('the GitHub API returned a draft/prerelease as latest — that should be impossible')
+}
+
+for (const yml of ['latest.yml', 'latest-linux.yml', 'latest-mac.yml']) {
+  if (!names.includes(yml)) continue
+  const dir = mkdtempSync(join(tmpdir(), 'pomnia-yml-'))
+  try {
+    execFileSync('gh', ['release', 'download', release.tag_name, '--pattern', yml, '--dir', dir, '--clobber'], {
+      encoding: 'utf8',
+    })
+    const missing = unmetManifestClaims(readFileSync(join(dir, yml), 'utf8'), names)
+    if (missing.length) {
+      die(`${yml} names ${missing.join(', ')} but those files are not on the release`)
+    }
+  } catch (e) {
+    die(`could not read ${yml} on ${release.tag_name} — ${e.message}`)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 }
 
 if (!assessment.complete) {

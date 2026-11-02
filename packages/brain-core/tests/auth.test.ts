@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import type { IncomingMessage } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -140,6 +140,23 @@ describe('auth gate', () => {
 
     writeTokens(['old', 'btk_old'], ['new', 'btk_new'])
     clock += 5000 // past the 2s re-read guard
+    expect(await g.check(req('Bearer btk_new'))).toMatchObject({ ok: true, name: 'new' })
+  })
+
+  it('picks up a same-length replacement even when the mtime does not move', async () => {
+    writeTokens(['old', 'btk_old'])
+    const stamp = new Date('2026-09-13T08:30:00Z')
+    utimesSync(tokensFile, stamp, stamp)
+    let clock = 1_000_000
+    const g = gate('0.0.0.0', 20, () => clock)
+    expect(await g.check(req('Bearer btk_old'))).toMatchObject({ ok: true, name: 'old' })
+
+    // Same byte length, same timestamp. A gate that trusts mtime keeps the
+    // revoked token and never sees the new one.
+    writeTokens(['new', 'btk_new'])
+    utimesSync(tokensFile, stamp, stamp)
+    clock += 5000
+    expect(await g.check(req('Bearer btk_old'))).toMatchObject({ ok: false })
     expect(await g.check(req('Bearer btk_new'))).toMatchObject({ ok: true, name: 'new' })
   })
 

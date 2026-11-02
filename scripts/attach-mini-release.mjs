@@ -18,7 +18,10 @@ import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { collectMiniAssets, refreshMiniNotes, versionFromTag } from './lib/release-assets.ts'
+import { formatReleaseCommit } from './lib/release-guard.ts'
+import { rewriteReleaseNotes } from './lib/release-notes.ts'
+import { preflightReleaseUpload } from './lib/release-preflight.ts'
+import { collectMiniAssets, versionFromTag } from './lib/release-assets.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
@@ -53,7 +56,6 @@ if (!mini.present) {
   die(`missing release/mini/PomniaMini-${version}.zip — run npm run release:mini first`)
 }
 
-const assets = mini.assets
 console.log(`tag     ${tag}`)
 console.log(`version ${version}`)
 console.log(`dry-run ${dryRun}`)
@@ -71,37 +73,20 @@ if (dryRun) {
   process.exit(0)
 }
 
-try {
-  sh('gh', ['release', 'view', tag])
-} catch {
-  die(`release ${tag} does not exist — push the tag (CI creates it) or run publish:release`)
-}
+const gate = preflightReleaseUpload({ cwd: root, tag, version })
+if (!gate.ok) die(gate.error)
+const commitFile = join(root, 'release', `pomnia-${version}.commit`)
+writeFileSync(commitFile, formatReleaseCommit(gate.head), 'utf8')
+const assets = [...mini.assets, commitFile]
 
 sh('gh', ['release', 'upload', tag, ...assets, '--clobber'])
 console.log(`\n✔ uploaded Pomnia Mini zip to ${tag}`)
 
-{
-  const body = sh('gh', ['release', 'view', tag, '--json', 'body', '--jq', '.body'])
-  let commit = 'unknown'
-  try {
-    commit = sh('git', ['rev-parse', '--short', 'HEAD'])
-  } catch {
-    commit = 'unknown'
-  }
-  const next = refreshMiniNotes(body, {
-    version,
-    sizeMb: mini.sizeMb,
-    commit,
-    sha256: mini.sha256,
-  })
-  if (next === body) {
-    console.log('✔ release notes already name this Mini zip')
-  } else {
-    const notesFile = join(releaseDir, '.release-notes-mini.md')
-    writeFileSync(notesFile, next, 'utf8')
-    sh('gh', ['release', 'edit', tag, '--notes-file', notesFile])
-    console.log('✔ release notes now say to download the Mini zip')
-  }
+try {
+  rewriteReleaseNotes({ cwd: root, tag })
+  console.log('✔ release notes list every SHA-256 sidecar, in lowercase')
+} catch (e) {
+  die(e instanceof Error ? e.message : String(e))
 }
 
 try {

@@ -104,15 +104,22 @@ jobs:
           [ "$fail" = 0 ] || { echo "::error::built for ${{ matrix.arch }} but carries foreign binaries"; exit 1; }
           echo "all native modules are ${{ matrix.expect }}"
 
-      - name: SHA-256 checksum
+      - name: Seal checksums, manifest, and source commit
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+        run: npx tsx scripts/seal-release-dir.mjs
+
+      # Each arch emits latest-mac.yml for itself. Uploading both under that
+      # name keeps whichever job finishes last. The join job merges them.
+      - name: Name this arch's update manifest
         run: |
           set -euo pipefail
-          cd release
-          for f in *.dmg; do
-            [ -f "$f" ] || continue
-            shasum -a 256 "$f" | tee "${f}.sha256"
-          done
-          ls -lah *.dmg *.sha256 2>/dev/null || true
+          if [ -f release/latest-mac.yml ]; then
+            mv release/latest-mac.yml "release/latest-mac-${{ matrix.arch }}.yml"
+          else
+            echo "::error::electron-builder did not emit release/latest-mac.yml"
+            exit 1
+          fi
 
       - name: Upload Actions artifact
         uses: actions/upload-artifact@v4
@@ -121,6 +128,9 @@ jobs:
           path: |
             release/*.dmg
             release/*.sha256
+            release/*.blockmap
+            release/latest-mac-${{ matrix.arch }}.yml
+            release/pomnia-*.commit
           if-no-files-found: error
 
       # Uploading to Actions only meant the DMG existed somewhere nobody
@@ -133,8 +143,13 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
+          draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null || true)
+          if [ "$draft" = "false" ]; then
+            echo "refusing to modify published $TAG — cut the next version" >&2
+            exit 1
+          fi
           shopt -s nullglob
-          ASSETS=(release/*.dmg release/*.sha256)
+          ASSETS=(release/*.dmg release/*.sha256 release/*.blockmap release/pomnia-*.commit)
           if [ ${#ASSETS[@]} -eq 0 ]; then
             echo "No DMG to upload" >&2
             exit 1
@@ -149,3 +164,46 @@ jobs:
               --draft
             echo "Created draft release $TAG with the macOS DMG"
           fi
+
+  # One latest-mac.yml that lists both DMGs. electron-updater reads this name.
+  publish-mac-manifest:
+    needs: build-mac
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download per-arch manifests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pomnia-macos-*
+          path: mac-parts
+          merge-multiple: true
+      - name: Merge latest-mac.yml
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          npx tsx scripts/merge-mac-manifest.mjs mac-parts/latest-mac-arm64.yml mac-parts/latest-mac-x64.yml
+      - name: Attach the merged manifest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null || true)
+          if [ "$draft" = "false" ]; then
+            echo "refusing to modify published $TAG" >&2
+            exit 1
+          fi
+          gh release upload "$TAG" release/latest-mac.yml --clobber
+      - name: Promote if every platform is present
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx tsx scripts/promote-release.mjs --tag "${{ github.ref_name }}"

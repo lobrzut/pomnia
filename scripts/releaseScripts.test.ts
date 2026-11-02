@@ -96,6 +96,16 @@ describe('release scripts', () => {
     expect(pkg.scripts['attach:mini-release']).toBe('tsx scripts/attach-mini-release.mjs')
   })
 
+  it('writes release notes as a UTF-8 file', () => {
+    const publish = releaseScripts.find((s) => s.name === 'publish-release.mjs')!.text
+    const code = publish.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    expect(code).toContain('--notes-file')
+    expect(code).not.toMatch(/['"]--notes['"]/)
+    const notes = readFileSync(join(root, 'scripts', 'lib', 'release-notes.ts'), 'utf8')
+    expect(notes).toContain("'--notes-file'")
+    expect(notes).not.toContain("'--notes'")
+  })
+
   it('never forces a push or rewrites a tag', () => {
     for (const { name, text } of releaseScripts) {
       const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')

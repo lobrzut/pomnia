@@ -54,7 +54,9 @@ docker run -d --cpus 1.5 --memory 3g -p 7865:7865 \
 docker run --rm -v /srv/pomnia:/var/lib/pomnia pomnia/brain-core --add-token laptop       # agent token, printed once
 docker run --rm -i -v /srv/pomnia:/var/lib/pomnia pomnia/brain-core --add-user me --role admin  # panel account, password on stdin
 
-# Tarball install: the same flags on the `brain-core` command
+# Tarball install: install.sh puts `brain-core` on PATH (/usr/local/bin/brain-core).
+# It runs the daemon as the service user, with this install's data dir.
+# The container image has the same command for `docker exec`.
 brain-core --add-token laptop
 ```
 

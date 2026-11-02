@@ -60,6 +60,10 @@ describe('assessReleaseAssets', () => {
     'pomnia-brain-core-0.1.82-linux-x64.tar.gz.sha256',
     'PomniaMini-0.1.82.zip',
     'PomniaMini-0.1.82.zip.sha256',
+    'PomniaMini-win-x64.zip',
+    'PomniaMini-win-x64.zip.sha256',
+    'latest-mac.yml',
+    'pomnia-0.1.82.commit',
   ]
 
   it('passes a full version-matched set', () => {
@@ -126,12 +130,14 @@ describe('assessReleaseAssets', () => {
 })
 
 describe('SHA-256 sidecars', () => {
-  it('parses and formats uppercase hex', () => {
+  it('writes lowercase hex and accepts an uppercase sidecar', () => {
     const hex = 'A'.repeat(64)
+    expect(formatSha256Line(hex, 'a.bin')).toBe(`${'a'.repeat(64)}  a.bin\n`)
     expect(parseSha256Line(formatSha256Line(hex, 'a.bin'))).toEqual({
-      hex,
+      hex: 'a'.repeat(64),
       fileName: 'a.bin',
     })
+    expect(parseSha256Line(`${hex}  a.bin\n`)?.hex).toBe('a'.repeat(64))
   })
 
   it('refuses a stale sidecar next to a swapped binary (F18)', () => {
@@ -221,7 +227,7 @@ describe('refreshWindowsNotes', () => {
     // The v0.1.91 case: installer re-attached from 68680c9, notes still said 9855d40.
     const out = refreshWindowsNotes(staleBody(OLD), { version: '0.1.91', sizeMb: '145.65', commit: '68680c9', sha256: NEW })
     expect(out).toContain('145.65 MB · built from `68680c9`')
-    expect(out).toContain(NEW)
+    expect(out).toContain(NEW.toLowerCase())
     expect(out).not.toContain(OLD)
     expect(out).not.toContain('9855d40')
   })
@@ -237,7 +243,7 @@ describe('refreshWindowsNotes', () => {
     expect(out.startsWith('Linux-first draft from CI.')).toBe(true)
     expect(out).toContain('**Windows installer** · 150.00 MB · built from `abc1234`')
     expect(out).toContain('Get-FileHash Pomnia-0.1.92-setup.exe')
-    expect(out).toContain(NEW)
+    expect(out).toContain(NEW.toLowerCase())
   })
 
   it('is idempotent', () => {
@@ -248,7 +254,7 @@ describe('refreshWindowsNotes', () => {
 
   it('handles a body GitHub hands back with CRLF line endings', () => {
     const out = refreshWindowsNotes(staleBody(OLD).replace(/\n/g, '\r\n'), { version: '0.1.91', sizeMb: '145.65', commit: '68680c9', sha256: NEW })
-    expect(out).toContain(NEW)
+    expect(out).toContain(NEW.toLowerCase())
     expect(out).not.toContain(OLD)
   })
 })
@@ -271,6 +277,8 @@ describe('collectMiniAssets', () => {
     expect(r.assets.some((p) => p.endsWith(name))).toBe(true)
     expect(r.assets.some((p) => p.endsWith(`${name}.sha256`))).toBe(true)
     expect(r.sha256).toBe(computeSha256Hex('mini-bytes'))
+    expect(r.assets.some((p) => p.endsWith('PomniaMini-win-x64.zip'))).toBe(true)
+    expect(r.sha256).toMatch(/^[0-9a-f]{64}$/)
   })
 
   it('refuses a portable zip in place of the download', () => {
@@ -308,7 +316,7 @@ describe('refreshMiniNotes', () => {
     expect(out).toContain('unpack it once')
     expect(out).toContain('not the download')
     expect(out).toContain('Get-FileHash PomniaMini-0.1.91.zip')
-    expect(out).toContain(NEW)
+    expect(out).toContain(NEW.toLowerCase())
   })
 
   it('replaces the Mini hash and leaves the installer hash alone', () => {
@@ -319,9 +327,9 @@ describe('refreshMiniNotes', () => {
       sha256: NEW,
     })
     expect(out).toContain('91.25 MB · built from `bbbbbbb`')
-    expect(out).toContain(NEW)
+    expect(out).toContain(NEW.toLowerCase())
     expect(out).not.toContain(OLD)
-    expect(out).toContain(WIN)
+    expect(out).toContain(WIN.toLowerCase())
     expect(out).toContain('**Windows installer**')
   })
 

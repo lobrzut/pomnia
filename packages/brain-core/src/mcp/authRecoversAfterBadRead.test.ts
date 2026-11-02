@@ -8,14 +8,15 @@ import { afterEach, expect, it } from 'vitest'
 import { createAuthGate } from './auth.js'
 
 /**
- * The gate re-reads the token store only when its mtime moves. After a read it
- * could not parse, it cached "no tokens" against the mtime it had just seen —
- * so it refused every request, a refused request never touches the store, the
- * mtime never moved again, and the refusal never ended.
+ * After a read it could not parse, the gate must not remember that failure
+ * against the file's stamp. It used to cache "no tokens" against the mtime it
+ * had just seen — so it refused every request, a refused request never touches
+ * the store, the mtime never moved again, and the refusal never ended.
  *
  * That is the shape of the outage on 13 September 2026: a healthy server
  * answering 401 to every token for hours. Failing closed on a bad read is
  * right. Failing closed until someone happens to rewrite the file is an outage.
+ * A repair that lands in the same timestamp tick has to count too.
  */
 
 let dir = ''

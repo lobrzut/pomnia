@@ -6,7 +6,7 @@
 
 Pomnia Desktop (Windows / macOS / Linux) collects chats from assistants (Claude Code, Codex, Cursor, Claude Desktop, Antigravity, VS Code, Continue) **and** imports from exports (Claude.ai, ChatGPT, Gemini, Grok) plus documents (PDF, DOCX, EPUB) into one vault — with search (**Chats**), distill via Ollama, and Brain on `127.0.0.1:7862`.
 
-**Pomnia Mini** ships alongside it on the same GitHub Release: the same app with no vault of its own, talking to a Brain server you already run. It has Connect, Settings, Skills, Prompts and an ingest screen, and it is the build to reach for on a machine you do not want to leave a vault on. Download **`PomniaMini-<version>.zip`**, unpack it once, and run `PomniaMini.exe`. That zip is the Mini build. A portable `.exe` is a different file — it unpacks into `%TEMP%` on every launch, measured at about 70 seconds — and it is not the download.
+**Pomnia Mini** ships alongside it on the same GitHub Release. It does **not** keep a vault of its own: search, skills, prompts and replication live on a Brain server you already run, and a second encrypted store on the Mini machine would be a second copy to disagree with that server. What it does keep is its own user-data directory, `pomnia-mini` (settings, the admin token, ingest staging, logs), so it cannot overwrite a Desktop install beside it. The screens are Connect, Settings, Skills, Prompts and ingest. Download **`PomniaMini-win-x64.zip`** (stable name; the versioned file is `PomniaMini-<version>.zip`), unpack it once, and run `PomniaMini.exe`. A portable `.exe` is a different file — it unpacks into `%TEMP%` on every launch, measured at about 70 seconds — and it is not the download. Linux Mini is a separate pack and is not part of this tree until that work lands.
 
 I have run this on my own machines every working day since early 2026, and the vault
 behind this sentence holds 7269 indexed files across 8102 chunks as of 2026-09-10.
@@ -56,7 +56,7 @@ Caches (GPUCache, blob_storage, Crashpad, …) are skipped automatically. Creden
 ```
 src/core/            Engine — pure TS, Node + sql.js(WASM) + crypto
   vault.ts           Encrypted, content-addressed store (AES-256-GCM + scrypt)
-  adapters/          claudeCode · cursor · profile(snapshot)
+  adapters/          claudeCode · codex · cursor · antigravity · profile(snapshot)
   backup.ts          Backup orchestration
   brain/             Distill · localIndex · deploy (Ollama)
 packages/brain-core/ Embedded Brain (MCP :7862) bundled with Desktop
@@ -68,7 +68,7 @@ src/renderer/        UI: React + Tailwind + Framer Motion
 
 ## Desktop user guide
 
-> [docs/START-HERE.md](docs/START-HERE.md) · historical audit snapshot: [docs/AUDYT-POMNIA-2026-07-09.md](docs/AUDYT-POMNIA-2026-07-09.md)
+> [docs/START-HERE.md](docs/START-HERE.md) · historical audit snapshot: [docs/archive/AUDYT-POMNIA-2026-07-09.md](docs/archive/AUDYT-POMNIA-2026-07-09.md)
 
 **In the app:** encrypted vault, adapter backup, ZIP/JSON + PDF/DOCX/EPUB import, embedded brain-core (MCP `:7862`), distill via Ollama, **How it works** / **Connect** tabs, tray + diagnostics in Settings.
 
@@ -133,7 +133,13 @@ npm run attach:mini-release
 
 Mac: `npm run pack:mac` (local). Releases: [GitHub Releases](https://github.com/lobrzut/pomnia/releases).
 
-Logs: `%AppData%/Pomnia/logs/` (Windows).
+Logs (Desktop / Mini), under Electron's app-data directory:
+
+| | Desktop | Mini |
+|---|---|---|
+| Windows | `%AppData%\pomnia\logs\` | `%AppData%\pomnia-mini\logs\` |
+| macOS | `~/Library/Application Support/pomnia/logs/` | `~/Library/Application Support/pomnia-mini/logs/` |
+| Linux | `~/.config/pomnia/logs/` | `~/.config/pomnia-mini/logs/` |
 
 ---
 
@@ -215,7 +221,7 @@ Rules: [SECURITY.md](SECURITY.md).
 - [x] Conversation browser (**Chats**) — full-text without GPU
 - [x] Brain pipeline Collect→Distill→Index (CLI + GUI)
 - [ ] Map-reduce for very long conversations
-- [ ] Incremental backup by mtime
+- [x] Incremental backup by mtime — a file whose mtime and size match the previous snapshot is reused (`src/core/backup.ts`); the search index skips unchanged files the same way
 - [ ] Cloud vault sync (git-remote / S3 / WebDAV) — not shipped. Copying a vault between your own machines is self-hosted replica (brain-core), not cloud sync — [docs/LINUX-SELF-HOSTED.md](docs/LINUX-SELF-HOSTED.md)
 - [ ] Backup schedules (CLI + Task Scheduler / launchd)
 - [ ] Signed installers

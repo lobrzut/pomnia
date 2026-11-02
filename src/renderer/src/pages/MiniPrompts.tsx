@@ -23,7 +23,7 @@ import type { RemotePrompt } from '@core/brain/remoteSkills'
 import { isSafePromptName } from '@core/brain/remoteSkills'
 import { referenceForAgent } from '@core/brain/agentReference'
 
-import { Button, GlassCard, Spinner } from '../components/ui'
+import { Button, GlassCard, ServerErrorCard, Spinner } from '../components/ui'
 import { AgentPickBar, ListRow, ListSection } from '../components/EntityList'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { api } from '../lib/api'
@@ -160,14 +160,16 @@ export default function MiniPrompts() {
       </div>
 
       {error && (
-        <GlassCard className="mb-4 shrink-0 p-5">
-          <p className="text-xs text-amber">{labels.skillsRemoteReason(error.code)}</p>
-          {(error.code === 'unauthorized' || error.code === 'no-token') && (
-            <Button className="mt-3" variant="soft" onClick={() => setRoute('settings')}>
-              {labels.navSettings}
-            </Button>
-          )}
-        </GlassCard>
+        <ServerErrorCard
+          title={labels.skillsRemoteReason(error.code)}
+          detail={error.detail}
+          actionLabel={
+            error.code === 'unauthorized' || error.code === 'no-token' ? labels.navConnect : undefined
+          }
+          onAction={
+            error.code === 'unauthorized' || error.code === 'no-token' ? () => setRoute('connect') : undefined
+          }
+        />
       )}
 
       {open ? (

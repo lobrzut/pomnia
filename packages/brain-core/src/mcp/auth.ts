@@ -16,10 +16,12 @@
  *   [ { "name": "claude-code-laptop", "token": "btk_…", "created": "…" }, … ]
  *
  * The file is re-read on change, so tokens can be added or revoked without a
- * restart — revocation that needs a restart tends not to happen.
+ * restart — revocation that needs a restart tends not to happen. The look is
+ * at the bytes, not the mtime: a same-second rewrite (and some filesystems
+ * only stamp whole seconds) must still be picked up.
  */
 import { createHash, timingSafeEqual } from 'node:crypto'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import type { IncomingMessage } from 'node:http'
 
 import { clientAddress } from './clientAddress.js'
@@ -109,26 +111,28 @@ export function createAuthGate(opts: AuthGateOptions): AuthGate {
   const trustedProxies = opts.trustedProxies ?? []
 
   let cached: TokenEntry[] = []
-  let cachedMtimeMs = -1
+  let cachedDigest = ''
   let checkedAt = 0
 
   async function loadTokens(): Promise<TokenEntry[]> {
     const t = now()
-    // Cheap guard so a burst of requests does not stat() per request.
+    // Cheap guard so a burst of requests does not read the file per request.
     if (t - checkedAt < 2000) return cached
     checkedAt = t
-    let mtimeMs: number
+    let raw: string
     try {
-      mtimeMs = (await stat(opts.tokensFile)).mtimeMs
+      raw = await readFile(opts.tokensFile, 'utf8')
     } catch {
       cached = []
-      cachedMtimeMs = -1
+      cachedDigest = ''
       return cached
     }
-    if (mtimeMs === cachedMtimeMs) return cached
+    const digest = createHash('sha256').update(raw).digest('hex')
+    // Same bytes as last time: skip the parse. A new token of the same length
+    // does not move every filesystem's mtime, so size and mtime are not enough.
+    if (digest === cachedDigest && cachedDigest !== '') return cached
     try {
-      const raw = await readFile(opts.tokensFile, 'utf8')
-      const parsed = JSON.parse(raw.replace(/^﻿/, '')) as unknown
+      const parsed = JSON.parse(raw.replace(/^\uFEFF/, '')) as unknown
       cached = Array.isArray(parsed)
         ? parsed
             .filter((e): e is TokenEntry => !!e && typeof e === 'object' && typeof (e as TokenEntry).token === 'string')
@@ -140,18 +144,19 @@ export function createAuthGate(opts: AuthGateOptions): AuthGate {
               role: (e as { role?: unknown }).role === 'admin' ? 'admin' : 'agent',
             }))
         : []
-      cachedMtimeMs = mtimeMs
+      cachedDigest = digest
     } catch {
       // Unreadable or malformed: treat as "no tokens", i.e. deny everything.
       // Failing open here would turn a typo into an open MCP server.
       //
-      // But do not remember the mtime. Caching the refusal against it meant the
-      // gate looked again only once the file changed, and with every request
-      // refused nothing changed it: a healthy server answering 401 to every
-      // token until someone rewrote the store. Leaving it unset retries on the
-      // next stat, two seconds later, still closed while the store stays bad.
+      // Do not remember the digest. Caching the refusal against the bytes meant
+      // the gate looked again only once the file changed, and with every
+      // request refused nothing changed it: a healthy server answering 401 to
+      // every token until someone rewrote the store. Leaving it unset retries
+      // on the next read, two seconds later, still closed while the store stays
+      // bad — including when a repair lands without moving the mtime.
       cached = []
-      cachedMtimeMs = -1
+      cachedDigest = ''
     }
     return cached
   }

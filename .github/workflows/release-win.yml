@@ -1,0 +1,100 @@
+name: Release Windows (installer + Mini zip)
+
+# Same tag as Linux and macOS. The installer is packed from that commit,
+# not from whatever happens to be checked out on a developer machine later.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-win:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build workspace packages
+        run: npm run build:brain-core && npm run build:doc-parser
+
+      - name: Pack the Windows installer
+        env:
+          # Empty on purpose: a GH_TOKEN here makes electron-builder publish
+          # on its own, with --notes, which is the path that mojibaked v0.1.91.
+          GH_TOKEN: ''
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          GOLDEN_PATH_SKIP: '1'
+          USE_HARD_LINKS: 'false'
+        run: npm run build:win
+
+      - name: Pack Pomnia Mini zip
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          USE_HARD_LINKS: 'false'
+        run: npm run release:mini -- --pack-only
+
+      - name: Seal checksums, manifest, and source commit
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+        run: npx tsx scripts/seal-release-dir.mjs
+
+      - name: Attach to GitHub Release (tag pushes)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null || true)
+          if [ "$draft" = "false" ]; then
+            echo "refusing to modify published $TAG — cut the next version"
+            exit 1
+          fi
+          shopt -s nullglob
+          ASSETS=(
+            release/Pomnia-*-setup.exe
+            release/Pomnia-*-setup.exe.blockmap
+            release/Pomnia-*-setup.exe.sha256
+            release/latest.yml
+            release/pomnia-*.commit
+            release/PomniaMini-win-x64.zip
+            release/PomniaMini-win-x64.zip.sha256
+            release/mini/PomniaMini-*.zip
+            release/mini/PomniaMini-*.zip.sha256
+            release/mini/*.zip.blockmap
+          )
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "No Windows assets to upload"
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+          else
+            NOTES="$(mktemp)"
+            printf '%s\n' "Windows installer and Pomnia Mini, built from ${GITHUB_SHA}. Other platforms attach from their tag jobs. Notes are rewritten as UTF-8 when the release is promoted." > "$NOTES"
+            gh release create "$TAG" "${ASSETS[@]}" \
+              --title "Pomnia ${TAG#v}" \
+              --notes-file "$NOTES" \
+              --draft
+          fi
+
+      - name: Promote if every platform is present
+        if: startsWith(github.ref, 'refs/tags/')
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx tsx scripts/promote-release.mjs --tag "${{ github.ref_name }}"
