@@ -33,6 +33,7 @@ import {
 import { log } from '@core/index.js'
 
 import { getAppSettings } from './appSettings.js'
+import { adminToken } from './brainTokens.js'
 
 /**
  * A minute is short enough that the user learns before the next conversation,
@@ -53,7 +54,7 @@ export function healthWatchState(): HealthState {
 async function probe(): Promise<HealthState> {
   const s = getAppSettings()
   const url = (s.brainMcpUrl ?? '').trim()
-  const token = (s.replicaToken ?? '').trim() || (s.connectToken ?? '').trim()
+  const token = adminToken(s)
 
   if (!url) return classify({ hasTarget: false, hasToken: !!token })
   if (!token) return classify({ hasTarget: true, hasToken: false })

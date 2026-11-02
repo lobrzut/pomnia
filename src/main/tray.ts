@@ -20,9 +20,12 @@ let tray: Tray | null = null
 
 /** Filenames tried in order. Darwin uses a color brand PNG outside asar (not Template). */
 export function trayFileNames(platform: NodeJS.Platform): string[] {
-  return platform === 'darwin'
-    ? ['trayIcon.png']
-    : ['icon.ico', 'icon.png', 'trayIcon.png']
+  if (platform === 'darwin') return ['trayIcon.png']
+  // Linux: nativeImage cannot decode .ico, so icon.ico (found inside app.asar)
+  // gave an empty image and the getFileIcon fallback threw "Failed to get file
+  // icon" — no tray at all. Prefer the PNGs there.
+  if (platform === 'linux') return ['trayIcon.png', 'icon.png']
+  return ['icon.ico', 'icon.png', 'trayIcon.png']
 }
 
 export function traySearchDirs(resourcesPath: string, appPath: string): string[] {

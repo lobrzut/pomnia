@@ -1229,7 +1229,7 @@ const PL_LABELS: UiLabels = {
   vaultReplicaFailed: 'Replikacja nieudana',
   vaultReplicaUrl: 'Adres repliki',
   vaultReplicaLegacyToken:
-    'Ten vault trzyma osobny, stary token repliki ze starszej wersji. Nie jest już używany — synchronizacja bierze token admina z panelu Brain wyżej. Usuń go, żeby nie mylił.',
+    'Zapisany token admina jest używany do zapisu (synchronizacja, zachowanie serwera). Pole wyżej to token agenta do konfiguracji MCP. Usuń zapisany token tylko wtedy, gdy serwer go odrzuca — wtedy te akcje wrócą do pola wyżej.',
   vaultReplicaTokenSaved: 'Token repliki zapisany',
   vaultReplicaTokenSaveAction: 'Zapisz token',
   vaultReplicaTokenClearAction: 'Usuń',
@@ -1237,7 +1237,7 @@ const PL_LABELS: UiLabels = {
   vaultReplicaAuto: 'Wysyłaj automatycznie po destylacji',
   vaultReplicaAutoHint:
     'Nieudana próba nie zniknie po cichu — wynik jest zawsze zapisany i widoczny niżej.',
-  vaultReplicaTokenOwn: 'Synchronizacja używa tokena admina z panelu Brain.',
+  vaultReplicaTokenOwn: 'Synchronizacja używa zapisanego tokena admina.',
   vaultReplicaTokenBorrowed:
     'Brak własnego tokena repliki — wysyłka użyje tokena Connect, który jest tokenem agenta ' +
     'i nie ma prawa zapisu. Serwer odrzuci ją z błędem o roli admina. Nie podnoś roli tokena ' +
@@ -2326,14 +2326,14 @@ const EN_LABELS: UiLabels = {
   vaultReplicaFailed: 'Replication failed',
   vaultReplicaUrl: 'Replica address',
   vaultReplicaLegacyToken:
-    'This vault still holds a separate replica token from an older build. It is no longer used — syncing takes the admin token from the Brain panel above. Clear it so it stops confusing things.',
+    'The stored admin token is what writes use (sync, server behaviour). The field above is the agent token that goes into MCP configs. Clear the stored token only if the server no longer accepts it — those actions then fall back to the field.',
   vaultReplicaTokenSaved: 'Replica token saved',
   vaultReplicaTokenSaveAction: 'Save token',
   vaultReplicaTokenClearAction: 'Clear',
   vaultReplicaTokenCleared: 'Replica token cleared',
   vaultReplicaAuto: 'Push automatically after distillation',
   vaultReplicaAutoHint: 'A failed attempt is recorded and shown below — it never disappears quietly.',
-  vaultReplicaTokenOwn: 'Syncing uses the admin token from the Brain panel.',
+  vaultReplicaTokenOwn: 'Syncing uses the stored admin token.',
   vaultReplicaTokenBorrowed:
     'No replica token set — push will fall back to the Connect token, which is an agent ' +
     'token and cannot write. The server refuses it with an admin-role error. Do not raise the ' +

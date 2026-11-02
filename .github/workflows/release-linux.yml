@@ -202,7 +202,8 @@ jobs:
 
       # pack:linux calls electron-builder with no --config, so it loads
       # electron-builder.yml (desktop layer, embeds resources/brain-core).
-      # Mini is Windows-only and uses electron-builder.mini.yml.
+      # Mini Linux is electron-builder.mini-linux.yml (AppImage, no embedded
+      # Brain) and is not what this job packs.
       - name: Build Linux AppImage + deb
         run: |
           rm -rf release/linux-unpacked release/*.AppImage release/*.deb release/latest-linux.yml || true

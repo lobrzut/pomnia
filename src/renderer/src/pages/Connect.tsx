@@ -489,14 +489,11 @@ export default function Connect() {
   }
 
   /**
-   * Store a new replica token.
+   * Clear the stored admin token.
    *
-   * Until this existed the panel could say a token was set and offer no way to
-   * replace it, which is worse than having no token at all: main prefers the
-   * stored `replicaToken` over anything the renderer passes, so once the stored
-   * one was revoked server-side every sync failed with 401 and nothing the user
-   * could reach would change it. Pasting a fresh token elsewhere did not help —
-   * the dead one still won.
+   * Writes prefer it over the field. After a paste the field is an agent token
+   * and cannot push; this stored token is the one that can. Clearing a revoked
+   * one is what lets the field be tried instead.
    */
   async function saveReplicaToken(token: string) {
     const next = token.trim()
@@ -839,7 +836,7 @@ export default function Connect() {
         {effectiveTarget === 'remote' && (
           <div className="mt-2">
             <p className="text-[11px] text-ink-faint">
-              {replica?.hasToken ? labels.tokenHaveAdmin : labels.tokenNoAdmin}
+              {replica?.hasToken || tokenState === 'admin' ? labels.tokenHaveAdmin : labels.tokenNoAdmin}
             </p>
             {/* Saved and accepted are different facts, and only the second one
                 predicts whether anything on the other screens will work. */}
@@ -1299,11 +1296,9 @@ export default function Connect() {
             />
           </Field>
 
-          {/* One token, not two. Replication now uses the Brain admin token from
-              the panel above; the only thing left to offer here is a way out of
-              a legacy `replicaToken` that an older build stored and could not
-              replace — the state that made every sync answer 401 with nothing
-              on screen able to fix it. */}
+          {/* The field above is the agent token. Writes use the admin token stored
+              in main. Clearing it is the way out of one the server has revoked —
+              until then it wins, and a fresh paste in the field changes nothing. */}
           {replica?.hasToken && (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber/25 bg-amber/10 px-3.5 py-2.5">
               <p className="min-w-0 flex-1 text-[11px] leading-snug text-amber-100">
