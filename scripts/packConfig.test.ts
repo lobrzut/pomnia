@@ -152,7 +152,7 @@ describe('electron-builder flavour configs', () => {
 
     expect(miniLinux.linux?.target).toEqual(['AppImage'])
     expect(miniLinux.linux?.executableName).toBe('PomniaMini')
-    expect(miniLinux.linux?.artifactName).toBe('${productName}-${version}.${ext}')
+    expect(miniLinux.linux?.artifactName).toBe('PomniaMini-linux-x64.${ext}')
     expect(miniLinux.linux?.desktop?.Name).toBe('PomniaMini')
     expect(miniLinux.linux?.desktop?.StartupWMClass).toBe('PomniaMini')
 

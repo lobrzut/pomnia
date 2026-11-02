@@ -202,8 +202,6 @@ jobs:
 
       # pack:linux calls electron-builder with no --config, so it loads
       # electron-builder.yml (desktop layer, embeds resources/brain-core).
-      # Mini Linux is electron-builder.mini-linux.yml (AppImage, no embedded
-      # Brain) and is not what this job packs.
       - name: Build Linux AppImage + deb
         run: |
           rm -rf release/linux-unpacked release/*.AppImage release/*.deb release/latest-linux.yml || true
@@ -215,6 +213,20 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
           # Avoid EEXIST hardlink collisions when canvas is listed both as an
           # explicit files: copy and as a resolved dependency (Linux CI).
+          USE_HARD_LINKS: 'false'
+
+      # Mini AppImage. Own config (no embedded Brain), stable file name so
+      # pomnia.ai can link releases/latest/download/PomniaMini-linux-x64.AppImage.
+      # Stays under release/mini/ — collectLinuxDesktopAssets only reads
+      # release/ and would treat a versionless AppImage there as a foreign file.
+      - name: Build Mini Linux AppImage
+        run: |
+          rm -rf release/mini
+          npm run build:mini:linux
+          test -f release/mini/PomniaMini-linux-x64.AppImage
+        env:
+          GOLDEN_PATH_SKIP: '1'
+          CSC_IDENTITY_AUTO_DISCOVERY: false
           USE_HARD_LINKS: 'false'
 
       # The server had no artifact at all. .AppImage and .deb are the desktop
@@ -299,7 +311,9 @@ jobs:
             [ -f "$f" ] || continue
             sha256sum "$f" | tee "${f}.sha256"
           done
-          ls -lah *.AppImage *.deb *.tar.gz *.sha256 2>/dev/null || true
+          test -f mini/PomniaMini-linux-x64.AppImage
+          ( cd mini && sha256sum PomniaMini-linux-x64.AppImage | tee PomniaMini-linux-x64.AppImage.sha256 )
+          ls -lah *.AppImage *.deb *.tar.gz *.sha256 mini/PomniaMini-linux-x64.AppImage mini/*.sha256 2>/dev/null || true
 
       - name: Upload Actions artifacts
         uses: actions/upload-artifact@v4
@@ -311,6 +325,8 @@ jobs:
             release/*.tar.gz
             release/*.sha256
             release/latest-linux.yml
+            release/mini/PomniaMini-linux-x64.AppImage
+            release/mini/PomniaMini-linux-x64.AppImage.sha256
           if-no-files-found: error
 
       - name: Attach to GitHub Release (tag pushes)
@@ -322,6 +338,7 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           shopt -s nullglob
           ASSETS=(release/*.AppImage release/*.deb release/*.tar.gz release/*.sha256)
+          ASSETS+=(release/mini/PomniaMini-linux-x64.AppImage release/mini/PomniaMini-linux-x64.AppImage.sha256)
           if [ -f release/latest-linux.yml ]; then
             ASSETS+=(release/latest-linux.yml)
           fi
@@ -339,7 +356,7 @@ jobs:
             # undrafts after check-release-complete passes.
             gh release create "$TAG" "${ASSETS[@]}" \
               --title "Pomnia ${TAG#v}" \
-              --notes "Linux desktop app (AppImage/deb, unsigned) and the self-hosted server tarball (pomnia-brain-core-*-linux-x64.tar.gz). Windows installer may follow via publish:release." \
+              --notes "Linux desktop app (AppImage/deb, unsigned), Pomnia Mini (PomniaMini-linux-x64.AppImage), and the self-hosted server tarball (pomnia-brain-core-*-linux-x64.tar.gz). Windows installer may follow via publish:release." \
               --draft
             echo "Created DRAFT release $TAG with Linux assets (promote when complete)"
           fi
